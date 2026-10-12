@@ -130,8 +130,10 @@ class DepartmentWorkController extends Controller
         $params = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'selected_id' => ['nullable', 'integer'],
+            'include_completed' => ['nullable', 'boolean'],
         ]);
         $term = trim($params['q'] ?? '');
+        $includeCompleted = $request->boolean('include_completed');
         $base = fn () => ProjectJob::query()
             ->where('company_id', $viewer->company_id)
             ->where(function ($query) use ($viewer) {
@@ -141,6 +143,8 @@ class DepartmentWorkController extends Controller
                     ->orWhereHas('teamMembers', fn ($q) => $q->where('user_id', $viewer->id))
                     ->orWhereHas('projectJobAssignments', fn ($q) => $q->where('user_id', $viewer->id));
             });
+        $searchable = fn () => $base()->when(! $includeCompleted,
+            fn ($query) => $query->where('completed', false));
         $matching = function ($query) use ($term) {
             if ($term === '') return;
             foreach (preg_split('/\s+/u', $term) as $word) {
@@ -152,9 +156,9 @@ class DepartmentWorkController extends Controller
                 });
             }
         };
-        $fields = ['id', 'title', 'jobcode', 'client_id', 'show_on_department_schedule'];
+        $fields = ['id', 'title', 'jobcode', 'client_id', 'completed', 'show_on_department_schedule'];
         $load = fn ($query) => $query->with('client:id,name')->get($fields);
-        $team = $load($base()->whereHas('teamMembers', fn ($q) => $q->where('user_id', $viewer->id))
+        $team = $load($searchable()->whereHas('teamMembers', fn ($q) => $q->where('user_id', $viewer->id))
             ->when($term !== '', $matching)->orderBy('completed')->orderByDesc('updated_at')->limit(10));
 
         $recentIds = PersonalWorkEntry::where('user_id', $viewer->id)->whereNotNull('project_job_id')
@@ -163,10 +167,10 @@ class DepartmentWorkController extends Controller
             ->merge(ProjectJobAssignment::where('user_id', $viewer->id)->whereNotNull('project_job_id')
                 ->orderByDesc('created_at')->limit(100)->pluck('project_job_id'))
             ->unique()->take(20)->values();
-        $recent = $recentIds->isEmpty() ? collect() : $load($base()->whereIn('id', $recentIds)
+        $recent = $recentIds->isEmpty() ? collect() : $load($searchable()->whereIn('id', $recentIds)
             ->when($term !== '', $matching)->limit(20))->sortBy(fn ($project) => $recentIds->search($project->id))->values();
 
-        $others = $term === '' ? collect() : $load($base()->whereNotIn('id', $team->pluck('id')->merge($recent->pluck('id')))
+        $others = $term === '' ? collect() : $load($searchable()->whereNotIn('id', $team->pluck('id')->merge($recent->pluck('id')))
             ->where($matching)->orderBy('completed')->orderByDesc('updated_at')->limit(20));
         $selected = empty($params['selected_id']) ? collect() : $load($base()->whereKey($params['selected_id']));
         $projects = $selected->concat($team)->concat($recent)->concat($others)->unique('id')->take(30)
@@ -176,6 +180,7 @@ class DepartmentWorkController extends Controller
                     'title' => $project->title,
                     'jobcode' => $project->jobcode,
                     'client_name' => $project->client?->name,
+                    'completed' => (bool) $project->completed,
                     'group' => $team->contains('id', $project->id) ? 'team'
                         : ($recent->contains('id', $project->id) ? 'recent' : 'search'),
                 ];
@@ -292,7 +297,7 @@ class DepartmentWorkController extends Controller
             'period' => $params['period'],
             'start' => $start->toDateString(), 'end' => $end->toDateString(),
             'excluded_count' => $allUsers->count() - $users->count(),
-            'score_version' => 'trial_time_v1',
+            'score_version' => 'trial_time_v2',
             'point_rule' => [
                 'points_per_hour' => PersonalWorkPoints::POINTS_PER_HOUR,
                 'default_coefficient' => PersonalWorkPoints::DEFAULT_COEFFICIENT,
@@ -325,7 +330,7 @@ class DepartmentWorkController extends Controller
         $user = $request->user();
         abort_unless($this->schedule->available($user) && (int) $entry->user_id === (int) $user->id, 403);
         abort_if($entry->source_event_id, 422);
-        $data = $this->validatedEntry($request, $user);
+        $data = $this->validatedEntry($request, $user, in_array($entry->plan_slot, ['am', 'pm', 'full'], true));
         abort_if($entry->diary_id && $entry->work_date->toDateString() !== $data['work_date'], 422, '日報へ取り込んだ作業の日付は変更できません。');
         $entry->update($data);
         return response()->json(['id' => $entry->id]);
@@ -340,13 +345,13 @@ class DepartmentWorkController extends Controller
         return response()->noContent();
     }
 
-    private function validatedEntry(Request $request, User $user): array
+    private function validatedEntry(Request $request, User $user, bool $allowLegacySlot = false): array
     {
         $data = $request->validate([
             'work_date' => ['required', 'date_format:Y-m-d'],
             'work_category' => ['required', Rule::in(['shinko', 'eigyo', 'dtp', 'kousei', 'jimu', 'other'])],
             'activity_type' => ['nullable', Rule::in(PersonalWorkActivities::codes())],
-            'plan_slot' => ['required', Rule::in(['am', 'pm', 'full', 'hour'])],
+            'plan_slot' => ['required', Rule::in($allowLegacySlot ? ['am', 'pm', 'full', 'hour'] : ['hour'])],
             'planned_start_time' => ['required_if:plan_slot,hour', 'nullable', 'date_format:H:i'],
             'planned_end_time' => ['required_if:plan_slot,hour', 'nullable', 'date_format:H:i', 'after:planned_start_time'],
             'title' => ['nullable', 'string', 'max:255'],
@@ -364,10 +369,12 @@ class DepartmentWorkController extends Controller
         $data['actual_minutes'] = $this->schedule->plannedMinutes(
             new PersonalWorkEntry($data), $this->schedule->workWindow($user, $data['work_date'])
         );
+        if (! $data['actual_minutes']) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'planned_end_time' => '開始時刻と終了時刻を指定してください。',
+            ]);
+        }
         if (filled($data['result_note'] ?? null)) {
-            if (blank($data['activity_type'] ?? null) || ! $data['actual_minutes']) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['result_note' => '結果を記録する場合は作業種類と有効な予定時間を指定してください。']);
-            }
             $data['result_note'] = trim($data['result_note']);
         }
         if (! PersonalWorkActivities::allows($data['work_category'], $data['activity_type'] ?? null)) {
@@ -376,13 +383,6 @@ class DepartmentWorkController extends Controller
         if ($data['plan_slot'] !== 'hour') {
             $data['planned_start_time'] = null;
             $data['planned_end_time'] = null;
-        } else {
-            foreach (['planned_start_time', 'planned_end_time'] as $field) {
-                [$hour, $minute] = array_map('intval', explode(':', $data[$field]));
-                if ($minute % 15 !== 0) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([$field => '15分単位で指定してください。']);
-                }
-            }
         }
         if (! empty($data['project_job_id'])) {
             $permitted = ProjectJob::whereKey($data['project_job_id'])

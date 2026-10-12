@@ -169,7 +169,8 @@ onUnmounted(() => window.clearInterval(clockInterval));
             </TooltipProvider>
             <div v-if="selectedPerson" class="p-4">
                 <h4 class="font-semibold">{{ selectedPerson.name }}の予定・結果</h4>
-                <div v-if="Object.keys(selectedPerson.results || {}).length" class="mt-2 flex flex-wrap gap-1 text-xs">
+                <div v-if="Object.keys(selectedPerson.results || {}).length" class="mt-2 flex flex-wrap items-center gap-1 text-xs">
+                    <span class="text-gray-600">進みメモ：</span>
                     <span v-for="(result, category) in selectedPerson.results" :key="category" class="rounded bg-blue-50 px-2 py-1 text-blue-900">{{ categoryName(category) }} {{ result.count }}件<span v-for="(quantity, unit) in result.quantities" :key="unit" class="ml-1">・{{ quantity }}{{ unit }}</span></span>
                 </div>
                 <p v-if="!selectedPerson.items.length" class="mt-2 text-sm text-gray-500">予定はまだありません。</p>
@@ -178,7 +179,8 @@ onUnmounted(() => window.clearInterval(clockInterval));
                         <span class="mr-2 rounded bg-gray-100 px-2 py-0.5 text-xs">{{ kindName(item) }}</span>
                         <strong>{{ item.title }}</strong>
                         <span class="ml-2 text-gray-500">{{ itemTime(item) }}</span>
-                        <p v-if="item.result_note" class="mt-1 text-gray-700">{{ item.result_note }}<span v-if="item.activity_type" class="ml-2 text-blue-700">{{ activityLabel(item.activity_type, item.work_category) }}</span><span v-if="item.actual_minutes !== null" class="ml-2 text-gray-500">{{ duration(item.actual_minutes) }}</span><span v-if="item.actual_quantity !== null" class="ml-2 text-gray-500">{{ item.actual_quantity }} {{ item.actual_unit }}</span></p>
+                        <p v-if="item.result_note" class="mt-1 text-gray-700">{{ item.result_note }}</p>
+                        <p v-if="item.activity_type || item.actual_quantity !== null" class="mt-1 text-xs text-gray-600"><span v-if="item.activity_type" class="text-blue-700">{{ activityLabel(item.activity_type, item.work_category) }}</span><span v-if="item.actual_quantity !== null" class="ml-2">{{ item.actual_quantity }} {{ item.actual_unit }}</span></p>
                     </li>
                 </ul>
             </div>

@@ -33,8 +33,7 @@ class PersonalWorkPoints
 
     public static function points(PersonalWorkEntry $entry): float
     {
-        if (! filled($entry->result_note) || ! filled($entry->activity_type)
-            || ! PersonalWorkActivities::allows($entry->work_category, $entry->activity_type)
+        if (! PersonalWorkActivities::allows($entry->work_category, $entry->activity_type)
             || (int) $entry->actual_minutes <= 0) {
             return 0.0;
         }

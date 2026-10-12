@@ -23,14 +23,11 @@ use App\Services\WorkloadTrialAnalysis;
 
 class DiaryController extends Controller
 {
-    private function workReminder(User $user, string $date, array $candidates): ?array
+    private function workReminder(User $user, string $date): ?array
     {
         $schedule = app(PersonalWorkSchedule::class);
         if (! $schedule->available($user)) return null;
 
-        $unfinishedPlans = collect($candidates)
-            ->filter(fn ($row) => ! empty($row['entry_id']) && ! ($row['ready'] ?? false))
-            ->count();
         $window = $schedule->workWindow($user, $date);
         // 勤務形態が未設定の試用者は、A日程の7時間30分を目安として案内する。
         $expectedMinutes = $window
@@ -47,14 +44,13 @@ class DiaryController extends Controller
         }
         $missingMinutes = $expectedMinutes > 0 && $date <= now('Asia/Tokyo')->toDateString()
             ? $expectedMinutes - $recordedMinutes : 0;
-        if ($missingMinutes < 30 && $unfinishedPlans === 0) return null;
+        if ($missingMinutes < 30) return null;
 
         return [
             'date' => $date,
             'scheduled_minutes' => $expectedMinutes,
             'recorded_minutes' => $recordedMinutes,
             'missing_minutes' => $missingMinutes,
-            'unfinished_plans' => $unfinishedPlans,
             'approximate' => $window === null,
         ];
     }
@@ -255,7 +251,7 @@ class DiaryController extends Controller
             'defaultWorktypeId'  => $defaultWorktypeId,
             'workCandidates'     => $workCandidates,
             'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
-            'workReminder' => $this->workReminder($user, $date, $workCandidates),
+            'workReminder' => $this->workReminder($user, $date),
         ]);
     }
 
@@ -431,7 +427,7 @@ class DiaryController extends Controller
             ] : null,
             'workCandidates' => $workCandidates,
             'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
-            'workReminder' => $this->workReminder($user, $dateStr, $workCandidates),
+            'workReminder' => $this->workReminder($user, $dateStr),
         ]);
     }
 

@@ -14,14 +14,11 @@ const duration = (minutes) => {
             <div>
                 <strong class="font-semibold">この日の作業記録を確認してください</strong>
                 <p v-if="reminder.missing_minutes >= 30" class="mt-1">
-                    {{ reminder.approximate ? 'A日程を仮に使った勤務時間の目安' : '通常勤務枠' }} {{ duration(reminder.scheduled_minutes) }} のうち、点数に反映される記録は
+                    {{ reminder.approximate ? 'A日程を仮に使った勤務時間の目安' : '通常勤務枠' }} {{ duration(reminder.scheduled_minutes) }} のうち、予定表に記録された時間は
                     {{ duration(reminder.recorded_minutes) }}。記録のない時間が {{ duration(reminder.missing_minutes) }} あります。
                 </p>
-                <p v-if="reminder.unfinished_plans" class="mt-1">
-                    結果または作業種類が未入力の簡易予定が {{ reminder.unfinished_plans }} 件あります。
-                </p>
                 <p class="mt-1 text-xs text-amber-800">
-                    未記録の時間や未完成の簡易予定は、暫定ポイントに反映されません。実際に行った差配・進行確認などもカレンダーで追記できます。日報はこのまま保存できます。
+                    必要ならカレンダーで予定を追加・修正してください。日報はこのまま保存できます。
                 </p>
                 <p v-if="reminder.approximate" class="mt-1 text-xs text-amber-800">勤務形態が未設定のため、空き時間は作業記録の合計から推定しています。</p>
             </div>

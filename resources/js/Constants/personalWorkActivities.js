@@ -9,7 +9,9 @@ const commonActivities = [
     ['internal_improvement', '社内改善・システム開発'],
 ];
 
-export const analysisActivityLabels = { my_job: 'マイジョブ・依頼ジョブ', outing: '業務外出・訪問' };
+export const analysisActivityLabels = {
+    my_job: 'マイジョブ・依頼ジョブ', outing: '業務外出・訪問', unspecified: '作業種類未指定',
+};
 
 export const workActivities = {
     dtp: [['new_creation', '新規作成'], ['revision', '修正'], ['data_preparation', 'データ整備'], ['delivery_check', '納品チェック'], ...commonActivities],

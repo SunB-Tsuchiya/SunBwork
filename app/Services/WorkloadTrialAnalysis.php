@@ -33,16 +33,17 @@ class WorkloadTrialAnalysis
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
         $startDate = $start->toDateString();
         $endDate = $end->toDateString();
+        $now = now('Asia/Tokyo');
+        $today = $now->toDateString();
+        $currentTime = $now->format('H:i:s');
         $userById = $users->keyBy('id');
         $entries = PersonalWorkEntry::query()
             ->where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
             ->whereIn('user_id', $userIds)
             ->whereBetween('work_date', [$startDate, $endDate])
-            ->where('work_date', '<=', now('Asia/Tokyo')->toDateString())
+            ->where('work_date', '<=', $today)
             ->where('actual_minutes', '>', 0)
-            ->whereNotNull('activity_type')->where('activity_type', '!=', '')
-            ->whereNotNull('result_note')->whereRaw('TRIM(result_note) <> ?', [''])
             ->with([
                 'projectJob.coordinators:id',
                 'projectJob:id,title,company_id,user_id,show_on_department_schedule',
@@ -95,6 +96,7 @@ class WorkloadTrialAnalysis
             if (! $user) continue;
             $date = $entry->work_date->toDateString();
             $key = 'quick-'.$entry->id;
+            $activity = $entry->activity_type ?: 'unspecified';
             if ($entry->source_event_id && $entry->sourceEvent) {
                 $from = $this->resolveJstCarbon($entry->sourceEvent, 'starts_at');
                 $to = $this->resolveJstCarbon($entry->sourceEvent, 'ends_at');
@@ -102,9 +104,12 @@ class WorkloadTrialAnalysis
             } else {
                 $range = $this->schedule->slotInterval($entry, $this->schedule->workWindow($user, $date));
             }
+            if ($range && $date === $today) {
+                $range[1] = min($range[1], $now->hour * 60 + $now->minute);
+            }
             if (! $range || $range[1] <= $range[0]) continue;
             $intervals[$entry->user_id][$date][] = $this->item(
-                $key, $range, $entry->work_category, $entry->activity_type,
+                $key, $range, $entry->work_category, $activity,
                 $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent)
             );
             $recordKeys[$entry->user_id][$key] = true;
@@ -117,16 +122,15 @@ class WorkloadTrialAnalysis
                 ? $this->jobUnitReference($assignment)
                 : ($entry->project_job_id ? 'project-'.$entry->project_job_id
                     : 'title-'.mb_strtolower(trim((string) ($entry->title ?: $entry->id))));
-            $workUnits[$entry->user_id][$date.'|'.$entry->work_category.'|'.$entry->activity_type.'|'.$reference] = true;
+            $workUnits[$entry->user_id][$date.'|'.$entry->work_category.'|'.$activity.'|'.$reference] = true;
             if ($entry->actual_quantity !== null && filled($entry->actual_unit)) {
-                $group = $entry->work_category.'|'.$entry->activity_type;
+                $group = $entry->work_category.'|'.$activity;
                 $unit = trim($entry->actual_unit);
                 $quickQuantities[$entry->user_id][$group][$unit] =
                     ($quickQuantities[$entry->user_id][$group][$unit] ?? 0) + (float) $entry->actual_quantity;
             }
         }
 
-        $now = now('Asia/Tokyo');
         foreach ($events as $event) {
             $from = $this->resolveJstCarbon($event, 'starts_at');
             $to = $this->resolveJstCarbon($event, 'ends_at');
@@ -184,17 +188,29 @@ class WorkloadTrialAnalysis
             ->groupBy('created_by_user_id');
         $activityStart = $start->copy()->subDays(15)->toDateTimeString();
         $activityEnd = $end->copy()->addDays(2)->endOfDay()->toDateTimeString();
+        $quickActivityQuery = PersonalWorkEntry::query()->whereNotNull('project_job_id')
+            ->where('company_id', $viewer->company_id)
+            ->whereNull('source_event_id')
+            ->whereNotNull('plan_slot')
+            ->whereBetween('work_date', [$start->copy()->subDays(14)->toDateString(), $endDate])
+            ->where('actual_minutes', '>', 0)
+            ->where(function ($query) use ($today, $currentTime) {
+                $query->where('work_date', '<', $today)
+                    ->orWhere(function ($sameDay) use ($today, $currentTime) {
+                        $sameDay->where('work_date', $today)
+                            ->where(function ($started) use ($currentTime) {
+                                $started->where('plan_slot', '!=', 'hour')
+                                    ->orWhere('planned_start_time', '<', $currentTime);
+                            });
+                    });
+            });
         $activeProjectIds = DB::table('events as e')
             ->join('project_job_assignments as a', 'a.id', '=', 'e.project_job_assignment_id')
             ->join('project_jobs as p', 'p.id', '=', 'a.project_job_id')
             ->where('p.company_id', $viewer->company_id)
             ->whereBetween('e.starts_at', [$activityStart, $activityEnd])
             ->whereNotNull('a.project_job_id')->distinct()->pluck('a.project_job_id')
-            ->merge(PersonalWorkEntry::query()->whereNotNull('project_job_id')
-                ->where('company_id', $viewer->company_id)
-                ->whereBetween('work_date', [$start->copy()->subDays(14)->toDateString(), $endDate])
-                ->whereNotNull('result_note')->whereRaw('TRIM(result_note) <> ?', [''])
-                ->distinct()->pluck('project_job_id'))
+            ->merge((clone $quickActivityQuery)->distinct()->pluck('project_job_id'))
             ->unique()->values()->all();
         $managedProjects = ProjectJob::query()->where('company_id', $viewer->company_id)
             ->whereIn('id', $activeProjectIds)
@@ -221,9 +237,7 @@ class WorkloadTrialAnalysis
                 $projectId = $event->projectJobAssignment?->project_job_id;
                 if ($projectId) $activityDates[$projectId][$from->toDateString()] = true;
             }
-            $teamEntries = PersonalWorkEntry::query()->whereIn('project_job_id', $managedIds)
-                ->whereBetween('work_date', [$start->copy()->subDays(14)->toDateString(), $endDate])
-                ->whereNotNull('result_note')->whereRaw('TRIM(result_note) <> ?', [''])
+            $teamEntries = (clone $quickActivityQuery)->whereIn('project_job_id', $managedIds)
                 ->get(['project_job_id', 'work_date']);
             foreach ($teamEntries as $entry) {
                 $activityDates[$entry->project_job_id][$entry->work_date->toDateString()] = true;

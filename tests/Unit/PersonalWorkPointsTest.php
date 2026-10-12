@@ -8,14 +8,15 @@ use PHPUnit\Framework\TestCase;
 
 class PersonalWorkPointsTest extends TestCase
 {
-    public function test_plan_without_a_result_has_no_points_even_with_a_time_slot(): void
+    public function test_recorded_minutes_count_without_an_optional_result_or_activity(): void
     {
         $entry = new PersonalWorkEntry([
-            'work_category' => 'dtp', 'activity_type' => 'new_creation',
-            'plan_slot' => 'full', 'actual_minutes' => 480,
+            'work_category' => 'dtp', 'plan_slot' => 'hour',
+            'planned_start_time' => '09:00', 'planned_end_time' => '10:00',
+            'actual_minutes' => 60,
         ]);
 
-        $this->assertSame(0.0, PersonalWorkPoints::points($entry));
+        $this->assertSame(10.0, PersonalWorkPoints::points($entry));
     }
 
     public function test_proof_heavy_and_light_have_simple_visible_coefficients(): void

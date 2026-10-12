@@ -4,7 +4,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import { workCategories, workActivities, activityLabel } from '@/Constants/personalWorkActivities';
-import { evColor } from '@/Composables/useEventTypeColors';
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
 const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
@@ -17,11 +16,7 @@ const pointRule = ref({ points_per_hour: 10, default_coefficient: 1, coefficient
 const includeCreation = ref(true);
 const includeOvertime = ref(true);
 const includeManagement = ref(true);
-const plannedPeople = ref([]);
-const planLoading = ref(false);
-const planError = ref('');
 let loadSequence = 0;
-let planSequence = 0;
 
 const categoryName = (value) => workCategories.find(([key]) => key === value)?.[1] || 'その他';
 const activityColors = {
@@ -45,9 +40,6 @@ const roleColor = (code) => roleColors[code] || roleColors.other;
 const visibleRoles = computed(() => [...new Set(people.value.map((person) => person.role?.code || 'other'))]
     .map((code) => ({ code, ...roleColor(code) })));
 const chipStyle = (color) => ({ backgroundColor: color.bg, color: color.text, borderColor: color.border });
-const plannedChipStyle = (item) => chipStyle(item.private
-    ? { bg: '#f3f4f6', text: '#4b5563', border: '#d1d5db' }
-    : evColor(item));
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ''}`;
 const totalRecords = computed(() => people.value.reduce((sum, person) => sum + Number(person.records || 0), 0));
 const totalMinutes = computed(() => people.value.reduce((sum, person) => sum + Number(person.minutes || 0), 0));
@@ -101,8 +93,6 @@ watch(activityOptions, (options) => {
     if (!options.some((option) => option.key === selectedActivityKey.value)) selectedActivityKey.value = options[0]?.key || '';
 });
 const rangeLabel = computed(() => range.value || date.value);
-const pendingPlans = (personId) => plannedPeople.value.find((person) => person.id === personId)?.items
-    ?.filter((item) => !item.result_note) || [];
 
 async function load() {
     const sequence = ++loadSequence;
@@ -123,25 +113,8 @@ async function load() {
     }
 }
 
-async function loadPlans() {
-    const sequence = ++planSequence;
-    plannedPeople.value = [];
-    planError.value = '';
-    if (period.value !== 'day') return;
-    planLoading.value = true;
-    try {
-        const { data } = await axios.get(route('schedule.department_work.index'), { params: { date: date.value } });
-        if (sequence === planSequence) plannedPeople.value = data.people || [];
-    } catch {
-        if (sequence === planSequence) planError.value = '予定を読み込めませんでした。';
-    } finally {
-        if (sequence === planSequence) planLoading.value = false;
-    }
-}
-
 watch([date, period], load);
-watch([date, period], loadPlans);
-onMounted(() => { load(); loadPlans(); });
+onMounted(load);
 </script>
 
 <template>
@@ -151,7 +124,7 @@ onMounted(() => { load(); loadPlans(); });
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h3 class="font-semibold">作業実績の内訳</h3>
-                    <p class="mt-1 text-xs text-gray-500">結果を記録した簡易作業と、過去のジョブ・仕事の会議を集計します。未記録は作業ゼロを意味しません。非公開の作業は本人以外の内訳に含めません。</p>
+                    <p class="mt-1 text-xs text-gray-500">時刻を記録した簡易作業と、過去のジョブ・仕事の会議を集計します。未記録は作業ゼロを意味しません。非公開の作業は本人以外の内訳に含めません。</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
                     <input v-model="date" type="date" aria-label="集計日" class="rounded border px-2 py-1" />
@@ -163,13 +136,13 @@ onMounted(() => { load(); loadPlans(); });
             <p class="mt-2 text-xs text-gray-500">対象：{{ rangeLabel }} <span v-if="loading">読み込み中...</span></p>
             <p v-if="error" class="mt-2 text-sm text-red-700" role="alert">{{ error }}</p>
             <div v-else class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">結果を記録した人</div><div class="text-xl font-semibold">{{ recordedPeople }} / {{ people.length }}人</div></div>
-                <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">認定実績</div><div class="text-xl font-semibold">{{ totalRecords }}件</div></div>
+                <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">時間記録のある人</div><div class="text-xl font-semibold">{{ recordedPeople }} / {{ people.length }}人</div></div>
+                <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">記録件数</div><div class="text-xl font-semibold">{{ totalRecords }}件</div></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">記録された作業時間</div><div class="text-xl font-semibold">{{ duration(totalMinutes) }}</div></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">案件登録</div><div class="text-xl font-semibold">{{ totalCreatedProjects }}件</div></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">作業記録のない残業</div><div class="text-xl font-semibold">{{ duration(totalUnrecordedOvertime) }}</div></div>
             </div>
-            <p class="mt-2 text-xs text-gray-500">簡易予定は結果文と作業種類が揃った場合だけ認定します。過去のジョブ予定・仕事の会議も時間に含め、同じ時間帯の重複は分けて数えます。ページ数は点数や順位に使いません。</p>
+            <p class="mt-2 text-xs text-gray-500">簡易作業は開始・終了時刻から集計します。進み・作業種類の記入は任意です。過去のジョブ予定・仕事の会議も時間に含め、重複時間と昼休憩を除きます。ページ数は点数や順位に使いません。</p>
             <div v-if="!error" class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600" aria-label="担当ごとのグラフ色">
                 <span v-for="role in visibleRoles" :key="role.code" class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" :style="{ backgroundColor: role.bar }"></span>{{ role.label }}</span>
             </div>
@@ -185,6 +158,7 @@ onMounted(() => { load(); loadPlans(); });
                 <details class="mt-2 text-xs text-gray-600">
                     <summary class="cursor-pointer text-amber-900">仮係数を見る</summary>
                     <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        <div><strong>作業種類未指定</strong><div>標準 ×{{ pointRule.default_coefficient }}</div></div>
                         <div v-for="[category, label] in workCategories" :key="category">
                             <strong>{{ label }}</strong>
                             <div v-for="[code, name] in workActivities[category]" :key="code">{{ name }} ×{{ pointRule.coefficients?.[code] ?? pointRule.default_coefficient }}</div>
@@ -237,13 +211,6 @@ onMounted(() => { load(); loadPlans(); });
                             <span v-for="(quantity, unit) in activity.quantities" :key="unit" class="ml-1">・{{ quantity }}{{ unit }}</span>
                         </span>
                         </div>
-                    </div>
-                    <div v-if="period === 'day'" class="text-xs text-gray-600">
-                        <span class="font-medium">結果未入力の予定：</span>
-                        <span v-if="planLoading">読み込み中...</span>
-                        <span v-else-if="planError">{{ planError }}</span>
-                        <span v-else-if="!pendingPlans(person.id).length">なし</span>
-                        <span v-for="item in pendingPlans(person.id)" :key="`${item.source}-${item.id}`" class="mr-1 inline-block rounded border px-2 py-0.5" :style="plannedChipStyle(item)">{{ item.title }}</span>
                     </div>
                 </div>
                 </div>
