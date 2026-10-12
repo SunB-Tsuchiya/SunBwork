@@ -51,12 +51,18 @@ class DepartmentWorkController extends Controller
     {
         $viewer = $request->user();
         abort_unless($this->schedule->available($viewer), 403);
-        $date = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString();
+        $params = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $date = $params['date'] ?? now()->toDateString();
 
         $users = User::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
+            ->when(isset($params['user_id']), fn ($query) => $query->whereKey($params['user_id']))
             ->with(['assignment:id,code', 'userSetting'])
             ->ordered()->get(['id', 'name', 'company_id', 'department_id', 'assignment_id', 'sort_order']);
+        abort_if(isset($params['user_id']) && $users->isEmpty(), 404);
         $userIds = $users->pluck('id')->all();
         $entries = PersonalWorkEntry::whereIn('user_id', $userIds)
             ->whereDate('work_date', $date)
@@ -269,6 +275,7 @@ class DepartmentWorkController extends Controller
         $params = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
             'period' => ['required', Rule::in(['day', 'week', 'month', 'quarter'])],
+            'user_id' => ['nullable', 'integer', 'min:1'],
         ]);
         $day = Carbon::createFromFormat('!Y-m-d', $params['date'], 'Asia/Tokyo');
         $start = match ($params['period']) {
@@ -292,6 +299,11 @@ class DepartmentWorkController extends Controller
             return ($user->employmentSetting?->ranking_included ?? $default)
                 && ($user->employmentSetting?->workload_tracked ?? $default);
         })->values();
+        $individual = isset($params['user_id']);
+        if ($individual) {
+            $users = $users->filter(fn (User $user) => (int) $user->id === (int) $params['user_id'])->values();
+            abort_if($users->isEmpty(), 404);
+        }
 
         return response()->json([
             'period' => $params['period'],
@@ -308,7 +320,7 @@ class DepartmentWorkController extends Controller
                 'management_points_per_active_day' => WorkloadTrialAnalysis::MANAGEMENT_POINTS_PER_ACTIVE_DAY,
                 'deputy_factor' => WorkloadTrialAnalysis::DEPUTY_FACTOR,
             ],
-            'people' => $this->trial->analyze($viewer, $users, $start, $end),
+            'people' => $this->trial->analyze($viewer, $users, $start, $end, $individual),
         ]);
     }
 

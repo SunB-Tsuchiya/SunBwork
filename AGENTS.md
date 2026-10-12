@@ -11,6 +11,29 @@ This file contains workspace-specific instructions for Codex. Read it before mak
 - For non-trivial work, summarize the approach, affected files, and verification plan before implementation.
 - `CLAUDE.md` is maintained for Claude. Do not edit it unless the user explicitly asks.
 
+## Long-Running Project Handoffs
+
+- For the work-record, calendar-input, and workload-evaluation redesign, read
+  `z_instructions/JOB_EVALUATION_CONTROL1.md` first, then the current PLAN,
+  MANAGER, and PROMPT files it identifies. Older plans remain historical evidence;
+  a newer user decision can supersede them.
+- At each handoff, compare the working files with the latest available committed
+  versions and recent conversation records when accessible. A `/tmp` worktree may
+  have disappeared, and an untracked file in the main worktree may be older than
+  `origin/main`. State the revision and evidence used; never infer a screen check
+  from a successful build or deploy.
+- Record each material user decision, correction, and suggestion in the project
+  control file in the same work session. Label it as confirmed, proposed, deferred,
+  or superseded; name what it replaces and the next decision or verification needed.
+  Do not silently promote a suggestion into a requirement or drop one because it
+  is outside the current implementation phase.
+- Keep implementation, deployment, code verification, user screen verification,
+  and manager/lead review as separate states. Update the current manager and restart
+  prompt after a milestone, with dated evidence and one explicit next step. Before
+  asking the user to repeat a check, read that evidence.
+- If earlier chat records are unavailable, say so and use only the documented
+  evidence. Do not claim to have reviewed a past conversation that was not read.
+
 ## Project Overview
 
 SunBWork is an internal member management site for a printing/typesetting company. Core features include project job assignment, progress management, diaries, workload analysis, messages, files, and calendars.

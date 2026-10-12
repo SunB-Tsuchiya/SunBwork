@@ -1,6 +1,6 @@
 <script setup>
 import axios from 'axios';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import { workCategories, workActivities, activityLabel } from '@/Constants/personalWorkActivities';
@@ -16,7 +16,14 @@ const pointRule = ref({ points_per_hour: 10, default_coefficient: 1, coefficient
 const includeCreation = ref(true);
 const includeOvertime = ref(true);
 const includeManagement = ref(true);
+const selectedPersonId = ref(null);
+const selectedPerson = ref(null);
+const personSchedule = ref([]);
+const personLoading = ref(false);
+const personError = ref('');
+const closeButton = ref(null);
 let loadSequence = 0;
+let personSequence = 0;
 
 const categoryName = (value) => workCategories.find(([key]) => key === value)?.[1] || 'その他';
 const activityColors = {
@@ -41,6 +48,12 @@ const visibleRoles = computed(() => [...new Set(people.value.map((person) => per
     .map((code) => ({ code, ...roleColor(code) })));
 const chipStyle = (color) => ({ backgroundColor: color.bg, color: color.text, borderColor: color.border });
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ''}`;
+const itemName = (item) => ({ quick_work: '簡易予定', my_job: 'マイジョブ', assigned_job: '依頼ジョブ' })[item.kind] || '予定';
+const clockFromMinutes = (minutes) => minutes == null ? '—' : `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+const eventClock = (value) => value ? (value.slice(0, 10) === date.value ? value.slice(11, 16) : value.slice(0, 16)) : '—';
+const itemStart = (item) => item.source === 'entry' ? clockFromMinutes(item.timeline_start_minute) : eventClock(item.starts_at);
+const itemEnd = (item) => item.source === 'entry' ? clockFromMinutes(item.timeline_end_minute) : eventClock(item.ends_at);
+const orderedSchedule = computed(() => [...personSchedule.value].sort((a, b) => itemStart(a).localeCompare(itemStart(b), 'ja')));
 const totalRecords = computed(() => people.value.reduce((sum, person) => sum + Number(person.records || 0), 0));
 const totalMinutes = computed(() => people.value.reduce((sum, person) => sum + Number(person.minutes || 0), 0));
 const visiblePoints = (person) => Number(person.base_points || 0)
@@ -113,7 +126,42 @@ async function load() {
     }
 }
 
-watch([date, period], load);
+function closePerson() {
+    personSequence++;
+    selectedPersonId.value = null;
+    selectedPerson.value = null;
+    personSchedule.value = [];
+    personError.value = '';
+    personLoading.value = false;
+}
+
+async function openPerson(person) {
+    const sequence = ++personSequence;
+    selectedPersonId.value = person.id;
+    nextTick(() => closeButton.value?.focus());
+    selectedPerson.value = null;
+    personSchedule.value = [];
+    personError.value = '';
+    personLoading.value = true;
+    try {
+        const requests = [axios.get(route('schedule.department_work.analysis'), {
+            params: { date: date.value, period: period.value, user_id: person.id },
+        })];
+        if (period.value === 'day') requests.push(axios.get(route('schedule.department_work.index'), { params: { date: date.value, user_id: person.id } }));
+        const [analysisResponse, scheduleResponse] = await Promise.all(requests);
+        if (sequence !== personSequence) return;
+        selectedPerson.value = analysisResponse.data.people?.[0] || null;
+        personSchedule.value = scheduleResponse?.data.people?.find((row) => Number(row.id) === Number(person.id))?.items
+            ?.filter((item) => !item.private) || [];
+        if (!selectedPerson.value) personError.value = 'この担当者の詳細を表示できません。';
+    } catch {
+        if (sequence === personSequence) personError.value = '詳細を読み込めませんでした。';
+    } finally {
+        if (sequence === personSequence) personLoading.value = false;
+    }
+}
+
+watch([date, period], () => { closePerson(); load(); });
 onMounted(load);
 </script>
 
@@ -168,7 +216,7 @@ onMounted(load);
                 <div class="mt-3 space-y-2">
                     <div v-for="(row, index) in pointRows" :key="row.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_4rem] items-center gap-2 text-sm">
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
-                        <span class="truncate font-medium" :title="`${row.name}（${row.role?.label || 'その他'}）`"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</span>
+                        <button type="button" class="truncate text-left font-medium text-blue-800 underline underline-offset-2" :title="`${row.name}の詳細を表示`" @click="openPerson(row)"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</button>
                         <div class="h-5 overflow-hidden rounded bg-white"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
                         <span class="text-right font-semibold tabular-nums" :title="`適用中：作業 ${pointLabel(row.base_points)}／残業 ${pointLabel(includeOvertime ? row.overtime_points : 0)}／登録 ${pointLabel(includeCreation ? row.creation_points : 0)}／管理 ${pointLabel(includeManagement ? row.management_points : 0)}`">{{ pointLabel(visiblePoints(row)) }}点</span>
                     </div>
@@ -185,7 +233,7 @@ onMounted(load);
                 <div class="mt-3 space-y-2">
                     <div v-for="(row, index) in rankingRows" :key="row.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_5.5rem] items-center gap-2 text-sm">
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
-                        <span class="truncate font-medium" :title="`${row.name}（${row.role?.label || 'その他'}）`"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</span>
+                        <button type="button" class="truncate text-left font-medium text-blue-800 underline underline-offset-2" :title="`${row.name}の詳細を表示`" @click="openPerson(row)"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</button>
                         <div class="h-5 overflow-hidden rounded bg-gray-100"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
                         <span class="text-right tabular-nums">{{ duration(row.value) }}<small class="ml-1 text-gray-500">{{ row.records }}件</small></span>
                     </div>
@@ -197,7 +245,7 @@ onMounted(load);
                 <div class="grid items-start gap-3 lg:grid-cols-2">
                 <div v-for="person in people" :key="person.id" class="min-w-0 space-y-2 rounded-lg border border-gray-200 p-3 text-sm">
                     <div>
-                        <strong>{{ person.name }}</strong>
+                        <button type="button" class="font-semibold text-blue-800 underline underline-offset-2" :aria-label="`${person.name}の詳細を表示`" @click="openPerson(person)">{{ person.name }}</button>
                         <span class="ml-2 rounded px-1.5 py-0.5 text-xs" :style="{ backgroundColor: roleColor(person.role?.code).chip, color: roleColor(person.role?.code).bar }">{{ person.role?.label || 'その他' }}</span>
                         <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}` : '公開範囲内の認定時間なし' }}／作業 {{ pointLabel(person.base_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
                     </div>
@@ -216,5 +264,63 @@ onMounted(load);
                 </div>
             </div>
         </section>
+        <Teleport to="body">
+            <div v-if="selectedPersonId !== null" class="fixed inset-0 z-[2200] flex items-center justify-center bg-black/50 p-3 sm:p-6" @click.self="closePerson" @keydown.esc="closePerson">
+                <div role="dialog" aria-modal="true" aria-label="担当者の作業詳細" tabindex="-1" class="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold">{{ selectedPerson?.name || '担当者' }}の作業詳細</h2>
+                            <p class="text-sm text-gray-600">{{ rangeLabel }}・{{ { day: '日', week: '週', month: '月' }[period] }}別</p>
+                        </div>
+                        <button ref="closeButton" type="button" class="rounded border px-3 py-1 text-sm hover:bg-gray-50" @click="closePerson">閉じる</button>
+                    </div>
+                    <p v-if="personLoading" class="mt-5 text-sm text-gray-600">読み込み中...</p>
+                    <p v-else-if="personError" class="mt-5 text-sm text-red-700" role="alert">{{ personError }}</p>
+                    <template v-else-if="selectedPerson">
+                        <div class="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                            <div class="rounded border bg-slate-50 p-3">記録件数 <strong class="ml-2">{{ selectedPerson.records }}件</strong></div>
+                            <div class="rounded border bg-slate-50 p-3">集計された作業時間 <strong class="ml-2">{{ duration(selectedPerson.minutes) }}</strong></div>
+                            <div class="rounded border bg-slate-50 p-3">暫定作業点 <strong class="ml-2">{{ pointLabel(selectedPerson.base_points) }}点</strong></div>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-600">集計時間は昼休憩と重複時間を除きます。予定表にある時間の単純な合計とは異なる場合があります。暫定点は正式な人事評価ではありません。</p>
+                        <div class="mt-4 flex flex-wrap gap-2 text-xs">
+                            <span v-for="[source, label] in [['quick', '簡易予定'], ['my_job', 'マイジョブ'], ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出']]" :key="source" class="rounded border bg-gray-50 px-2 py-1">{{ label }} {{ selectedPerson.source_counts?.[source] || 0 }}件</span>
+                        </div>
+                        <div v-if="selectedPerson.activities?.length" class="mt-3 flex flex-wrap gap-2 text-xs">
+                            <span v-for="activity in selectedPerson.activities" :key="`${activity.work_category}-${activity.activity_type}`" class="rounded border px-2 py-1" :style="chipStyle(activityColors[activity.work_category] || activityColors.other)">
+                                {{ categoryName(activity.work_category) }}／{{ activity.activity_type ? activityLabel(activity.activity_type, activity.work_category) : '旧記録' }}：{{ duration(activity.minutes) }}・{{ activity.records }}件
+                            </span>
+                        </div>
+                        <div v-if="period === 'day'" class="mt-5">
+                            <h3 class="font-semibold">その日の時刻表と内容</h3>
+                            <p class="mt-1 text-xs text-gray-600">集計対象外の予定も含む予定表の表示です。非公開の内容は表示しません。</p>
+                            <p v-if="!orderedSchedule.length" class="mt-3 rounded border p-3 text-sm text-gray-600">表示できる予定はありません。</p>
+                            <div v-else class="mt-3 space-y-2">
+                                <div v-for="item in orderedSchedule" :key="`${item.source}-${item.id}`" class="grid gap-2 rounded border p-3 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]">
+                                    <div class="font-medium tabular-nums">{{ itemStart(item) }}〜{{ itemEnd(item) }}</div>
+                                    <div>
+                                        <div class="flex flex-wrap items-center gap-2"><strong>{{ item.title }}</strong><span class="rounded bg-pink-50 px-1.5 py-0.5 text-xs text-pink-800">{{ itemName(item) }}</span></div>
+                                        <p v-if="item.project_name" class="mt-1 text-xs text-gray-600">案件：{{ item.project_name }}</p>
+                                        <p class="mt-1 text-xs text-gray-600">{{ categoryName(item.work_category) }}／{{ item.activity_type ? activityLabel(item.activity_type, item.work_category) : '作業種類未指定' }}<span v-if="item.actual_quantity !== null && item.actual_quantity !== undefined">・{{ item.actual_quantity }}{{ item.actual_unit || '' }}</span></p>
+                                        <p v-if="item.result_note" class="mt-1 whitespace-pre-wrap text-xs text-gray-700">進み・結果：{{ item.result_note }}</p>
+                                        <p v-else-if="item.kind === 'quick_work'" class="mt-1 text-xs text-gray-500">進み・結果：未入力</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="mt-5">
+                            <h3 class="font-semibold">日ごとの集計</h3>
+                            <p class="mt-1 text-xs text-gray-600">期間内の日別値です。日をまたぐ予定は各日に表示されるため、日別件数の合計と期間の記録件数が異なる場合があります。</p>
+                            <div class="mt-3 max-h-96 overflow-y-auto rounded border">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="sticky top-0 bg-gray-50 text-xs text-gray-600"><tr><th class="px-3 py-2">日付</th><th class="px-3 py-2 text-right">予定数</th><th class="px-3 py-2 text-right">集計時間</th><th class="px-3 py-2 text-right">暫定作業点</th></tr></thead>
+                                    <tbody><tr v-for="day in selectedPerson.daily || []" :key="day.date" class="border-t"><td class="px-3 py-2">{{ day.date }}</td><td class="px-3 py-2 text-right">{{ day.records }}件</td><td class="px-3 py-2 text-right">{{ duration(day.minutes) }}</td><td class="px-3 py-2 text-right">{{ pointLabel(day.base_points) }}点</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </Teleport>
     </WorkloadAnalysisShell>
 </template>

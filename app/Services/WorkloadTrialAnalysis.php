@@ -28,7 +28,7 @@ class WorkloadTrialAnalysis
 
     public function __construct(private PersonalWorkSchedule $schedule) {}
 
-    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end): array
+    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false): array
     {
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
         $startDate = $start->toDateString();
@@ -255,9 +255,18 @@ class WorkloadTrialAnalysis
             $overtimePoints = 0.0;
             $unrecordedOvertime = 0;
             $recordedDays = 0;
+            $daily = [];
             foreach ($dayItems as $date => $items) {
                 $window = $this->schedule->workWindow($user, $date);
                 $ledger = $this->minuteLedger($items, $window);
+                if ($withDaily) {
+                    $daily[$date] = [
+                        'date' => $date,
+                        'records' => count(array_unique(array_column($items, 'key'))),
+                        'minutes' => $ledger['minutes'],
+                        'base_points' => round($ledger['points'], 1),
+                    ];
+                }
                 if ($ledger['minutes'] > 0) $recordedDays++;
                 $minutes += $ledger['minutes'];
                 if ($window) {
@@ -335,7 +344,7 @@ class WorkloadTrialAnalysis
                 $managementPoints += $days * self::MANAGEMENT_POINTS_PER_ACTIVE_DAY
                     * ($leader ? 1 : self::DEPUTY_FACTOR) * $teamFactor;
             }
-            $people[] = [
+            $person = [
                 'id' => $id, 'name' => $user->name, 'role' => PersonalWorkRole::forUser($user),
                 'minutes' => $minutes, 'base_points' => round($basePoints, 1),
                 'scheduled_covered_minutes' => $scheduledCoveredMinutes,
@@ -358,6 +367,15 @@ class WorkloadTrialAnalysis
                 'work_units' => count($workUnits[$id] ?? []),
                 'activities' => $activities,
             ];
+            if ($withDaily) {
+                for ($day = $start->copy()->startOfDay(); $day->lte($end); $day->addDay()) {
+                    $date = $day->toDateString();
+                    $daily[$date] ??= ['date' => $date, 'records' => 0, 'minutes' => 0, 'base_points' => 0.0];
+                }
+                ksort($daily);
+                $person['daily'] = array_values($daily);
+            }
+            $people[] = $person;
         }
         return $people;
     }
