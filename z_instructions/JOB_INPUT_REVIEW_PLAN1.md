@@ -1,6 +1,6 @@
 # ジョブ入力の総点検・簡易入力の改修計画
 
-更新: 2026-10-12。まず概要、その後に根拠と実装順を示す。第1段階はローカル実装中。既存データ・本番画面・採点式は変更しない。
+更新: 2026-10-12。まず概要、その後に根拠と実装順を示す。第1・2段階は Super Admin 限定の試用画面に反映済み。既存データ、一般利用者の画面、旧採点式は変更しない。
 
 ## 概要
 
@@ -94,7 +94,7 @@
 3. **Super Admin だけで実例確認**: 短い仕事を1日に多数切り替える日、長期案件、仮案件、依頼からの転換、時間だけの入力、修正・削除を比較する。全員公開と採点変更は別判断とする。
 4. **マイジョブ・依頼ジョブへ反映**: 既存 `AssignmentForm.vue` の利用経路と必須値を壊さず、本人用の初期表示を短くする。依頼側は担当者・納期・ファイル・進行表リンクを保持して整理する。旧レコードのサイズ・難易度は削除しない。
 
-第1・2段階で想定する主なファイル: `resources/js/Components/Calendar/QuickWorkEntryModal.vue`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Services/WorkloadTrialAnalysis.php`、`app/Http/Controllers/DiaryController.php`、`resources/js/Components/Diaries/DiaryWorkReminder.vue`。日付だけから開いた場合は開始・終了を空欄で表示し、カレンダーの時刻表に沿って入力してから保存する。独立した作業時間入力は設けず、内部集計用の分数は開始・終了から算出する。DBの破壊的変更や本番反映はこの段階に含めない。
+第1・2段階の主なファイル: `resources/js/Components/Calendar/QuickWorkEntryModal.vue`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Services/WorkloadTrialAnalysis.php`、`app/Http/Controllers/DiaryController.php`、`resources/js/Components/Diaries/DiaryWorkReminder.vue`、`resources/js/Helpers/diaryTimelineEvents.js`。日付だけから開いた場合は開始・終了を空欄で表示し、カレンダーの時刻表に沿って入力してから保存する。独立した作業時間入力は設けず、内部集計用の分数は開始・終了から算出する。DBの破壊的変更は行っていない。
 
 ## 検証
 
