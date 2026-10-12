@@ -121,9 +121,9 @@ watch(() => props.show, async (show) => {
     form.title = props.entry?.title || '';
     form.entry_visibility = props.entry?.entry_visibility || 'department';
     form.actual_quantity = props.entry?.actual_quantity ?? '';
-    form.actual_unit = props.entry?.actual_unit || '';
+    form.actual_unit = props.entry?.actual_unit || 'ページ';
     form.result_note = props.entry?.result_note || '';
-    showMore.value = Boolean(form.actual_quantity !== '' || form.actual_unit || form.result_note || form.activity_type || form.entry_visibility === 'private');
+    showMore.value = Boolean(form.result_note || form.activity_type || form.entry_visibility === 'private');
     await loadProjects(true);
 });
 
@@ -134,6 +134,7 @@ async function save() {
         const payload = {
             ...form, project_job_id: form.project_job_id || null,
             actual_quantity: form.actual_quantity === '' ? null : form.actual_quantity,
+            actual_unit: form.actual_quantity === '' ? null : form.actual_unit,
         };
         if (props.entry?.id) {
             await axios.put(route('schedule.department_work.update', { entry: props.entry.id }), payload);
@@ -207,21 +208,18 @@ async function remove() {
                             <button v-for="item in titleSuggestions" :key="item.title" type="button" role="option" class="block w-full px-3 py-2 text-left hover:bg-pink-50" @pointerdown.prevent="form.title = item.title; showTitleSuggestions = false">{{ item.title }}</button>
                         </div>
                     </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="text-sm">ページ数・数量（任意）<input v-model="form.actual_quantity" type="number" min="0" max="99999999" step="0.01" class="mt-1 w-full rounded border p-2" placeholder="例：100" /></label>
+                        <label class="text-sm">単位<input v-model="form.actual_unit" type="text" list="quick-work-unit-suggestions" maxlength="30" :required="form.actual_quantity !== ''" class="mt-1 w-full rounded border p-2" placeholder="ページ・件など" /></label>
+                    </div>
+                    <datalist id="quick-work-unit-suggestions"><option v-for="unit in unitSuggestions" :key="unit" :value="unit" /></datalist>
                     <button type="button" class="text-sm text-blue-700 underline" :aria-expanded="showMore" @click="showMore = !showMore">
-                        {{ showMore ? '詳しい項目を閉じる' : '数量・進みなどを入力する（任意）' }}
+                        {{ showMore ? '詳しい項目を閉じる' : '進みなどを入力する（任意）' }}
                     </button>
                     <div v-if="showMore" class="space-y-3 rounded-lg border border-pink-200 bg-pink-50/50 p-3">
                         <label class="block text-sm">作業種類（任意）
                             <select v-model="form.activity_type" class="mt-1 w-full rounded border p-2"><option value="">未指定</option><option v-for="[key, label] in workActivities[form.work_category] || workActivities.other" :key="key" :value="key">{{ label }}</option></select>
                         </label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <label class="text-sm">数量<input v-model="form.actual_quantity" type="number" min="0" max="99999999" step="0.01" class="mt-1 w-full rounded border p-2" placeholder="例：100" /></label>
-                            <label class="text-sm">単位<input v-model="form.actual_unit" type="text" list="quick-work-unit-suggestions" maxlength="30" :required="form.actual_quantity !== ''" class="mt-1 w-full rounded border p-2" placeholder="ページ・件など" /></label>
-                        </div>
-                        <datalist id="quick-work-unit-suggestions"><option v-for="unit in unitSuggestions" :key="unit" :value="unit" /></datalist>
-                        <div class="flex flex-wrap gap-1.5" aria-label="よく使う単位">
-                            <button v-for="unit in unitSuggestions.slice(0, 6)" :key="unit" type="button" class="rounded-full border border-pink-200 bg-white px-2 py-0.5 text-xs text-pink-800 hover:bg-pink-100" @click="form.actual_unit = unit">{{ unit }}</button>
-                        </div>
                         <label class="block text-sm">今日の進み・結果（任意）<textarea v-model="form.result_note" rows="2" maxlength="2000" class="mt-1 w-full rounded border p-2" placeholder="例：初校を提出、確認待ち"></textarea></label>
                         <label class="block text-sm">部署一覧での表示
                             <select v-model="form.entry_visibility" class="mt-1 w-full rounded border p-2"><option value="department">内容を表示</option><option value="private">内容を非公開</option></select>
