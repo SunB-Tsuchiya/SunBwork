@@ -3,6 +3,7 @@ import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
+import TimelineDiary from '@/Components/TimelineDiary.vue';
 import { workCategories, workActivities, activityLabel } from '@/Constants/personalWorkActivities';
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
@@ -54,6 +55,41 @@ const eventClock = (value) => value ? (value.slice(0, 10) === date.value ? value
 const itemStart = (item) => item.source === 'entry' ? clockFromMinutes(item.timeline_start_minute) : eventClock(item.starts_at);
 const itemEnd = (item) => item.source === 'entry' ? clockFromMinutes(item.timeline_end_minute) : eventClock(item.ends_at);
 const orderedSchedule = computed(() => [...personSchedule.value].sort((a, b) => itemStart(a).localeCompare(itemStart(b), 'ja')));
+const personTimelineEvents = computed(() => orderedSchedule.value.map((item) => {
+    const start = item.source === 'entry' ? localDateTimeAtMinute(date.value, item.timeline_start_minute) : item.starts_at?.replace(' ', 'T');
+    const end = item.source === 'entry' ? localDateTimeAtMinute(date.value, item.timeline_end_minute) : item.ends_at?.replace(' ', 'T');
+    if (!start || !end || new Date(end) <= new Date(start)) return null;
+    return {
+        id: `${item.source}-${item.id}`,
+        title: item.title || itemName(item),
+        start,
+        end,
+        allDay: false,
+        color: item._custom_color || '#2563eb',
+        textColor: item._custom_text_color || '#fff',
+        borderColor: item._custom_border_color || '#fff',
+        tooltip: `${itemStart(item)}〜${itemEnd(item)} ${item.title || itemName(item)}`,
+        readOnly: true,
+    };
+}).filter(Boolean));
+const personTimelineHours = computed(() => {
+    const dayStart = new Date(`${date.value}T00:00:00`).getTime();
+    const minutes = personTimelineEvents.value.flatMap((event) => [
+        Math.max(0, (new Date(event.start).getTime() - dayStart) / 60000),
+        Math.min(1440, (new Date(event.end).getTime() - dayStart) / 60000),
+    ]);
+    return {
+        start: minutes.length ? Math.max(0, Math.min(7, Math.floor(Math.min(...minutes) / 60))) : 7,
+        end: minutes.length ? Math.min(24, Math.max(19, Math.ceil(Math.max(...minutes) / 60))) : 19,
+    };
+});
+function localDateTimeAtMinute(day, minute) {
+    if (minute === null || minute === undefined || !Number.isFinite(Number(minute))) return null;
+    const value = new Date(`${day}T00:00:00`);
+    if (Number.isNaN(value.getTime())) return null;
+    value.setMinutes(Number(minute));
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}T${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}:00`;
+}
 const totalRecords = computed(() => people.value.reduce((sum, person) => sum + Number(person.records || 0), 0));
 const totalMinutes = computed(() => people.value.reduce((sum, person) => sum + Number(person.minutes || 0), 0));
 const visiblePoints = (person) => Number(person.base_points || 0)
@@ -283,6 +319,10 @@ onMounted(load);
                             <div class="rounded border bg-slate-50 p-3">暫定作業点 <strong class="ml-2">{{ pointLabel(selectedPerson.base_points) }}点</strong></div>
                         </div>
                         <p class="mt-2 text-xs text-gray-600">集計時間は昼休憩と重複時間を除きます。予定表にある時間の単純な合計とは異なる場合があります。暫定点は正式な人事評価ではありません。</p>
+                        <div v-if="period === 'day' && personTimelineEvents.length" class="mt-3" aria-label="当日の予定タイムテーブル">
+                            <h3 class="mb-1 text-sm font-semibold">当日の予定</h3>
+                            <TimelineDiary :date="date" :events="personTimelineEvents" :start-hour="personTimelineHours.start" :end-hour="personTimelineHours.end" :editable="false" compact />
+                        </div>
                         <div class="mt-4 flex flex-wrap gap-2 text-xs">
                             <span v-for="[source, label] in [['quick', '簡易予定'], ['my_job', 'マイジョブ'], ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出']]" :key="source" class="rounded border bg-gray-50 px-2 py-1">{{ label }} {{ selectedPerson.source_counts?.[source] || 0 }}件</span>
                         </div>

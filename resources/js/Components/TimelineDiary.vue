@@ -1,14 +1,14 @@
 <template>
     <div>
         <div ref="scrollWrapperRef" class="w-full overflow-x-hidden rounded border bg-gray-50">
-            <div ref="timelineContentRef" class="px-2 py-2">
+            <div ref="timelineContentRef" class="px-2" :class="compact ? 'py-1' : 'py-2'">
                 <div class="flex items-center justify-between px-2">
-                    <div ref="labelsRowRef" class="relative h-6 w-full text-xs text-gray-600">
+                    <div ref="labelsRowRef" class="relative w-full text-xs text-gray-600" :class="compact ? 'h-5' : 'h-6'">
                         <template v-for="h in hourLabels" :key="h">
                             <div
                                 :style="{
                                     position: 'absolute',
-                                    left: (h - startHour) * 60 * usedPxPerMin + 'px',
+                                    left: (h - startHourRef) * 60 * usedPxPerMin + 'px',
                                     transform: 'translateX(-50%)',
                                 }"
                                 class="text-center"
@@ -18,12 +18,12 @@
                         </template>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <button @click="shiftLeft" :disabled="startHour <= 0" class="rounded bg-gray-200 px-2 py-1 text-sm">◀</button>
-                        <button @click="shiftRight" :disabled="endHour >= 24" class="rounded bg-gray-200 px-2 py-1 text-sm">▶</button>
+                        <button @click="shiftLeft" :disabled="startHourRef <= 0" class="rounded bg-gray-200 px-2 py-1 text-sm">◀</button>
+                        <button @click="shiftRight" :disabled="endHourRef >= 24" class="rounded bg-gray-200 px-2 py-1 text-sm">▶</button>
                     </div>
                 </div>
 
-                <div class="flex gap-2 p-2">
+                <div v-if="!compact || localEvents.some((e) => e.allDay)" class="flex gap-2 p-2">
                     <template v-for="ev in localEvents.filter((e) => e.allDay)" :key="`ad-${ev.id}`">
                         <div class="rounded px-2 py-1 text-xs" :style="{ background: ev.color, color: '#fff' }" @click.prevent="onEventClick(ev)">
                             {{ ev.title }}
@@ -31,13 +31,13 @@
                     </template>
                 </div>
 
-                <div ref="timelineRef" class="relative mt-2 border-t border-gray-200" :style="{ height: timelineHeight }" @click.stop="onBackgroundClick($event)">
+                <div ref="timelineRef" class="relative border-t border-gray-200" :class="compact ? 'mt-1' : 'mt-2'" :style="{ height: timelineHeight }" @click.stop="onBackgroundClick($event)">
                     <div class="pointer-events-none absolute inset-y-0 left-0 top-0 w-full">
                         <template v-for="h in hourLabels" :key="'hour-' + h">
                             <div
                                 :style="{
                                     position: 'absolute',
-                                    left: (h - startHour) * 60 * usedPxPerMin + 'px',
+                                    left: (h - startHourRef) * 60 * usedPxPerMin + 'px',
                                     top: '0',
                                     height: '100%',
                                     borderLeft: '1px solid rgba(0,0,0,0.16)',
@@ -105,6 +105,7 @@ const props = defineProps({
     startHour: { type: Number, default: 8 },
     endHour: { type: Number, default: 20 },
     editable: { type: Boolean, default: true },
+    compact: { type: Boolean, default: false },
     pxPerMinute: { type: Number, default: 1.5 },
     laneToleranceMinutes: { type: Number, default: 0 },
 });
@@ -161,8 +162,8 @@ const usedPxPerMin = computed(() => {
 });
 
 // ── レーン割り当て（重複予定を上下に振り分け） ──────────────────────────────
-const EVENT_ROW_H = 44; // px: イベント高さ(36) + 行間(8)
-const TIMELINE_TOP_PAD = 8; // px
+const eventRowHeight = computed(() => props.compact ? 32 : 44);
+const timelineTopPad = computed(() => props.compact ? 4 : 8);
 
 const eventLanes = computed(() => {
     const nonAllDay = localEvents.value.filter(e => !e.allDay && e.start);
@@ -190,11 +191,11 @@ const numLanes = computed(() => {
     return max;
 });
 
-const timelineHeight = computed(() => `${TIMELINE_TOP_PAD + numLanes.value * EVENT_ROW_H + 8}px`);
+const timelineHeight = computed(() => `${timelineTopPad.value + numLanes.value * eventRowHeight.value + (props.compact ? 4 : 8)}px`);
 
 function getEventTop(ev) {
     const lane = eventLanes.value.get(String(ev.id)) ?? 0;
-    return `${TIMELINE_TOP_PAD + lane * EVENT_ROW_H}px`;
+    return `${timelineTopPad.value + lane * eventRowHeight.value}px`;
 }
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -227,8 +228,9 @@ function computeEventStyle(ev) {
         const pxPerMinuteLocal = measuredPxPerMin || pxPerMinuteRef.value;
         const start = new Date(ev.start);
         const end = new Date(ev.end || ev.start);
-        const startMinutes = start.getHours() * 60 + start.getMinutes();
-        const endMinutes = end.getHours() * 60 + end.getMinutes();
+        const dayStart = new Date(`${props.date}T00:00:00`).getTime();
+        const startMinutes = (start.getTime() - dayStart) / 60000;
+        const endMinutes = (end.getTime() - dayStart) / 60000;
         const windowStartMin = baselineHour * 60;
         const windowEndMin = endHourRef.value * 60;
         const origLeft = startMinutes;
@@ -252,8 +254,8 @@ function computeEventStyle(ev) {
             border: `2px solid ${ev.borderColor || 'rgba(255,255,255,0.7)'}`,
             boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
             position: 'absolute',
-            height: '2.25rem',
-            lineHeight: '2.25rem',
+            height: props.compact ? '1.75rem' : '2.25rem',
+            lineHeight: props.compact ? '1.75rem' : '2.25rem',
             borderRadius: '6px',
             overflow: 'hidden',
             whiteSpace: 'nowrap',

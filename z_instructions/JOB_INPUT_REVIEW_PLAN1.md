@@ -103,6 +103,10 @@
 - 個別取得は情報出版 Super Admin 試用の権限、会社・部署、集計対象者の条件を再確認する。非公開の内容は表示せず、他者の未公開案件を広げない。週・月の集計は日別の時間・件数が期間合計と整合することを確認する。
 - Vue ビルド、PHP 構文、対象 API の権限・日付・集計整合を検証する。本番への SSH は実行コマンドを利用者に提示して確認を得る。
 
+### 2026-10-13 追加工程: 日別の予定タイムテーブル（横断台帳 P12）
+
+利用者は P11 の日別個人詳細を実例と照合して一致を確認した。その後、集計説明文の直下、予定一覧の上に、日報に似たコンパクトな当日の予定タイムテーブルを希望した。日表示だけで既存の予定データを表示専用バーにし、重複した予定は上下に分ける。日付をまたぐ予定は当日の範囲に収める。非公開内容は API と画面の両方の既存判定に従う。集計時間との違いを説明する文と詳細一覧は残す。対象は `WorkAnalysis.vue`、`TimelineDiary.vue` と管理資料。さくら用 Vue ビルドと差分を確認し、SSH の正確なコマンドを提示して承認後に反映する。
+
 第1・2段階の主なファイル: `resources/js/Components/Calendar/QuickWorkEntryModal.vue`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Services/WorkloadTrialAnalysis.php`、`app/Http/Controllers/DiaryController.php`、`resources/js/Components/Diaries/DiaryWorkReminder.vue`、`resources/js/Helpers/diaryTimelineEvents.js`。日付だけから開いた場合は開始・終了を空欄で表示し、カレンダーの時刻表に沿って入力してから保存する。独立した作業時間入力は設けず、内部集計用の分数は開始・終了から算出する。DBの破壊的変更は行っていない。
 
 ## 検証
