@@ -2097,6 +2097,15 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'personal-work-visibility-1',
+                'title' => '情報出版の試用予定表で所属会社が空欄の案件を表示',
+                'released_at' => '2026-10-13',
+                'summary' => '部署に表示する設定の案件は、案件の所属会社が未設定でも同部署の試用予定表に予定名を表示します。極秘案件と非公開の個人・共有予定は引き続き伏せます。予定の帯から「【完了】」を省きました。',
+                'design_files' => ['z_instructions/JOB_VISIBILITY_AUDIT1.md'],
+                'claude_notes' => '情報出版 Super Admin 限定試用。10/09 の部署予定99件中、案件会社IDがNULLのマイジョブ42件が自動マスクされていたため公開判定を修正。既存の show_on_department_schedule=false と private を保持し、保存済みの予定名や完了状態、DB値は変更しない。',
+                'body' => '<section class="cl-fix"><h3>試用予定表の表示</h3><ul><li>案件の所属会社が空欄でも「部署に表示する」が有効なら件名を表示</li><li>極秘案件と非公開の個人・共有予定は引き続き非公開</li><li>帯の表示から「【完了】」を省略</li></ul></section>',
+            ],
         ];
 
         foreach ($entries as $entry) {

@@ -101,8 +101,9 @@ class PersonalWorkSchedule
         $related = $own || ($project && ((int) $project->user_id === (int) $viewer->id
             || $project->coordinators->contains('id', $viewer->id)));
         if ($project) {
-            $public = (int) $project->company_id === (int) $viewer->company_id
-                && $project->show_on_department_schedule;
+            // Legacy projects can lack a company; the department board already scopes people to the viewer's department.
+            $public = $project->show_on_department_schedule
+                && ($project->company_id === null || (int) $project->company_id === (int) $viewer->company_id);
             $showDetail = $related || $public;
         } else {
             // Reuse the shared schedule's public/company/group visibility for meetings.
@@ -122,12 +123,14 @@ class PersonalWorkSchedule
                 : ($assignment->job_type === 'proof' ? '#DB2777'
                     : ((int) $assignment->sender_id === (int) $event->user_id && $assignment->sender_id !== null ? '#4F46E5' : '#059669')))
             : ($event->is_company_event ? null : '#1fb6b3');
+        $displayTitle = trim(preg_replace('/^【完了】\s*/u', '', (string) $event->title));
+        if ($displayTitle === '') $displayTitle = $project?->title ?: (string) $event->title;
 
         return [
             'id' => $event->id,
             'source' => 'event',
             'kind' => $kind,
-            'title' => $showDetail ? $event->title : '非公開の予定',
+            'title' => $showDetail ? $displayTitle : '非公開の予定',
             'project_name' => $showDetail ? $project?->title : null,
             'work_category' => $event->project_job_assignment_id ? $this->categoryForEvent($event) : 'other',
             'activity_type' => $showDetail ? $result?->activity_type : null,
@@ -153,8 +156,8 @@ class PersonalWorkSchedule
         $related = $own || ($project && ((int) $project->user_id === (int) $viewer->id
             || $project->coordinators->contains('id', $viewer->id)));
         $showDetail = $related || ($entry->entry_visibility === 'department'
-            && (! $project || ((int) $project->company_id === (int) $viewer->company_id
-                && $project->show_on_department_schedule)));
+            && (! $project || ($project->show_on_department_schedule
+                && ($project->company_id === null || (int) $project->company_id === (int) $viewer->company_id))));
 
         $interval = $this->slotInterval($entry, $window);
 

@@ -139,6 +139,64 @@ class PersonalWorkScheduleTest extends TestCase
         $this->assertNull($result['result_note']);
     }
 
+    public function test_unassigned_project_company_is_visible_only_when_department_display_is_enabled(): void
+    {
+        $viewer = new User();
+        $viewer->id = 20;
+        $viewer->company_id = 1;
+        $project = new ProjectJob([
+            'title' => '大枠のテスト', 'company_id' => null, 'user_id' => 10,
+            'show_on_department_schedule' => true,
+        ]);
+        $project->setRelation('coordinators', collect());
+        $assignment = new ProjectJobAssignment(['user_id' => 10, 'sender_id' => 10]);
+        $assignment->setRelation('projectJob', $project);
+        $event = new Event();
+        $event->setRawAttributes([
+            'user_id' => 10, 'title' => '【完了】大枠のテスト／入力',
+            'starts_at' => '2026-10-09 09:00:00', 'ends_at' => '2026-10-09 10:00:00',
+        ]);
+        $event->setRelation('projectJobAssignment', $assignment);
+        $service = new PersonalWorkSchedule();
+
+        $visible = $service->eventForViewer($event, $viewer, '2026-10-09', 10);
+        $this->assertFalse($visible['private']);
+        $this->assertSame('大枠のテスト／入力', $visible['title']);
+        $this->assertSame('大枠のテスト', $visible['project_name']);
+        $this->assertSame('【完了】大枠のテスト／入力', $event->title);
+
+        $project->show_on_department_schedule = false;
+        $secret = $service->eventForViewer($event, $viewer, '2026-10-09', 10);
+        $this->assertTrue($secret['private']);
+        $this->assertSame('非公開の予定', $secret['title']);
+
+        $project->show_on_department_schedule = true;
+        $project->company_id = 2;
+        $this->assertTrue($service->eventForViewer($event, $viewer, '2026-10-09', 10)['private']);
+    }
+
+    public function test_department_entry_can_show_unassigned_project_without_revealing_private_entry(): void
+    {
+        $viewer = new User();
+        $viewer->id = 20;
+        $viewer->company_id = 1;
+        $project = new ProjectJob([
+            'title' => '大枠のテスト', 'company_id' => null, 'user_id' => 10,
+            'show_on_department_schedule' => true,
+        ]);
+        $project->setRelation('coordinators', collect());
+        $entry = new PersonalWorkEntry([
+            'user_id' => 10, 'title' => '入力', 'entry_visibility' => 'department',
+        ]);
+        $entry->setRelation('projectJob', $project);
+        $service = new PersonalWorkSchedule();
+
+        $this->assertSame('大枠のテスト／入力', $service->entryForViewer($entry, $viewer)['title']);
+
+        $entry->entry_visibility = 'private';
+        $this->assertSame('非公開の予定', $service->entryForViewer($entry, $viewer)['title']);
+    }
+
     public function test_result_without_plan_does_not_claim_the_day_is_scheduled(): void
     {
         $user = new User();
