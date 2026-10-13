@@ -19,10 +19,22 @@ const includeOvertime = ref(true);
 const includeManagement = ref(true);
 const selectedPersonId = ref(null);
 const selectedPerson = ref(null);
+const personName = ref('');
+const personDate = ref(date.value);
+const personPeriod = ref(period.value);
+const personRange = ref('');
+const personDrilled = ref(false);
+const personSummary = ref(null);
 const personSchedule = ref([]);
 const personLoading = ref(false);
 const personError = ref('');
 const closeButton = ref(null);
+const backButton = ref(null);
+const personPanel = ref(null);
+const personTable = ref(null);
+let personSummaryScrollTop = 0;
+let personTableScrollTop = 0;
+let personSummaryDay = '';
 let loadSequence = 0;
 let personSequence = 0;
 
@@ -51,13 +63,13 @@ const chipStyle = (color) => ({ backgroundColor: color.bg, color: color.text, bo
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ''}`;
 const itemName = (item) => ({ quick_work: '簡易予定', my_job: 'マイジョブ', assigned_job: '依頼ジョブ' })[item.kind] || '予定';
 const clockFromMinutes = (minutes) => minutes == null ? '—' : `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-const eventClock = (value) => value ? (value.slice(0, 10) === date.value ? value.slice(11, 16) : value.slice(0, 16)) : '—';
+const eventClock = (value) => value ? (value.slice(0, 10) === personDate.value ? value.slice(11, 16) : value.slice(0, 16)) : '—';
 const itemStart = (item) => item.source === 'entry' ? clockFromMinutes(item.timeline_start_minute) : eventClock(item.starts_at);
 const itemEnd = (item) => item.source === 'entry' ? clockFromMinutes(item.timeline_end_minute) : eventClock(item.ends_at);
 const orderedSchedule = computed(() => [...personSchedule.value].sort((a, b) => itemStart(a).localeCompare(itemStart(b), 'ja')));
 const personTimelineEvents = computed(() => orderedSchedule.value.map((item) => {
-    const start = item.source === 'entry' ? localDateTimeAtMinute(date.value, item.timeline_start_minute) : item.starts_at?.replace(' ', 'T');
-    const end = item.source === 'entry' ? localDateTimeAtMinute(date.value, item.timeline_end_minute) : item.ends_at?.replace(' ', 'T');
+    const start = item.source === 'entry' ? localDateTimeAtMinute(personDate.value, item.timeline_start_minute) : item.starts_at?.replace(' ', 'T');
+    const end = item.source === 'entry' ? localDateTimeAtMinute(personDate.value, item.timeline_end_minute) : item.ends_at?.replace(' ', 'T');
     if (!start || !end || new Date(end) <= new Date(start)) return null;
     return {
         id: `${item.source}-${item.id}`,
@@ -73,7 +85,7 @@ const personTimelineEvents = computed(() => orderedSchedule.value.map((item) => 
     };
 }).filter(Boolean));
 const personTimelineHours = computed(() => {
-    const dayStart = new Date(`${date.value}T00:00:00`).getTime();
+    const dayStart = new Date(`${personDate.value}T00:00:00`).getTime();
     const minutes = personTimelineEvents.value.flatMap((event) => [
         Math.max(0, (new Date(event.start).getTime() - dayStart) / 60000),
         Math.min(1440, (new Date(event.end).getTime() - dayStart) / 60000),
@@ -166,27 +178,39 @@ function closePerson() {
     personSequence++;
     selectedPersonId.value = null;
     selectedPerson.value = null;
+    personName.value = '';
+    personRange.value = '';
+    personDrilled.value = false;
+    personSummary.value = null;
+    personSummaryScrollTop = 0;
+    personTableScrollTop = 0;
+    personSummaryDay = '';
     personSchedule.value = [];
     personError.value = '';
     personLoading.value = false;
 }
 
-async function openPerson(person) {
+async function loadPerson(person, selectedPeriod, selectedDate) {
     const sequence = ++personSequence;
     selectedPersonId.value = person.id;
-    nextTick(() => closeButton.value?.focus());
+    personName.value = person.name || personName.value;
+    personPeriod.value = selectedPeriod;
+    personDate.value = selectedDate;
+    personRange.value = selectedDate;
+    nextTick(() => (personDrilled.value ? backButton.value : closeButton.value)?.focus());
     selectedPerson.value = null;
     personSchedule.value = [];
     personError.value = '';
     personLoading.value = true;
     try {
         const requests = [axios.get(route('schedule.department_work.analysis'), {
-            params: { date: date.value, period: period.value, user_id: person.id },
+            params: { date: selectedDate, period: selectedPeriod, user_id: person.id },
         })];
-        if (period.value === 'day') requests.push(axios.get(route('schedule.department_work.index'), { params: { date: date.value, user_id: person.id } }));
+        if (selectedPeriod === 'day') requests.push(axios.get(route('schedule.department_work.index'), { params: { date: selectedDate, user_id: person.id } }));
         const [analysisResponse, scheduleResponse] = await Promise.all(requests);
         if (sequence !== personSequence) return;
         selectedPerson.value = analysisResponse.data.people?.[0] || null;
+        personRange.value = `${analysisResponse.data.start} ～ ${analysisResponse.data.end}`;
         personSchedule.value = scheduleResponse?.data.people?.find((row) => Number(row.id) === Number(person.id))?.items
             ?.filter((item) => !item.private) || [];
         if (!selectedPerson.value) personError.value = 'この担当者の詳細を表示できません。';
@@ -195,6 +219,49 @@ async function openPerson(person) {
     } finally {
         if (sequence === personSequence) personLoading.value = false;
     }
+}
+
+function openPerson(person) {
+    personDrilled.value = false;
+    personSummary.value = null;
+    loadPerson(person, period.value, date.value);
+}
+
+function openPersonDay(day) {
+    if (!selectedPersonId.value || !day?.date) return;
+    personSummary.value = {
+        person: selectedPerson.value,
+        range: personRange.value,
+        period: personPeriod.value,
+        date: personDate.value,
+    };
+    personSummaryScrollTop = personPanel.value?.scrollTop || 0;
+    personTableScrollTop = personTable.value?.scrollTop || 0;
+    personSummaryDay = day.date;
+    personDrilled.value = true;
+    loadPerson({ id: selectedPersonId.value, name: personName.value }, 'day', day.date);
+    nextTick(() => { if (personPanel.value) personPanel.value.scrollTop = 0; });
+}
+
+function backToPersonPeriod() {
+    if (!selectedPersonId.value || !personSummary.value) return;
+    personSequence++;
+    selectedPerson.value = personSummary.value.person;
+    personRange.value = personSummary.value.range;
+    personPeriod.value = personSummary.value.period;
+    personDate.value = personSummary.value.date;
+    personSchedule.value = [];
+    personLoading.value = false;
+    personError.value = '';
+    personDrilled.value = false;
+    personSummary.value = null;
+    nextTick(() => {
+        if (personPanel.value) personPanel.value.scrollTop = personSummaryScrollTop;
+        if (personTable.value) personTable.value.scrollTop = personTableScrollTop;
+        const dayButton = [...(personTable.value?.querySelectorAll('button[data-day]') || [])]
+            .find((button) => button.dataset.day === personSummaryDay);
+        (dayButton || closeButton.value)?.focus({ preventScroll: true });
+    });
 }
 
 watch([date, period], () => { closePerson(); load(); });
@@ -302,11 +369,12 @@ onMounted(load);
         </section>
         <Teleport to="body">
             <div v-if="selectedPersonId !== null" class="fixed inset-0 z-[2200] flex items-center justify-center bg-black/50 p-3 sm:p-6" @click.self="closePerson" @keydown.esc="closePerson">
-                <div role="dialog" aria-modal="true" aria-label="担当者の作業詳細" tabindex="-1" class="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
+                <div ref="personPanel" role="dialog" aria-modal="true" aria-label="担当者の作業詳細" tabindex="-1" class="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
                     <div class="flex items-start justify-between gap-3">
                         <div>
-                            <h2 class="text-lg font-semibold">{{ selectedPerson?.name || '担当者' }}の作業詳細</h2>
-                            <p class="text-sm text-gray-600">{{ rangeLabel }}・{{ { day: '日', week: '週', month: '月' }[period] }}別</p>
+                            <h2 class="text-lg font-semibold">{{ personName || '担当者' }}の作業詳細</h2>
+                            <p class="text-sm text-gray-600">{{ personRange }}・{{ { day: '日', week: '週', month: '月' }[personPeriod] }}別</p>
+                            <button v-if="personDrilled" ref="backButton" type="button" class="mt-1 text-sm font-medium text-blue-800 underline underline-offset-2" @click="backToPersonPeriod">{{ personSummary?.period === 'week' ? '週' : '月' }}の集計に戻る</button>
                         </div>
                         <button ref="closeButton" type="button" class="rounded border px-3 py-1 text-sm hover:bg-gray-50" @click="closePerson">閉じる</button>
                     </div>
@@ -319,9 +387,9 @@ onMounted(load);
                             <div class="rounded border bg-slate-50 p-3">暫定作業点 <strong class="ml-2">{{ pointLabel(selectedPerson.base_points) }}点</strong></div>
                         </div>
                         <p class="mt-2 text-xs text-gray-600">集計時間は昼休憩と重複時間を除きます。予定表にある時間の単純な合計とは異なる場合があります。暫定点は正式な人事評価ではありません。</p>
-                        <div v-if="period === 'day' && personTimelineEvents.length" class="mt-3" aria-label="当日の予定タイムテーブル">
+                        <div v-if="personPeriod === 'day' && personTimelineEvents.length" class="mt-3" aria-label="当日の予定タイムテーブル">
                             <h3 class="mb-1 text-sm font-semibold">当日の予定</h3>
-                            <TimelineDiary :date="date" :events="personTimelineEvents" :start-hour="personTimelineHours.start" :end-hour="personTimelineHours.end" :editable="false" compact />
+                            <TimelineDiary :date="personDate" :events="personTimelineEvents" :start-hour="personTimelineHours.start" :end-hour="personTimelineHours.end" :editable="false" compact />
                         </div>
                         <div class="mt-4 flex flex-wrap gap-2 text-xs">
                             <span v-for="[source, label] in [['quick', '簡易予定'], ['my_job', 'マイジョブ'], ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出']]" :key="source" class="rounded border bg-gray-50 px-2 py-1">{{ label }} {{ selectedPerson.source_counts?.[source] || 0 }}件</span>
@@ -331,7 +399,7 @@ onMounted(load);
                                 {{ categoryName(activity.work_category) }}／{{ activity.activity_type ? activityLabel(activity.activity_type, activity.work_category) : '旧記録' }}：{{ duration(activity.minutes) }}・{{ activity.records }}件
                             </span>
                         </div>
-                        <div v-if="period === 'day'" class="mt-5">
+                        <div v-if="personPeriod === 'day'" class="mt-5">
                             <h3 class="font-semibold">その日の時刻表と内容</h3>
                             <p class="mt-1 text-xs text-gray-600">集計対象外の予定も含む予定表の表示です。非公開の内容は表示しません。</p>
                             <p v-if="!orderedSchedule.length" class="mt-3 rounded border p-3 text-sm text-gray-600">表示できる予定はありません。</p>
@@ -351,10 +419,10 @@ onMounted(load);
                         <div v-else class="mt-5">
                             <h3 class="font-semibold">日ごとの集計</h3>
                             <p class="mt-1 text-xs text-gray-600">期間内の日別値です。日をまたぐ予定は各日に表示されるため、日別件数の合計と期間の記録件数が異なる場合があります。</p>
-                            <div class="mt-3 max-h-96 overflow-y-auto rounded border">
+                            <div ref="personTable" class="mt-3 max-h-96 overflow-y-auto rounded border">
                                 <table class="w-full text-left text-sm">
                                     <thead class="sticky top-0 bg-gray-50 text-xs text-gray-600"><tr><th class="px-3 py-2">日付</th><th class="px-3 py-2 text-right">予定数</th><th class="px-3 py-2 text-right">集計時間</th><th class="px-3 py-2 text-right">暫定作業点</th></tr></thead>
-                                    <tbody><tr v-for="day in selectedPerson.daily || []" :key="day.date" class="border-t"><td class="px-3 py-2">{{ day.date }}</td><td class="px-3 py-2 text-right">{{ day.records }}件</td><td class="px-3 py-2 text-right">{{ duration(day.minutes) }}</td><td class="px-3 py-2 text-right">{{ pointLabel(day.base_points) }}点</td></tr></tbody>
+                                    <tbody><tr v-for="day in selectedPerson.daily || []" :key="day.date" class="border-t"><td class="px-3 py-2"><button type="button" class="font-medium text-blue-800 underline underline-offset-2 hover:text-blue-600" :data-day="day.date" :aria-label="`${day.date}の作業詳細を表示`" @click="openPersonDay(day)">{{ day.date }}</button></td><td class="px-3 py-2 text-right">{{ day.records }}件</td><td class="px-3 py-2 text-right">{{ duration(day.minutes) }}</td><td class="px-3 py-2 text-right">{{ pointLabel(day.base_points) }}点</td></tr></tbody>
                                 </table>
                             </div>
                         </div>

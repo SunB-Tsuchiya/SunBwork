@@ -107,6 +107,10 @@
 
 利用者は P11 の日別個人詳細を実例と照合して一致を確認した。その後、集計説明文の直下、予定一覧の上に、日報に似たコンパクトな当日の予定タイムテーブルを希望した。日表示だけで既存の予定データを表示専用バーにし、重複した予定は上下に分ける。日付をまたぐ予定は当日の範囲に収める。非公開内容は API と画面の両方の既存判定に従う。集計時間との違いを説明する文と詳細一覧は残す。対象は `WorkAnalysis.vue`、`TimelineDiary.vue` と管理資料。さくら用 Vue ビルドと差分を確認し、SSH の正確なコマンドを提示して承認後に反映する。
 
+### 2026-10-13 追加工程: 週・月の集計から当日詳細へ（横断台帳 P13）
+
+利用者は週表示で先に確認した日の予定数・集計時間が一致すると回答したが、表の日付から当日の内訳へ進めず照合しにくいと指摘した。週・月の「日ごとの集計」の日付をボタンにし、同じ人の当日詳細（集計カード、タイムテーブル、予定内容）をモーダル内で表示する。「週／月の集計に戻る」で元の表へ戻り、画面側の期間・基準日は保持する。既存の個人分析・部署予定 API と権限判定を再利用し、新規 DB/API は不要。対象は `WorkAnalysis.vue` と管理資料。ビルド、差分、週・月それぞれの往復を確認する。
+
 第1・2段階の主なファイル: `resources/js/Components/Calendar/QuickWorkEntryModal.vue`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Services/WorkloadTrialAnalysis.php`、`app/Http/Controllers/DiaryController.php`、`resources/js/Components/Diaries/DiaryWorkReminder.vue`、`resources/js/Helpers/diaryTimelineEvents.js`。日付だけから開いた場合は開始・終了を空欄で表示し、カレンダーの時刻表に沿って入力してから保存する。独立した作業時間入力は設けず、内部集計用の分数は開始・終了から算出する。DBの破壊的変更は行っていない。
 
 ## 検証
