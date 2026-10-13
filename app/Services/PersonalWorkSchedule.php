@@ -153,7 +153,7 @@ class PersonalWorkSchedule
     {
         $own = (int) $entry->user_id === (int) $viewer->id;
         $project = $entry->projectJob;
-        $broadProject = $entry->broadProject;
+        $broadProject = $entry->broad_project_id ? $entry->broadProject : null;
         $related = $own || ($project && ((int) $project->user_id === (int) $viewer->id
             || $project->coordinators->contains('id', $viewer->id)));
         $showDetail = $related || ($entry->entry_visibility === 'department'
@@ -195,7 +195,9 @@ class PersonalWorkSchedule
 
     public function entryCalendarTitle(PersonalWorkEntry $entry): string
     {
-        $projectName = $entry->projectJob?->title ?: $entry->broadProject?->name ?: $entry->project_name_text;
+        $projectName = $entry->projectJob?->title
+            ?: ($entry->broad_project_id ? $entry->broadProject?->name : null)
+            ?: $entry->project_name_text;
         $workTitle = trim($entry->title ?? '');
 
         if ($projectName && $workTitle && $projectName !== $workTitle) return $projectName.'／'.$workTitle;
