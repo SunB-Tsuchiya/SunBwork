@@ -73,6 +73,7 @@ CLAUDE.md の UI/レイアウトセクションが最上位の権威。本ファ
 ### 情報出版の作業分析試用画面（2026-10-11）
 
 2026-10-13: 大まかな案件の登録画面 `SuperAdmin/BroadProjects/Index.vue` は通常の `AppLayout` を使う。Super Admin のモバイル・デスクトップ両メニューに「大まかな案件」を置き、表示条件とサーバ権限は情報出版の試用判定に揃える。Coordinator メニューは一般利用時の後工程。
+2026-10-14: 同画面の取引先候補は文字を入力したときだけ開き、閉じるボタン・外側クリック・Esc で閉じられるようにする。空欄をフォーカスしただけで候補を表示すると下の登録ボタンを覆うため、避ける。
 
 `Schedule/WorkAnalysis.vue` と `Schedule/WorkDetailAnalysis.vue` は、予定表や Super Admin の通常メニューから別タブで開く独立画面。両画面は `Components/Schedule/WorkloadAnalysisShell.vue` を使い、`AppLayout` の役割別ヘッダー・タブを表示しない。独立画面内では簡易順位と詳細分析を同じタブで切り替え、予定表へ戻れる。旧方式アーカイブは別タブで既存画面を参照する。集計 API と表示権限は従来どおり。
 

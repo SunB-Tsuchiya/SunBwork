@@ -1,6 +1,6 @@
 <script setup>
 import axios from 'axios';
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 
@@ -10,22 +10,45 @@ const editingId = ref(null);
 const clientSearch = ref('');
 const clientOptions = ref([]);
 const clientLoading = ref(false);
+const clientPickerOpen = ref(false);
+const clientPickerRef = ref(null);
 const form = useForm({ name: '', client_id: null, fiscal_year: null, is_active: true });
 let clientRequest = 0;
 
-function reset() {
+function closeClientOptions() {
     clientRequest++;
     clientLoading.value = false;
+    clientPickerOpen.value = false;
+    clientOptions.value = [];
+}
+
+function onOutsidePointerDown(event) {
+    if (clientPickerOpen.value && !clientPickerRef.value?.contains(event.target)) closeClientOptions();
+}
+
+function onEscape(event) {
+    if (event.key === 'Escape' && clientPickerOpen.value) closeClientOptions();
+}
+
+onMounted(() => {
+    document.addEventListener('pointerdown', onOutsidePointerDown);
+    document.addEventListener('keydown', onEscape);
+});
+onUnmounted(() => {
+    document.removeEventListener('pointerdown', onOutsidePointerDown);
+    document.removeEventListener('keydown', onEscape);
+});
+
+function reset() {
+    closeClientOptions();
     editingId.value = null;
     form.reset();
     form.clearErrors();
     clientSearch.value = '';
-    clientOptions.value = [];
 }
 
 function edit(project) {
-    clientRequest++;
-    clientLoading.value = false;
+    closeClientOptions();
     editingId.value = project.id;
     form.name = project.name;
     form.client_id = project.client_id;
@@ -33,15 +56,22 @@ function edit(project) {
     form.is_active = project.is_active;
     form.clearErrors();
     clientSearch.value = project.client?.name || '';
-    clientOptions.value = [];
 }
 
 async function searchClients() {
     const request = ++clientRequest;
+    const term = clientSearch.value.trim();
+    clientOptions.value = [];
+    if (!term) {
+        clientPickerOpen.value = false;
+        clientLoading.value = false;
+        return;
+    }
+    clientPickerOpen.value = true;
     clientLoading.value = true;
     try {
-        const { data } = await axios.get(route('superadmin.broad_projects.clients'), { params: { q: clientSearch.value } });
-        if (request === clientRequest) clientOptions.value = data;
+        const { data } = await axios.get(route('superadmin.broad_projects.clients'), { params: { q: term } });
+        if (request === clientRequest && clientPickerOpen.value) clientOptions.value = data;
     } catch {
         if (request === clientRequest) clientOptions.value = [];
     } finally {
@@ -49,20 +79,20 @@ async function searchClients() {
     }
 }
 
+function focusClientSearch() {
+    if (clientSearch.value.trim() && !form.client_id) searchClients();
+}
+
 function chooseClient(client) {
-    clientRequest++;
-    clientLoading.value = false;
+    closeClientOptions();
     form.client_id = client.id;
     clientSearch.value = client.name;
-    clientOptions.value = [];
 }
 
 function clearClient() {
-    clientRequest++;
-    clientLoading.value = false;
+    closeClientOptions();
     form.client_id = null;
     clientSearch.value = '';
-    clientOptions.value = [];
 }
 
 function save() {
@@ -87,18 +117,25 @@ function save() {
                         <input v-model="form.fiscal_year" type="number" min="1900" max="2100" class="mt-1 w-full rounded border p-2" placeholder="例：2026" />
                         <span v-if="form.errors.fiscal_year" class="block text-red-700">{{ form.errors.fiscal_year }}</span>
                     </label>
-                    <div class="relative text-sm sm:col-span-2">
+                    <div ref="clientPickerRef" class="relative text-sm sm:col-span-2">
                         <label for="broad-project-client">取引先（任意）</label>
                         <div class="mt-1 flex gap-2">
-                            <input id="broad-project-client" v-model="clientSearch" type="search" autocomplete="off" placeholder="名前で検索" class="w-full rounded border p-2" @input="form.client_id = null; searchClients()" @focus="searchClients" />
+                            <input id="broad-project-client" v-model="clientSearch" type="search" autocomplete="off" placeholder="名前で検索" :aria-expanded="clientPickerOpen" aria-controls="broad-project-client-options" class="w-full rounded border p-2" @input="form.client_id = null; searchClients()" @focus="focusClientSearch" />
                             <button v-if="form.client_id" type="button" class="shrink-0 text-sm text-blue-700 underline" @click="clearClient">解除</button>
                         </div>
                         <span v-if="form.errors.client_id" class="block text-red-700">{{ form.errors.client_id }}</span>
                         <p v-if="clientSearch && !form.client_id" class="mt-1 text-xs text-gray-500">取引先を登録する場合は候補から選択してください。</p>
-                        <div v-if="clientOptions.length" class="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border bg-white shadow">
-                            <button v-for="client in clientOptions" :key="client.id" type="button" class="block w-full px-3 py-2 text-left hover:bg-yellow-50" @click="chooseClient(client)">{{ client.name }}</button>
+                        <div v-if="clientPickerOpen" id="broad-project-client-options" class="absolute z-10 mt-1 w-full rounded border bg-white shadow">
+                            <div class="flex items-center justify-between border-b px-3 py-2 text-xs text-gray-600">
+                                <span>取引先の候補</span>
+                                <button type="button" class="text-blue-700 underline" @click="closeClientOptions">閉じる</button>
+                            </div>
+                            <div class="max-h-48 overflow-auto">
+                                <p v-if="clientLoading" class="px-3 py-2 text-gray-500">検索中...</p>
+                                <p v-else-if="!clientOptions.length" class="px-3 py-2 text-gray-500">候補がありません。</p>
+                                <button v-for="client in clientOptions" :key="client.id" type="button" class="block w-full px-3 py-2 text-left hover:bg-yellow-50" @click="chooseClient(client)">{{ client.name }}</button>
+                            </div>
                         </div>
-                        <p v-else-if="clientLoading" class="text-xs text-gray-500">検索中...</p>
                     </div>
                     <label class="flex items-center gap-2 text-sm"><input v-model="form.is_active" type="checkbox" />簡易予定で選択できる</label>
                     <div class="flex justify-end gap-3">
