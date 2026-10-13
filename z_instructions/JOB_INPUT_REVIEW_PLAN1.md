@@ -111,6 +111,10 @@
 
 利用者は週表示で先に確認した日の予定数・集計時間が一致すると回答したが、表の日付から当日の内訳へ進めず照合しにくいと指摘した。週・月の「日ごとの集計」の日付をボタンにし、同じ人の当日詳細（集計カード、タイムテーブル、予定内容）をモーダル内で表示する。「週／月の集計に戻る」で元の表へ戻り、画面側の期間・基準日は保持する。既存の個人分析・部署予定 API と権限判定を再利用し、新規 DB/API は不要。対象は `WorkAnalysis.vue` と管理資料。ビルド、差分、週・月それぞれの往復を確認する。
 
+### 主工程後: カレンダー日表示の重複予定（横断台帳 P14）
+
+2026-10-13、利用者が同じ15分の簡易予定を2件置いたところ、カレンダー日表示では一方のバーが上に載り、2件あることが分からなかった。日報などのタイムテーブルは並列表示される。主工程後に日カレンダーの重複配置とクリック先を調査し、各件が見分けられ、個別に詳細を開けるようにする。マイジョブ、依頼ジョブ、一般予定の同種・異種の重なりも確認する。これら他種類の不具合はまだ確認されていない。重複時間の試用集計除外は画面確認済みであり、表示の修正と分けて扱う。
+
 第1・2段階の主なファイル: `resources/js/Components/Calendar/QuickWorkEntryModal.vue`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Services/WorkloadTrialAnalysis.php`、`app/Http/Controllers/DiaryController.php`、`resources/js/Components/Diaries/DiaryWorkReminder.vue`、`resources/js/Helpers/diaryTimelineEvents.js`。日付だけから開いた場合は開始・終了を空欄で表示し、カレンダーの時刻表に沿って入力してから保存する。独立した作業時間入力は設けず、内部集計用の分数は開始・終了から算出する。DBの破壊的変更は行っていない。
 
 ## 検証
