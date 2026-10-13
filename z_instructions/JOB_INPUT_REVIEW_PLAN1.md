@@ -119,6 +119,10 @@
 
 2026-10-13、利用者は設定上の昼休憩に置いた15分予定が記録件数だけ増え、集計時間と暫定作業点は増えないことを確認した。そのうえで、11:00〜14:00の予定から休憩を引くのはよいが、実際に11:00〜12:30まで働いた人の12:00〜12:30は作業として数えたい場合があると指摘した。「昼休憩中も作業中にカウント」する操作、または実際に取った休憩時刻をその日ごとに調整する方法を候補にする。後で休憩した時間の二重計上を防ぎ、日報の不足案内と試用分析の認定時間・暫定点を一致させる。入力負担と上長の運用を実例で検討してから方式を決める。現行の一律除外はこの時点では変更しない。
 
+### 2026-10-13 調査工程: 部署予定の非公開表示（横断台帳 P16）
+
+利用者は2026-10-09の「部署の作業予定」に非公開が多いと指摘。極秘案件だけを限定して伏せ、社内で周知の仕事は管理層が読める運用を希望した。まず同じ画面の API が返す非公開件数を、`source`・`kind` と、簡易予定の `entry_visibility`、案件の `show_on_department_schedule`、既存 `events` の `is_company_event`・`visibility`・割当リンク・会議コピーの別で集計する。個人名・件名・本文は出さず、本番 sales DB には触れない。関連の表示判定は `PersonalWorkSchedule::eventForViewer()` / `entryForViewer()`。従来の個人・社内・取引先予定は保存時に公開範囲を設定せず、DB 初期値 `private` になる。取引先予定の直接 `project_job_id` は新一覧の判定に使われていない。公開範囲の変更は原因と既存権限を確認してから別途提案し、極秘例外を維持する。調査時に既存レコードを一括変更しない。
+
 第1・2段階の主なファイル: `resources/js/Components/Calendar/QuickWorkEntryModal.vue`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Services/WorkloadTrialAnalysis.php`、`app/Http/Controllers/DiaryController.php`、`resources/js/Components/Diaries/DiaryWorkReminder.vue`、`resources/js/Helpers/diaryTimelineEvents.js`。日付だけから開いた場合は開始・終了を空欄で表示し、カレンダーの時刻表に沿って入力してから保存する。独立した作業時間入力は設けず、内部集計用の分数は開始・終了から算出する。DBの破壊的変更は行っていない。
 
 ## 検証
