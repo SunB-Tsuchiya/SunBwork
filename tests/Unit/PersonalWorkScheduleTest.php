@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\PersonalWorkEntry;
+use App\Models\BroadProject;
 use App\Models\Event;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
@@ -13,6 +14,32 @@ use PHPUnit\Framework\TestCase;
 
 class PersonalWorkScheduleTest extends TestCase
 {
+    public function test_broad_project_name_is_visible_only_within_its_department_and_respects_private(): void
+    {
+        $broad = new BroadProject(['name' => '大まかな案件', 'company_id' => 1, 'department_id' => 2]);
+        $entry = new PersonalWorkEntry([
+            'user_id' => 10, 'broad_project_id' => 7, 'work_category' => 'dtp',
+            'title' => '初校', 'entry_visibility' => 'department',
+        ]);
+        $entry->setRelation('projectJob', null);
+        $entry->setRelation('broadProject', $broad);
+        $viewer = new User();
+        $viewer->id = 20;
+        $viewer->company_id = 1;
+        $viewer->department_id = 2;
+
+        $service = new PersonalWorkSchedule();
+        $this->assertSame('大まかな案件／初校', $service->entryForViewer($entry, $viewer)['title']);
+        $this->assertSame('大まかな案件', $service->entryForViewer($entry, $viewer)['project_name']);
+
+        $entry->entry_visibility = 'private';
+        $this->assertSame('非公開の予定', $service->entryForViewer($entry, $viewer)['title']);
+
+        $entry->entry_visibility = 'department';
+        $viewer->department_id = 3;
+        $this->assertSame('非公開の予定', $service->entryForViewer($entry, $viewer)['title']);
+    }
+
     public function test_preview_is_unavailable_to_non_super_admin_users(): void
     {
         $user = new User();

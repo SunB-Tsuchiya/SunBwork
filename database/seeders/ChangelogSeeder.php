@@ -2106,6 +2106,15 @@ HTML,
                 'claude_notes' => '情報出版 Super Admin 限定試用。10/09 の部署予定99件中、案件会社IDがNULLのマイジョブ42件が自動マスクされていたため公開判定を修正。既存の show_on_department_schedule=false と private を保持し、保存済みの予定名や完了状態、DB値は変更しない。',
                 'body' => '<section class="cl-fix"><h3>試用予定表の表示</h3><ul><li>案件の所属会社が空欄でも「部署に表示する」が有効なら件名を表示</li><li>極秘案件と非公開の個人・共有予定は引き続き非公開</li><li>帯の表示から「【完了】」を省略</li></ul></section>',
             ],
+            [
+                'version' => 'broad-project-trial-1',
+                'title' => '情報出版の試用向けに大まかな案件を登録',
+                'released_at' => '2026-10-13',
+                'summary' => 'Super Admin が大まかな案件を登録し、簡単な作業予定で選べるようにしました。名前だけで先に登録でき、取引先と年度は任意です。',
+                'design_files' => ['z_instructions/BROAD_PROJECT_PLAN1.md'],
+                'claude_notes' => '情報出版 Super Admin の試用限定。broad_projects を ProjectJob と分け、personal_work_entries に任意の参照を追加。既存 ProjectJob への紐づけ、ProjectJob 登録画面の選択、Coordinator メニューは後工程。',
+                'body' => '<section class="cl-feature"><h3>大まかな案件</h3><ul><li>Super Admin の専用メニューから登録・編集・休止</li><li>簡単な作業予定から大まかな案件を選択</li><li>取引先と年度は任意で、細かな案件を作る前に登録可能</li></ul></section>',
+            ],
         ];
 
         foreach ($entries as $entry) {

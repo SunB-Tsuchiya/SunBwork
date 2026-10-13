@@ -1191,7 +1191,7 @@ onUnmounted(() => {
                             <li v-for="entry in props.diary.personal_work_entries" :key="entry.id" class="rounded bg-white p-2">
                                 <strong>{{ workCategories.find(([code]) => code === entry.work_category)?.[1] || 'その他' }}</strong>
                                 <span v-if="entry.activity_type" class="ml-2 text-blue-700">{{ activityLabel(entry.activity_type, entry.work_category) }}</span>
-                                <span class="ml-2">{{ entry.title || entry.project_job?.title || entry.project_name_text || '作業' }}</span>
+                                <span class="ml-2">{{ entry.title || entry.project_job?.title || entry.broad_project?.name || entry.project_name_text || '作業' }}</span>
                                 <p class="mt-1">{{ entry.result_note }}</p>
                                 <p v-if="entry.actual_quantity !== null" class="text-gray-600">{{ entry.actual_quantity }} {{ entry.actual_unit }}</p>
                                 <p v-if="entry.actual_minutes !== null" class="text-gray-600">実績 {{ Math.floor(entry.actual_minutes / 60) }}時間{{ entry.actual_minutes % 60 }}分</p>

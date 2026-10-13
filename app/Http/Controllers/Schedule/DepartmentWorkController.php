@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Schedule;
 
 use App\Http\Controllers\Controller;
 use App\Models\PersonalWorkEntry;
+use App\Models\BroadProject;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProgressCell;
@@ -66,7 +67,7 @@ class DepartmentWorkController extends Controller
         $userIds = $users->pluck('id')->all();
         $entries = PersonalWorkEntry::whereIn('user_id', $userIds)
             ->whereDate('work_date', $date)
-            ->with(['projectJob.coordinators:id', 'projectJob:id,title,company_id,user_id,show_on_department_schedule'])
+            ->with(['projectJob.coordinators:id', 'projectJob:id,title,company_id,user_id,show_on_department_schedule', 'broadProject:id,name,company_id,department_id'])
             ->get()->groupBy('user_id');
         $events = $this->schedule->eventsForUsers($userIds, $date);
         $progressAssignmentIds = ProgressCell::whereIn('assignment_id', $events->pluck('project_job_assignment_id')->filter()->unique())
@@ -136,6 +137,7 @@ class DepartmentWorkController extends Controller
         $params = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'selected_id' => ['nullable', 'integer'],
+            'selected_broad_id' => ['nullable', 'integer'],
             'include_completed' => ['nullable', 'boolean'],
         ]);
         $term = trim($params['q'] ?? '');
@@ -192,6 +194,29 @@ class DepartmentWorkController extends Controller
                 ];
             })->values();
 
+        $selectedBroadId = (int) ($params['selected_broad_id'] ?? 0);
+        $broadProjects = BroadProject::where('company_id', $viewer->company_id)
+            ->where('department_id', $viewer->department_id)
+            ->where(function ($query) use ($selectedBroadId, $term) {
+                $query->where(function ($active) use ($term) {
+                    $active->where('is_active', true)
+                        ->when($term !== '', fn ($q) => $q->where(function ($match) use ($term) {
+                            $like = '%'.addcslashes($term, '%_\\').'%';
+                            $match->where('name', 'like', $like)
+                                ->orWhereHas('client', fn ($client) => $client->where('name', 'like', $like));
+                        }));
+                })->when($selectedBroadId, fn ($q) => $q->orWhereKey($selectedBroadId));
+            })
+            ->with('client:id,name')
+            ->when($selectedBroadId, fn ($query) => $query->orderByRaw('id = ? DESC', [$selectedBroadId]))
+            ->orderBy('name')->limit(30)->get()
+            ->map(fn ($project) => [
+                'id' => $project->id, 'name' => $project->name,
+                'client_name' => $project->client?->name,
+                'fiscal_year' => $project->fiscal_year,
+                'is_active' => $project->is_active,
+            ]);
+
         $recentTitles = PersonalWorkEntry::where('user_id', $viewer->id)
             ->whereNull('source_event_id')->whereNotNull('title')
             ->orderByDesc('work_date')->orderByDesc('id')->limit(100)
@@ -205,6 +230,7 @@ class DepartmentWorkController extends Controller
 
         return response()->json([
             'projects' => $projects,
+            'broad_projects' => $broadProjects,
             'recent_titles' => $recentTitles,
             'recent_units' => PersonalWorkEntry::where('user_id', $viewer->id)
                 ->whereNotNull('actual_unit')->orderByDesc('updated_at')->orderByDesc('id')
@@ -230,7 +256,7 @@ class DepartmentWorkController extends Controller
         abort_if(Carbon::parse($range['start'])->diffInDays(Carbon::parse($range['end'])) > 62, 422);
         $entries = PersonalWorkEntry::where('user_id', $user->id)
             ->whereBetween('work_date', [$range['start'], $range['end']])
-            ->whereNull('source_event_id')->with('projectJob:id,title')
+            ->whereNull('source_event_id')->with(['projectJob:id,title', 'broadProject:id,name'])
             ->orderBy('work_date')->get();
 
         $windows = [];
@@ -256,7 +282,8 @@ class DepartmentWorkController extends Controller
                     'activity_type' => $entry->activity_type,
                     'planned_start_time' => $entry->planned_start_time ? substr($entry->planned_start_time, 0, 5) : null,
                     'planned_end_time' => $entry->planned_end_time ? substr($entry->planned_end_time, 0, 5) : null,
-                    'project_job_id' => $entry->project_job_id, 'project_name_text' => $entry->project_name_text,
+                    'project_job_id' => $entry->project_job_id, 'broad_project_id' => $entry->broad_project_id,
+                    'project_name_text' => $entry->project_name_text,
                     'title' => $entry->title, 'entry_visibility' => $entry->entry_visibility,
                     'actual_quantity' => $entry->actual_quantity, 'actual_unit' => $entry->actual_unit,
                     'actual_minutes' => $entry->actual_minutes, 'result_note' => $entry->result_note,
@@ -342,7 +369,7 @@ class DepartmentWorkController extends Controller
         $user = $request->user();
         abort_unless($this->schedule->available($user) && (int) $entry->user_id === (int) $user->id, 403);
         abort_if($entry->source_event_id, 422);
-        $data = $this->validatedEntry($request, $user, in_array($entry->plan_slot, ['am', 'pm', 'full'], true));
+        $data = $this->validatedEntry($request, $user, in_array($entry->plan_slot, ['am', 'pm', 'full'], true), $entry);
         abort_if($entry->diary_id && $entry->work_date->toDateString() !== $data['work_date'], 422, '日報へ取り込んだ作業の日付は変更できません。');
         $entry->update($data);
         return response()->json(['id' => $entry->id]);
@@ -357,7 +384,7 @@ class DepartmentWorkController extends Controller
         return response()->noContent();
     }
 
-    private function validatedEntry(Request $request, User $user, bool $allowLegacySlot = false): array
+    private function validatedEntry(Request $request, User $user, bool $allowLegacySlot = false, ?PersonalWorkEntry $existing = null): array
     {
         $data = $request->validate([
             'work_date' => ['required', 'date_format:Y-m-d'],
@@ -369,6 +396,7 @@ class DepartmentWorkController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'project_name_text' => ['nullable', 'string', 'max:255'],
             'project_job_id' => ['nullable', 'integer', 'exists:project_jobs,id'],
+            'broad_project_id' => ['nullable', 'integer', 'exists:broad_projects,id'],
             'entry_visibility' => ['required', Rule::in(['department', 'private'])],
             'actual_quantity' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'actual_unit' => ['nullable', 'string', 'max:30'],
@@ -407,6 +435,20 @@ class DepartmentWorkController extends Controller
                         ->orWhereHas('projectJobAssignments', fn ($q) => $q->where('user_id', $user->id));
                 })->exists();
             if (! $permitted) abort(403);
+            $data['project_name_text'] = null;
+        }
+        if (! empty($data['broad_project_id'])) {
+            $broad = BroadProject::whereKey($data['broad_project_id'])
+                ->where('company_id', $user->company_id)
+                ->where('department_id', $user->department_id)
+                ->first();
+            if (! $broad) abort(403);
+            if (! $broad->is_active && (int) ($existing?->broad_project_id) !== (int) $broad->id) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['broad_project_id' => '休止中の大まかな案件は選べません。']);
+            }
+            if (! empty($data['project_job_id'])) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['broad_project_id' => '案件は一つだけ選んでください。']);
+            }
             $data['project_name_text'] = null;
         }
         return $data;

@@ -324,7 +324,7 @@ class DiaryController extends Controller
     {
         $this->authorize('view', $diary);
         // Load relations and normalize read_by / comments to match interactions view
-        $diary->load('user', 'comments', 'attachments', 'personalWorkEntries.projectJob');
+        $diary->load('user', 'comments', 'attachments', 'personalWorkEntries.projectJob', 'personalWorkEntries.broadProject');
 
         $readBy = $diary->read_by ?? [];
         $readByNames = [];
@@ -410,7 +410,7 @@ class DiaryController extends Controller
         $diaryArr['date'] = $dateStr;
         $diaryArr['attachments'] = $this->formatDiaryAttachments($diary);
         $diaryArr['personal_work_entries'] = $user->isSuperAdmin()
-            ? $diary->personalWorkEntries()->with('projectJob')->get()
+            ? $diary->personalWorkEntries()->with(['projectJob', 'broadProject'])->get()
             : [];
 
         return Inertia::render('Diaries/Edit', [

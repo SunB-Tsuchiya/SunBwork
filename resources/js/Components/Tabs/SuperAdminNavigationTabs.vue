@@ -79,6 +79,12 @@ const tabs = computed(() => [
         condition: canAccessWorkRecordTrial.value && typeof route === 'function' && route().has('schedule.work_record_trial.page'),
     },
     {
+        key: 'broad_projects',
+        href: tryRoute('superadmin.broad_projects.index'),
+        label: '大まかな案件',
+        condition: canAccessWorkRecordTrial.value && typeof route === 'function' && route().has('superadmin.broad_projects.index'),
+    },
+    {
         key: 'billing_transport_input',
         href: tryRoute('superadmin.billing.transport.index'),
         label: '交通費入力',
@@ -225,6 +231,13 @@ function onMobileSelect(e) {
             >
                 作業記録の試用
             </a>
+            <Link
+                v-if="canAccessWorkRecordTrial && typeof route === 'function' && route().has('superadmin.broad_projects.index')"
+                :href="route('superadmin.broad_projects.index')"
+                :class="tab('broad_projects')"
+            >
+                大まかな案件
+            </Link>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.billing.transport.index')"
                 :href="route('superadmin.billing.transport.index')"

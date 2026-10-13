@@ -36,8 +36,8 @@ class PersonalWorkSchedule
             ->whereDate('work_date', $date)
             ->whereNull('source_event_id')
             ->orderBy('id')
-            ->with('projectJob:id,title')
-            ->get(['id', 'work_category', 'activity_type', 'title', 'project_name_text', 'project_job_id', 'plan_slot', 'planned_start_time', 'planned_end_time', 'actual_quantity', 'actual_unit', 'actual_minutes', 'result_note']);
+            ->with(['projectJob:id,title', 'broadProject:id,name'])
+            ->get(['id', 'work_category', 'activity_type', 'title', 'project_name_text', 'project_job_id', 'broad_project_id', 'plan_slot', 'planned_start_time', 'planned_end_time', 'actual_quantity', 'actual_unit', 'actual_minutes', 'result_note']);
 
         $window = $this->workWindow($user, $date);
         $entries = $entries->map(function (PersonalWorkEntry $entry) use ($window) {
@@ -153,11 +153,14 @@ class PersonalWorkSchedule
     {
         $own = (int) $entry->user_id === (int) $viewer->id;
         $project = $entry->projectJob;
+        $broadProject = $entry->broadProject;
         $related = $own || ($project && ((int) $project->user_id === (int) $viewer->id
             || $project->coordinators->contains('id', $viewer->id)));
         $showDetail = $related || ($entry->entry_visibility === 'department'
             && (! $project || ($project->show_on_department_schedule
-                && ($project->company_id === null || (int) $project->company_id === (int) $viewer->company_id))));
+                && ($project->company_id === null || (int) $project->company_id === (int) $viewer->company_id)))
+            && (! $broadProject || ((int) $broadProject->company_id === (int) $viewer->company_id
+                && (int) $broadProject->department_id === (int) $viewer->department_id)));
 
         $interval = $this->slotInterval($entry, $window);
 
@@ -166,7 +169,7 @@ class PersonalWorkSchedule
             'source' => 'entry',
             'kind' => 'quick_work',
             'title' => $showDetail ? $this->entryCalendarTitle($entry) : '非公開の予定',
-            'project_name' => $showDetail ? ($project?->title ?: $entry->project_name_text) : null,
+            'project_name' => $showDetail ? ($project?->title ?: $broadProject?->name ?: $entry->project_name_text) : null,
             'work_category' => $entry->work_category,
             'activity_type' => $showDetail ? $entry->activity_type : null,
             'plan_slot' => $entry->plan_slot,
@@ -180,6 +183,7 @@ class PersonalWorkSchedule
             'actual_minutes' => $showDetail ? $entry->actual_minutes : null,
             'entry_visibility' => $own ? $entry->entry_visibility : null,
             'project_job_id' => $own ? $entry->project_job_id : null,
+            'broad_project_id' => $own ? $entry->broad_project_id : null,
             'project_name_text' => $own ? $entry->project_name_text : null,
             'private' => ! $showDetail,
             'own' => $own,
@@ -191,7 +195,7 @@ class PersonalWorkSchedule
 
     public function entryCalendarTitle(PersonalWorkEntry $entry): string
     {
-        $projectName = $entry->projectJob?->title ?: $entry->project_name_text;
+        $projectName = $entry->projectJob?->title ?: $entry->broadProject?->name ?: $entry->project_name_text;
         $workTitle = trim($entry->title ?? '');
 
         if ($projectName && $workTitle && $projectName !== $workTitle) return $projectName.'／'.$workTitle;

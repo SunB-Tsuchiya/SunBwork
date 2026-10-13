@@ -13,11 +13,13 @@ const props = defineProps({
 });
 const emit = defineEmits(['close', 'saved']);
 const projects = ref([]);
+const broadProjects = ref([]);
 const recentUnits = ref([]);
 const recentTitles = ref([]);
 const showTitleSuggestions = ref(false);
 const projectSearch = ref('');
 const selectedProject = ref(null);
+const selectedBroadProject = ref(null);
 const projectPickerOpen = ref(false);
 const includeCompleted = ref(false);
 const showMore = ref(false);
@@ -29,7 +31,7 @@ const error = ref('');
 const form = reactive({
     work_date: '', work_category: 'other', activity_type: '', plan_slot: 'hour',
     planned_start_time: '', planned_end_time: '',
-    project_job_id: '', project_name_text: '', title: '', entry_visibility: 'department',
+    project_job_id: '', broad_project_id: '', project_name_text: '', title: '', entry_visibility: 'department',
     actual_quantity: '', actual_unit: '', result_note: '',
 });
 const categories = workCategories;
@@ -41,6 +43,11 @@ const titleSuggestions = computed(() => recentTitles.value
     .slice(0, 8));
 const time = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 const projectLabel = (project) => [project.title, project.jobcode, project.client_name].filter(Boolean).join(' / ');
+const broadProjectLabel = (project) => [project.name, project.client_name, project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' / ');
+const matchingBroadProjects = computed(() => broadProjects.value.filter(project => {
+    const words = projectSearch.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    return words.every(word => broadProjectLabel(project).toLocaleLowerCase().includes(word));
+}));
 const projectGroups = computed(() => [
     { key: 'team', label: '担当・チーム案件' },
     { key: 'recent', label: '最近使った案件・過去のマイジョブ' },
@@ -55,14 +62,17 @@ async function loadProjects(applyDefaultCategory = false) {
             params: {
                 q: projectSearch.value,
                 selected_id: form.project_job_id || undefined,
+                selected_broad_id: form.broad_project_id || undefined,
                 include_completed: includeCompleted.value ? 1 : 0,
             },
         });
         if (request !== searchRequest) return;
         projects.value = data.projects || [];
+        broadProjects.value = data.broad_projects || [];
         recentUnits.value = data.recent_units || [];
         recentTitles.value = data.recent_titles || [];
         selectedProject.value = projects.value.find(project => String(project.id) === String(form.project_job_id)) || selectedProject.value;
+        selectedBroadProject.value = broadProjects.value.find(project => String(project.id) === String(form.broad_project_id)) || selectedBroadProject.value;
         if (applyDefaultCategory && !props.entry) form.work_category = data.default_category || 'other';
     } catch {
         if (request === searchRequest) error.value = '案件候補を読み込めませんでした。';
@@ -89,14 +99,27 @@ function openProjectPicker() {
 
 function chooseProject(project) {
     form.project_job_id = project.id;
+    form.broad_project_id = '';
     selectedProject.value = project;
+    selectedBroadProject.value = null;
+    projectSearch.value = '';
+    projectPickerOpen.value = false;
+}
+
+function chooseBroadProject(project) {
+    form.broad_project_id = project.id;
+    form.project_job_id = '';
+    selectedBroadProject.value = project;
+    selectedProject.value = null;
     projectSearch.value = '';
     projectPickerOpen.value = false;
 }
 
 function clearProject() {
     form.project_job_id = '';
+    form.broad_project_id = '';
     selectedProject.value = null;
+    selectedBroadProject.value = null;
     projectSearch.value = '';
     projectPickerOpen.value = false;
     loadProjects();
@@ -108,6 +131,7 @@ watch(() => props.show, async (show) => {
     clearTimeout(searchTimer);
     projectSearch.value = '';
     selectedProject.value = null;
+    selectedBroadProject.value = null;
     projectPickerOpen.value = false;
     includeCompleted.value = false;
     form.work_date = props.entry?.work_date || props.date;
@@ -117,6 +141,7 @@ watch(() => props.show, async (show) => {
     form.planned_start_time = props.entry?.planned_start_time || (props.startMin !== null ? time(props.startMin) : '');
     form.planned_end_time = props.entry?.planned_end_time || (props.endMin !== null && props.endMin < 1440 ? time(props.endMin) : '');
     form.project_job_id = props.entry?.project_job_id || '';
+    form.broad_project_id = props.entry?.broad_project_id || '';
     form.project_name_text = props.entry?.project_name_text || '';
     form.title = props.entry?.title || '';
     form.entry_visibility = props.entry?.entry_visibility || 'department';
@@ -132,7 +157,7 @@ async function save() {
     error.value = '';
     try {
         const payload = {
-            ...form, project_job_id: form.project_job_id || null,
+            ...form, project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
             actual_quantity: form.actual_quantity === '' ? null : form.actual_quantity,
             actual_unit: form.actual_quantity === '' ? null : form.actual_unit,
         };
@@ -197,9 +222,16 @@ async function remove() {
                                 <button type="button" class="text-blue-700 underline" @click="clearProject">解除</button>
                             </div>
                         </div>
+                        <div v-else-if="selectedBroadProject" class="mt-1 flex items-center justify-between gap-2 rounded border border-yellow-200 bg-yellow-50 p-2">
+                            <span class="min-w-0 truncate">大まかな案件：{{ broadProjectLabel(selectedBroadProject) }}</span>
+                            <div class="flex shrink-0 gap-2">
+                                <button type="button" class="text-blue-700 underline" @click="openProjectPicker">変更</button>
+                                <button type="button" class="text-blue-700 underline" @click="clearProject">解除</button>
+                            </div>
+                        </div>
                         <button v-else type="button" class="mt-1 w-full rounded border border-blue-300 bg-blue-50 px-3 py-2 text-left text-blue-800 hover:bg-blue-100" @click="openProjectPicker">案件を探す</button>
                     </div>
-                    <label v-if="!form.project_job_id" class="block text-sm">案件がまだない場合の名前（任意）<input v-model="form.project_name_text" type="text" maxlength="255" placeholder="例：実力チェックテスト" class="mt-1 w-full rounded border p-2" /></label>
+                    <label v-if="!form.project_job_id && !form.broad_project_id" class="block text-sm">案件がまだない場合の名前（任意）<input v-model="form.project_name_text" type="text" maxlength="255" placeholder="例：実力チェックテスト" class="mt-1 w-full rounded border p-2" /></label>
                     <div class="relative text-sm">
                         <label for="quick-work-title" class="block">作業名（任意）</label>
                         <input id="quick-work-title" v-model="form.title" type="text" maxlength="255" autocomplete="off" aria-autocomplete="list" :aria-expanded="showTitleSuggestions && titleSuggestions.length > 0" aria-controls="quick-work-title-suggestions" class="mt-1 w-full rounded border p-2" @focus="showTitleSuggestions = true" @input="showTitleSuggestions = true" @keydown.esc="showTitleSuggestions = false" @blur="showTitleSuggestions = false" />
@@ -238,13 +270,20 @@ async function remove() {
                     <h3 class="text-lg font-semibold">案件を探す</h3>
                     <button type="button" class="text-sm text-gray-600 underline" @click="projectPickerOpen = false">閉じる</button>
                 </div>
-                <label for="quick-work-project-search" class="mt-4 block text-sm">案件名・番号・取引先名
+                <label for="quick-work-project-search" class="mt-4 block text-sm">大まかな案件名・案件名・番号・取引先名
                     <input id="quick-work-project-search" v-model="projectSearch" type="search" autocomplete="off" placeholder="入力して検索" class="mt-1 w-full rounded border p-2" />
                 </label>
                 <label class="mt-3 flex items-center gap-2 text-sm"><input v-model="includeCompleted" type="checkbox" />完了した案件も表示する</label>
                 <div class="mt-3 max-h-80 overflow-y-auto rounded border" aria-label="案件候補">
                     <p v-if="loading" class="p-3 text-sm text-gray-500">検索中...</p>
-                    <p v-else-if="!projectGroups.length" class="p-3 text-sm text-gray-500">該当する案件がありません。閉じて仮の案件名を入力できます。</p>
+                    <p v-else-if="!projectGroups.length && !matchingBroadProjects.length" class="p-3 text-sm text-gray-500">該当する案件がありません。閉じて仮の案件名を入力できます。</p>
+                    <div v-if="matchingBroadProjects.length">
+                        <p class="bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800">大まかな案件</p>
+                        <button v-for="project in matchingBroadProjects" :key="project.id" type="button" class="flex w-full items-center justify-between gap-3 border-t px-3 py-2 text-left text-sm hover:bg-yellow-50" @click="chooseBroadProject(project)">
+                            <span>{{ broadProjectLabel(project) }}</span>
+                            <span v-if="!project.is_active" class="shrink-0 text-xs text-gray-500">休止中</span>
+                        </button>
+                    </div>
                     <div v-for="group in projectGroups" :key="group.key">
                         <p class="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">{{ group.label }}</p>
                         <button v-for="project in group.items" :key="project.id" type="button" class="flex w-full items-center justify-between gap-3 border-t px-3 py-2 text-left text-sm hover:bg-blue-50" @click="chooseProject(project)">

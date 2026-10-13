@@ -589,6 +589,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Ziggy用: 明示的にsuperadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
+        Route::get('broad-projects/clients', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'clients'])->name('broad_projects.clients');
+        Route::get('broad-projects', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'index'])->name('broad_projects.index');
+        Route::post('broad-projects', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'store'])->name('broad_projects.store');
+        Route::put('broad-projects/{broadProject}', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'update'])->name('broad_projects.update');
+
         // デモページ管理
         Route::prefix('demo-pages')->name('demo_pages.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SuperAdmin\DemoPagesController::class, 'index'])->name('index');

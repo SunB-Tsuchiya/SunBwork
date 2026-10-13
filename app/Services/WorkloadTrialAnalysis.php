@@ -47,6 +47,7 @@ class WorkloadTrialAnalysis
             ->with([
                 'projectJob.coordinators:id',
                 'projectJob:id,title,company_id,user_id,show_on_department_schedule',
+                'broadProject:id,name,company_id,department_id',
                 'sourceEvent.user:id,company_id',
                 'sourceEvent.eventItemType:id,slug',
                 'sourceEvent.projectJobAssignment:id,project_job_id,user_id,sender_id,job_type,stage_id,work_item_type_id',
@@ -121,7 +122,8 @@ class WorkloadTrialAnalysis
             $reference = $assignment
                 ? $this->jobUnitReference($assignment)
                 : ($entry->project_job_id ? 'project-'.$entry->project_job_id
-                    : 'title-'.mb_strtolower(trim((string) ($entry->title ?: $entry->id))));
+                    : ($entry->broad_project_id ? 'broad-'.$entry->broad_project_id
+                        : 'title-'.mb_strtolower(trim((string) ($entry->title ?: $entry->id)))));
             $workUnits[$entry->user_id][$date.'|'.$entry->work_category.'|'.$activity.'|'.$reference] = true;
             if ($entry->actual_quantity !== null && filled($entry->actual_unit)) {
                 $group = $entry->work_category.'|'.$activity;

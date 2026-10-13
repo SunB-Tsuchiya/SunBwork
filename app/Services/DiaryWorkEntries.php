@@ -26,8 +26,8 @@ class DiaryWorkEntries
             $row = $saved->get('entry-'.$entry['id']);
             $rows[] = [
                 'key' => 'entry-'.$entry['id'], 'entry_id' => $entry['id'], 'source_event_id' => null,
-                'title' => $entry['title'] ?: ($entry['project_name_text'] ?: ($entry['project_job']['title'] ?? '作業予定')),
-                'project_name' => $entry['project_job']['title'] ?? $entry['project_name_text'], 'work_category' => $entry['work_category'],
+                'title' => $entry['title'] ?: ($entry['project_job']['title'] ?? $entry['broad_project']['name'] ?? $entry['project_name_text'] ?? '作業予定'),
+                'project_name' => $entry['project_job']['title'] ?? $entry['broad_project']['name'] ?? $entry['project_name_text'], 'work_category' => $entry['work_category'],
                 'selected' => (bool) $row, 'result_note' => $entry['result_note'] ?? '',
                 'actual_quantity' => $entry['actual_quantity'], 'actual_unit' => $entry['actual_unit'] ?? '',
                 'activity_type' => $row?->activity_type ?? $entry['activity_type'] ?? '',
