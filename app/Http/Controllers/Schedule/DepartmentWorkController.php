@@ -205,7 +205,7 @@ class DepartmentWorkController extends Controller
                             $match->where('name', 'like', $like)
                                 ->orWhereHas('client', fn ($client) => $client->where('name', 'like', $like));
                         }));
-                })->when($selectedBroadId, fn ($q) => $q->orWhereKey($selectedBroadId));
+                })->when($selectedBroadId, fn ($q) => $q->orWhere('broad_projects.id', $selectedBroadId));
             })
             ->with('client:id,name')
             ->when($selectedBroadId, fn ($query) => $query->orderByRaw('id = ? DESC', [$selectedBroadId]))
