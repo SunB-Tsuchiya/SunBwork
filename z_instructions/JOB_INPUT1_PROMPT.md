@@ -41,7 +41,7 @@ W05/P06: 利用者は「既存の大まかな案件区分はない」と訂正�
 
 2026-10-14 マイジョブ通常新規登録の現状と新決定: 利用者が画面画像を提供。MyJobBox の作成ボタンは `user.project_jobs.assignments.create` を経て `events.create_job` にリダイレクトし、通常画面は `Events/Create_Job.vue`。カレンダーからの作成も同画面。`MyJobBox/Create_user.vue` は依頼引継ぎ等の別経路で、通常画面と同一視しない。ユーザーは「1：別ページ」との最初の回答を即座に取り消し、「2：モーダルの方が気軽」と訂正。現方針は通常新規登録のモーダル化。依頼引継ぎ、進行表、過去データ流用、ファイル情報、既存編集の経路を失わない設計が必要。詳細は `JOB_INPUT_REVIEW_MANAGER1.md`。
 
-同日: 初期表示の案件・ジョブ名・作業日/開始/終了・任意数量、開閉式詳細の概要・ファイル・作業種別等を利用者が承認。本番は情報出版 Super Admin のみ試用、一般利用者は現行画面を維持する。`MYJOB_MODAL_PLAN1.md` / `MYJOB_MODAL_MANAGER1.md` / `MYJOB_MODAL1_PROMPT.md` を作成。モーダルと各入口、候補・保存の試用限定応答を GitHub main `4a4d570ae` に反映。Viteビルド、対象 ESLint、変更PHPの構文確認は成功。さくら反映と利用者画面確認は未実施。続きは `MYJOB_MODAL_MANAGER1.md` を見る。
+同日: 初期表示の案件・ジョブ名・作業日/開始/終了・任意数量、開閉式詳細の概要・ファイル・作業種別等を利用者が承認。本番は情報出版 Super Admin のみ試用、一般利用者は現行画面を維持する。`MYJOB_MODAL_PLAN1.md` / `MYJOB_MODAL_MANAGER1.md` / `MYJOB_MODAL1_PROMPT.md` を作成。モーダルと各入口、候補・保存の試用限定応答を GitHub main `4a4d570ae` に反映。Viteビルド、対象 ESLint、変更PHPの構文確認は成功。利用者承認の SSH でさくら `06366a0ca` へ反映し、PHP構文と cache clear 成功。**実画面確認は未実施。** 続きは `MYJOB_MODAL_MANAGER1.md` を見る。
 
 ## 作業環境と安全事項
 
