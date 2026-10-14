@@ -39,6 +39,8 @@
 
 W05/P06: 利用者は「既存の大まかな案件区分はない」と訂正。以前の「既存大枠を候補検索で確認」は撤回済み。新しい専用登録を情報出版 Super Admin メニューに先行追加。名前必須、取引先・年度任意。`843ca6d25` までさくらへ反映し、登録・編集、簡易予定での選択保存、日表示の件名と再表示時の選択保持を利用者が画面確認済み。所有者以外からの `private` 表示は権限レビューへ保留。既存 ProjectJob の紐づけ、ProjectJob 登録時選択、Coordinator メニューは皆で使う段階の保留事項。次はマイジョブ入力見直し。`BROAD_PROJECT_PLAN1.md` / `BROAD_PROJECT_MANAGER1.md` / `BROAD_PROJECT1_PROMPT.md` を読む。
 
+2026-10-14 マイジョブ通常新規登録の現状と新決定: 利用者が画面画像を提供。MyJobBox の作成ボタンは `user.project_jobs.assignments.create` を経て `events.create_job` にリダイレクトし、通常画面は `Events/Create_Job.vue`。カレンダーからの作成も同画面。`MyJobBox/Create_user.vue` は依頼引継ぎ等の別経路で、通常画面と同一視しない。ユーザーは「1：別ページ」との最初の回答を即座に取り消し、「2：モーダルの方が気軽」と訂正。現方針は通常新規登録のモーダル化。初期表示項目は確認中。依頼引継ぎ、進行表、過去データ流用、ファイル情報、既存編集の経路を失わない設計が必要。詳細は `JOB_INPUT_REVIEW_MANAGER1.md`。
+
 ## 作業環境と安全事項
 
 - `/home/w229/SunBwork` のローカル `main` は古い HEAD から分岐し、他者の未コミット変更や大量の `public/build` 差分がある。そのまま add、commit、push しない。今回のアプリ変更は隔離作業ツリー `/tmp/sunbwork-job-input-deploy-20261012` から GitHub `main` へ送った。次回は `origin/main` の最新を確認し、清潔な隔離作業ツリーを使う。`/tmp` の既存ツリーが残っていると決めつけない。
