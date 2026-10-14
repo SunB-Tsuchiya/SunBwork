@@ -10,7 +10,7 @@ import { Link } from '@inertiajs/vue3';
 import { computed, ref, onMounted } from 'vue';
 import { route } from 'ziggy-js';
 
-const props = defineProps({ diaries: Array, meta: Object, filters: Object });
+const props = defineProps({ diaries: Array, meta: Object, filters: Object, myJobModalEnabled: { type: Boolean, default: false } });
 const showCalendar = ref(false);
 
 // 年月セレクター: デフォルトは現在の月
@@ -111,7 +111,7 @@ onMounted(() => {
                         <!-- カレンダー本体 -->
                         <div class="calendar-popup absolute left-auto top-full z-50 ml-2 mt-2">
                             <div class="min-w-[300px] rounded bg-white p-4 shadow-lg">
-                                <Calendar @date-select="handleDateSelect" />
+                                <Calendar :my-job-modal-enabled="myJobModalEnabled" @date-select="handleDateSelect" />
                                 <button @click="showCalendar = false" class="mt-2 text-xs text-gray-500 hover:text-blue-600">閉じる</button>
                             </div>
                         </div>

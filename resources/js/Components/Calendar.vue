@@ -367,6 +367,13 @@
             </div>
         </div>
 
+        <MyJobCreateModal
+            :show="showMyJobCreate"
+            :date="myJobDef.date"
+            :start-min="myJobDef.startMin"
+            :end-min="myJobDef.endMin"
+            @close="showMyJobCreate = false"
+            @saved="onMyJobSaved" />
         <!-- schedule-specific UI removed — this Calendar is personal-only -->
     </div>
 </template>
@@ -380,6 +387,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
+import MyJobCreateModal from '@/Components/MyJobCreateModal.vue';
 
 /**
  * hex カラーを rgba に変換して薄い背景色を生成する
@@ -410,6 +418,7 @@ function completedEventStyle(color) {
 }
 
 const props = defineProps({
+    myJobModalEnabled: { type: Boolean, default: false },
     diaries: {
         type: Array,
         default: () => [],
@@ -873,10 +882,29 @@ function goToDiaryCreate() {
     }
 }
 
+const showMyJobCreate = ref(false);
+const myJobDef = ref({ date: '', startMin: null, endMin: null });
+
+function onMyJobSaved() {
+    showMyJobCreate.value = false;
+    router.reload({ preserveScroll: true });
+}
+
 function goToJobCreate() {
     showSelectModal.value = false;
     try {
         const params = buildDateTimeParams();
+        if (props.myJobModalEnabled) {
+            const startMin = Number(params.startHour) * 60 + Number(params.startMinute);
+            const rawEndMin = Number(params.endHour) * 60 + Number(params.endMinute);
+            myJobDef.value = {
+                date: params.date,
+                startMin,
+                endMin: rawEndMin > startMin ? rawEndMin : null,
+            };
+            showMyJobCreate.value = true;
+            return;
+        }
         try {
             router.get(route('events.create_job', params));
             return;

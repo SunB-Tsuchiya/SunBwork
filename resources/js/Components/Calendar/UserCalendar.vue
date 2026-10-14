@@ -9,6 +9,7 @@ import EventModal       from '@/Components/Schedule/EventModal.vue';
 import EventDetailModal from '@/Components/Schedule/EventDetailModal.vue';
 import ActionSheet      from '@/Components/Calendar/ActionSheet.vue';
 import QuickWorkEntryModal from '@/Components/Calendar/QuickWorkEntryModal.vue';
+import MyJobCreateModal from '@/Components/MyJobCreateModal.vue';
 import UserDayView      from '@/Components/Calendar/UserDayView.vue';
 import { useCalendarCore } from '@/Components/Schedule/useCalendarCore.js';
 
@@ -147,10 +148,24 @@ function minToParams(startMin, endMin) {
     return p;
 }
 
+const showMyJobCreate = ref(false);
+const myJobDef = ref({ date: '', startMin: null, endMin: null });
+
 function onActionMyJob() {
     showActionSheet.value = false;
     const { date, startMin, endMin } = actionSheetDef.value;
+    if (props.departmentWorkEnabled) {
+        myJobDef.value = { date, startMin, endMin };
+        showMyJobCreate.value = true;
+        return;
+    }
     router.get(route('events.create_job', { date, ...minToParams(startMin, endMin) }));
+}
+
+function onMyJobSaved(date) {
+    showMyJobCreate.value = false;
+    if (date) currentDate.value = date;
+    loadEvents();
 }
 
 function onActionSheetJob() {
@@ -740,6 +755,14 @@ async function saveWeekBreaks() {
         :entry="quickWorkEntry"
         @close="showQuickWork = false"
         @saved="onQuickWorkSaved" />
+
+    <MyJobCreateModal
+        :show="showMyJobCreate"
+        :date="myJobDef.date"
+        :start-min="myJobDef.startMin"
+        :end-min="myJobDef.endMin"
+        @close="showMyJobCreate = false"
+        @saved="onMyJobSaved" />
 
     <!-- ── 進行表・管理シートモーダル ─────────────────────────── -->
     <div

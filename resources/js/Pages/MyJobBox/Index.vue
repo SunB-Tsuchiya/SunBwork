@@ -23,7 +23,9 @@
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
                 <div class="flex items-center gap-2">
-                    <Link
+                    <button v-if="myJobModalEnabled" type="button" @click="showMyJobModal = true"
+                        class="rounded bg-indigo-600 px-4 py-2 text-sm text-white">マイジョブ作成</button>
+                    <Link v-else
                         :href="typeof route === 'function' ? route('user.project_jobs.assignments.create') : '/project_jobs/assignments/create-user'"
                         class="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
                         >マイジョブ作成</Link
@@ -238,12 +240,14 @@
                 </div>
             </div>
         </Teleport>
+        <MyJobCreateModal :show="showMyJobModal" @close="showMyJobModal = false" @saved="onMyJobSaved" />
     </AppLayout>
 </template>
 
 <script setup>
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import MyJobCreateModal from '@/Components/MyJobCreateModal.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch, onMounted } from 'vue';
@@ -368,7 +372,18 @@ function goToWorkflowSheet() {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
-const props = defineProps({ projectJob: Object, messages: Object, myAssignments: Object });
+const props = defineProps({
+    projectJob: Object, messages: Object, myAssignments: Object,
+    myJobModalEnabled: { type: Boolean, default: false },
+});
+const showMyJobModal = ref(false);
+function onMyJobSaved(date) {
+    showMyJobModal.value = false;
+    router.get(route('user.myjobbox.index'), {
+        q: page.props.q_model || undefined,
+        period: date?.slice(0, 7) || page.props.period_model,
+    }, { preserveScroll: true });
+}
 const page = usePage();
 page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';

@@ -26,6 +26,7 @@ use App\Services\HtmlSanitizer;
 use App\Models\Team;
 use App\Models\Unit;
 use App\Http\Controllers\Concerns\CalculatesEventTime;
+use App\Services\PersonalWorkSchedule;
 
 class EventController extends Controller
 {
@@ -440,6 +441,7 @@ class EventController extends Controller
             'date' => $date,
             'user_id' => $baseUserId,
             'jobs' => [],
+            'myJobModalEnabled' => $request->user() ? app(PersonalWorkSchedule::class)->available($request->user()) : false,
         ]);
     }
 
@@ -1983,6 +1985,22 @@ class EventController extends Controller
      */
     public function createJob(Request $request)
     {
+        $myJobModal = $request->boolean('myjob_modal');
+        if ($myJobModal) {
+            abort_unless(app(PersonalWorkSchedule::class)->available($request->user()), 403);
+            $request->validate([
+                'date' => ['nullable', 'date_format:Y-m-d'],
+                'startHour' => ['nullable', 'integer', 'between:0,23'],
+                'startMinute' => ['nullable', 'integer', 'between:0,59'],
+                'endHour' => ['nullable', 'integer', 'between:0,23'],
+                'endMinute' => ['nullable', 'integer', 'between:0,59'],
+                'job' => ['prohibited'],
+                'source_job_assignment_id' => ['prohibited'],
+                'progress_sheet_id' => ['prohibited'],
+                'workflow_sheet_id' => ['prohibited'],
+                'project_job_id' => ['prohibited'],
+            ]);
+        }
         // reuse much of create() logic but render a dedicated job creation page
         $date = $request->query('date', now()->toDateString());
         $jobId = $request->query('job');
@@ -2286,6 +2304,10 @@ class EventController extends Controller
         try {
             \Illuminate\Support\Facades\Log::info('INERTIA_PROPS createJob', ['props' => ['date' => $date, 'jobId' => $jobId]]);
         } catch (\Throwable $__e) {
+        }
+
+        if ($myJobModal) {
+            return response()->json($props);
         }
 
         return Inertia::render('Events/Create_Job', $props);

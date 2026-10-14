@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Assignment;
 use Illuminate\Support\Facades\Log;
+use App\Services\PersonalWorkSchedule;
 
 class AssignedProjectController extends Controller
 {
@@ -88,6 +89,7 @@ class AssignedProjectController extends Controller
         $jobs = collect($assignments);
         return Inertia::render('Calendar/Index', [
             'jobs' => $jobs,
+            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($user),
         ]);
     }
 

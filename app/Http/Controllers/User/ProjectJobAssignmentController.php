@@ -13,7 +13,10 @@ use App\Models\ProjectJobAssignment;
 use App\Models\JobAssignmentMessage;
 use App\Models\Event;
 use App\Models\ProgressCell;
+use App\Models\ProjectTeamMember;
 use Illuminate\Support\Facades\Schema;
+use App\Services\PersonalWorkSchedule;
+use Illuminate\Validation\ValidationException;
 
 class ProjectJobAssignmentController extends Controller
 {
@@ -24,6 +27,38 @@ class ProjectJobAssignmentController extends Controller
      */
     public function store(Request $request, ProjectJob $projectJob)
     {
+        $myJobModal = $request->boolean('myjob_modal');
+        if ($myJobModal) {
+            abort_unless(app(PersonalWorkSchedule::class)->available($request->user()), 403);
+            $request->validate([
+                'assignments' => ['required', 'array', 'size:1'],
+                'assignments.0.desired_start_date' => ['required', 'date_format:Y-m-d'],
+                'assignments.0.start_time' => ['required', 'date_format:H:i'],
+                'assignments.0.desired_time' => ['required', 'date_format:H:i'],
+                'assignments.0.id' => ['prohibited'],
+                'assignments.0.source_assignment_id' => ['prohibited'],
+                'assignments.0.supersedes_assignment_id' => ['prohibited'],
+                'assignments.0._progress_sheet_id' => ['prohibited'],
+                'assignments.0._workflow_sheet_id' => ['prohibited'],
+                'assignments.0._row_id' => ['prohibited'],
+                'assignments.0._col_key' => ['prohibited'],
+            ]);
+            $user = $request->user();
+            $isOther = $projectJob->title === 'その他'
+                && $projectJob->client?->name === 'その他'
+                && $projectJob->client?->company_id === null;
+            $isMember = ProjectTeamMember::where('user_id', $user->id)
+                ->where('project_job_id', $projectJob->id)->exists();
+            $isLeader = (int) $projectJob->user_id === (int) $user->id;
+            $isCoordinator = $projectJob->coordinators()->where('users.id', $user->id)->exists();
+            abort_unless($isOther || (! $projectJob->completed && ($isMember || $isLeader || $isCoordinator)), 403);
+            $slot = $request->input('assignments.0');
+            if ($slot['desired_time'] <= $slot['start_time']) {
+                throw ValidationException::withMessages([
+                    'assignments.0.desired_time' => '終了時刻は開始時刻より後にしてください。',
+                ]);
+            }
+        }
         $data = $request->validate([
             'assignments' => 'required|array',
             'assignments.*.desired_start_date' => 'nullable|date',
@@ -60,6 +95,7 @@ class ProjectJobAssignmentController extends Controller
 
         // (removed temporary debug logging)
 
+        $createdAssignmentIds = [];
         foreach ($data['assignments'] as $a) {
             // 同一 Coordinator 割当からの二重登録を防止
             if (!empty($a['supersedes_assignment_id'])) {
@@ -72,7 +108,7 @@ class ProjectJobAssignmentController extends Controller
                 }
             }
 
-            DB::transaction(function () use ($projectJob, $a, $user) {
+            DB::transaction(function () use ($projectJob, $a, $user, $myJobModal, &$createdAssignmentIds) {
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
@@ -95,8 +131,8 @@ class ProjectJobAssignmentController extends Controller
                     'size_id' => $a['size_id'] ?? null,
                     'stage_id' => $a['stage_id'] ?? null,
                     'status_id' => $a['status_id'] ?? null,
-                    'company_id' => $a['company_id'] ?? null,
-                    'department_id' => $a['department_id'] ?? null,
+                    'company_id' => $myJobModal ? $user->company_id : ($a['company_id'] ?? null),
+                    'department_id' => $myJobModal ? $user->department_id : ($a['department_id'] ?? null),
                     'amounts' => $a['amounts'] ?? null,
                     'amounts_unit' => $a['amounts_unit'] ?? null,
                     'file_info' => !empty($a['file_info'])
@@ -112,7 +148,7 @@ class ProjectJobAssignmentController extends Controller
                 if (class_exists(ProjectJobAssignmentByMyself::class)) {
                     // 自己割当ジョブは sender_id = user_id が必須。
                     // フォームから sender_id が送られない場合は認証ユーザーをデフォルトにする。
-                    $createPayload['sender_id'] = $a['sender_id'] ?? ($user ? $user->id : null);
+                    $createPayload['sender_id'] = $myJobModal ? $user->id : ($a['sender_id'] ?? ($user ? $user->id : null));
                     // 自己割当は本人が登録している時点で「確認済み＋セット済み」状態が正しい。
                     // (旧テーブル project_job_assignment_by_myself は統合済みのため
                     //  Schema::hasColumn チェックは不要。project_job_assignments に直接セットする)
@@ -132,6 +168,7 @@ class ProjectJobAssignmentController extends Controller
                     $createPayload['scheduled_at'] = now();
                     $assignment = ProjectJobAssignment::create($createPayload);
                 }
+                $createdAssignmentIds[] = $assignment->id;
 
                 // 元の Coordinator 割当を「登録済み」にする（ジョブ重複防止）
                 if (!empty($a['supersedes_assignment_id'])) {
@@ -335,12 +372,24 @@ class ProjectJobAssignmentController extends Controller
                             }
                         }
                         // ──────────────────────────────────────────────────────────────
+                    } elseif ($myJobModal) {
+                        throw new \RuntimeException('予定テーブルを利用できません。');
                     }
                 } catch (\Throwable $__e) {
+                    if ($myJobModal) {
+                        throw $__e;
+                    }
                     // ignore event creation errors to avoid failing the assignment creation
                     \Illuminate\Support\Facades\Log::warning('Failed to create Event for ProjectJobAssignmentByMyself', ['error' => $__e->getMessage()]);
                 }
             });
+        }
+
+        if ($myJobModal) {
+            return response()->json([
+                'assignment_id' => $createdAssignmentIds[0] ?? null,
+                'date' => $data['assignments'][0]['desired_start_date'],
+            ], 201);
         }
 
         // 管理シート経由なら管理シートへ、それ以外はカレンダーへ

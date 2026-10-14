@@ -19,6 +19,7 @@ defineProps({
         type: Array,
         default: () => [],
     },
+    myJobModalEnabled: { type: Boolean, default: false },
 });
 </script>
 
@@ -28,7 +29,7 @@ defineProps({
             <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">予定表</h2>
         </template>
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <Calendar :diaries="diaries" :events="events" :jobs="jobs" />
+            <Calendar :diaries="diaries" :events="events" :jobs="jobs" :my-job-modal-enabled="myJobModalEnabled" />
         </div>
     </AppLayout>
 </template>

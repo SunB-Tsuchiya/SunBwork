@@ -107,6 +107,7 @@ class DiaryController extends Controller
                 'diaries' => $diariesArr,
                 'meta' => null,
                 'filters' => $filters,
+                'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($request->user()),
             ]);
         }
 
@@ -144,6 +145,7 @@ class DiaryController extends Controller
                 'diaries' => $diariesArr,
                 'meta' => $meta,
                 'filters' => $filters,
+                'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($request->user()),
             ]);
         }
 
@@ -217,6 +219,7 @@ class DiaryController extends Controller
             'diaries' => collect($diariesArr),
             'meta' => $meta,
             'filters' => $filters,
+            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($request->user()),
         ]);
     }
 

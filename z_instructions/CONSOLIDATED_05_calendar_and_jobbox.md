@@ -257,6 +257,14 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 - Clerk管理ルートは`clerk.reminders.*`。別会社のレコードを編集・停止・削除しようとした場合は404。
 - 必須migrationは`2026_09_15_120000_create_clerk_calendar_reminders_table.php`と`2026_09_15_120001_add_color_key_to_clerk_calendar_reminders_table.php`。テストは専用インメモリSQLiteの`ClerkCalendarReminderTest`を使う。
 
+## マイジョブ通常新規登録のモーダル試用（2026-10-14）
+
+状態: コード作成・静的確認済み。GitHub/さくらへの反映と利用者画面確認は `MYJOB_MODAL_MANAGER1.md` で別に管理する。
+
+- 情報出版所属の Super Admin にだけ、マイジョブBOXとカレンダーの通常新規作成入口から短いモーダルを表示する。サーバ側も `PersonalWorkSchedule::available()` で候補取得とモーダル保存応答を制限する。一般利用者は従来の `Events/Create_Job.vue` へ進む。正式公開は別判断。
+- 初期表示は ProjectJob 案件、ジョブ名、作業日、開始/終了時刻、任意の数量と単位。概要、ファイル情報、作業種別・工程・サイズ・難易度は「詳細を開く」に置く。時刻は両方必須で、終了は開始より後とする。案件が決まらないときは現行の「その他」を選べる。大まかな案件から ProjectJob への紐づけは後工程。
+- 保存は既存 `user.project_jobs.assignments.store` に送り、`project_job_assignments` と `events` の関係を維持する。モーダル試用リクエストだけ JSON で応答し、保存元一覧・カレンダーを再取得する。依頼引継ぎ、続き、進行表・管理表経由、過去データ流用、既存編集は従来画面を残す。詳細な計画と進捗は `MYJOB_MODAL_PLAN1.md` / `MYJOB_MODAL_MANAGER1.md`。
+
 ## 個人カレンダーの簡易作業予定（2026-10-12試用改修）
 
 - 情報出版の Super Admin 試用者は個人カレンダーの時刻表から「簡単な作業予定を追加」を選び、開始・終了時刻と大区分を登録する。案件・作業名・作業種類・数量・進みは任意。日付だけから開いた場合も開始・終了を入力してから保存する。簡易予定は `personal_work_entries` に保存し、個人カレンダー専用 API で重ねて表示する。`events` には複製しない。

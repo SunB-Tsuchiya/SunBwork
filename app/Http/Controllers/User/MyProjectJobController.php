@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 use Illuminate\Support\Facades\Log;
+use App\Services\PersonalWorkSchedule;
 
 class MyProjectJobController extends Controller
 {
@@ -179,6 +180,7 @@ class MyProjectJobController extends Controller
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         return Inertia::render('MyJobBox/Index', [
+            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($user),
             'jobs' => $jobs,
             'myAssignments' => $myAssignments,
             'monthOptions' => $monthOptions,
