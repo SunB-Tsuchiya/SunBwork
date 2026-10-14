@@ -35,6 +35,10 @@ This file contains workspace-specific instructions for Codex. Read it before mak
   immediately preceding step, unless the user explicitly says the result is partial.
   Do not extend that confirmation to checks that were never requested. Record the
   confirmed checks and any remaining checks explicitly in the manager file.
+- When a screen-check request has multiple conditions or could be ambiguous,
+  list the checks and the reply format in advance: "成功" alone means every
+  listed check passed; otherwise, ask for the item and the observed result.
+  Phrase the requested response so no inference from a brief reply is needed.
 - If earlier chat records are unavailable, say so and use only the documented
   evidence. Do not claim to have reviewed a past conversation that was not read.
 
