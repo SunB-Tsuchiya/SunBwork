@@ -31,6 +31,10 @@ This file contains workspace-specific instructions for Codex. Read it before mak
   and manager/lead review as separate states. Update the current manager and restart
   prompt after a milestone, with dated evidence and one explicit next step. Before
   asking the user to repeat a check, read that evidence.
+- Treat a user's "成功" or "OK" as confirmation of every check requested in the
+  immediately preceding step, unless the user explicitly says the result is partial.
+  Do not extend that confirmation to checks that were never requested. Record the
+  confirmed checks and any remaining checks explicitly in the manager file.
 - If earlier chat records are unavailable, say so and use only the documented
   evidence. Do not claim to have reviewed a past conversation that was not read.
 
