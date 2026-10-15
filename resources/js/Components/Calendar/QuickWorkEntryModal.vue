@@ -245,13 +245,13 @@ async function remove() {
                         <label class="text-sm">単位<input v-model="form.actual_unit" type="text" list="quick-work-unit-suggestions" maxlength="30" :required="form.actual_quantity !== ''" class="mt-1 w-full rounded border p-2" placeholder="ページ・件など" /></label>
                     </div>
                     <datalist id="quick-work-unit-suggestions"><option v-for="unit in unitSuggestions" :key="unit" :value="unit" /></datalist>
+                    <label class="block text-sm">作業種類（任意）
+                        <select v-model="form.activity_type" class="mt-1 w-full rounded border p-2"><option value="">未指定</option><option v-for="[key, label] in workActivities[form.work_category] || workActivities.other" :key="key" :value="key">{{ label }}</option></select>
+                    </label>
                     <button type="button" class="text-sm text-blue-700 underline" :aria-expanded="showMore" @click="showMore = !showMore">
                         {{ showMore ? '詳しい項目を閉じる' : '進みなどを入力する（任意）' }}
                     </button>
                     <div v-if="showMore" class="space-y-3 rounded-lg border border-pink-200 bg-pink-50/50 p-3">
-                        <label class="block text-sm">作業種類（任意）
-                            <select v-model="form.activity_type" class="mt-1 w-full rounded border p-2"><option value="">未指定</option><option v-for="[key, label] in workActivities[form.work_category] || workActivities.other" :key="key" :value="key">{{ label }}</option></select>
-                        </label>
                         <label class="block text-sm">今日の進み・結果（任意）<textarea v-model="form.result_note" rows="2" maxlength="2000" class="mt-1 w-full rounded border p-2" placeholder="例：初校を提出、確認待ち"></textarea></label>
                         <label class="block text-sm">部署一覧での表示
                             <select v-model="form.entry_visibility" class="mt-1 w-full rounded border p-2"><option value="department">内容を表示</option><option value="private">内容を非公開</option></select>

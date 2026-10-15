@@ -228,6 +228,13 @@ async function save() {
                                 class="mt-1 w-full rounded border px-3 py-2" :aria-invalid="!!errors.title" />
                             <p v-if="errors.title" class="mt-1 text-xs text-red-600">{{ errors.title }}</p>
                         </div>
+                        <div>
+                            <label for="my-job-work-item-type" class="block text-sm font-medium">作業種別（任意）</label>
+                            <select id="my-job-work-item-type" v-model="form.work_item_type_id" class="mt-1 w-full rounded border px-3 py-2">
+                                <option value="">未指定</option>
+                                <option v-for="item in filterMaster('types')" :key="item.id" :value="String(item.id)">{{ item.name }}</option>
+                            </select>
+                        </div>
                         <div class="grid gap-3 sm:grid-cols-3">
                             <div>
                                 <label for="my-job-date" class="block text-sm font-medium">作業日</label>
@@ -280,7 +287,6 @@ async function save() {
                             </div>
                             <div class="grid gap-3 sm:grid-cols-2">
                                 <div v-for="field in [
-                                    { key: 'work_item_type_id', label: '作業種別', list: 'types' },
                                     { key: 'stage_id', label: '工程', list: 'stages' },
                                     { key: 'size_id', label: 'サイズ', list: 'sizes' },
                                     { key: 'difficulty_id', label: '難易度', list: 'difficulties' },

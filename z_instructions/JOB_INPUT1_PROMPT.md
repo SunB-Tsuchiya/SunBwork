@@ -43,6 +43,8 @@ W05/P06: 利用者は「既存の大まかな案件区分はない」と訂正�
 
 同日: 初期表示の案件・ジョブ名・作業日/開始/終了・任意数量、開閉式詳細の概要・ファイル・作業種別等を利用者が承認。本番は情報出版 Super Admin のみ試用、一般利用者は現行画面を維持する。`MYJOB_MODAL_PLAN1.md` / `MYJOB_MODAL_MANAGER1.md` / `MYJOB_MODAL1_PROMPT.md` を作成。モーダルと各入口、候補・保存の試用限定応答を GitHub main `4a4d570ae` に反映。Viteビルド、対象 ESLint、変更PHPの構文確認は成功。利用者承認の SSH でさくら `06366a0ca` へ反映し、PHP構文と cache clear 成功。**実画面確認は未実施。** 続きは `MYJOB_MODAL_MANAGER1.md` を見る。
 
+2026-10-15: 利用者が Super Admin のマイジョブBOXでモーダル起動・初期欄・詳細開閉・キャンセル/外側クリック/Escによる閉鎖を「成功」と確認。保存は未確認。続けてマイジョブ「作業種別」と簡易予定「作業種類」を詳細の外へ出すよう依頼したため、上記初期配置案の種類部分を置換。両欄は任意のまま。次は修正の試用反映と画面確認、その後に保存・再表示。詳細は `MYJOB_MODAL_MANAGER1.md`。
+
 ## 作業環境と安全事項
 
 - `/home/w229/SunBwork` のローカル `main` は古い HEAD から分岐し、他者の未コミット変更や大量の `public/build` 差分がある。そのまま add、commit、push しない。今回のアプリ変更は隔離作業ツリー `/tmp/sunbwork-job-input-deploy-20261012` から GitHub `main` へ送った。次回は `origin/main` の最新を確認し、清潔な隔離作業ツリーを使う。`/tmp` の既存ツリーが残っていると決めつけない。
