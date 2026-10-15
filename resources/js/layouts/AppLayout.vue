@@ -55,6 +55,10 @@ useToasts();
 // resource being viewed when it's not the logged-in user.
 const user = page.props.user;
 const authUser = page.props.auth && page.props.auth.user ? page.props.auth.user : page.props.user;
+// 一般会社（サンエー印刷等）かどうか。サン・ブレーン向け表示は companyType !== 'general' のとき従来どおり
+const isGeneral = computed(() => page.props.auth?.companyType === 'general');
+// 一般会社の Clerk エリアの種別（'soumu' 総務 | 'keiri' 経理）。Clerk は所属部署、Admin 以上は選択中の方（サーバー側セッション）
+const clerkKind = computed(() => page.props.auth?.clerkKind ?? 'soumu');
 const canShowPrepressNav = computed(() => {
     if (authUser?.isSuperAdmin) return true;
 
@@ -247,6 +251,8 @@ function roleNavClass(role) {
         proof_coordinator: 'bg-pink-600 text-white font-semibold',
         user:              'bg-blue-500 text-white font-semibold',
         prepress:          'bg-green-700 text-white font-semibold',
+        soumu:             'bg-purple-600 text-white font-semibold',
+        keiri:             'bg-teal-600 text-white font-semibold',
     };
     const inactiveMap = {
         superadmin:        'text-yellow-600 hover:text-yellow-800',
@@ -257,8 +263,10 @@ function roleNavClass(role) {
         proof_coordinator: 'text-pink-600 hover:text-pink-800',
         user:              'text-blue-600 hover:text-blue-800',
         prepress:          'text-green-700 hover:text-green-900',
+        soumu:             'text-purple-600 hover:text-purple-800',
+        keiri:             'text-teal-600 hover:text-teal-800',
     };
-    return `${base} ${currentRouteContext.value === role ? activeMap[role] : inactiveMap[role]}`;
+    return `${base} ${activeRoleKey.value === role ? activeMap[role] : inactiveMap[role]}`;
 }
 
 // compute active key for coordinator tabs
@@ -316,6 +324,11 @@ const currentRouteContext = computed(() => {
     }
 });
 
+// ロールボタンのハイライト用キー。一般会社の Clerk エリアだけ総務/経理に分ける（他は currentRouteContext と同じ）
+const activeRoleKey = computed(() =>
+    isGeneral.value && currentRouteContext.value === 'clerk' ? clerkKind.value : currentRouteContext.value,
+);
+
 // ロール別ダッシュボードルート名
 const ROLE_DASHBOARD_ROUTE = {
     superadmin:       'superadmin.dashboard',
@@ -337,10 +350,11 @@ function pathnameOf(url) {
     try { return new URL(url, window.location.origin).pathname; } catch { return url; }
 }
 
-// 銀本進行は共通ナビゲーションを持たない独立画面。
+// 銀本進行・作業内容分析（/schedule/department-work 配下）は共通ナビゲーションを持たない独立画面。
 // ロールの復帰先に保存すると通常画面へ戻れなくなるため除外する。
 function isStandaloneMGinbonUrl(url) {
-    return /\/coordinator\/mginbon(?:\/|$)/.test(pathnameOf(url));
+    return /\/coordinator\/mginbon(?:\/|$)/.test(pathnameOf(url))
+        || /\/schedule\/department-work(?:\/|$)/.test(pathnameOf(url));
 }
 
 // ページ遷移時に現ロールの最終URLをlocalStorageに保存
@@ -361,6 +375,11 @@ watch(
 // 常にそのロールのダッシュボードへ遷移させる
 function navigateToRole(role) {
     try {
+        // 一般会社の総務/経理: 同じ Clerk エリアを kind 付きで開く（kind はサーバー側セッションに保持）
+        if (role === 'soumu' || role === 'keiri') {
+            router.get(route('clerk.dashboard', { kind: role }));
+            return;
+        }
         if (role === currentRouteContext.value) {
             router.get(route(ROLE_DASHBOARD_ROUTE[role]));
             return;
@@ -438,8 +457,8 @@ function navigateToRole(role) {
                                 </div>
                             </div>
 
-                            <!-- ジョブ通知 -->
-                            <div class="group relative">
+                            <!-- ジョブ通知（一般会社は非表示） -->
+                            <div v-if="!isGeneral" class="group relative">
                                 <Link :href="route('job-notifications.index')" class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
@@ -466,8 +485,8 @@ function navigateToRole(role) {
                                 </div>
                             </div>
 
-                            <!-- 使い方ガイド -->
-                            <div class="group relative">
+                            <!-- 使い方ガイド（一般会社は非表示） -->
+                            <div v-if="!isGeneral" class="group relative">
                                 <Link :href="route('guide.index')" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
@@ -480,7 +499,7 @@ function navigateToRole(role) {
                             </div>
 
                             <!-- スクリプトツール -->
-                            <div v-if="canAccessScripts" class="group relative">
+                            <div v-if="canAccessScripts && !isGeneral" class="group relative">
                                 <Link :href="route('scripts.index')" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
@@ -492,8 +511,8 @@ function navigateToRole(role) {
                                 </div>
                             </div>
 
-                            <!-- 更新ログ -->
-                            <div class="group relative">
+                            <!-- 更新ログ（一般会社は非表示） -->
+                            <div v-if="!isGeneral" class="group relative">
                                 <Link :href="route('changelogs.index')" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -577,7 +596,7 @@ function navigateToRole(role) {
                                 </svg>
                                 <span v-if="unreadAnnouncements > 0" class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white pointer-events-none">{{ unreadAnnouncements }}</span>
                             </Link>
-                            <Link :href="route('job-notifications.index')" class="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100">
+                            <Link v-if="!isGeneral" :href="route('job-notifications.index')" class="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                                 </svg>
@@ -619,9 +638,30 @@ function navigateToRole(role) {
 
                     <!-- Row 2: Role navigation links -->
                     <div class="hidden border-t border-gray-100 pb-1.5 pt-1 sm:flex sm:items-center sm:space-x-4">
+                        <!-- 一般会社（サンエー印刷等）用ナビゲーション -->
+                        <template v-if="isGeneral">
+                            <button
+                                v-if="$page.props.auth.user.user_role === 'superadmin'"
+                                type="button" @click="navigateToRole('superadmin')" :class="roleNavClass('superadmin')"
+                            >SuperAdmin</button>
+                            <button
+                                v-if="['superadmin', 'admin'].includes($page.props.auth.user.user_role)"
+                                type="button" @click="navigateToRole('admin')" :class="roleNavClass('admin')"
+                            >管理者</button>
+                            <template v-if="['superadmin', 'admin'].includes($page.props.auth.user.user_role)">
+                                <button type="button" @click="navigateToRole('soumu')" :class="roleNavClass('soumu')">総務</button>
+                                <button type="button" @click="navigateToRole('keiri')" :class="roleNavClass('keiri')">経理</button>
+                            </template>
+                            <button
+                                v-else-if="$page.props.auth.user.user_role === 'clerk'"
+                                type="button" @click="navigateToRole(clerkKind)" :class="roleNavClass(clerkKind)"
+                            >{{ clerkKind === 'keiri' ? '経理' : '総務' }}</button>
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">ユーザー</button>
+                        </template>
+
                         <!-- SuperAdmin用ナビゲーション -->
                         <template
-                            v-if="
+                            v-else-if="
                                 $page.props.auth.user.user_role === 'superadmin' &&
                                 (typeof route === 'function' ? route().has('superadmin.dashboard') : false)
                             "
@@ -696,9 +736,46 @@ function navigateToRole(role) {
                 <!-- Responsive Navigation Menu -->
                 <div :class="{ block: showingNavigationDropdown, hidden: !showingNavigationDropdown }" class="sm:hidden">
                     <div class="space-y-1 pb-3 pt-2">
+                        <!-- 一般会社（サンエー印刷等）用レスポンシブナビゲーション -->
+                        <template v-if="isGeneral">
+                            <div v-if="$page.props.auth.user.user_role === 'superadmin'" class="flex items-center gap-2 px-4 py-2">
+                                <span class="text-xs font-medium text-gray-500">会社切替:</span>
+                                <SuperAdminContextSwitcher />
+                            </div>
+                            <ResponsiveNavLink
+                                v-if="$page.props.auth.user.user_role === 'superadmin'"
+                                :href="route('superadmin.dashboard')" :active="route().current('superadmin.dashboard')"
+                            >
+                                <span class="text-yellow-600">SuperAdmin Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                v-if="['superadmin', 'admin'].includes($page.props.auth.user.user_role)"
+                                :href="route('admin.dashboard')" :active="route().current('admin.dashboard')"
+                            >
+                                <span class="text-red-600">管理者 Dashboard</span>
+                            </ResponsiveNavLink>
+                            <template v-if="['superadmin', 'admin'].includes($page.props.auth.user.user_role)">
+                                <ResponsiveNavLink :href="route('clerk.dashboard', { kind: 'soumu' })" :active="route().current('clerk.*') && clerkKind === 'soumu'">
+                                    <span class="text-purple-600">総務 Dashboard</span>
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink :href="route('clerk.dashboard', { kind: 'keiri' })" :active="route().current('clerk.*') && clerkKind === 'keiri'">
+                                    <span class="text-teal-600">経理 Dashboard</span>
+                                </ResponsiveNavLink>
+                            </template>
+                            <ResponsiveNavLink
+                                v-else-if="$page.props.auth.user.user_role === 'clerk'"
+                                :href="route('clerk.dashboard')" :active="route().current('clerk.dashboard')"
+                            >
+                                <span :class="clerkKind === 'keiri' ? 'text-teal-600' : 'text-purple-600'">{{ clerkKind === 'keiri' ? '経理' : '総務' }} Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
+                                <span class="text-blue-600">ユーザー Dashboard</span>
+                            </ResponsiveNavLink>
+                        </template>
+
                         <!-- SuperAdmin用レスポンシブナビゲーション -->
                         <template
-                            v-if="
+                            v-else-if="
                                 $page.props.auth.user.user_role === 'superadmin' &&
                                 (typeof route === 'function' ? route().has('superadmin.dashboard') : false)
                             "
@@ -826,9 +903,9 @@ function navigateToRole(role) {
 
                             <div class="border-t border-gray-200 my-1" />
 
-                            <ResponsiveNavLink :href="route('guide.index')" :active="route().current('guide.index')"> 使い方ガイド </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('changelogs.index')" :active="route().current('changelogs.index')"> 更新ログ </ResponsiveNavLink>
-                            <ResponsiveNavLink v-if="canAccessScripts" :href="route('scripts.index')" :active="route().current('scripts.*')"> スクリプトツール </ResponsiveNavLink>
+                            <ResponsiveNavLink v-if="!isGeneral" :href="route('guide.index')" :active="route().current('guide.index')"> 使い方ガイド </ResponsiveNavLink>
+                            <ResponsiveNavLink v-if="!isGeneral" :href="route('changelogs.index')" :active="route().current('changelogs.index')"> 更新ログ </ResponsiveNavLink>
+                            <ResponsiveNavLink v-if="canAccessScripts && !isGeneral" :href="route('scripts.index')" :active="route().current('scripts.*')"> スクリプトツール </ResponsiveNavLink>
 
                             <div class="border-t border-gray-200 my-1" />
 

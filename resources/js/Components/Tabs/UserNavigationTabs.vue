@@ -7,6 +7,10 @@ const props = defineProps({
 });
 
 const isSunbrain = computed(() => usePage().props.auth?.companyType === 'sunbrain');
+// 一般会社（サンエー印刷等）はジョブ系タブを出さない。サン・ブレーンは従来どおり全タブ
+const isGeneral = computed(() => usePage().props.auth?.companyType === 'general');
+const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings'];
+const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
 
 // User カラー: blue
 const tab = (key) => [
@@ -30,7 +34,7 @@ const tabs = computed(() => [
     { key: 'team_rooms', href: tryRoute('team-rooms.index'), label: 'チームルーム' },
     { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
-].filter(t => t.condition !== false && t.href));
+].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
 function onMobileSelect(e) {
     const href = e.target.value;
@@ -64,13 +68,13 @@ function onMobileSelect(e) {
             <Link :href="route('calendar.index')" :class="tab('calendar')">
                 カレンダー
             </Link>
-            <Link :href="route('user.project_jobs.index')" :class="tab('project_jobs')">
+            <Link v-if="showTab('project_jobs')" :href="route('user.project_jobs.index')" :class="tab('project_jobs')">
                 案件確認
             </Link>
-            <Link :href="route('user.myjobbox.index')" :class="tab('myjob')">
+            <Link v-if="showTab('myjob')" :href="route('user.myjobbox.index')" :class="tab('myjob')">
                 マイジョブBOX
             </Link>
-            <Link :href="route('user.jobbox.index')" :class="tab('jobbox')">
+            <Link v-if="showTab('jobbox')" :href="route('user.jobbox.index')" :class="tab('jobbox')">
                 依頼されたジョブ
             </Link>
             <Link :href="route('diaries.index')" :class="tab('diaries')">

@@ -1322,7 +1322,7 @@ onUnmounted(() => {
                             {{ formatJstDate(props.diary.date) }} {{ pad2(clickedStartHour) }}:{{ pad2(clickedStartMinute) }} の操作
                         </h2>
                         <div class="flex flex-col gap-4">
-                            <button @click="createClientEventFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
+                            <button v-if="$page.props.auth?.companyType !== 'general'" @click="createClientEventFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
                             <button @click="createInternalEventFromSelect" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
                             <button @click="closeSelectModal" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
                         </div>

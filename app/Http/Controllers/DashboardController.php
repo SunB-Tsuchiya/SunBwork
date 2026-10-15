@@ -75,6 +75,11 @@ class DashboardController extends Controller
             $component = 'Dashboard';
         } else {
             // ログイン直後など: user_roleで自動リダイレクト
+            // 一般会社（サンエー印刷等）の Leader/Coordinator/ProofCoordinator は専用エリアが無いため User ダッシュボードへ
+            if ($user->company?->company_type === 'general'
+                && in_array($user->user_role, ['leader', 'coordinator', 'proof_coordinator'], true)) {
+                return redirect()->route('user.dashboard');
+            }
             if ($user->user_role === 'superadmin') {
                 return redirect()->route('superadmin.dashboard');
             } elseif ($user->user_role === 'admin') {

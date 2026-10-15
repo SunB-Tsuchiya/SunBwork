@@ -20,6 +20,15 @@ const can = (key) => perm.value === null || perm.value[key] === true;
 const isRepresentative = computed(() => page.props.auth?.user?.isRepresentative ?? false);
 const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
 
+// 一般会社（サンエー印刷等）は表示するタブを許可リストで絞る。サン・ブレーンは従来どおり全タブ
+const isGeneral = computed(() => page.props.auth?.companyType === 'general');
+const GENERAL_ALLOWED = [
+    'dashboard', 'companies', 'users', 'departments', 'special_teams', 'diaries', 'diary_teams',
+    'worktypes', 'work_records', 'leader_permissions', 'meeting_definitions',
+    'presence_board_settings', 'meeting_rooms', 'schedule_settings',
+];
+const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
+
 function tryRoute(name) {
     try { return route(name); } catch { return null; }
 }
@@ -54,7 +63,7 @@ const tabs = computed(() => [
     { key: 'presence_board_settings', href: tryRoute('admin.presence.board_settings'), label: '在席ボード管理' },
     { key: 'meeting_rooms',       href: tryRoute('admin.meeting-rooms.index'),    label: '会議室管理' },
     { key: 'schedule_settings',   href: tryRoute('admin.schedule-settings.edit'), label: '予定表権限設定' },
-].filter(t => t.condition !== false && t.href));
+].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
 function onMobileSelect(e) {
     const href = e.target.value;
@@ -83,128 +92,133 @@ function onMobileSelect(e) {
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
             <Link
+                v-if="showTab('dashboard')"
                 :href="route('admin.dashboard')"
                 :class="tab('dashboard')"
             >
                 ダッシュボード
             </Link>
             <Link
+                v-if="showTab('project_jobs')"
                 :href="route('admin.project_jobs.index')"
                 :class="tab('project_jobs')"
             >
                 案件総覧
             </Link>
             <Link
-                v-if="can('company_management') && typeof route === 'function' && route().has('admin.companies.index')"
+                v-if="showTab('companies') && can('company_management') && typeof route === 'function' && route().has('admin.companies.index')"
                 :href="route('admin.companies.index')"
                 :class="tab('companies')"
             >
                 会社管理
             </Link>
             <Link
-                v-if="can('user_management')"
+                v-if="showTab('users') && can('user_management')"
                 :href="route('admin.users.index')"
                 :class="tab('users')"
             >
                 ユーザー管理
             </Link>
             <Link
-                v-if="can('team_management')"
+                v-if="showTab('departments') && can('team_management')"
                 :href="route('admin.departments.index')"
                 :class="tab('departments')"
             >
                 部署管理
             </Link>
             <Link
-                v-if="can('team_management')"
+                v-if="showTab('special_teams') && can('team_management')"
                 :href="route('admin.special_teams.index')"
                 :class="tab('special_teams')"
             >
                 特別チーム
             </Link>
             <Link
-                v-if="can('diary_management')"
+                v-if="showTab('diaries') && can('diary_management')"
                 :href="route('admin.diaryinteractions.index')"
                 :class="tab('diaries')"
             >
                 日報管理
             </Link>
             <Link
-                v-if="can('diary_management')"
+                v-if="showTab('diary_teams') && can('diary_management')"
                 :href="route('admin.diary_teams.index')"
                 :class="tab('diary_teams')"
             >
                 日報権限管理
             </Link>
             <Link
-                v-if="can('client_management')"
+                v-if="showTab('clients') && can('client_management')"
                 :href="route('admin.clients.index')"
                 :class="tab('clients')"
             >
                 クライアント管理
             </Link>
             <Link
-                v-if="can('workload_analysis')"
+                v-if="showTab('workload') && can('workload_analysis')"
                 :href="route('admin.workload_analyzer.index')"
                 :class="tab('workload')"
             >
                 作業量分析
             </Link>
             <Link
-                v-if="can('worktype_setting')"
+                v-if="showTab('worktypes') && can('worktype_setting')"
                 :href="route('admin.worktypes.index')"
                 :class="tab('worktypes')"
             >
                 勤務形態設定
             </Link>
             <Link
-                v-if="can('work_record_management')"
+                v-if="showTab('work_records') && can('work_record_management')"
                 :href="route('admin.work_records.index')"
                 :class="tab('work_records')"
             >
                 勤務時間管理
             </Link>
             <Link
-                v-if="canAccessSalesAnalysis && typeof route === 'function' && route().has('admin.sales_analysis.dashboard')"
+                v-if="showTab('sales_analysis') && canAccessSalesAnalysis && typeof route === 'function' && route().has('admin.sales_analysis.dashboard')"
                 :href="route('admin.sales_analysis.dashboard')"
                 :class="tab('sales_analysis')"
             >
                 売上分析
             </Link>
             <Link
-                v-if="isRepresentative"
+                v-if="showTab('admin_permissions') && isRepresentative"
                 :href="route('admin.admin_permissions.index')"
                 :class="tab('admin_permissions')"
             >
                 Admin権限管理
             </Link>
             <Link
+                v-if="showTab('leader_permissions')"
                 :href="route('admin.leader_permissions.index')"
                 :class="tab('leader_permissions')"
             >
                 Leader権限管理
             </Link>
             <Link
+                v-if="showTab('meeting_definitions')"
                 :href="route('admin.meeting_definitions.index')"
                 :class="tab('meeting_definitions')"
             >
                 会議設定
             </Link>
             <Link
+                v-if="showTab('presence_board_settings')"
                 :href="route('admin.presence.board_settings')"
                 :class="tab('presence_board_settings')"
             >
                 在席ボード管理
             </Link>
             <Link
-                v-if="typeof route === 'function' && route().has('admin.meeting-rooms.index')"
+                v-if="showTab('meeting_rooms') && typeof route === 'function' && route().has('admin.meeting-rooms.index')"
                 :href="route('admin.meeting-rooms.index')"
                 :class="tab('meeting_rooms')"
             >
                 会議室管理
             </Link>
             <Link
-                v-if="typeof route === 'function' && route().has('admin.schedule-settings.edit')"
+                v-if="showTab('schedule_settings') && typeof route === 'function' && route().has('admin.schedule-settings.edit')"
                 :href="route('admin.schedule-settings.edit')"
                 :class="tab('schedule_settings')"
             >

@@ -10,12 +10,21 @@ const page = usePage();
 const isDiaryManager = computed(() => page.props.auth?.isDiaryManager ?? false);
 const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
 
+// 一般会社（サンエー印刷等）は総務/経理ごとに許可リストで絞る。サン・ブレーンは従来どおり全タブ
+const isGeneral = computed(() => page.props.auth?.companyType === 'general');
+// 総務/経理は現在同じタブ構成（今後それぞれ機能追加予定）
+const generalAllowed = ['dashboard', 'announcements', 'calendar', 'reminders'];
+const showTab = (key) => !isGeneral.value || generalAllowed.includes(key);
+
 // Clerk カラー: purple
+const isKeiri = computed(() => isGeneral.value && page.props.auth?.clerkKind === 'keiri');
 const tab = (key) => [
     'rounded-md px-3 py-2 text-sm font-medium',
     props.active === key
-        ? 'bg-purple-100 text-purple-700'
-        : 'border border-purple-200 text-purple-600 hover:bg-purple-50 hover:text-purple-800',
+        ? (isKeiri.value ? 'bg-teal-100 text-teal-700' : 'bg-purple-100 text-purple-700')
+        : (isKeiri.value
+            ? 'border border-teal-200 text-teal-600 hover:bg-teal-50 hover:text-teal-800'
+            : 'border border-purple-200 text-purple-600 hover:bg-purple-50 hover:text-purple-800'),
 ];
 
 function tryRoute(name) {
@@ -34,7 +43,7 @@ const tabs = computed(() => [
         label: '売上分析',
         condition: canAccessSalesAnalysis.value && typeof route === 'function' && route().has('clerk.sales_analysis.dashboard'),
     },
-].filter(t => t.condition !== false && t.href));
+].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
 function onMobileSelect(e) {
     const href = e.target.value;
@@ -48,7 +57,7 @@ function onMobileSelect(e) {
         <div class="sm:hidden">
             <select
                 @change="onMobileSelect"
-                class="w-full rounded-md border border-purple-300 bg-white px-3 py-2 text-sm text-purple-700 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                :class="isKeiri ? 'border-teal-300 text-teal-700 focus:border-teal-500 focus:ring-teal-500' : 'border-purple-300 text-purple-700 focus:border-purple-500 focus:ring-purple-500'" class="w-full rounded-md border bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1"
             >
                 <option value="">— ページを選択 —</option>
                 <option
@@ -62,27 +71,27 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
-            <Link :href="route('clerk.dashboard')" :class="tab('dashboard')">
+            <Link v-if="showTab('dashboard')" :href="route('clerk.dashboard')" :class="tab('dashboard')">
                 ダッシュボード
             </Link>
-            <Link :href="route('clerk.announcements.index')" :class="tab('announcements')">
+            <Link v-if="showTab('announcements')" :href="route('clerk.announcements.index')" :class="tab('announcements')">
                 お知らせ通知
             </Link>
-            <Link :href="route('clerk.calendar')" :class="tab('calendar')">
+            <Link v-if="showTab('calendar')" :href="route('clerk.calendar')" :class="tab('calendar')">
                 カレンダー
             </Link>
-            <Link :href="route('clerk.reminders.index')" :class="tab('reminders')">
+            <Link v-if="showTab('reminders')" :href="route('clerk.reminders.index')" :class="tab('reminders')">
                 リマインダー設定
             </Link>
             <Link
-                v-if="isDiaryManager"
+                v-if="showTab('diaries') && isDiaryManager"
                 :href="route('diary_manager.diaryinteractions.index')"
                 :class="tab('diaries')"
             >
                 日報管理
             </Link>
             <Link
-                v-if="canAccessSalesAnalysis && typeof route === 'function' && route().has('clerk.sales_analysis.dashboard')"
+                v-if="showTab('sales_analysis') && canAccessSalesAnalysis && typeof route === 'function' && route().has('clerk.sales_analysis.dashboard')"
                 :href="route('clerk.sales_analysis.dashboard')"
                 :class="tab('sales_analysis')"
             >

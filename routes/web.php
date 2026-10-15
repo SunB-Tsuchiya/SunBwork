@@ -683,7 +683,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
 // Ziggy用: 明示的にleader.dashboardルートを追加
 // Leader Routes (AdminとLeaderのみアクセス可能)
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'leader'])
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'leader', 'deny_general'])
     ->prefix('leader')
     ->name('leader.')
     ->group(function () {
@@ -863,7 +863,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/{jobNotification}', [\App\Http\Controllers\JobNotificationController::class, 'show'])->name('show');
     });
 
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator'])
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator', 'deny_general'])
     ->prefix('coordinator')
     ->name('coordinator.')
     ->group(function () {

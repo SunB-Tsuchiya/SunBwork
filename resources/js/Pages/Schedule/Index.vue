@@ -2,8 +2,8 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import ScheduleCalendar from '@/Components/Schedule/ScheduleCalendar.vue';
 import DepartmentWorkBoard from '@/Components/Schedule/DepartmentWorkBoard.vue';
-import { Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     initialDate:        { type: String, default: '' },
@@ -19,7 +19,11 @@ const props = defineProps({
     departmentWorkEnabled: { type: Boolean, default: false },
 });
 
-const tab = ref(props.departmentWorkEnabled && new URLSearchParams(window.location.search).get('tab') !== 'calendar' ? 'work' : 'calendar');
+// 一般会社（サンエー印刷等）は評価システム系の「部署の作業」を出さず、共有予定のみ表示する
+const isGeneral = computed(() => usePage().props.auth?.companyType === 'general');
+const workEnabled = computed(() => props.departmentWorkEnabled && !isGeneral.value);
+
+const tab = ref(workEnabled.value && new URLSearchParams(window.location.search).get('tab') !== 'calendar' ? 'work' : 'calendar');
 const workDate = ref(props.initialDate);
 </script>
 
@@ -28,20 +32,20 @@ const workDate = ref(props.initialDate);
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2>
-                <Link :href="route('guide.schedule')" class="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">
+                <Link v-if="!isGeneral" :href="route('guide.schedule')" class="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">
                     📖 使い方ガイド
                 </Link>
             </div>
         </template>
 
-        <div v-if="departmentWorkEnabled" class="mb-3 flex gap-2 border-b border-gray-200">
+        <div v-if="workEnabled" class="mb-3 flex gap-2 border-b border-gray-200">
             <button type="button" class="rounded-t px-4 py-2 text-sm font-semibold" :class="tab === 'work' ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="tab = 'work'">部署の作業</button>
             <a :href="route('schedule.department_work.results', { date: workDate })" target="_blank" rel="noopener noreferrer" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">作業実績の内訳 ↗</a>
             <button type="button" class="rounded-t px-4 py-2 text-sm font-semibold" :class="tab === 'calendar' ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="tab = 'calendar'">共有予定</button>
             <Link :href="route('calendar.index')" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">カレンダー</Link>
         </div>
 
-        <DepartmentWorkBoard v-if="departmentWorkEnabled && tab === 'work'" :initial-date="initialDate" @date-change="workDate = $event" />
+        <DepartmentWorkBoard v-if="workEnabled && tab === 'work'" :initial-date="initialDate" @date-change="workDate = $event" />
         <template v-else>
         <!-- 会議室予約テスト中バナー -->
         <div class="mb-2 flex items-center gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">

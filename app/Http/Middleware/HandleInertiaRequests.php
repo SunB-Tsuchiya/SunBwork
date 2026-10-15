@@ -139,6 +139,27 @@ class HandleInertiaRequests extends Middleware
                         ]
                     )
                     : null,
+                // 一般会社（サンエー印刷等）の Clerk エリア種別 'soumu' | 'keiri'（それ以外は null）
+                // Clerk は所属部署名に「経理」を含むか、Admin 以上は ?kind= で選んだ方をセッションに保持（既定 総務）
+                'clerkKind' => (function () use ($request, $contextCompany) {
+                    $u = $request->user();
+                    if (! $u || $contextCompany?->company_type !== 'general') {
+                        return null;
+                    }
+                    if ($u->isClerk()) {
+                        return str_contains((string) \App\Models\Department::find($u->department_id)?->name, '経理') ? 'keiri' : 'soumu';
+                    }
+                    if ($u->isSuperAdmin() || $u->isAdmin()) {
+                        $kind = $request->query('kind');
+                        if (in_array($kind, ['soumu', 'keiri'], true)) {
+                            session(['clerk_kind' => $kind]);
+                        }
+
+                        return session('clerk_kind', 'soumu');
+                    }
+
+                    return null;
+                })(),
                 // Admin 権限（admin ロール時のみ取得、それ以外は null）
                 'adminPermissions' => $request->user()?->isAdmin()
                     ? AdminPermission::where('user_id', $request->user()->id)->first()

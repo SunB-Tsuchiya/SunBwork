@@ -5,10 +5,10 @@
             <div class="sm:hidden">
                 <select @change="onMobileActionSelect" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">— 操作を選択 —</option>
-                    <option value="client_event">案件打合せ・外出</option>
+                    <option v-if="!isGeneral" value="client_event">案件打合せ・外出</option>
                     <option value="internal_event">社内予定</option>
-                    <option value="myjob">マイジョブ</option>
-                    <option value="job_sheet">進行表・管理表ジョブ</option>
+                    <option v-if="!isGeneral" value="myjob">マイジョブ</option>
+                    <option v-if="!isGeneral" value="job_sheet">進行表・管理表ジョブ</option>
                     <option value="diary">{{ props.diaryLabel }}入力</option>
                     <option value="schedule">日程設定</option>
                     <option value="break">休憩設定</option>
@@ -16,10 +16,10 @@
             </div>
             <!-- デスクトップ: ボタン列 -->
             <div class="hidden sm:flex flex-wrap gap-2">
-                <button @click="openClientEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
+                <button v-if="!isGeneral" @click="openClientEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
                 <button @click="openInternalEventModal" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
-                <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
-                <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表・管理表ジョブ</button>
+                <button v-if="!isGeneral" @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
+                <button v-if="!isGeneral" @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表・管理表ジョブ</button>
                 <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}入力</button>
                 <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">日程設定</button>
                 <button @click="openBreakModal" class="rounded border border-teal-400 bg-white px-4 py-2 text-sm text-teal-700 hover:bg-teal-50">休憩設定</button>
@@ -90,10 +90,10 @@
             <div class="w-full max-w-xs rounded-lg bg-white p-6 text-center shadow-lg">
                 <h2 class="mb-4 text-lg font-bold">{{ selectedDate }} の操作</h2>
                 <div class="flex flex-col gap-4">
-                    <button @click="openClientEventModalFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
+                    <button v-if="!isGeneral" @click="openClientEventModalFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
                     <button @click="openInternalEventModalFromSelect" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
-                    <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
-                    <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表・管理表ジョブ</button>
+                    <button v-if="!isGeneral" @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
+                    <button v-if="!isGeneral" @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表・管理表ジョブ</button>
                     <button
                         v-if="isProofMember"
                         @click="showSelectModal = false; router.get(route('user.proof_jobs.index'))"
@@ -463,6 +463,8 @@ const props = defineProps({
 
 const page = usePage();
 const isProofMember = computed(() => page.props.auth?.isProofMember ?? false);
+// 一般会社（サンエー印刷等）はジョブ系の予定登録を出さない。サン・ブレーンは従来どおり
+const isGeneral = computed(() => page.props.auth?.companyType === 'general');
 
 // 日ごとの勤務形態マップ { 'YYYY-MM-DD': worktype_id }（ローカル更新可能）
 const localDailyWorktypes = ref([...(props.dailyWorktypes ?? [])]);
