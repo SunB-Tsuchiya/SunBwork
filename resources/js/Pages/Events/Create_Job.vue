@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import { usePage } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 
 function goBack() { window.history.back(); }
 
@@ -230,6 +230,12 @@ function applyRequestJob(rec) {
     formKey.value += 1;
     showRequestModal.value = false;
 }
+
+onMounted(() => {
+    const requested = new URLSearchParams(window.location.search).get('open');
+    if (requested === 'past') openModal();
+    if (requested === 'request') openRequestModal();
+});
 </script>
 
 <template>

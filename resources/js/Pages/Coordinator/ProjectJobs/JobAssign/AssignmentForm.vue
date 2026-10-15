@@ -473,7 +473,7 @@
             <label class="mb-1 mt-4 block font-semibold">難易度</label>
             <select v-model="block.difficulty_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
                 <option :value="null">-- 選択 --</option>
-                <option v-for="d in ($page.props.difficulties || [])" :key="d.id" :value="d.id">{{ d.name }}</option>
+                <option v-for="d in (formContext.difficulties || [])" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
 
             <!-- 締め切り: coordinator = 常に編集可, user = 既存レコードのみ読み取り表示 -->
@@ -704,20 +704,20 @@
     <SelectionModal
         v-if="props.mode === 'coordinator' && showSelector"
         :show="showSelector"
-        :companies="$page.props.companies || []"
-        :types="$page.props.types || []"
-        :sizes="$page.props.sizes || []"
-        :stages="$page.props.stages || []"
-        :statuses="$page.props.statuses || []"
-        :user-role="$page.props.auth.user.user_role || null"
-        :current-company-id="$page.props.company ? $page.props.company.id : $page.props.auth.user.company_id || ''"
-        :current-department-id="$page.props.department ? $page.props.department.id : $page.props.auth.user.department_id || ''"
+        :companies="formContext.companies || []"
+        :types="formContext.types || []"
+        :sizes="formContext.sizes || []"
+        :stages="formContext.stages || []"
+        :statuses="formContext.statuses || []"
+        :user-role="formContext.auth.user.user_role || null"
+        :current-company-id="formContext.company ? formContext.company.id : formContext.auth.user.company_id || ''"
+        :current-department-id="formContext.department ? formContext.department.id : formContext.auth.user.department_id || ''"
         @close="showSelector = false"
         @selected="onSelected"
     />
 
     <!-- Event overlap warning modal -->
-    <div v-if="showOverlapModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div v-if="showOverlapModal" class="fixed inset-0 z-[2200] flex items-center justify-center bg-black bg-opacity-50">
         <div class="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
             <div class="border-b px-6 py-4">
                 <h2 class="text-lg font-semibold text-red-700">予定が重複しています</h2>
@@ -766,6 +766,7 @@
 
 <script setup>
 import SelectionModal from '@/Components/SelectionModal.vue';
+import axios from 'axios';
 import useToasts from '@/Composables/useToasts';
 import { useFileAnalyzer, SUPPORTED_TYPES, UNSUPPORTED_NOTICE } from '@/composables/useFileAnalyzer';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -798,8 +799,11 @@ const props = defineProps({
     // 作業日・時間スロット表示
     showWorkSlots:    { type: Boolean, default: false },
     initialWorkSlots: { type: Array,   default: () => [] },
+    modalContext: { type: Object, default: null },
 });
 const page = usePage();
+const formContext = computed(() => ({ ...page.props, ...(props.modalContext || {}) }));
+const emit = defineEmits(['saved']);
 
 // projectJobにサイズが設定されている場合、割当ブロックのサイズを固定する
 const projectJobSizeId = computed(() => props.projectJob?.size_id ? String(props.projectJob.size_id) : null);
@@ -813,8 +817,8 @@ const validationErrors = ref({});
 function effectiveAuthUser() {
     return (
         injectedAuthUser ||
-        (page.props && page.props.auth && page.props.auth.user ? page.props.auth.user : null) ||
-        (page.props && page.props.user ? page.props.user : null) ||
+        (formContext.value && formContext.value.auth && formContext.value.auth.user ? formContext.value.auth.user : null) ||
+        (formContext.value && formContext.value.user ? formContext.value.user : null) ||
         null
     );
 }
@@ -840,7 +844,7 @@ const startTimeHour = ref(_initTime.h);
 const startTimeMin  = ref(_initTime.m);
 const _initEnd = (() => {
     // 初期値は常に勤務形態の終業時刻（編集時の安全なデフォルト）
-    const worktypeEnd = (page.props?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
+    const worktypeEnd = (formContext.value?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
     const [weh, wem] = worktypeEnd.split(':').map(Number);
     return { h: String(weh).padStart(2, '0'), m: String(wem || 0).padStart(2, '0') };
 })();
@@ -873,7 +877,7 @@ const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 
 
 function makeLabel(kind, id) {
     if (!id) return null;
-    const list = { types: page.props.types, sizes: page.props.sizes, statuses: page.props.statuses, stages: page.props.stages }[kind];
+    const list = { types: formContext.value.types, sizes: formContext.value.sizes, statuses: formContext.value.statuses, stages: formContext.value.stages }[kind];
     if (!Array.isArray(list)) return null;
     const found = list.find((x) => String(x.id) === String(id));
     return found ? `${kind.replace(/s$/, '')}: ${found.name}` : null;
@@ -1069,7 +1073,7 @@ function minsOptions(currentVal) {
 
 function resolveDifficultySlug(id) {
     if (id === undefined || id === null) return 'normal';
-    const list = page.props.difficulties || null;
+    const list = formContext.value.difficulties || null;
     if (Array.isArray(list)) {
         const found = list.find((d) => String(d.id) === String(id));
         if (found) return found.slug || found.key || 'normal';
@@ -1083,7 +1087,7 @@ function resolveDifficultyId(val) {
     if (val === undefined || val === null || val === '') return null;
     const num = Number(val);
     if (!Number.isNaN(num) && String(val).trim() !== '') return num;
-    const list = window?.page?.props?.difficulties || page.props.difficulties || null;
+    const list = window?.page?.props?.difficulties || formContext.value.difficulties || null;
     if (Array.isArray(list)) {
         const lower = String(val).toLowerCase();
         const found = list.find((d) => {
@@ -1245,9 +1249,9 @@ if (props.mode === 'coordinator') {
         if (a.showInlineSelector === undefined) a.showInlineSelector = false;
         const authForDefaults = effectiveAuthUser();
         const defaultCompany =
-            authForDefaults && authForDefaults.company_id ? authForDefaults.company_id : page.props.company ? page.props.company.id : null;
+            authForDefaults && authForDefaults.company_id ? authForDefaults.company_id : formContext.value.company ? formContext.value.company.id : null;
         const defaultDepartment =
-            authForDefaults && authForDefaults.department_id ? authForDefaults.department_id : page.props.department ? page.props.department.id : null;
+            authForDefaults && authForDefaults.department_id ? authForDefaults.department_id : formContext.value.department ? formContext.value.department.id : null;
         if (a.company_id === undefined || a.company_id === null || a.company_id === '') a.company_id = defaultCompany;
         if (a.department_id === undefined || a.department_id === null || a.department_id === '') a.department_id = defaultDepartment;
         if (a.work_item_type_id === undefined) a.work_item_type_id = a.work_item_type_id || null;
@@ -1289,10 +1293,10 @@ if (props.mode === 'coordinator') {
                 if (!a.project_job.title && !a.project_job.name) {
                     if (props.projectJob && (props.projectJob.title || props.projectJob.name)) {
                         a.project_job.title = props.projectJob.title || props.projectJob.name || '';
-                    } else if (Array.isArray(page.props.userProjects)) {
+                    } else if (Array.isArray(formContext.value.userProjects)) {
                         const pid = a.project_job.id || a.project_job.project_job_id || null;
                         if (pid) {
-                            const found = page.props.userProjects.find((p) => String(p.id) === String(pid));
+                            const found = formContext.value.userProjects.find((p) => String(p.id) === String(pid));
                             if (found) a.project_job.title = found.title || found.name || found.project_name || '';
                         }
                     }
@@ -1328,12 +1332,12 @@ if (props.mode === 'coordinator') {
     assignments.value.forEach((a) => {
         if (a.company_id === undefined || a.company_id === null || a.company_id === '') {
             const auth = effectiveAuthUser();
-            const defaultCompany = page.props.company ? page.props.company.id : auth && auth.company_id ? auth.company_id : null;
+            const defaultCompany = formContext.value.company ? formContext.value.company.id : auth && auth.company_id ? auth.company_id : null;
             a.company_id = defaultCompany;
         }
         if (a.department_id === undefined || a.department_id === null || a.department_id === '') {
             const auth = effectiveAuthUser();
-            const defaultDepartment = page.props.department ? page.props.department.id : auth && auth.department_id ? auth.department_id : null;
+            const defaultDepartment = formContext.value.department ? formContext.value.department.id : auth && auth.department_id ? auth.department_id : null;
             a.department_id = defaultDepartment;
         }
         if (a.work_item_type_id === undefined) a.work_item_type_id = a.work_item_type_id || null;
@@ -1373,8 +1377,8 @@ if (props.mode === 'coordinator') {
         const role = effectiveAuthUser() && effectiveAuthUser().user_role ? effectiveAuthUser().user_role : null;
         if (role !== 'superadmin') {
             const auth2 = effectiveAuthUser();
-            const forcedCompany = page.props.company ? page.props.company.id : auth2 && auth2.company_id ? auth2.company_id : null;
-            const forcedDepartment = page.props.department ? page.props.department.id : auth2 && auth2.department_id ? auth2.department_id : null;
+            const forcedCompany = formContext.value.company ? formContext.value.company.id : auth2 && auth2.company_id ? auth2.company_id : null;
+            const forcedDepartment = formContext.value.department ? formContext.value.department.id : auth2 && auth2.department_id ? auth2.department_id : null;
             assignments.value.forEach((a) => {
                 if (!a.company_id && forcedCompany) a.company_id = forcedCompany;
                 if (!a.department_id && forcedDepartment) a.department_id = forcedDepartment;
@@ -1390,7 +1394,7 @@ const { toasts, dismissToast, toastClass } = useToasts();
 onMounted(() => {
     if (props.mode === 'coordinator') {
         try {
-            const list = window?.page?.props?.difficulties || page.props.difficulties || null;
+            const list = window?.page?.props?.difficulties || formContext.value.difficulties || null;
             if (Array.isArray(list)) {
                 // difficulties loaded
             }
@@ -1458,7 +1462,7 @@ onMounted(() => {
                 } else {
                     const _nt = _calcInitStartTime();
                     const _nowMins = Number(_nt.h) * 60 + Number(_nt.m);
-                    const _wEnd = (page.props?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
+                    const _wEnd = (formContext.value?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
                     const [_weh, _wem] = _wEnd.split(':').map(Number);
                     const _wEndMins = _weh * 60 + (_wem || 0);
                     if (_nowMins < _wEndMins) {
@@ -1484,8 +1488,8 @@ watch(
         injectedAuthUser: injectedAuthUser,
         injectedUser: injectedUser,
         effective: effectiveAuthUser(),
-        pageAuthUser: page.props && page.props.auth ? page.props.auth.user : null,
-        pageUser: page.props ? page.props.user : null,
+        pageAuthUser: formContext.value && formContext.value.auth ? formContext.value.auth.user : null,
+        pageUser: formContext.value ? formContext.value.user : null,
     }),
     (_val) => {},
     { deep: true },
@@ -1541,8 +1545,8 @@ function clientName(block) {
         const clientId =
             (block && block.project_job && (block.project_job.client?.id || block.project_job.client_id)) ||
             (props.projectJob && (props.projectJob.client?.id || props.projectJob.client_id));
-        if (clientId && Array.isArray(page.props.clients)) {
-            const found = page.props.clients.find((x) => String(x.id) === String(clientId));
+        if (clientId && Array.isArray(formContext.value.clients)) {
+            const found = formContext.value.clients.find((x) => String(x.id) === String(clientId));
             if (found && found.name) return found.name;
         }
     } catch (e) {}
@@ -1559,8 +1563,8 @@ function projectName(block) {
         }
         if (props.projectJob && (props.projectJob.title || props.projectJob.name)) return props.projectJob.title || props.projectJob.name;
         const pid = block && block.project_job && (block.project_job.id || block.project_job.project_job_id);
-        if (pid && Array.isArray(page.props.userProjects)) {
-            const found = page.props.userProjects.find((p) => String(p.id) === String(pid));
+        if (pid && Array.isArray(formContext.value.userProjects)) {
+            const found = formContext.value.userProjects.find((p) => String(p.id) === String(pid));
             if (found) return found.name || found.title || found.project_name || '';
         }
         if (block && block.project_job_id) {
@@ -1575,7 +1579,7 @@ function onSelected(payload) {
     const idx = selectorTargetIndex.value;
     const makeLabel2 = (kind, id) => {
         if (!id) return null;
-        const list = { types: page.props.types, sizes: page.props.sizes, statuses: page.props.statuses, stages: page.props.stages }[kind];
+        const list = { types: formContext.value.types, sizes: formContext.value.sizes, statuses: formContext.value.statuses, stages: formContext.value.stages }[kind];
         if (!Array.isArray(list)) return null;
         const found = list.find((x) => String(x.id) === String(id));
         return found ? `${kind.replace(/s$/, '')}: ${found.name}` : null;
@@ -1623,13 +1627,13 @@ function onSelected(payload) {
 
 function companyNameFromId(companyId) {
     if (!companyId) return companyName(companyId);
-    const fromList = (page.props.companies || []).find((c) => String(c.id) === String(companyId));
+    const fromList = (formContext.value.companies || []).find((c) => String(c.id) === String(companyId));
     if (fromList && fromList.name) return fromList.name;
-    if (page.props && page.props.company && String(page.props.company.id) === String(companyId) && page.props.company.name) {
-        return page.props.company.name;
+    if (formContext.value && formContext.value.company && String(formContext.value.company.id) === String(companyId) && formContext.value.company.name) {
+        return formContext.value.company.name;
     }
     try {
-        const up = page.props.userProjects || page.props.user_projects || null;
+        const up = formContext.value.userProjects || formContext.value.user_projects || null;
         if (Array.isArray(up)) {
             const found = up.find((p) => {
                 if (!p) return false;
@@ -1648,7 +1652,7 @@ function companyNameFromId(companyId) {
 
 function departmentsFlattened() {
     const out = [];
-    (page.props.companies || []).forEach((c) => {
+    (formContext.value.companies || []).forEach((c) => {
         const deps = c && c.departments ? c.departments : [];
         Array.from(deps || []).forEach((d) => {
             const id = d && (d.id ?? d['id']) ? (d.id ?? d['id']) : null;
@@ -1663,8 +1667,8 @@ function departmentNameFromId(departmentId) {
     if (!departmentId) return departmentName(departmentId);
     const fromList = departmentsFlattened().find((d) => String(d.id) === String(departmentId));
     if (fromList && fromList.name) return fromList.name;
-    if (page.props && page.props.department && String(page.props.department.id) === String(departmentId) && page.props.department.name) {
-        return page.props.department.name;
+    if (formContext.value && formContext.value.department && String(formContext.value.department.id) === String(departmentId) && formContext.value.department.name) {
+        return formContext.value.department.name;
     }
     return departmentName(departmentId);
 }
@@ -1687,7 +1691,7 @@ function departmentNameFromBlock(block) {
 
 function companyName(companyId) {
     if (!companyId) return 'グローバル/未設定';
-    const found = (page.props.companies || []).find((c) => String(c.id) === String(companyId));
+    const found = (formContext.value.companies || []).find((c) => String(c.id) === String(companyId));
     return found ? found.name : String(companyId);
 }
 
@@ -1700,7 +1704,7 @@ function departmentName(departmentId) {
 
 function companyById(companyId) {
     if (!companyId) return null;
-    const found = (page.props.companies || []).find((c) => String(c.id) === String(companyId));
+    const found = (formContext.value.companies || []).find((c) => String(c.id) === String(companyId));
     return found || null;
 }
 
@@ -1713,7 +1717,7 @@ function departmentById(departmentId) {
 
 function itemName(kind, id) {
     if (!id) return '';
-    const list = { types: page.props.types, sizes: page.props.sizes, statuses: page.props.statuses, stages: page.props.stages }[kind];
+    const list = { types: formContext.value.types, sizes: formContext.value.sizes, statuses: formContext.value.statuses, stages: formContext.value.stages }[kind];
     if (!Array.isArray(list)) return String(id);
     const found = list.find((x) => String(x.id) === String(id));
     return found ? found.name : String(id);
@@ -1724,7 +1728,7 @@ function memberName(userId) {
     if (typeof userId === 'string' && isNaN(Number(userId))) return userId;
     const m = (props.members || []).find((mm) => String(mm.id) === String(userId));
     if (m) return m.name || m.full_name || String(m.id);
-    const pageUsers = page.props.users || page.props.members || [];
+    const pageUsers = formContext.value.users || formContext.value.members || [];
     const found = (Array.isArray(pageUsers) ? pageUsers : []).find((u) => String(u.id) === String(userId));
     if (found) return found.name || found.full_name || String(found.id);
     try {
@@ -1809,10 +1813,10 @@ function sizesGrouped(companyId, departmentId, mediumFilter, filterDeptId) {
 }
 
 function typesForSelect(companyId, departmentId) {
-    const list = page.props.types || [];
+    const list = formContext.value.types || [];
     const auth = effectiveAuthUser();
-    const comp = companyId ?? (page.props.company ? page.props.company.id : auth && auth.company_id) ?? '';
-    const dept = departmentId ?? (page.props.department ? page.props.department.id : auth && auth.department_id) ?? '';
+    const comp = companyId ?? (formContext.value.company ? formContext.value.company.id : auth && auth.company_id) ?? '';
+    const dept = departmentId ?? (formContext.value.department ? formContext.value.department.id : auth && auth.department_id) ?? '';
     const sComp = String(comp ?? '');
     const sDept = String(dept ?? '');
     return list.filter((t) => {
@@ -1825,10 +1829,10 @@ function typesForSelect(companyId, departmentId) {
 }
 
 function sizesForSelect(companyId, departmentId) {
-    const list = page.props.sizes || [];
+    const list = formContext.value.sizes || [];
     const auth = effectiveAuthUser();
-    const comp = companyId ?? (page.props.company ? page.props.company.id : auth && auth.company_id) ?? '';
-    const dept = departmentId ?? (page.props.department ? page.props.department.id : auth && auth.department_id) ?? '';
+    const comp = companyId ?? (formContext.value.company ? formContext.value.company.id : auth && auth.company_id) ?? '';
+    const dept = departmentId ?? (formContext.value.department ? formContext.value.department.id : auth && auth.department_id) ?? '';
     const sComp = String(comp ?? '');
     const sDept = String(dept ?? '');
     return list.filter((s) => {
@@ -1841,10 +1845,10 @@ function sizesForSelect(companyId, departmentId) {
 }
 
 function stagesForSelect(companyId, departmentId) {
-    const list = page.props.stages || [];
+    const list = formContext.value.stages || [];
     const auth = effectiveAuthUser();
-    const comp = companyId ?? (page.props.company ? page.props.company.id : auth && auth.company_id) ?? '';
-    const dept = departmentId ?? (page.props.department ? page.props.department.id : auth && auth.department_id) ?? '';
+    const comp = companyId ?? (formContext.value.company ? formContext.value.company.id : auth && auth.company_id) ?? '';
+    const dept = departmentId ?? (formContext.value.department ? formContext.value.department.id : auth && auth.department_id) ?? '';
     const sComp = String(comp ?? '');
     const sDept = String(dept ?? '');
     return list.filter((st) => {
@@ -1857,10 +1861,10 @@ function stagesForSelect(companyId, departmentId) {
 }
 
 function statusesForSelect(companyId, departmentId) {
-    const list = page.props.statuses || [];
+    const list = formContext.value.statuses || [];
     const auth = effectiveAuthUser();
-    const comp = companyId ?? (page.props.company ? page.props.company.id : auth && auth.company_id) ?? '';
-    const dept = departmentId ?? (page.props.department ? page.props.department.id : auth && auth.department_id) ?? '';
+    const comp = companyId ?? (formContext.value.company ? formContext.value.company.id : auth && auth.company_id) ?? '';
+    const dept = departmentId ?? (formContext.value.department ? formContext.value.department.id : auth && auth.department_id) ?? '';
     const sComp = String(comp ?? '');
     const sDept = String(dept ?? '');
     return list.filter((st) => {
@@ -1886,7 +1890,7 @@ const SLOT_LEGACY_MODEL = { type: 'work_item_type_id', stage: 'stage_id', size: 
 const SLOT_FIELD_MODEL  = { type: 'field_type_val', stage: 'field_stage_val', size: 'field_size_val' };
 
 function getSlotConfig(departmentId, slot) {
-    const configs = page.props.departmentFieldConfigs ?? [];
+    const configs = formContext.value.departmentFieldConfigs ?? [];
     return configs.find(
         (c) => String(c.department_id) === String(departmentId) && c.slot === slot
     ) ?? { enabled: true, label: DEFAULT_SLOT_LABELS[slot], allowed_item_ids: null, source: null, source_group: null };
@@ -1911,7 +1915,7 @@ function slotUsesCustom(block, slot) {
 // カスタムソース時のアイテム一覧（source_group でフィルタ）
 function customItemsForSlot(block, slot) {
     const cfg   = getSlotConfig(block.department_id, slot);
-    const all   = page.props.jobFieldOptions ?? [];
+    const all   = formContext.value.jobFieldOptions ?? [];
     const group = cfg.source_group;
     return group ? all.filter((i) => i.group_key === group) : all;
 }
@@ -1930,8 +1934,8 @@ function openInlineSelector(idx) {
     b.showInlineSelector = true;
     if (!b.selectionForm) {
         b.selectionForm = {
-            company_id: b.company_id || page.props.company ? page.props.company.id : page.props.auth.user.company_id || '',
-            department_id: b.department_id || page.props.department ? page.props.department.id : page.props.auth.user.department_id || '',
+            company_id: b.company_id || formContext.value.company ? formContext.value.company.id : formContext.value.auth.user.company_id || '',
+            department_id: b.department_id || formContext.value.department ? formContext.value.department.id : formContext.value.auth.user.department_id || '',
             type_id: b.work_item_type_id || '',
             size_id: b.size_id || '',
             stage_id: b.stage_id || '',
@@ -2147,7 +2151,7 @@ function memberById(userId) {
     try {
         const m = (props.members || []).find((mm) => String(mm.id) === String(userId));
         if (m) return m;
-        const pageUsers = page.props.users || page.props.members || [];
+        const pageUsers = formContext.value.users || formContext.value.members || [];
         if (Array.isArray(pageUsers)) {
             const p = pageUsers.find((u) => String(u.id) === String(userId));
             if (p) return p;
@@ -2229,7 +2233,7 @@ function authCompanyName() {
         }
     } catch (e) {}
     try {
-        if (page.props && page.props.company && page.props.company.name) return page.props.company.name;
+        if (formContext.value && formContext.value.company && formContext.value.company.name) return formContext.value.company.name;
     } catch (e) {}
     return companyNameFromId(null);
 }
@@ -2245,7 +2249,7 @@ function authDepartmentName() {
         }
     } catch (e) {}
     try {
-        if (page.props && page.props.department && page.props.department.name) return page.props.department.name;
+        if (formContext.value && formContext.value.department && formContext.value.department.name) return formContext.value.department.name;
     } catch (e) {}
     return departmentNameFromId(null);
 }
@@ -2350,7 +2354,7 @@ fileAnalyzers.forEach((analyzer, idx) => {
             });
             const topSize = Object.entries(sizeCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
             if (topSize) {
-                const sizeList = page.props.sizes ?? [];
+                const sizeList = formContext.value.sizes ?? [];
                 const matched =
                     sizeList.find((sz) => sz.name === topSize) ??
                     sizeList.find((sz) => sz.name.startsWith(topSize) || topSize.startsWith(sz.name));
@@ -2665,6 +2669,23 @@ async function save(sendImmediately = true) {
                     try {
                         alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
                     } catch (e) {}
+                    saving.value = false;
+                    return;
+                }
+                if (props.modalContext) {
+                    try {
+                        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                        await axios.post(
+                            route('user.project_jobs.assignments.store', { projectJob: computedProjectJobId }),
+                            { ...payload, myjob_modal: 1 },
+                            { headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' } },
+                        );
+                        emit('saved', workDate.value);
+                    } catch (error) {
+                        handleSaveError(error.response?.data?.errors || {});
+                    } finally {
+                        saving.value = false;
+                    }
                     return;
                 }
                 router.post(
@@ -2675,6 +2696,11 @@ async function save(sendImmediately = true) {
                         onError: handleSaveError,
                     }
                 );
+                return;
+            }
+            if (props.modalContext) {
+                handleSaveError({ 'assignments.0.user_id': '本人を選択してください。' });
+                saving.value = false;
                 return;
             }
         } catch (e) {
