@@ -36,8 +36,7 @@ class ProjectJobAssignmentController extends Controller
                 'assignments.0.start_time' => ['required', 'date_format:H:i'],
                 'assignments.0.desired_time' => ['required', 'date_format:H:i'],
                 'assignments.0.id' => ['prohibited'],
-                'assignments.0.source_assignment_id' => ['prohibited'],
-                'assignments.0.supersedes_assignment_id' => ['prohibited'],
+                'reuse_assignment_id' => ['nullable', 'integer', 'exists:project_job_assignments,id'],
                 'assignments.0._progress_sheet_id' => ['prohibited'],
                 'assignments.0._workflow_sheet_id' => ['prohibited'],
                 'assignments.0._row_id' => ['prohibited'],
@@ -51,8 +50,37 @@ class ProjectJobAssignmentController extends Controller
                 ->where('project_job_id', $projectJob->id)->exists();
             $isLeader = (int) $projectJob->user_id === (int) $user->id;
             $isCoordinator = $projectJob->coordinators()->where('users.id', $user->id)->exists();
-            abort_unless($isOther || (! $projectJob->completed && ($isMember || $isLeader || $isCoordinator)), 403);
             $slot = $request->input('assignments.0');
+            $sourceId = $slot['source_assignment_id'] ?? null;
+            $requestId = $slot['supersedes_assignment_id'] ?? null;
+            $reuseId = $request->input('reuse_assignment_id');
+            if (count(array_filter([$sourceId, $requestId, $reuseId])) > 1) {
+                throw ValidationException::withMessages([
+                    'assignments.0.project_job_id' => '引用元は1件だけ選択してください。',
+                ]);
+            }
+            if ((int) ($slot['project_job_id'] ?? 0) !== (int) $projectJob->id) {
+                throw ValidationException::withMessages([
+                    'assignments.0.project_job_id' => '選択した案件を確認してください。',
+                ]);
+            }
+            $ownPast = $sourceId || $reuseId;
+            if ($ownPast && !ProjectJobAssignmentByMyself::whereKey($sourceId ?: $reuseId)
+                ->where('user_id', $user->id)->where('project_job_id', $projectJob->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'assignments.0.project_job_id' => '選択した過去ジョブを確認してください。',
+                ]);
+            }
+            if ($requestId && !ProjectJobAssignment::whereKey($requestId)
+                ->where('user_id', $user->id)->where('project_job_id', $projectJob->id)
+                ->where(function ($query) {
+                    $query->whereColumn('sender_id', '!=', 'user_id')->orWhereNull('sender_id');
+                })->whereDoesntHave('supersededBy')->exists()) {
+                throw ValidationException::withMessages([
+                    'assignments.0.supersedes_assignment_id' => '依頼ジョブは既に登録済みか、選択できません。',
+                ]);
+            }
+            abort_unless($isOther || $ownPast || $requestId || (! $projectJob->completed && ($isMember || $isLeader || $isCoordinator)), 403);
             if ($slot['desired_time'] <= $slot['start_time']) {
                 throw ValidationException::withMessages([
                     'assignments.0.desired_time' => '終了時刻は開始時刻より後にしてください。',
@@ -103,6 +131,11 @@ class ProjectJobAssignmentController extends Controller
                     ->whereColumn('sender_id', 'user_id')
                     ->exists();
                 if ($supersedingExists) {
+                    if ($myJobModal) {
+                        throw ValidationException::withMessages([
+                            'assignments.0.supersedes_assignment_id' => 'このジョブはすでにマイジョブとして登録済みです。',
+                        ]);
+                    }
                     return redirect()->route('user.myjobbox.index')
                         ->with('error', 'このジョブはすでにマイジョブとして登録済みです。');
                 }

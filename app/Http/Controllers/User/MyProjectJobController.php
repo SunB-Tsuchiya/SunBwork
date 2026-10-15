@@ -962,6 +962,7 @@ class MyProjectJobController extends Controller
                 'title'            => $a->title,
                 'project_job_id'   => $a->project_job_id,
                 'project_job_name' => $a->projectJob?->title ?? $a->projectJob?->name ?? '-',
+                'client_id'        => $a->projectJob?->client_id,
                 'client_name'      => $a->projectJob?->client?->name ?? '-',
                 'sender_name'      => $a->sender?->name ?? '-',
                 'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),

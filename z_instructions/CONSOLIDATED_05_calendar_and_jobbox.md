@@ -259,11 +259,12 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 
 ## マイジョブ通常新規登録のモーダル試用（2026-10-14）
 
-状態: コード作成・静的確認済み。GitHub/さくらへの反映と利用者画面確認は `MYJOB_MODAL_MANAGER1.md` で別に管理する。
+状態: 通常作成・保存・カレンダー日時引継ぎは試用画面で利用者確認済み。過去流用・依頼引継ぎのモーダル内完結は改修中。GitHub/さくら反映と画面確認の正確な状態は `MYJOB_MODAL_MANAGER1.md` で別に管理する。
 
-- 情報出版所属の Super Admin にだけ、マイジョブBOXとカレンダーの通常新規作成入口から短いモーダルを表示する。サーバ側も `PersonalWorkSchedule::available()` で候補取得とモーダル保存応答を制限する。一般利用者は従来の `Events/Create_Job.vue` へ進む。正式公開は別判断。
-- 初期表示は ProjectJob 案件、ジョブ名、作業種別（任意）、作業日、開始/終了時刻、任意の数量と単位。概要、ファイル情報、工程・サイズ・難易度は「詳細を開く」に置く。作業種別は2026-10-15の利用者指摘に従い、詳細から初期画面へ移した。時刻は両方必須で、終了は開始より後とする。案件が決まらないときは現行の「その他」を選べる。大まかな案件から ProjectJob への紐づけは後工程。
-- 保存は既存 `user.project_jobs.assignments.store` に送り、`project_job_assignments` と `events` の関係を維持する。モーダル試用リクエストだけ JSON で応答し、保存元一覧・カレンダーを再取得する。依頼引継ぎ、続き、進行表・管理表経由、過去データ流用、既存編集は従来画面を残す。詳細な計画と進捗は `MYJOB_MODAL_PLAN1.md` / `MYJOB_MODAL_MANAGER1.md`。
+- 情報出版所属の Super Admin にだけ、マイジョブBOXとカレンダーの通常新規作成入口からモーダルを表示する。サーバ側も `PersonalWorkSchedule::available()` で候補取得とモーダル保存応答を制限する。一般利用者は従来の `Events/Create_Job.vue` へ進む。正式公開は別判断。
+- 入力には旧画面と同じ `AssignmentForm.vue` を使い、クライアント→プロジェクトの選択、作業種別を含む全欄、作業日と開始/終了時刻を開閉なしで表示する。終了は開始より後とする。案件が決まらないときは現行の「その他」を選べる。大まかな案件から ProjectJob への紐づけは後工程。
+- 過去データと未対応依頼の一覧をモーダル内で選ぶ。過去の続きは `source_assignment_id`、依頼からの登録は `supersedes_assignment_id` でつなぐ。独立した新規引用は元ジョブの本人・案件一致を保存時に確認するが、関係IDは付けない。一般利用者の旧画面と進行表・管理表経由、既存編集は維持する。
+- 保存は既存 `user.project_jobs.assignments.store` に送り、`project_job_assignments` と `events` の関係を維持する。モーダル試用リクエストだけ JSON で応答し、保存元一覧・カレンダーを再取得する。詳細な計画と進捗は `MYJOB_MODAL_PLAN1.md` / `MYJOB_MODAL_MANAGER1.md`。
 
 ## 個人カレンダーの簡易作業予定（2026-10-12試用改修）
 

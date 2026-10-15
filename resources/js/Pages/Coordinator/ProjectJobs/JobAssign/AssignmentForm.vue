@@ -800,6 +800,7 @@ const props = defineProps({
     showWorkSlots:    { type: Boolean, default: false },
     initialWorkSlots: { type: Array,   default: () => [] },
     modalContext: { type: Object, default: null },
+    modalReuseAssignmentId: { type: [Number, String], default: null },
 });
 const page = usePage();
 const formContext = computed(() => ({ ...page.props, ...(props.modalContext || {}) }));
@@ -2677,7 +2678,7 @@ async function save(sendImmediately = true) {
                         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
                         await axios.post(
                             route('user.project_jobs.assignments.store', { projectJob: computedProjectJobId }),
-                            { ...payload, myjob_modal: 1 },
+                            { ...payload, myjob_modal: 1, reuse_assignment_id: props.modalReuseAssignmentId },
                             { headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' } },
                         );
                         emit('saved', workDate.value);
