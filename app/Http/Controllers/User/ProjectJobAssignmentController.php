@@ -206,7 +206,7 @@ class ProjectJobAssignmentController extends Controller
                 // 元の Coordinator 割当を「登録済み」にする（ジョブ重複防止）
                 if (!empty($a['supersedes_assignment_id'])) {
                     ProjectJobAssignment::where('id', (int)$a['supersedes_assignment_id'])
-                        ->whereColumn('user_id', '!=', 'sender_id')
+                        ->coordinatorAssigned()
                         ->update(['is_registered' => true]);
                 }
 
