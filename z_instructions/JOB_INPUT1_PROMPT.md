@@ -1,5 +1,7 @@
 # 次の Codex への引継ぎ：ジョブ入力と作業量評価の試用
 
+2026-10-17 現在の優先事項: `JOB_EVALUATION_CONTROL1.md` の D12 と `MYJOB_MODAL_MANAGER1.md` を参照。本人宛て新規依頼の分類修正は GitHub main・さくら `c285576fc` に反映済み。既存8649は完了状態を維持して依頼ジョブ区分へ1件更新済み。利用者画面では `/user/jobbox` の「完了を表示しない」を外して8649の一覧・詳細とマイジョブ一覧からの消失を照合する。今後の本人宛て新規依頼、他人発信依頼からのマイジョブ転換保存、別アカウントの旧導線は未確認。下の古い順序・時点表現より横断台帳と現行マネージャーを優先する。
+
 ## 最初に読むもの
 
 `AGENTS.md` と横断管理の `JOB_EVALUATION_CONTROL1.md` を最初に読み、続けて `JOB_INPUT_REVIEW_PLAN1.md` の概要と修正順序、`JOB_INPUT_REVIEW_MANAGER1.md` を読む。背景は `JOB_REDESIGN_FLOW_AUDIT1.md`、`JOB_SYSTEM_RETHINK_NOTES1.md`、`CONSOLIDATED_05_calendar_and_jobbox.md`、`CONSOLIDATED_07_workload_and_handover.md`。バックアップ群を無差別に読む必要はない。
