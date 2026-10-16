@@ -823,6 +823,13 @@ class ProjectJobAssignmentsController extends Controller
                         : null,
                 ];
 
+                // この画面から本人に依頼してもマイジョブの自己登録ではない。
+                // 割当側は依頼ジョブの区分にし、実際の依頼者はメッセージと通知に残す。
+                if ($senderUser && $createData['user_id'] !== null
+                    && (int) $createData['user_id'] === (int) $senderUser->id) {
+                    $createData['sender_id'] = null;
+                }
+
                 // legacy difficulty string column removed from create payload
 
                 // (debug logs removed)

@@ -98,6 +98,8 @@ AppLayout.vue の `currentRouteContext` computed はルート名プレフィッ�
 - `sender_id = user_id` → **自己割当**（旧 project_job_assignment_by_myself）
 - `sender_id ≠ user_id` or NULL → **Coordinator 割当**
 
+2026-10-16 の本人宛て依頼: Coordinator の割当画面から自分を担当者にして依頼する場合も依頼ジョブ。割当レコードの `sender_id` は NULL にし、実際の送信者IDは `job_assignment_messages.sender_id` と通知に保持する。JobBox の本人受信一覧は、割当が `sender_id IS NULL` の場合には本人が送った依頼メッセージも表示する。自分で作るマイジョブの `sender_id = user_id`、他人宛て依頼の区分は従来どおり。既存8649は条件付きで1件だけ修正する計画で、他の既存データには自動適用しない。
+
 **スコープ（ProjectJobAssignment モデル）:**
 ```php
 scopeSelfAssigned()        // whereColumn('sender_id', 'user_id')

@@ -731,8 +731,7 @@ class JobBoxController extends Controller
             ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id');
 
         // このルートは権限や選択中の会社に関係なく、ログイン本人の受信箱。
-        $base->where('project_job_assignments.user_id', $user->id)
-            ->where('job_assignment_messages.sender_id', '!=', $user->id);
+        $base->forRecipientInbox($user->id);
         // 登録済みジョブも一覧に残す（フロントエンドの「登録済みを表示しない」チェックで制御）
 
         if ($q) {
@@ -814,8 +813,7 @@ class JobBoxController extends Controller
         $monthValuesQuery = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id');
 
-        $monthValuesQuery->where('project_job_assignments.user_id', $user->id)
-            ->where('job_assignment_messages.sender_id', '!=', $user->id);
+        $monthValuesQuery->forRecipientInbox($user->id);
 
         $monthValues = $monthValuesQuery
             ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")

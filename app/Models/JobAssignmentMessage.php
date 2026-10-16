@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class JobAssignmentMessage extends Model
@@ -33,6 +34,17 @@ class JobAssignmentMessage extends Model
         'scheduled_at' => 'datetime',
         'completed' => 'boolean',
     ];
+
+    /** Apply after joining project_job_assignments for the recipient's inbox. */
+    public function scopeForRecipientInbox(Builder $query, int $userId): Builder
+    {
+        return $query->where('project_job_assignments.user_id', $userId)
+            ->where(function (Builder $inbox) use ($userId) {
+                $inbox->where('job_assignment_messages.sender_id', '!=', $userId)
+                    // Coordinator から本人への依頼は割当 sender_id が NULL。
+                    ->orWhereNull('project_job_assignments.sender_id');
+            });
+    }
 
     public function projectJobAssignment()
     {

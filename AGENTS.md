@@ -288,6 +288,7 @@ $start = $this->resolveJstCarbon($event, 'starts_at');
 
 - `sender_id = user_id`: self-assignment, MyJobBox
 - `sender_id != user_id` or `NULL`: Coordinator assignment, JobBox
+- When Coordinator sends a job request to themselves, store `project_job_assignments.sender_id` as `NULL` so it remains a requested job. Keep the actual sender ID in `job_assignment_messages.sender_id` and notifications. Do not classify the request as a MyJob solely because sender and recipient are the same person.
 - `desired_start_date` does not exist; use `desired_end_date` for period filters.
 
 Continuation job foreign keys:
