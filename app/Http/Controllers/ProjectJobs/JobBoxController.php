@@ -701,25 +701,6 @@ class JobBoxController extends Controller
             return redirect()->route('login');
         }
 
-        // SuperAdmin: グローバルモードでは会社を選択させる
-        $superAdminContextId = null;
-        if ($user->isSuperAdmin()) {
-            $superAdminContextId = session('superadmin_context.company_id');
-            if ($superAdminContextId === null) {
-                return inertia('JobBox/Index', [
-                    'projectJob'   => null,
-                    'messages'     => [],
-                    'q'            => $request->input('q'),
-                    'period'       => 'all',
-                    'monthOptions' => [],
-                    'sort'         => null,
-                    'dir'          => 'desc',
-                    'routeContext' => 'user',
-                    'isGlobalMode' => true,
-                ]);
-            }
-        }
-
         $q = $request->input('q');
         $periodParam = $request->query('period');
         $usePeriodFilter = true;
@@ -749,15 +730,9 @@ class JobBoxController extends Controller
             ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
             ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id');
 
-        if ($superAdminContextId) {
-            // SuperAdmin + 会社選択: その会社の全案件への受信ジョブを表示
-            $base->where('project_jobs.company_id', $superAdminContextId);
-        } else {
-            $base->where('project_job_assignments.user_id', $user->id)
-                // 自己割当・自分の返信を除外: メッセージ送信者が自分自身のものは表示しない
-                // (受信箱として機能させる：他者から送られたメッセージのみ表示)
-                ->where('job_assignment_messages.sender_id', '!=', $user->id);
-        }
+        // このルートは権限や選択中の会社に関係なく、ログイン本人の受信箱。
+        $base->where('project_job_assignments.user_id', $user->id)
+            ->where('job_assignment_messages.sender_id', '!=', $user->id);
         // 登録済みジョブも一覧に残す（フロントエンドの「登録済みを表示しない」チェックで制御）
 
         if ($q) {
@@ -839,12 +814,8 @@ class JobBoxController extends Controller
         $monthValuesQuery = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id');
 
-        if ($superAdminContextId) {
-            $monthValuesQuery->where('project_jobs.company_id', $superAdminContextId);
-        } else {
-            $monthValuesQuery->where('project_job_assignments.user_id', $user->id)
-                ->where('job_assignment_messages.sender_id', '!=', $user->id);
-        }
+        $monthValuesQuery->where('project_job_assignments.user_id', $user->id)
+            ->where('job_assignment_messages.sender_id', '!=', $user->id);
 
         $monthValues = $monthValuesQuery
             ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")

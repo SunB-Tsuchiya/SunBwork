@@ -206,32 +206,7 @@ class ProjectJobAssignmentsController extends Controller
         $prefillWorkflowSheetId  = $request->query('workflow_sheet_id')  ? (int) $request->query('workflow_sheet_id')  : null;
         $prefillRowId  = $request->query('row_id')  ? (int) $request->query('row_id')  : null;
         $prefillColKey = $request->query('col_key');
-        // send available team members for selection (exclude self for normal jobs)
-        $selfId  = Auth::id();
-        $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
-            return [
-                'id'                    => $m->user?->id,
-                'name'                  => $m->user?->name,
-                'assignment_name'       => $m->user?->assignment?->name,
-                'employment_type'       => $m->user?->employment_type ?? 'regular',
-                'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
-                'is_ghost'              => (bool) ($m->user?->is_ghost ?? false),
-            ];
-        })->filter(function ($item) use ($selfId) {
-            return $item['id'] !== null && $item['id'] !== $selfId && !$item['is_ghost'];
-        })->values();
-        $ghosts = \App\Models\User::withGhosts()
-            ->where('ghost_owner_id', $selfId)
-            ->get(['id', 'name'])
-            ->map(fn ($g) => [
-                'id'                    => $g->id,
-                'name'                  => $g->name,
-                'assignment_name'       => null,
-                'employment_type'       => 'regular',
-                'employment_type_label' => '',
-                'is_ghost'              => true,
-            ]);
-        $members = $members->concat($ghosts);
+        $members = $this->assignmentMemberOptions($projectJob);
 
         // ensure projectJob has client relation loaded so the create/edit pages can display client name
         if (method_exists($projectJob, 'load')) {
@@ -324,31 +299,7 @@ class ProjectJobAssignmentsController extends Controller
 
     public function edit(ProjectJob $projectJob, ProjectJobAssignment $assignment)
     {
-        $selfId  = Auth::id();
-        $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
-            return [
-                'id'                    => $m->user?->id,
-                'name'                  => $m->user?->name,
-                'assignment_name'       => $m->user?->assignment?->name,
-                'employment_type'       => $m->user?->employment_type ?? 'regular',
-                'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
-                'is_ghost'              => (bool) ($m->user?->is_ghost ?? false),
-            ];
-        })->filter(function ($item) use ($selfId) {
-            return $item['id'] !== null && $item['id'] !== $selfId && !$item['is_ghost'];
-        })->values();
-        $ghosts = \App\Models\User::withGhosts()
-            ->where('ghost_owner_id', $selfId)
-            ->get(['id', 'name'])
-            ->map(fn ($g) => [
-                'id'                    => $g->id,
-                'name'                  => $g->name,
-                'assignment_name'       => null,
-                'employment_type'       => 'regular',
-                'employment_type_label' => '',
-                'is_ghost'              => true,
-            ]);
-        $members = $members->concat($ghosts);
+        $members = $this->assignmentMemberOptions($projectJob, $assignment->user_id);
 
         $a = $assignment;
 
@@ -494,31 +445,7 @@ class ProjectJobAssignmentsController extends Controller
         // Build display payload similar to edit(), including resolved labels and user info
         $a = $assignment;
         // prepare members and lookup lists (same as edit) so frontend can resolve names
-        $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
-            return [
-                'id'                    => $m->user?->id,
-                'name'                  => $m->user?->name,
-                'assignment_name'       => $m->user?->assignment?->name,
-                'employment_type'       => $m->user?->employment_type ?? 'regular',
-                'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
-                'is_ghost'              => (bool) ($m->user?->is_ghost ?? false),
-            ];
-        })->filter(function ($item) {
-            return $item['id'] !== null && !$item['is_ghost'];
-        })->values();
-        $showSelfId = Auth::id();
-        $ghosts = \App\Models\User::withGhosts()
-            ->where('ghost_owner_id', $showSelfId)
-            ->get(['id', 'name'])
-            ->map(fn ($g) => [
-                'id'                    => $g->id,
-                'name'                  => $g->name,
-                'assignment_name'       => null,
-                'employment_type'       => 'regular',
-                'employment_type_label' => '',
-                'is_ghost'              => true,
-            ]);
-        $members = $members->concat($ghosts);
+        $members = $this->assignmentMemberOptions($projectJob, $assignment->user_id);
 
         // ensure projectJob has client relation loaded for the show page
         if (method_exists($projectJob, 'load')) {
@@ -1215,6 +1142,44 @@ class ProjectJobAssignmentsController extends Controller
             'clients' => $clients,
             'projects' => $projects,
         ]);
+    }
+
+    /**
+     * Assignment candidates include project leadership even when they were not
+     * separately entered in the team-member table. Keep the current assignee
+     * visible on edit/show as well.
+     */
+    private function assignmentMemberOptions(ProjectJob $projectJob, ?int $selectedUserId = null): \Illuminate\Support\Collection
+    {
+        $ids = $projectJob->teamMembers()->pluck('user_id')
+            ->merge($projectJob->coordinators()->pluck('users.id'))
+            ->push($projectJob->user_id)
+            ->push($selectedUserId)
+            ->filter()->unique()->values();
+
+        $members = \App\Models\User::whereIn('id', $ids)->with('assignment')->ordered()->get()
+            ->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'assignment_name' => $user->assignment?->name,
+                'employment_type' => $user->employment_type ?? 'regular',
+                'employment_type_label' => $user->employmentTypeLabel(),
+                'is_ghost' => false,
+            ]);
+
+        $ghosts = \App\Models\User::withGhosts()
+            ->where('ghost_owner_id', Auth::id())
+            ->get(['id', 'name'])
+            ->map(fn ($ghost) => [
+                'id' => $ghost->id,
+                'name' => $ghost->name,
+                'assignment_name' => null,
+                'employment_type' => 'regular',
+                'employment_type_label' => '',
+                'is_ghost' => true,
+            ]);
+
+        return $members->concat($ghosts)->values();
     }
 
     /**
