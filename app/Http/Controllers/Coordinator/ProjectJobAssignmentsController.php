@@ -12,6 +12,7 @@ use App\Models\JobAssignmentMessage;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\Client;
+use App\Services\PersonalWorkSchedule;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -276,6 +277,7 @@ class ProjectJobAssignmentsController extends Controller
             'members' => $members,
             'assignments' => [],
             'editMode' => false,
+            'requestJobFormTrial' => app(PersonalWorkSchedule::class)->available($request->user()),
             'companies' => $companies,
             'prefill_title' => $prefillTitle,
             'prefill_stage_id' => $prefillStageId,
@@ -737,13 +739,15 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         $companyId = $request->user()->company_id;
-        $userExistsRule = ['nullable', Rule::exists('users', 'id')->where(function ($q) use ($companyId) {
+        $assigneeRequired = $request->boolean('send_immediately')
+            && app(PersonalWorkSchedule::class)->available($request->user());
+        $userExistsRule = Rule::exists('users', 'id')->where(function ($q) use ($companyId) {
             if ($companyId) {
                 $q->where(function ($q2) use ($companyId) {
                     $q2->where('company_id', $companyId)->orWhereNull('company_id');
                 });
             }
-        })];
+        });
 
         $data = $request->validate([
             'assignments' => 'required|array',
@@ -755,7 +759,7 @@ class ProjectJobAssignmentsController extends Controller
             // scheduling: desired_start_date removed
             'assignments.*.desired_end_date' => 'nullable|date',
             'assignments.*.desired_time' => 'nullable|date_format:H:i',
-            'assignments.*.user_id' => $userExistsRule,
+            'assignments.*.user_id' => [$assigneeRequired ? 'required' : 'nullable', $userExistsRule],
             // lookup fields moved from WorkItem: clients should send these lookup ids directly on the assignment payload
             'assignments.*.work_item_type_id' => 'nullable|exists:work_item_types,id',
             'assignments.*.size_id' => 'nullable|exists:sizes,id',
@@ -765,7 +769,7 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.stage_id' => 'nullable|exists:stages,id',
             'assignments.*.amounts' => 'nullable|integer|min:0',
             'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
-            'assignments.*.sender_id' => $userExistsRule,
+            'assignments.*.sender_id' => ['nullable', $userExistsRule],
             'assignments.*.title' => 'nullable|string|max:255',
             'assignments.*.description' => 'nullable|string',
             'assignments.*._progress_sheet_id'  => 'nullable|integer',
@@ -773,6 +777,8 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*._row_id'   => 'nullable|integer',
             'assignments.*._col_key'  => 'nullable|string|max:64',
             'assignments.*.file_info' => 'nullable|string',
+        ], [
+            'assignments.*.user_id.required' => '割当ユーザーを選択してください。',
         ]);
 
         $sendImmediately = $request->boolean('send_immediately', false);

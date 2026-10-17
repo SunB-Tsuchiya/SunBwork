@@ -18,7 +18,7 @@
         </template>
 
         <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <AssignmentForm :key="formKey" :projectJob="projectJob" :members="members" :assignments="formAssignments" :editMode="true" />
+            <AssignmentForm :key="formKey" :projectJob="projectJob" :members="members" :assignments="formAssignments" :editMode="true" :requestJobFormTrial="requestJobFormTrial" />
         </div>
     </AppLayout>
 
@@ -138,6 +138,7 @@ const props = defineProps({
     projectJob: Object,
     members: Array,
     assignments: Array,
+    requestJobFormTrial: { type: Boolean, default: false },
     prefill_title: { type: String, default: null },
     prefill_stage_id: { type: [String, Number], default: null },
     prefill_size_id: { type: [String, Number], default: null },

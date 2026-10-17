@@ -1,5 +1,5 @@
 # カレンダー・JobBox・イベント（統合）
-最終更新: 2026-10-12
+最終更新: 2026-10-17
 
 ## 情報出版の「部署の作業」（2026-10-08 追加）
 
@@ -25,6 +25,12 @@
 - 情報出版に所属する Clerk の専用カレンダーには、共通の個人カレンダー（簡易作業入力）と部署の作業・実績へのリンクを表示する。大区分の初期値は本人が最近使った種類を優先し、履歴がない Clerk は事務を初期値にする。権限・担当で選択肢を制限しない。
 - 関連実装: `app/Services/PersonalWorkSchedule.php`、`app/Services/DiaryWorkEntries.php`、`app/Support/PersonalWorkActivities.php`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Models/PersonalWorkEntry.php`、`resources/js/Components/Schedule/DepartmentWorkBoard.vue`。本番適用時は3件の migration を実行する。
 - 試験分析では `WorkloadTrialAnalysis` が過去のジョブ予定・仕事の会議と時刻のある簡易予定を時間で統合し、重複と昼休憩を除く。登録者・作成方法の2件の migration も必要。試験点の算式は `CONSOLIDATED_07_workload_and_handover.md` を参照。
+
+---
+
+## 依頼ジョブ新規画面の試用（2026-10-17）
+
+2026-10-17 の依頼ジョブ新規画面の試用実装: 情報出版 Super Admin の通常新規割当だけ、クライアント・案件→ジョブ名・担当者・締め切り→概要・ファイル→作業詳細・難易度・見積時間の順に全欄を表示する。`ProjectJobAssignmentsController::create()` が `PersonalWorkSchedule::available()` の試用判定を渡し、`JobAssign/Edit.vue` から共通 `AssignmentForm.vue` に渡す。試用対象の送信時は担当者を明示的に選ぶ。画面の未指定エラーに加え、`store()` も本人判定により各ブロックの `user_id` を必須とする。本人を選べば本人宛て依頼も可能。非試用、既存編集、マイジョブ、送信しない下書きの経路は従来どおり。実装・ビルド済みであり、さくら反映と利用者画面確認は別途管理する。
 
 ---
 

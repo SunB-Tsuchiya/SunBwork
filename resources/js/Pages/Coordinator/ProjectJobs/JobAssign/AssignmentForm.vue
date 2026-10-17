@@ -1,6 +1,7 @@
 <template>
     <form @submit.prevent="save">
-        <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4">
+        <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4" :class="requestTrialCreate ? 'flex flex-col' : ''">
+            <div :class="requestTrialCreate ? 'order-1' : ''">
             <!-- クライアント -->
             <label class="mb-1 block font-semibold">クライアント</label>
             <div v-if="props.mode === 'coordinator'" class="w-full rounded border bg-gray-50 px-3 py-2">
@@ -33,6 +34,9 @@
                 </select>
             </div>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-2' : ''">
+            <h3 v-if="requestTrialCreate" class="mt-4 border-t pt-3 text-sm font-semibold text-gray-700">依頼の基本</h3>
             <label class="mb-1 mt-2 block font-semibold">ジョブ名</label>
             <div>
                 <input
@@ -48,12 +52,16 @@
                 <datalist :id="`item-suggestions-${idx}`">
                     <option v-for="s in getBlockSuggestions(block)" :key="s" :value="s" />
                 </datalist>
+                <p v-if="requestTrialCreate" class="mt-1 text-xs text-gray-500">空欄なら案件名で登録します。</p>
                 <div v-if="getFieldError('assignments.0.title') || getFieldError('title')"
                      class="mt-1 text-sm text-red-600">
                     {{ getFieldError('assignments.0.title') || getFieldError('title') }}
                 </div>
             </div>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-5' : ''">
+            <h3 v-if="requestTrialCreate" class="mt-4 border-t pt-3 text-sm font-semibold text-gray-700">依頼内容</h3>
             <label class="mb-1 mt-2 block font-semibold">概要</label>
             <div>
                 <textarea v-model="block.detail" :disabled="!editMode" 
@@ -66,6 +74,8 @@
                 </div>
             </div>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-6' : ''">
             <!-- 作業ファイル情報 -->
             <template v-if="props.mode === 'coordinator' || props.mode === 'user'">
                 <div class="mt-3 rounded border border-blue-200 bg-blue-50 p-3">
@@ -220,7 +230,9 @@
                 </div>
             </template>
 
-            <!-- 割当ユーザー（概要直下に移動） -->
+            </div>
+            <div :class="requestTrialCreate ? 'order-3' : ''">
+            <!-- 割当ユーザー -->
             <label class="mb-1 mt-3 block font-semibold">割当ユーザー</label>
             <div v-if="!editMode" class="mt-1 flex items-center gap-2 rounded border bg-gray-50 px-3 py-2 text-sm">
                 <span v-if="memberIsGhost(block.user_id)" class="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">[テスト]</span>
@@ -246,8 +258,8 @@
                 </span>
             </div>
             <div v-else>
-                <select v-model="block.user_id" class="w-full rounded border px-3 py-2" @change="onUserChange(block)">
-                    <option value="">未指定</option>
+                <select v-model="block.user_id" class="w-full rounded border px-3 py-2" :class="requestTrialCreate && getFieldError(`assignments.${idx}.user_id`) ? 'border-red-500 bg-red-50' : ''" @change="onUserChange(block, idx)">
+                    <option value="">{{ requestTrialCreate ? '担当者を選択' : '未指定' }}</option>
                     <optgroup label="メンバー">
                         <option v-for="m in (props.members || members).filter(m => !m.is_ghost)" :key="m.id" :value="m.id">
                             {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
@@ -260,6 +272,9 @@
                         </option>
                     </optgroup>
                 </select>
+                <div v-if="requestTrialCreate && getFieldError(`assignments.${idx}.user_id`)" class="mt-1 text-sm text-red-600">
+                    {{ getFieldError(`assignments.${idx}.user_id`) }}
+                </div>
                 <!-- 選択後の雇用形態バッジ（派遣・業務委託のみ表示） -->
                 <div
                     v-if="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type]"
@@ -277,6 +292,8 @@
                 </div>
             </div>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-7' : ''">
             <!-- 作業詳細ヘッダー＋フィルター -->
             <div class="mb-1 mt-4 flex flex-wrap items-center gap-2">
                 <span class="font-semibold">作業詳細</span>
@@ -470,16 +487,21 @@
                 </div>
             </div>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-8' : ''">
             <label class="mb-1 mt-4 block font-semibold">難易度</label>
             <select v-model="block.difficulty_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
                 <option :value="null">-- 選択 --</option>
                 <option v-for="d in (formContext.difficulties || [])" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-4' : ''">
             <!-- 締め切り: coordinator = 常に編集可, user = 既存レコードのみ読み取り表示 -->
             <div class="mt-2" v-if="props.mode === 'coordinator'">
                 <div class="mt-2">
                     <label class="mb-1 block font-semibold">締め切り</label>
+                    <p v-if="requestTrialCreate" class="mb-2 text-xs text-gray-500">依頼先への期限です。作業する時間ではありません。</p>
                     <div class="flex flex-wrap items-center gap-3">
                         <input
                             v-model="block.desired_end_date"
@@ -529,6 +551,8 @@
                 </div>
             </div>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-9' : ''">
             <!-- 見積時間: coordinator = 常に編集可, user = 既存レコードのみ読み取り表示 -->
             <label class="mb-1 mt-2 block font-semibold">見積時間</label>
             <div class="flex flex-wrap items-center gap-2">
@@ -546,6 +570,8 @@
                 </template>
             </div>
 
+            </div>
+            <div :class="requestTrialCreate ? 'order-10' : ''">
             <div v-if="props.mode === 'coordinator'" class="mt-2 text-right">
                 <template v-if="block.linked_assignment_id">
                     <a
@@ -559,6 +585,7 @@
                         >割当を見る (#{{ block.linked_assignment_id }})</a
                     >
                 </template>
+            </div>
             </div>
         </div>
 
@@ -673,6 +700,9 @@
             </div>
         </div>
 
+        <p v-if="requestTrialCreate && missingAssigneeCount" class="mb-2 text-sm text-red-600" role="alert">
+            {{ missingAssigneeCount }}件のジョブブロックで割当ユーザーを選択してください。
+        </p>
         <div class="flex flex-wrap gap-2" v-if="editMode">
             <template v-if="props.mode === 'coordinator'">
                 <!-- 新規作成のみ「ブロック追加」を表示 -->
@@ -801,6 +831,7 @@ const props = defineProps({
     initialWorkSlots: { type: Array,   default: () => [] },
     modalContext: { type: Object, default: null },
     modalReuseAssignmentId: { type: [Number, String], default: null },
+    requestJobFormTrial: { type: Boolean, default: false },
 });
 const page = usePage();
 const formContext = computed(() => ({ ...page.props, ...(props.modalContext || {}) }));
@@ -955,6 +986,8 @@ function translateMessage(msg) {
 
 // フィールド名を日本語ラベルに変換
 function getFieldLabel(fieldName) {
+    const assignmentUserMatch = fieldName.match(/^assignments\.(\d+)\.user_id$/);
+    if (assignmentUserMatch) return `ジョブブロック${Number(assignmentUserMatch[1]) + 1}の割当ユーザー`;
     const labels = {
         'assignments.0.title': 'タイトル',
         'assignments.0.user_id': '担当者',
@@ -1520,7 +1553,8 @@ function assignmentNameToTypeFilter(assignmentName) {
     return '';
 }
 
-function onUserChange(block) {
+function onUserChange(block, idx) {
+    if (idx !== undefined) delete validationErrors.value[`assignments.${idx}.user_id`];
     const membersList = props.members || members.value || [];
     const found = membersList.find((m) => String(m.id) === String(block.user_id));
     if (found && found.assignment_name) {
@@ -2369,6 +2403,13 @@ const saving = ref(false);
 
 // 編集モード判定: assignments[0] に id があれば既存レコードの編集
 const isEditMode = computed(() => !!(assignments.value[0]?.id));
+const requestTrialCreate = computed(() => props.requestJobFormTrial
+    && props.mode === 'coordinator'
+    && !isEditMode.value
+    && !props.saveOnly
+    && !props.storeOverrideUrl);
+const missingAssigneeCount = computed(() => Object.keys(validationErrors.value)
+    .filter(key => /^assignments\.\d+\.user_id$/.test(key)).length);
 
 // ── 作業日・時間スロット ────────────────────────────────────
 const workSlots = ref(
@@ -2420,6 +2461,19 @@ async function save(sendImmediately = true) {
     // バリデーションエラーをクリア
     clearValidationErrors();
 
+    if (requestTrialCreate.value && sendImmediately) {
+        const missing = assignments.value
+            .map((assignment, index) => (!assignment.user_id ? index : null))
+            .filter(index => index !== null);
+        if (missing.length) {
+            validationErrors.value = Object.fromEntries(missing.map(index => [
+                `assignments.${index}.user_id`,
+                '割当ユーザーを選択してください。',
+            ]));
+            return;
+        }
+    }
+
     if (props.mode === 'coordinator') {
         saving.value = true;
 
@@ -2437,7 +2491,7 @@ async function save(sendImmediately = true) {
                 const rawUserId = a.user_id;
                 const isDispatcher = typeof rawUserId === 'string' && rawUserId.startsWith('dp_');
                 const dispatcherId = isDispatcher ? Number(rawUserId.replace('dp_', '')) : null;
-                const resolvedUserId = isDispatcher ? null : (rawUserId || (effectiveAuthUser() ? effectiveAuthUser().id : null));
+                const resolvedUserId = isDispatcher ? null : (rawUserId || (requestTrialCreate.value ? null : (effectiveAuthUser()?.id ?? null)));
                 return {
                     title: assembleTitleCoord(a),
                     detail: a.detail || '',
