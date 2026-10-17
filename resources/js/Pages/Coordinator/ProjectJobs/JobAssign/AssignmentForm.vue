@@ -1,7 +1,7 @@
 <template>
     <form @submit.prevent="save">
         <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4" :class="requestTrialCreate ? 'flex flex-col' : ''">
-            <div :class="requestTrialCreate ? 'order-1' : ''">
+            <div :class="requestTrialCreate ? 'order-1' : 'contents'">
             <!-- クライアント -->
             <label class="mb-1 block font-semibold">クライアント</label>
             <div v-if="props.mode === 'coordinator'" class="w-full rounded border bg-gray-50 px-3 py-2">
@@ -35,7 +35,7 @@
             </div>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-2' : ''">
+            <div :class="requestTrialCreate ? 'order-2' : 'contents'">
             <h3 v-if="requestTrialCreate" class="mt-4 border-t pt-3 text-sm font-semibold text-gray-700">依頼の基本</h3>
             <label class="mb-1 mt-2 block font-semibold">ジョブ名</label>
             <div>
@@ -60,7 +60,7 @@
             </div>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-5' : ''">
+            <div :class="requestTrialCreate ? 'order-5' : 'contents'">
             <h3 v-if="requestTrialCreate" class="mt-4 border-t pt-3 text-sm font-semibold text-gray-700">依頼内容</h3>
             <label class="mb-1 mt-2 block font-semibold">概要</label>
             <div>
@@ -75,7 +75,7 @@
             </div>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-6' : ''">
+            <div :class="requestTrialCreate ? 'order-6' : 'contents'">
             <!-- 作業ファイル情報 -->
             <template v-if="props.mode === 'coordinator' || props.mode === 'user'">
                 <div class="mt-3 rounded border border-blue-200 bg-blue-50 p-3">
@@ -231,7 +231,7 @@
             </template>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-3' : ''">
+            <div :class="requestTrialCreate ? 'order-3' : 'contents'">
             <!-- 割当ユーザー -->
             <label class="mb-1 mt-3 block font-semibold">割当ユーザー</label>
             <div v-if="!editMode" class="mt-1 flex items-center gap-2 rounded border bg-gray-50 px-3 py-2 text-sm">
@@ -293,7 +293,7 @@
             </div>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-7' : ''">
+            <div :class="requestTrialCreate ? 'order-7' : 'contents'">
             <!-- 作業詳細ヘッダー＋フィルター -->
             <div class="mb-1 mt-4 flex flex-wrap items-center gap-2">
                 <span class="font-semibold">作業詳細</span>
@@ -488,7 +488,7 @@
             </div>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-8' : ''">
+            <div :class="requestTrialCreate ? 'order-8' : 'contents'">
             <label class="mb-1 mt-4 block font-semibold">難易度</label>
             <select v-model="block.difficulty_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
                 <option :value="null">-- 選択 --</option>
@@ -496,7 +496,7 @@
             </select>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-4' : ''">
+            <div :class="requestTrialCreate ? 'order-4' : 'contents'">
             <!-- 締め切り: coordinator = 常に編集可, user = 既存レコードのみ読み取り表示 -->
             <div class="mt-2" v-if="props.mode === 'coordinator'">
                 <div class="mt-2">
@@ -552,7 +552,7 @@
             </div>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-9' : ''">
+            <div :class="requestTrialCreate ? 'order-9' : 'contents'">
             <!-- 見積時間: coordinator = 常に編集可, user = 既存レコードのみ読み取り表示 -->
             <label class="mb-1 mt-2 block font-semibold">見積時間</label>
             <div class="flex flex-wrap items-center gap-2">
@@ -571,7 +571,7 @@
             </div>
 
             </div>
-            <div :class="requestTrialCreate ? 'order-10' : ''">
+            <div :class="requestTrialCreate ? 'order-10' : 'contents'">
             <div v-if="props.mode === 'coordinator'" class="mt-2 text-right">
                 <template v-if="block.linked_assignment_id">
                     <a
