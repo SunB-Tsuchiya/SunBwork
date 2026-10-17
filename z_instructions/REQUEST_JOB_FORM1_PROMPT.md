@@ -9,3 +9,5 @@
 `AGENTS.md` の大規模作業規則により、PLAN/MANAGER/PROMPT を先に作成した。具体的な計画への利用者確認が済んでから実装する。さくら SSH には毎回正確なコマンド提示と事前確認が必要。本番 sales DB は参照しない。隔離ツリー `/tmp/sunbwork-myjob-only-20261016` がなければ最新の `origin/main` と作業ツリーを照合し、他者の変更を保護する。別人発信依頼のマイジョブ転換の実画面保存と別アカウントの旧導線確認は引き続き保留。
 
 **2026-10-17 更新:** 利用者は計画を `yes` と承認し、Super Admin 限定を念押し。コードはコントローラ、`JobAssign/Edit.vue`、共通 `AssignmentForm.vue` の3ファイルを修正。情報出版 Super Admin の新規依頼だけ全欄の並びを変え、送信時の割当先未指定を画面・サーバの両方で拒否する。対象 ESLint エラー0、PHP構文、`/members` 用 Vite ビルド、manifest 428件の参照先検査、`git diff --check` は成功。旧追跡済みアセットは残した。DB試験・実画面・GitHub・さくら反映は未実施。上の古い「確認後に実装する」より本行と `REQUEST_JOB_FORM_MANAGER1.md` を優先する。
+
+**2026-10-17 反映後:** GitHub main とさくらは `81e67aefe`。さくらの事前版 `c3fc2ee2a`・追跡対象変更なしを利用者承認の SSH で照合し、固定版条件で早送り。PHP構文・キャッシュクリア成功。追加で非試用フォームの囲み要素を `display: contents` にし、既存配置を保護した。**利用者の修正後画面確認はまだ。** 次は案件372の情報出版 Super Admin 新規依頼画面で、全欄と並びを保存せず確認する。詳しい状態は `REQUEST_JOB_FORM_MANAGER1.md` を優先する。
