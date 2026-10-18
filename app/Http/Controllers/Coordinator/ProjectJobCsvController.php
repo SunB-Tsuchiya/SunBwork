@@ -120,8 +120,15 @@ class ProjectJobCsvController extends Controller
             'rows.*.client_name'  => ['nullable', 'string', 'max:255'],
         ]);
 
-        $userId = $request->user()->id;
-        $now    = now();
+        $user = $request->user();
+        $userId = $user->id;
+        $companyId = $user->isSuperAdmin()
+            ? (int) (session('superadmin_context.company_id') ?? $user->company_id ?? 0)
+            : (int) ($user->company_id ?? 0);
+        if ($companyId === 0) {
+            return response()->json(['message' => '登録先の会社を選択してください。'], 422);
+        }
+        $now = now();
 
         $requestedJobcodes = array_filter(
             array_map(fn($r) => $r['jobcode'] ?: null, $request->input('rows'))
@@ -154,6 +161,7 @@ class ProjectJobCsvController extends Controller
                 'jobcode'      => $jc,
                 'title'        => $row['title'],
                 'client_id'    => !empty($row['client_id'])    ? (int) $row['client_id']    : null,
+                'company_id'   => $companyId,
                 'sales_rep'    => $row['sales_rep']            ?: null,
                 'sales_rep_id' => !empty($row['sales_rep_id']) ? (int) $row['sales_rep_id'] : null,
                 'created_at'   => $now,
