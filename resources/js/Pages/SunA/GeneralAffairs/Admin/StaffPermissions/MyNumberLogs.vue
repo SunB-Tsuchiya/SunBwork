@@ -53,7 +53,9 @@ defineProps({
             </div>
             <div v-if="logs.links && logs.last_page > 1" class="mt-4 flex flex-wrap gap-1">
                 <template v-for="(link, i) in logs.links" :key="i">
-                    <Link v-if="link.url" :href="link.url" class="rounded border px-3 py-1 text-xs" :class="link.active ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'" v-html="link.label" />
+                    <Link v-if="link.url" :href="link.url" class="rounded border px-3 py-1 text-xs" :class="link.active ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'">
+                        <span v-html="link.label" />
+                    </Link>
                     <span v-else class="rounded border border-gray-200 px-3 py-1 text-xs text-gray-400" v-html="link.label" />
                 </template>
             </div>
