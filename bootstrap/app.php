@@ -51,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'representative_leader' => \App\Http\Middleware\EnsureIsRepresentativeLeader::class,
             'company_type'   => \App\Http\Middleware\CheckCompanyType::class,
             'deny_general'   => \App\Http\Middleware\DenyGeneralCompany::class,
+            'suna_staff'     => \App\Http\Middleware\SunAStaffAbility::class,
             'sales_analysis' => \App\Http\Middleware\EnsureSalesAnalysisAccess::class,
         ]);
     })

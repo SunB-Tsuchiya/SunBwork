@@ -357,13 +357,28 @@ function isStandaloneMGinbonUrl(url) {
         || /\/schedule\/department-work(?:\/|$)/.test(pathnameOf(url));
 }
 
+// 年末調整など申請の下層ページ（受付詳細・入力フォーム・代理入力など）は、開き直すと
+// データを読み込めず（編集ロック・一時的な状態）エラーになりやすい。復帰先には申請の一覧画面を保存する。
+function restorableUrl(url) {
+    const path = pathnameOf(url);
+    try {
+        if (/\/clerk\/general-affairs\/(?:nencho|applications|application-types)(?:\/|$)/.test(path)) {
+            return route('clerk.general_affairs.applications.index');
+        }
+        if (/\/user\/nencho\/.+/.test(path)) {
+            return route('user.general_affairs.nencho.index');
+        }
+    } catch {}
+    return url;
+}
+
 // ページ遷移時に現ロールの最終URLをlocalStorageに保存
 watch(
     () => page.url,
     (url) => {
         const role = currentRouteContext.value;
         if (role && url && pathnameOf(url) !== '/dashboard' && !isStandaloneMGinbonUrl(url)) {
-            try { localStorage.setItem(`lastTab_${role}`, url); } catch {}
+            try { localStorage.setItem(`lastTab_${role}`, restorableUrl(url)); } catch {}
         }
     },
     { immediate: true },

@@ -1,0 +1,546 @@
+{
+ "sheet": "NTAAPP006",
+ "title": "令和  年分　給与所得者の基礎控除   申告書",
+ "items": [
+  {
+   "no": 1,
+   "level": 1,
+   "label": "令和  年分　給与所得者の基礎控除   申告書",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "NTAAPP006",
+   "note": null
+  },
+  {
+   "no": 2,
+   "level": 2,
+   "label": "バージョン",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "ver",
+   "note": "X.X.X"
+  },
+  {
+   "no": 3,
+   "level": 2,
+   "label": "各項目の件数",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_A00000",
+   "note": null
+  },
+  {
+   "no": 4,
+   "level": 3,
+   "label": "提出に関する情報 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_A00010",
+   "note": "数値1桁　※「1」固定。"
+  },
+  {
+   "no": 5,
+   "level": 3,
+   "label": "合計所得の見積額 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_A00020",
+   "note": "数値1桁　※「1」固定。"
+  },
+  {
+   "no": 6,
+   "level": 3,
+   "label": "あなたの合計所得金額見積額 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_A00030",
+   "note": "数値1桁　※「1」固定。"
+  },
+  {
+   "no": 7,
+   "level": 3,
+   "label": "控除の計算 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_A00040",
+   "note": "数値1桁　※「1」固定。"
+  },
+  {
+   "no": 8,
+   "level": 3,
+   "label": "参考情報 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_A00050",
+   "note": "数値1桁　※「1」固定。"
+  },
+  {
+   "no": 9,
+   "level": 2,
+   "label": "提出に関する情報",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00000",
+   "note": null
+  },
+  {
+   "no": 10,
+   "level": 3,
+   "label": "対象年分",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00010",
+   "note": null
+  },
+  {
+   "no": 11,
+   "level": 4,
+   "label": "控除申告年分（西暦）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00020",
+   "note": "数値4桁"
+  },
+  {
+   "no": 12,
+   "level": 4,
+   "label": "控除申告年分（元号）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00030",
+   "note": "5:令和"
+  },
+  {
+   "no": 13,
+   "level": 4,
+   "label": "控除申告年分（年）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00040",
+   "note": "数値1～2桁"
+  },
+  {
+   "no": 14,
+   "level": 3,
+   "label": "所轄税務署",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00050",
+   "note": "1～10文字（全角）"
+  },
+  {
+   "no": 15,
+   "level": 3,
+   "label": "支払者",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00060",
+   "note": null
+  },
+  {
+   "no": 16,
+   "level": 4,
+   "label": "給与の支払者の名称",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00070",
+   "note": "1～30文字（全角）"
+  },
+  {
+   "no": 17,
+   "level": 4,
+   "label": "給与の支払者の法人番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00080",
+   "note": "13文字（半角数字）"
+  },
+  {
+   "no": 18,
+   "level": 4,
+   "label": "給与の支払者の郵便番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00090",
+   "note": "7文字（半角数字）"
+  },
+  {
+   "no": 19,
+   "level": 4,
+   "label": "給与の支払者の所在地",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00100",
+   "note": null
+  },
+  {
+   "no": 20,
+   "level": 5,
+   "label": "都道府県",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00110",
+   "note": "3～4文字（全角）\n※ 都道府県名を設定する。"
+  },
+  {
+   "no": 21,
+   "level": 5,
+   "label": "市区町村",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00120",
+   "note": "1～35文字（全角）"
+  },
+  {
+   "no": 22,
+   "level": 5,
+   "label": "丁番地以降",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00130",
+   "note": "1～100文字（全角）"
+  },
+  {
+   "no": 23,
+   "level": 3,
+   "label": "申告者フリガナ",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00140",
+   "note": "3～60文字（全角カナ）\n※ 姓 + スペース +名の構成となるため、最低3文字設定する。"
+  },
+  {
+   "no": 24,
+   "level": 3,
+   "label": "申告者氏名",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00150",
+   "note": "3～30文字（全角）\n※ 姓 + スペース +名の構成となるため、最低3文字設定する。"
+  },
+  {
+   "no": 25,
+   "level": 3,
+   "label": "申告者の郵便番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00160",
+   "note": "7文字（半角数字）"
+  },
+  {
+   "no": 26,
+   "level": 3,
+   "label": "申告者住所又は居所",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00170",
+   "note": null
+  },
+  {
+   "no": 27,
+   "level": 4,
+   "label": "都道府県",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00180",
+   "note": "3～4文字（全角）\n※ 都道府県名を設定する。"
+  },
+  {
+   "no": 28,
+   "level": 4,
+   "label": "市区町村",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00190",
+   "note": "1～35文字（全角）"
+  },
+  {
+   "no": 29,
+   "level": 4,
+   "label": "丁番地以降",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_B00200",
+   "note": "1～100文字（全角）"
+  },
+  {
+   "no": 30,
+   "level": 2,
+   "label": "合計所得の見積額",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_C00030",
+   "note": null
+  },
+  {
+   "no": 31,
+   "level": 3,
+   "label": "あなたの本年中の合計所得金額の見積額",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_C00040",
+   "note": "0～9999999999"
+  },
+  {
+   "no": 32,
+   "level": 3,
+   "label": "あなたの本年中の給与所得金額の見積額",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_C00041",
+   "note": "0～9999999999"
+  },
+  {
+   "no": 33,
+   "level": 3,
+   "label": "あなたの本年中の給与所得以外の所得金額の見積額",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_C00042",
+   "note": "-9999999999～9999999999"
+  },
+  {
+   "no": 34,
+   "level": 3,
+   "label": "区分１",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_C00050",
+   "note": "1:489万円以下​(A) 2:489万円超655万円以下(A)​ 3:655万円超900万円以下(A) 4:900万円超950万円以下(B) 5:950万円超1,000万円以下(C) 6:1,000万円超2,350万円以下​ 7:2,350万円超2,400万円以下​ 8:2,400万円超2,450万円以下​ 9:2,450万円超2,500万円以下​ 10:2,500万円超"
+  },
+  {
+   "no": 35,
+   "level": 2,
+   "label": "控除の計算",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_D00000",
+   "note": null
+  },
+  {
+   "no": 36,
+   "level": 3,
+   "label": "基礎控除の額",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_D00010",
+   "note": "0～9999999999"
+  },
+  {
+   "no": 37,
+   "level": 2,
+   "label": "参考情報",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00000",
+   "note": null
+  },
+  {
+   "no": 38,
+   "level": 3,
+   "label": "提出年月日",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00010",
+   "note": null
+  },
+  {
+   "no": 39,
+   "level": 4,
+   "label": "年月日（西暦）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00020",
+   "note": "数値4桁(yyyy)"
+  },
+  {
+   "no": 40,
+   "level": 4,
+   "label": "年月日（元号）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00030",
+   "note": "5:令和"
+  },
+  {
+   "no": 41,
+   "level": 4,
+   "label": "年月日（年）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00040",
+   "note": "数値1～2桁(yy)"
+  },
+  {
+   "no": 42,
+   "level": 4,
+   "label": "年月日（月）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00050",
+   "note": "数値1～2桁(mm)"
+  },
+  {
+   "no": 43,
+   "level": 4,
+   "label": "年月日（日）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00060",
+   "note": "数値1～2桁(dd)"
+  },
+  {
+   "no": 44,
+   "level": 3,
+   "label": "ID（社員番号等）",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00070",
+   "note": "1～20文字（半角英数字）"
+  },
+  {
+   "no": 45,
+   "level": 3,
+   "label": "加工有無",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml006_E00080",
+   "note": "「3」固定（未使用）"
+  }
+ ]
+}

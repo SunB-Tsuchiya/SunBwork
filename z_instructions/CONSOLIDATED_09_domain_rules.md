@@ -833,3 +833,17 @@ class MyNSystemTest extends TestCase
 - commit時もサーバーで再解析・再照合し、対象itemをロックする。登録可能な行だけを既存milestoneへ反映し、`mginbon_change_logs` に記録する。
 - 既存日付は初期状態で上書きしない。利用者が上書きを明示した場合だけ別日付を更新する。
 - 完了した設計・検証記録は `z_instructions/archived/MGINBON_FILENAME_BULK_PLAN1.md` と `z_instructions/archived/MGINBON_FILENAME_BULK_MANAGER1.md` を参照。
+
+
+## 年末調整・社員情報（SunA／総務）（2026-10-18）
+
+- 配置は `app/**/SunA/GeneralAffairs`、`resources/js/{Pages,Components}/SunA/GeneralAffairs`、テーブル `suna_ga_*`、ルートは `routes/suna.php`。ルート名は総務 `clerk.general_affairs.*`、従業員 `user.nencho.*`、管理 `admin.general_affairs.*`。DBは分けない。
+- 社員情報・年末調整は会社をまたぐ例外。会社ではなく権限（`suna_staff:view_employees / edit_employees / view_my_number / manage_nencho`、`StaffAccess`）で制御する。権限は社員情報権限管理で人ごとに付与する。
+- マイナンバーは `encrypted` キャストで保存し `$hidden` に入れる。表示操作は `MyNumberAccessLog` に記録する。提出時スナップショットにはマイナンバーを含めない。
+- 年末調整の流れ: 受付（Campaign）→ 対象者（Target。社員・契約社員を自動取り込み、除外可）→ 提出（Submission: 入力中／提出済み／差戻し）。差戻し・管理者メモ・履歴（SubmissionEvent）を残す。
+- 編集ロック: `EditLockService`。画面ごとのトークンを保存・提出時に送り、ハートビート60秒、期限180秒。総務代理入力と本人入力は同時に編集できない。
+- 社員情報との差異照合は `ProfileDiff`（氏名・生年月日・住所・世帯）。反映は `ProfileSyncService`、確認済みは署名で管理する。
+- 国税庁XML定義（`resources/nta/r8_v7`）への適合は `NtaConformance` / `php artisan suna:nencho-check` で確認する。外部データ取込・XML出力は未実装（NENCHO_MANAGER1 D-1, D-2）。
+- 案内: `NoticeService`。受付開始のお知らせ（対象者全員）と未提出者への催促（未入力・入力中・差戻し）を既存の `Announcement` で送り、履歴を `suna_ga_nencho_notices` に残す。カレンダーのリマインダーは `campaigns.calendar_reminder_id` で紐づけ、受付の日付・タイトル変更時に同期する。専用の通知機構は作らない。
+- 日本語フォームの入力規則（全角テキスト、半角数字、金額の自動カンマ、1欄の日付入力、例の常時表示、郵便番号からの住所補完）は CLAUDE.md と `Components/SunA/GeneralAffairs/Nencho/Fields` を正とする。
+- 本番反映時は migrate（`--force`）、権限付与、申請の種類への年末調整登録（`feature_key=nencho`）が必要。

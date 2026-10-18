@@ -9,7 +9,9 @@ const props = defineProps({
 const isSunbrain = computed(() => usePage().props.auth?.companyType === 'sunbrain');
 // 一般会社（サンエー印刷等）はジョブ系タブを出さない。サン・ブレーンは従来どおり全タブ
 const isGeneral = computed(() => usePage().props.auth?.companyType === 'general');
-const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings'];
+const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings', 'nencho'];
+// 「年末調整」タブ: 自分が対象者になっている受付中の受付がある人にだけ表示（会社タイプ問わず。SunA/GeneralAffairs）
+const nenchoAvailable = computed(() => Boolean(usePage().props.auth?.nenchoAvailable));
 const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
 
 // User カラー: blue
@@ -33,6 +35,7 @@ const tabs = computed(() => [
     { key: 'diaries', href: tryRoute('diaries.index'), label: '日報一覧' },
     { key: 'team_rooms', href: tryRoute('team-rooms.index'), label: 'チームルーム' },
     { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value },
+    { key: 'nencho', href: tryRoute('user.general_affairs.nencho.index'), label: '年末調整', condition: nenchoAvailable.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
 ].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
@@ -85,6 +88,9 @@ function onMobileSelect(e) {
             </Link>
             <Link v-if="isSunbrain" :href="route('user.proof.status')" :class="tab('proof_status')">
                 校正状況
+            </Link>
+            <Link v-if="nenchoAvailable" :href="route('user.general_affairs.nencho.index')" :class="tab('nencho')">
+                年末調整
             </Link>
             <Link :href="route('user.settings.index')" :class="tab('settings')">
                 設定

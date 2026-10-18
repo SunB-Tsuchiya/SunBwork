@@ -111,6 +111,8 @@ require __DIR__ . '/debug.php';
 require __DIR__ . '/chat.php';
 // NSystem デモ用ルート（削除時は下記行と routes/nsystem.php を削除）
 require __DIR__ . '/nsystem.php';
+// サンエー印刷専用ルート（SunA。CLAUDE.md「SunA 配置ルール」参照）
+require __DIR__ . '/suna.php';
 
 
 

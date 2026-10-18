@@ -13,11 +13,15 @@ const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAna
 // 一般会社（サンエー印刷等）は総務/経理ごとに許可リストで絞る。サン・ブレーンは従来どおり全タブ
 const isGeneral = computed(() => page.props.auth?.companyType === 'general');
 // 総務/経理は現在同じタブ構成（今後それぞれ機能追加予定）
-const generalAllowed = ['dashboard', 'announcements', 'calendar', 'reminders'];
+const generalAllowed = ['dashboard', 'announcements', 'calendar', 'reminders', 'applications', 'employees'];
 const showTab = (key) => !isGeneral.value || generalAllowed.includes(key);
 
 // Clerk カラー: purple
 const isKeiri = computed(() => isGeneral.value && page.props.auth?.clerkKind === 'keiri');
+// 「申請」タブはサンエー印刷（general）の総務のみ（SunA/GeneralAffairs）
+const showApplications = computed(() => isGeneral.value && !isKeiri.value);
+// 「社員情報」タブ: サンエー印刷の総務で、社員情報を見る権限がある人（管理者は常に可）
+const showEmployees = computed(() => isGeneral.value && Boolean(page.props.auth?.staffAccess?.viewEmployees));
 const tab = (key) => [
     'rounded-md px-3 py-2 text-sm font-medium',
     props.active === key
@@ -36,6 +40,8 @@ const tabs = computed(() => [
     { key: 'announcements', href: tryRoute('clerk.announcements.index'), label: 'お知らせ通知' },
     { key: 'calendar', href: tryRoute('clerk.calendar'), label: 'カレンダー' },
     { key: 'reminders', href: tryRoute('clerk.reminders.index'), label: 'リマインダー設定' },
+    { key: 'applications', href: tryRoute('clerk.general_affairs.applications.index'), label: '申請', condition: showApplications.value },
+    { key: 'employees', href: tryRoute('clerk.general_affairs.employees.index'), label: '社員情報', condition: showEmployees.value },
     { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
     {
         key: 'sales_analysis',
@@ -82,6 +88,20 @@ function onMobileSelect(e) {
             </Link>
             <Link v-if="showTab('reminders')" :href="route('clerk.reminders.index')" :class="tab('reminders')">
                 リマインダー設定
+            </Link>
+            <Link
+                v-if="showApplications"
+                :href="route('clerk.general_affairs.applications.index')"
+                :class="tab('applications')"
+            >
+                申請
+            </Link>
+            <Link
+                v-if="showEmployees"
+                :href="route('clerk.general_affairs.employees.index')"
+                :class="tab('employees')"
+            >
+                社員情報
             </Link>
             <Link
                 v-if="showTab('diaries') && isDiaryManager"

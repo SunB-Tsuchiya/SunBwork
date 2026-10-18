@@ -160,6 +160,33 @@ class HandleInertiaRequests extends Middleware
 
                     return null;
                 })(),
+                // 年末調整: 自分が対象者になっている受付中の受付があるか（ユーザー用タブの「年末調整」表示用。会社タイプ問わず）
+                'nenchoAvailable' => (function () use ($request) {
+                    $u = $request->user();
+                    if (! $u) {
+                        return false;
+                    }
+                    $today = now('Asia/Tokyo')->toDateString();
+
+                    return \App\Models\SunA\GeneralAffairs\Nencho\Target::where('user_id', $u->id)
+                        ->where('is_excluded', false)
+                        ->whereHas('campaign', fn ($q) => $q->where('status', 'open')->whereDate('opens_on', '<=', $today)->whereDate('due_on', '>=', $today))
+                        ->exists()
+                        // 差戻しされた提出物がある人にも、受付期間外でもタブを出す（修正できるようにする）
+                        || \App\Models\SunA\GeneralAffairs\Nencho\Submission::where('user_id', $u->id)->where('status', 'returned')->exists();
+                })(),
+                // 総務の権限（社員情報・年末調整）。サンエー印刷（general）の clerk/admin と SuperAdmin のみ。それ以外は null（追加クエリなし）
+                'staffAccess' => (function () use ($request, $contextCompany) {
+                    $u = $request->user();
+                    if (! $u) {
+                        return null;
+                    }
+                    if (! $u->isSuperAdmin() && ! ($contextCompany?->company_type === 'general' && ($u->isAdmin() || $u->isClerk()))) {
+                        return null;
+                    }
+
+                    return \App\Support\SunA\GeneralAffairs\StaffAccess::for($u)->toArray();
+                })(),
                 // Admin 権限（admin ロール時のみ取得、それ以外は null）
                 'adminPermissions' => $request->user()?->isAdmin()
                     ? AdminPermission::where('user_id', $request->user()->id)->first()

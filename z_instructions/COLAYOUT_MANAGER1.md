@@ -45,7 +45,7 @@
 
 | # | タスク | 状態 | 備考 |
 |---|---|---|---|
-| 4-1 | sunbrain 表示が不変（全ロール） | ⬜ | ローカル company 2 を sunbrain 化済み（superadmin と user/clerk で確認可） |
+| 4-1 | sunbrain 表示が不変（全ロール） | ✅ | ローカル company 2 を sunbrain 化済み（superadmin と user/clerk で確認可） |
 | 4-2 | general の admin / 総務 / 経理 / user 表示 | ⬜ | ダミー 3 名でログイン確認（下記）。user ロールのダミーは未作成 |
 | 4-3 | SuperAdmin 会社切り替え | ⬜ | |
 | 4-4 | general の leader/coordinator 振り分けと 403 | ⬜ | |
@@ -55,8 +55,8 @@
 
 | # | タスク | 状態 | 備考 |
 |---|---|---|---|
-| 5-1 | 本番 `companies.company_type` の確認（サン・ブレーン = sunbrain） | ⬜ | **必須**。SSH 実行はユーザー確認後 |
-| 5-2 | DEPLOY_SAKURA.md 手順で本番反映（VITE_APP_BASE_PATH 手順厳守） | ⬜ | ユーザー指示があるまで実施しない |
+| 5-1 | 本番 `companies.company_type` の確認（サン・ブレーン = sunbrain） | ✅ | **必須**。SSH 実行はユーザー確認後 |
+| 5-2 | DEPLOY_SAKURA.md 手順で本番反映（VITE_APP_BASE_PATH 手順厳守） | ✅ | ユーザー指示があるまで実施しない |
 | 5-3 | ChangelogSeeder 追記 + 実行 | ⬜ | |
 | 5-4 | CONSOLIDATED_01 / 09 更新 | ⬜ | |
 
@@ -101,3 +101,10 @@
 | 2026-10-15 | 作業内容分析（/schedule/department-work 配下）を AppLayout の `lastTab_*` 保存対象から除外（銀本進行と同扱い）。ユーザー確認済みで解消。 |
 | 2026-10-15 | 総務/経理を別ボタン・別色に分離（総務=紫 / 経理=teal）。タブ構成は当面同一（4 タブ: ダッシュボード・お知らせ通知・カレンダー・リマインダー設定）。`auth.clerkKind` を追加（Clerk=所属部署名に「経理」、Admin 以上=`?kind=` で選んだ方をセッション `clerk_kind` に保持、既定 総務）。`isAccountingClerk` は廃止。 |
 | 2026-10-15 | 予定表を general では共有予定のみ表示（部署の作業タブ・作業実績の内訳・カレンダータブ・ガイドリンクを非表示）。ヘッダーの使い方ガイド / スクリプト / 更新ログを general で非表示（PC・スマホ）。お知らせ・予定表アイコンは共通のまま。 |
+| 2026-10-15 | **本番デプロイ完了**（コミット 6af669c89、migration なし）。本番確認: サン・ブレーン id=2 sunbrain / サンエー印刷 id=3 general（admin 2 名）。ローカル main が origin/main から 60 コミット遅れ＋競合 17 ファイル（ワークロード分析）だったため、origin/main から `colayout-deploy` ブランチを作り、本件の変更のみ当て直して push。ユーザー確認済み・問題なし。 |
+
+### ⚠ ブランチ状態（再開時に必ず確認）
+- ローカルは `colayout-deploy`（origin/main と同一）。ワークロード分析の作業は `main`（ローカル 8 コミット）と `git stash@{0}`（"colayout-before-pull-2026-10-15"、未コミット変更＋未追跡ファイル）に退避中
+- 戻す手順: `git checkout main` → `git stash pop`。その後 origin/main との統合（競合 17 ファイル: DiaryController / DepartmentWorkController / WorkloadTrialAnalysis / routes/web.php / AppLayout 以外のワークロード系 Vue 等）はワークロード分析の区切り後に実施
+- 安全バックアップ: スクラッチパッドに `pre_pull_tracked.patch` と `untracked_backup/`（セッション限り。消えている可能性あり）
+- 残タスク: ChangelogSeeder 追記、CONSOLIDATED_01 / 09 更新、後回し事項 D-1〜D-8

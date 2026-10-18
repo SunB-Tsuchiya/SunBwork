@@ -1,0 +1,774 @@
+{
+ "sheet": "NTAAPP008",
+ "title": "令和  年分　給与所得者の特定親族特別控除    申告書",
+ "items": [
+  {
+   "no": 1,
+   "level": 1,
+   "label": "令和  年分　給与所得者の特定親族特別控除申告書",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "NTAAPP008",
+   "note": null
+  },
+  {
+   "no": 2,
+   "level": 2,
+   "label": "バージョン",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "ver",
+   "note": "X.X.X"
+  },
+  {
+   "no": 3,
+   "level": 2,
+   "label": "各項目の件数",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_A00000",
+   "note": null
+  },
+  {
+   "no": 4,
+   "level": 3,
+   "label": "提出に関する情報 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_A00010",
+   "note": "数値1桁　※「1」固定。"
+  },
+  {
+   "no": 5,
+   "level": 3,
+   "label": "特定親族 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_A00020",
+   "note": "数値1～2桁"
+  },
+  {
+   "no": 6,
+   "level": 3,
+   "label": "参考情報 件数",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_A00030",
+   "note": "数値1桁　※「1」固定。"
+  },
+  {
+   "no": 7,
+   "level": 2,
+   "label": "提出に関する情報",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00000",
+   "note": null
+  },
+  {
+   "no": 8,
+   "level": 3,
+   "label": "対象年分",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00010",
+   "note": null
+  },
+  {
+   "no": 9,
+   "level": 4,
+   "label": "控除申告年分（西暦）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00020",
+   "note": "数値4桁"
+  },
+  {
+   "no": 10,
+   "level": 4,
+   "label": "控除申告年分（元号）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00030",
+   "note": "5:令和"
+  },
+  {
+   "no": 11,
+   "level": 4,
+   "label": "控除申告年分（年）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00040",
+   "note": "数値1～2桁"
+  },
+  {
+   "no": 12,
+   "level": 3,
+   "label": "所轄税務署",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00050",
+   "note": "1～10文字（全角）"
+  },
+  {
+   "no": 13,
+   "level": 3,
+   "label": "支払者",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00060",
+   "note": null
+  },
+  {
+   "no": 14,
+   "level": 4,
+   "label": "給与の支払者の名称",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00070",
+   "note": "1～30文字（全角）"
+  },
+  {
+   "no": 15,
+   "level": 4,
+   "label": "給与の支払者の法人番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00080",
+   "note": "13文字（半角数字）"
+  },
+  {
+   "no": 16,
+   "level": 4,
+   "label": "給与の支払者の郵便番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00090",
+   "note": "7文字（半角数字）"
+  },
+  {
+   "no": 17,
+   "level": 4,
+   "label": "給与の支払者の所在地",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00100",
+   "note": null
+  },
+  {
+   "no": 18,
+   "level": 5,
+   "label": "都道府県",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00110",
+   "note": "3～4文字（全角）\n※ 都道府県名を設定する。"
+  },
+  {
+   "no": 19,
+   "level": 5,
+   "label": "市区町村",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00120",
+   "note": "1～35文字（全角）"
+  },
+  {
+   "no": 20,
+   "level": 5,
+   "label": "丁番地以降",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00130",
+   "note": "1～100文字（全角）"
+  },
+  {
+   "no": 21,
+   "level": 3,
+   "label": "申告者フリガナ",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00140",
+   "note": "3～60文字（全角カナ）\n※ 姓 + スペース +名の構成となるため、最低3文字設定する。"
+  },
+  {
+   "no": 22,
+   "level": 3,
+   "label": "申告者氏名",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00150",
+   "note": "3～30文字（全角）\n※ 姓 + スペース +名の構成となるため、最低3文字設定する。"
+  },
+  {
+   "no": 23,
+   "level": 3,
+   "label": "申告者郵便番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00160",
+   "note": "7文字（半角数字）"
+  },
+  {
+   "no": 24,
+   "level": 3,
+   "label": "申告者住所又は居所",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00170",
+   "note": null
+  },
+  {
+   "no": 25,
+   "level": 4,
+   "label": "都道府県",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00180",
+   "note": "3～4文字（全角）\n※ 都道府県名を設定する。"
+  },
+  {
+   "no": 26,
+   "level": 4,
+   "label": "市区町村",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00190",
+   "note": "1～35文字（全角）"
+  },
+  {
+   "no": 27,
+   "level": 4,
+   "label": "丁番地以降",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_B00200",
+   "note": "1～100文字（全角）"
+  },
+  {
+   "no": 28,
+   "level": 2,
+   "label": "特定親族情報　繰り返し",
+   "type": null,
+   "min_max": [
+    "1",
+    "20"
+   ],
+   "tag": "xml008_C00000",
+   "note": "繰り返し回数は20回まで"
+  },
+  {
+   "no": 29,
+   "level": 3,
+   "label": "フリガナ",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00010",
+   "note": "3～60文字（全角カナ）\n※ 姓 + スペース +名の構成となるため、最低3文字設定する。"
+  },
+  {
+   "no": 30,
+   "level": 3,
+   "label": "特定親族の氏名",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00020",
+   "note": "3～30文字（全角）\n※ 姓 + スペース +名の構成となるため、最低3文字設定する。"
+  },
+  {
+   "no": 31,
+   "level": 3,
+   "label": "特定親族の個人番号提供済み",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00030",
+   "note": "0:未提供　1:提供済み"
+  },
+  {
+   "no": 32,
+   "level": 3,
+   "label": "特定親族の個人番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00040",
+   "note": "12文字（半角数字）\n※個人番号提供済みが【1:提供済み】の場合、空タグを設定する。"
+  },
+  {
+   "no": 33,
+   "level": 3,
+   "label": "続柄",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00050",
+   "note": null
+  },
+  {
+   "no": 34,
+   "level": 4,
+   "label": "コード",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00060",
+   "note": "0:初期値 3:子 4:親 5:孫 6:祖父母 7.曾祖父母 99:その他"
+  },
+  {
+   "no": 35,
+   "level": 4,
+   "label": "その他続柄",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00070",
+   "note": "1～10文字（全角）\n※コードが【99:その他】以外の場合、空タグを設定する。"
+  },
+  {
+   "no": 36,
+   "level": 3,
+   "label": "生年月日",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00080",
+   "note": null
+  },
+  {
+   "no": 37,
+   "level": 4,
+   "label": "生年月日（西暦）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00090",
+   "note": "数値4桁(yyyy)"
+  },
+  {
+   "no": 38,
+   "level": 4,
+   "label": "生年月日（元号）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00100",
+   "note": "1:明治　2:大正　3:昭和　4:平成　5:令和"
+  },
+  {
+   "no": 39,
+   "level": 4,
+   "label": "生年月日（年）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00110",
+   "note": "数値1～2桁(yy)"
+  },
+  {
+   "no": 40,
+   "level": 4,
+   "label": "生年月日（月）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00120",
+   "note": "数値1～2桁(mm)"
+  },
+  {
+   "no": 41,
+   "level": 4,
+   "label": "生年月日（日）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00130",
+   "note": "数値1～2桁(dd)"
+  },
+  {
+   "no": 42,
+   "level": 3,
+   "label": "郵便番号",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00140",
+   "note": "7文字（半角数字）"
+  },
+  {
+   "no": 43,
+   "level": 3,
+   "label": "あなたと特定親族の住所又は居所が異なる場合の特定親族の住所又は居所",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00150",
+   "note": null
+  },
+  {
+   "no": 44,
+   "level": 4,
+   "label": "申告者と同じ",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00160",
+   "note": "0:非該当　　1:該当　※1:該当の場合、住所又は居所は申告者と同じ情報を設定する。"
+  },
+  {
+   "no": 45,
+   "level": 4,
+   "label": "都道府県",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00170",
+   "note": "3～4文字（全角）\n※ 都道府県名を設定する。"
+  },
+  {
+   "no": 46,
+   "level": 4,
+   "label": "市区町村（海外住所の場合有り）",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00180",
+   "note": "1～35文字"
+  },
+  {
+   "no": 47,
+   "level": 4,
+   "label": "丁番目以降（海外住所の場合有り）",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00190",
+   "note": "1～100文字"
+  },
+  {
+   "no": 48,
+   "level": 3,
+   "label": "非居住者である特定親族",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00200",
+   "note": "0:非該当　　1:該当\n※居住/非居住者の区分で居住者を選ぶと非該当、非居住者を選ぶと該当となる。"
+  },
+  {
+   "no": 49,
+   "level": 3,
+   "label": "生計を一にする事実",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00210",
+   "note": "※居住者の場合、子ノードには空タグを設定する。"
+  },
+  {
+   "no": 50,
+   "level": 4,
+   "label": "送金額",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00220",
+   "note": "0～9999999999"
+  },
+  {
+   "no": 51,
+   "level": 4,
+   "label": "単位",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00230",
+   "note": null
+  },
+  {
+   "no": 52,
+   "level": 5,
+   "label": "コード",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00240",
+   "note": "0:初期値 1:円 2:米ドル 3:ユーロ 4:英ポンド 5:スイスフラン 6:豪ドル 7:カナダドル 99:その他"
+  },
+  {
+   "no": 53,
+   "level": 5,
+   "label": "その他単位",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00250",
+   "note": "1～15文字（全角）\n※コードが【99:その他】以外の場合、空タグを設定する。"
+  },
+  {
+   "no": 54,
+   "level": 3,
+   "label": "特定親族の本年中の合計所得金額の見積額",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00260",
+   "note": "0～9999999999"
+  },
+  {
+   "no": 55,
+   "level": 3,
+   "label": "特定親族特別控除の額",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_C00270",
+   "note": "0～9999999999"
+  },
+  {
+   "no": 56,
+   "level": 2,
+   "label": "参考情報",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00000",
+   "note": null
+  },
+  {
+   "no": 57,
+   "level": 3,
+   "label": "提出年月日",
+   "type": null,
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00010",
+   "note": null
+  },
+  {
+   "no": 58,
+   "level": 4,
+   "label": "年月日（西暦）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00020",
+   "note": "数値4桁(yyyy)"
+  },
+  {
+   "no": 59,
+   "level": 4,
+   "label": "年月日（元号）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00030",
+   "note": "5:令和"
+  },
+  {
+   "no": 60,
+   "level": 4,
+   "label": "年月日（年）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00040",
+   "note": "数値1～2桁(yy)"
+  },
+  {
+   "no": 61,
+   "level": 4,
+   "label": "年月日（月）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00050",
+   "note": "数値1～2桁(mm)"
+  },
+  {
+   "no": 62,
+   "level": 4,
+   "label": "年月日（日）",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00060",
+   "note": "数値1～2桁(dd)"
+  },
+  {
+   "no": 63,
+   "level": 3,
+   "label": "ID（社員番号等）",
+   "type": "string(utf-8)",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00070",
+   "note": "1～20文字（半角英数字）"
+  },
+  {
+   "no": 64,
+   "level": 3,
+   "label": "加工有無",
+   "type": "integer（10進）",
+   "min_max": [
+    "1",
+    "1"
+   ],
+   "tag": "xml008_D00080",
+   "note": "「3」固定（未使用）"
+  }
+ ]
+}

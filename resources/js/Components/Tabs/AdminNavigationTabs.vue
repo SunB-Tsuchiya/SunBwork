@@ -25,7 +25,7 @@ const isGeneral = computed(() => page.props.auth?.companyType === 'general');
 const GENERAL_ALLOWED = [
     'dashboard', 'companies', 'users', 'departments', 'special_teams', 'diaries', 'diary_teams',
     'worktypes', 'work_records', 'leader_permissions', 'meeting_definitions',
-    'presence_board_settings', 'meeting_rooms', 'schedule_settings',
+    'presence_board_settings', 'meeting_rooms', 'schedule_settings', 'staff_permissions',
 ];
 const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
 
@@ -63,6 +63,8 @@ const tabs = computed(() => [
     { key: 'presence_board_settings', href: tryRoute('admin.presence.board_settings'), label: '在席ボード管理' },
     { key: 'meeting_rooms',       href: tryRoute('admin.meeting-rooms.index'),    label: '会議室管理' },
     { key: 'schedule_settings',   href: tryRoute('admin.schedule-settings.edit'), label: '予定表権限設定' },
+    // サンエー印刷（general）のみ: 社員情報（マイナンバー等）の閲覧権限を管理（SunA/GeneralAffairs）
+    { key: 'staff_permissions', href: tryRoute('admin.general_affairs.staff_permissions.index'), label: '社員情報権限管理', condition: isGeneral.value },
 ].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
 function onMobileSelect(e) {
@@ -223,6 +225,13 @@ function onMobileSelect(e) {
                 :class="tab('schedule_settings')"
             >
                 予定表権限設定
+            </Link>
+            <Link
+                v-if="isGeneral"
+                :href="route('admin.general_affairs.staff_permissions.index')"
+                :class="tab('staff_permissions')"
+            >
+                社員情報権限管理
             </Link>
         </nav>
     </div>

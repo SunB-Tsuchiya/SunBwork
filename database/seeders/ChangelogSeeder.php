@@ -2115,6 +2115,28 @@ HTML,
                 'claude_notes' => '情報出版 Super Admin の試用限定。broad_projects を ProjectJob と分け、personal_work_entries に任意の参照を追加。既存 ProjectJob への紐づけ、ProjectJob 登録画面の選択、Coordinator メニューは後工程。',
                 'body' => '<section class="cl-feature"><h3>大まかな案件</h3><ul><li>Super Admin の専用メニューから登録・編集・休止</li><li>簡単な作業予定から大まかな案件を選択</li><li>取引先と年度は任意で、細かな案件を作る前に登録可能</li></ul></section>',
             ],
+            [
+                'version' => 'suna-nencho-1',
+                'title' => '総務に「年末調整」と「社員情報」を追加（サンエー印刷・サン・ブレーン共通）',
+                'released_at' => '2026-10-18',
+                'summary' => '総務が年末調整の受付を作り、従業員が画面の案内に沿って控除申告を入力・提出できるようになりました。社員情報（マイナンバーを含む）は権限を与えた人だけが扱えます。',
+                'design_files' => ['z_instructions/NENCHO_PLAN1.md', 'z_instructions/NENCHO_MANAGER1.md', 'z_instructions/SUNA_MANAGER1.md'],
+                'claude_notes' => 'SunA 配置規約（app/**/SunA, suna_ga_* テーブル, routes/suna.php）。社員情報・年末調整は会社をまたぐ例外で、会社ではなく権限（社員情報権限管理）で制御。マイナンバーは encrypted キャスト＋閲覧ログ、提出時スナップショットには含めない。国税庁XML定義（r8_v7）への適合チェックは artisan suna:nencho-check。本番反映は migrate（--force）が18本、権限付与、申請の種類への年末調整登録（feature_key=nencho）が必要。外部取込・XML出力は後回し（NENCHO_MANAGER1 D-1, D-2）。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>総務の機能</h3><ul>
+<li>申請メニューに「年末調整」を追加。受付（年度・期間・案内文）の作成と、対象者の自動取り込み・除外ができます。</li>
+<li>提出状況（未入力／入力中／提出済み／差戻し）を一覧で確認し、差戻し・管理者メモ・履歴を残せます。</li>
+<li>社員情報（マイナンバーを含む）を登録・編集できます。見る・編集・マイナンバー閲覧・年末調整の管理は、権限管理で人ごとに許可します。</li>
+<li>本人が入力した住所などと社員情報の差異を照合し、社員情報へ反映するかを選べます。</li>
+<li>従業員に代わって総務が入力することもできます。同じ画面を同時に編集することはできません。</li>
+<li>受付開始のお知らせと、未提出の方への催促を、既存の「お知らせ」で送れます（送信履歴と既読数つき）。カレンダーのリマインダーも受付期間に合わせて設定できます。</li>
+</ul></section>
+<section class="cl-feature"><h3>従業員の機能</h3><ul>
+<li>ユーザー用のタブ「年末調整」から、ステップに沿って入力・一時保存・前年からの引き継ぎ・提出ができます。</li>
+<li>郵便番号から住所を補完し、生年月日は「19770905」「和暦」でも入力できます。金額は自動でカンマが入ります。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

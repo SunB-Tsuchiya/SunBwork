@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+	<head>
+		<meta content="text/html; charset=shift_jis" http-equiv="Content-Type">
+
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		
+
+		<title>控除申告書データに係る仕様公開｜国税庁</title>
+		<link href="/template/css/bootstrap.min.css" rel="stylesheet">
+		<!--[if lt IE 9]>
+			<script src="/template/js/html5shiv.min.js"></script>
+			<script src="/template/js/respond.min.js"></script>
+		<![endif]-->
+		<script src="/template/js/jquery.min.js"></script>
+		<script src="/template/js/bootstrap.min.js"></script>
+		<link href="/template/css/common.css" rel="stylesheet">
+		<link href="/template/css/import.css" rel="stylesheet">
+		<script src="/template/js/custom.js"></script>
+
+		
+		<script src="/template/js/include.js"></script>
+	</head>
+	<body>
+<noscript>すべての機能をご利用いただくにはJavascriptを有効にしてください。</noscript>
+
+		<div class="container">
+
+			
+						<div id="header"></div>
+
+
+			<div class="wrap">
+
+				<div class="clearfix">
+
+					<div class="left-content contents">
+
+						
+
+					
+
+
+						<div id="contents">
+<div id="bodyArea">
+<p class="skip"></p>
+<ol class="breadcrumb"><li><a href="/">ホーム</a></li><li><a href="/users/index.htm">利用者別に調べる</a></li><li><a href="/users/gensen/index.htm">源泉徴収義務者の方</a></li><li class="active">控除申告書データに係る仕様公開</li></ol>
+
+<!--<p class="right">平成23年1月<br>国税庁</p>-->
+<div class="page-header" id="page-top"><h1>控除申告書データに係る仕様公開</h1></div>
+	
+<h2>(1)　控除申告書データに係る仕様公開の目的</h2>
+	<p>　年末調整手続において生命保険料控除、地震保険料控除（長期損害保険料控除を含みます。）又は住宅借入金等特別控除の適用を受ける場合は、従業員である被用者（以下「被用者」といいます。）が、給与等の支払者である雇用者（以下「雇用者」といいます。）に控除証明書や残高証明書など（以下「控除証明書等」といいます。）を提出又は提示する必要がありましたが、令和2年10月以降の年末調整においては、控除証明書等の電磁的方法による提供が可能となりました。<br>
+	 　そのため、国税庁は年末調整手続において、被用者が保険会社等から電磁的に交付された控除証明書等を用いて簡便・正確に控除申告書を作成し、雇用者に対して電磁的に提出できる年末調整控除申告書作成用ソフトウェア（以下「年調ソフト」といいます。）をリリースしております。
+	</p>
+
+	
+	<p style="margin: 0;">年調ソフトで作成できる控除申告書データは次のとおりです。</p>
+	<ul style="margin: 0 0 1em 1em;">
+		<li>給与所得者の扶養控除等（異動）申告書</li>
+		<li>給与所得者の配偶者控除等申告書</li>
+		<li>給与所得者の基礎控除申告書</li>
+		<li>所得金額調整控除申告書</li>
+		<li>給与所得者の特定親族特別控除申告書</li>
+		<li>給与所得者の保険料控除申告書</li>
+		<li>住宅借入金等特別控除申告書</li>
+		<li>従たる給与についての扶養控除等（異動）申告書</li>
+	</ul>
+
+	<p>
+	  &emsp;そこで、雇用者等のシステム開発部署や民間のソフトウェア開発業者等が提供するソフトウェアにおいて、年調ソフトに対応した控除申告書データの電磁的方法による提供及び利用が可能となるよう、控除申告書データの形式を定め、その仕様を一般公開するものです。</p>
+	
+<h2>(2)　控除申告書データに係る仕様公開に当たっての注意事項</h2>
+<h3>内容の変更</h3>	
+ 	<p>　公開内容は、今後の検討（法制面を含みます。）や技術動向などにより、変更する場合がありますので、最新の内容をご確認いただきますようお願いいたします。</p>
+	
+<h3>著作権</h3>	
+	 <p>　この仕様書の内容は著作権の対象となっています。著作権は、日本国著作権法及び国際条約により保護されています。<br>
+	  &emsp;ただし、このことは、雇用者等のシステム開発部署や民間のソフトウェア開発業者等がこの仕様に基づいた供給者ソフトウェアを開発し、市場に供給することを妨げるものではありません。
+	</p>
+<!---->
+<h3>免責事項</h3>
+	<p>　年調ソフトに含まれる情報の利用に当たり、システム利用者本人又は第三者が被った損害について、国税庁の故意又は重過失によるものである場合を除き、国税庁は責任を負わないものとします。</p>
+<!---->
+<h3>その他</h3>	
+	 <p>　年調ソフトで作成・出力する控除申告書データの仕様に関するお問い合わせは、下記メールアドレスにお問い合わせください。なお、お問い合わせの際は、お問い合わせ内容をメール本文に日本語で記載し、ファイルの添付はお控えください。</p>
+
+<p style="margin-left: 1em; text-indent: -1em">※　当窓口は、控除証明書等データに関する窓口ではありません。控除申告書データ以外に関するお問合せに対しては、回答・返信いたしかねますのでご留意ください。<br>
+　なお、控除証明書等データの仕様に関するお問合せについては、「<a href="https://www.e-tax.nta.go.jp/shiyo/index.htm" target="_blank">e-Taxホームページ</a>」をご確認ください。<br>
+　また、控除証明書等データに設定される値については、各控除証明書の発行主体へご確認ください。
+</p>
+<p style="margin-left: 1em; text-indent: -1em">※　年調ソフトのダウンロードや操作に関するお問い合わせは「<a href="/users/gensen/nenmatsu/nencho_04.htm">年調ソフトヘルプデスク</a>」をご覧ください。</p>
+<p>メールアドレス：nencho@nta.go.jp（国税庁課税部法人課税課宛）</p>
+
+<h2 id="a0024010-095">（3）控除申告書データに係る仕様</h2>	
+	<p>　令和８年分 年調ソフトの控除申告書データに係る仕様のご利用に当たっては、「控除申告書データに係る仕様公開に当たっての注意事項」を確認の上、ダウンロードを行ってください。<br>
+	 　ダウンロードをされた方は、「控除申告書データに係る仕様公開に当たっての注意事項」に同意したものとみなされます。
+</p>
+  
+<h3 id="a0024009-012">控除申告書データに係るXML定義書等</h3>
+
+	<div class="table-responsive"><table border="1" cellpadding="5" cellspacing="0" class="table table-bordered datatable width99" summary="控除申告書データに係る仕様書一覧">
+		<tbody>
+		<tr>
+		  <th scope="col">項番</th>
+		  <th scope="col">資料名</th>
+		  <th scope="col">データ形式：容量</th>
+		  <th scope="col">更新月</th>
+		</tr>
+		<tr>
+		  <th scope="row">1</th>
+		  <td><a href="/users/gensen/oshirase/teigisho01.xlsx">申告書XML定義書</a></td>
+		  <td>XLSX形式:178KB</td>
+		  <td>令和8年10月</td>
+		</tr>
+		<tr>
+		  <th scope="row">２</th>
+		  <td><a href="/users/gensen/oshirase/teigisho02.xlsx">申告書XML定義書（変更履歴付）</a></td>
+		  <td>XLSX形式:182KB</td>
+		  <td>令和8年10月</td>
+		  </tr>
+		<tr>
+		  <th scope="row">３</th>
+		  <td><a href="/users/gensen/oshirase/hosoku.xlsx">XML定義書の補足（控除証明書のインポート機能等の仕様）</a></td>
+		  <td>XLSX形式:848KB</td>
+		  <td>令和8年7月</td>
+		  </tr>
+		<tr>
+		  <th scope="row">４</th>
+		  <td><a href="/users/gensen/oshirase/zip/04.zip">帳票設計書（PC／スマートフォン版共通）</a></td>
+		  <td>ZIP形式:2,069KB</td>
+		  <td>令和8年10月</td>
+		  </tr>
+	    </tbody>
+	</table>
+	</div>
+	<div class="table-responsive">
+	<table width="100%" border="0">
+	  <tr>
+	    <td valign="top"><span class="indent1em">※</span></td>
+	    <td>項番２の「申告書XML定義書（変更履歴付）」は、令和７年11月公開の申告書XML定義書からの変更箇所を赤色等で示したものです。</td>
+	    </tr>
+	  <tr>
+	    <td valign="top"><span class="indent1em">※</span></td>
+	    <td>項番３については、国税庁の年調ソフトの機能に係る仕様を参考に提供するものです。ソフトウェア開発に際して、当該仕様に則る事を義務付けるものではありません。</td>
+	</tr>
+	  </table>
+	</div>
+    </div>
+</div><p class="page-top-link"><a href="#page-top">このページの先頭へ</a></p>
+
+					</div>
+					<!--/left-menu-->
+
+					<div class="right-menu">
+						
+						
+								<div class="panel panel-default sidenavi bmg20">
+							<div class="panel-heading">
+								<h2 class="panel-title"><a href="/users/index.htm">利用者別に調べる</a></h2>
+							</div>
+							<div class="panel-group" id="navi-Accordion">
+
+
+
+
+
+
+								<h3 class="sidenavi-title"><a class="navi_title" href="/users/kojin/index.htm">個人の方</a><a class="navi_btn collapsed" data-parent="#sidenaviAccordion" data-toggle="collapse" href="#sidenaviAccordionCollapse1"><img alt="メニューを開く" src="/template/img/template/navi_down.png"></a></h3><div class="panel-collapse collapse" id="sidenaviAccordionCollapse1"><ul><li><a href="/users/kojin/index.htm#kihon">基本的な情報</a></li><li><a href="/users/kojin/index.htm#ippan">一般的な税の取扱い</a></li><li><a href="/users/kojin/index.htm#senmon">専門的な税の取扱い</a></li><li><a href="/users/kojin/index.htm#shinkoku">申告・納税などの手続</a></li></ul></div><h3 class="sidenavi-title"><a class="navi_title" href="/users/hojin/index.htm">法人の方</a><a class="navi_btn collapsed" data-parent="#sidenaviAccordion" data-toggle="collapse" href="#sidenaviAccordionCollapse2"><img alt="メニューを開く" src="/template/img/template/navi_down.png"></a></h3><div class="panel-collapse collapse" id="sidenaviAccordionCollapse2"><ul><li><a href="/users/hojin/index.htm#ippan">一般的な税の取扱い</a></li><li><a href="/users/hojin/index.htm#senmon">専門的な税の取扱い</a></li><li><a href="/users/hojin/index.htm#shinkoku">申告・納税などの手続</a></li><li><a href="/users/hojin/daikibo_hojin.htm">大規模法人向けの情報</a></li></ul></div><h3 class="sidenavi-title"><a class="navi_title" href="/users/gensen/index.htm">源泉徴収義務者の方</a><a class="navi_btn" data-parent="#sidenaviAccordion" data-toggle="collapse" href="#sidenaviAccordionCollapse3"><img alt="メニューを閉じる" src="/template/img/template/navi_up.png"></a></h3><div class="panel-collapse collapse in" id="sidenaviAccordionCollapse3"><ul><li><a href="/users/gensen/index.htm#news">新着情報</a></li><li><a href="/users/gensen/index.htm#zeisei">税制改正等の情報</a></li><li><a href="/users/gensen/index.htm#nenmatsu">年末調整に関する情報</a></li><li><a href="/users/gensen/index.htm#ippan">一般的な情報</a></li><li><a href="/users/gensen/index.htm#senmon">専門的な情報</a></li></ul></div>
+
+							</div>
+						</div>
+
+
+
+
+
+
+
+
+
+
+
+
+					</div>
+					<!--/right-menu-->
+
+				</div>
+				<!--/clearfix-->
+
+			</div>
+			<!--/wrap-->
+
+			
+						<footer>
+				<h2>サイトマップ（コンテンツ一覧）</h2>
+				<ol class="breadcrumb footer"><li><a href="/">ホーム</a></li><li><a href="/users/index.htm">利用者別に調べる</a></li><li><a href="/users/gensen/index.htm">源泉徴収義務者の方</a></li><li class="active">控除申告書データに係る仕様公開</li></ol>
+				<div id="footer"></div>
+			</footer>
+
+		</div>
+		<!--/container-->
+
+	
+
+		
+		
+
+
+	</body>
+</html>
