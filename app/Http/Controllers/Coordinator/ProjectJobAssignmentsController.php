@@ -784,21 +784,40 @@ class ProjectJobAssignmentsController extends Controller
         $sendImmediately = $request->boolean('send_immediately', false);
         $senderUser = auth()->user();
 
-        foreach ($data['assignments'] as $a) {
-            // logical validations per assignment
-            // scheduling: desired_start_date removed; only validate desired_time vs today below
-            if (!empty($a['desired_end_date']) && !empty($a['desired_time'])) {
-                $today = date('Y-m-d');
-                if ($a['desired_end_date'] === $today) {
-                    $now = date('H:i');
-                    if ($a['desired_time'] < $now) {
-                        return back()->withErrors(['assignments' => '当日の時間は現在時刻以降を指定してください。'])->withInput();
-                    }
+        $deadlineIsPast = static function (array $assignment): bool {
+            return !empty($assignment['desired_end_date'])
+                && !empty($assignment['desired_time'])
+                && $assignment['desired_end_date'] === date('Y-m-d')
+                && $assignment['desired_time'] < date('H:i');
+        };
+
+        // 試用送信では、後ろのブロックの日時エラーで先のブロックだけ残さない。
+        if ($assigneeRequired) {
+            foreach ($data['assignments'] as $assignment) {
+                if ($deadlineIsPast($assignment)) {
+                    return back()->withErrors(['assignments' => '当日の時間は現在時刻以降を指定してください。'])->withInput();
+                }
+
+                // 再送信の重複は一括保存の前に確認する。同一リクエスト内の同名2ブロックは別件として扱う。
+                $recipientId = (int) $assignment['user_id'];
+                $assignmentSenderId = $senderUser && $recipientId === (int) $senderUser->id
+                    ? null
+                    : ($assignment['sender_id'] ?? null);
+                $alreadySent = ProjectJobAssignment::where('project_job_id', $projectJob->id)
+                    ->where('user_id', $recipientId)
+                    ->where('sender_id', $assignmentSenderId)
+                    ->where('title', $assignment['title'])
+                    ->where('created_at', '>=', now()->subSeconds(15))
+                    ->exists();
+                if ($alreadySent) {
+                    return back()->withErrors(['assignments' => '同じジョブが直近に登録されています。少し待ってから一覧を確認してください。'])->withInput();
                 }
             }
+        }
 
-            // Create assignment and associated WorkItem in a transaction
-            DB::transaction(function () use ($projectJob, $a, $sendImmediately, $senderUser) {
+        $storeAssignment = function (array $a) use ($projectJob, $sendImmediately, $senderUser, $assigneeRequired) {
+            // 試用時は外側の一括トランザクション内で各ブロックを保存する。
+            DB::transaction(function () use ($projectJob, $a, $sendImmediately, $senderUser, $assigneeRequired) {
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
@@ -842,14 +861,16 @@ class ProjectJobAssignmentsController extends Controller
 
                 // 二重送信ガード: 同一案件・同一担当者・同一タイトルの割当が直近数秒以内に
                 // 既に作成されていれば、フロントの連打・二重送信とみなして作成をスキップする
-                $isDuplicateSubmit = ProjectJobAssignment::where('project_job_id', $projectJob->id)
-                    ->where('user_id', $createData['user_id'])
-                    ->where('sender_id', $createData['sender_id'])
-                    ->where('title', $createData['title'])
-                    ->where('created_at', '>=', now()->subSeconds(15))
-                    ->exists();
-                if ($isDuplicateSubmit) {
-                    return;
+                if (!$assigneeRequired) {
+                    $isDuplicateSubmit = ProjectJobAssignment::where('project_job_id', $projectJob->id)
+                        ->where('user_id', $createData['user_id'])
+                        ->where('sender_id', $createData['sender_id'])
+                        ->where('title', $createData['title'])
+                        ->where('created_at', '>=', now()->subSeconds(15))
+                        ->exists();
+                    if ($isDuplicateSubmit) {
+                        return;
+                    }
                 }
 
                 $assignment = ProjectJobAssignment::create($createData);
@@ -898,22 +919,32 @@ class ProjectJobAssignmentsController extends Controller
                         $assignment->assigned = true;
                         $assignment->save();
 
-                        try {
-                            $jamLoaded = JobAssignmentMessage::with([
-                                'sender',
-                                'projectJobAssignment.user',
-                                'projectJobAssignment.projectJob.client',
-                            ])->find($jam->id);
-                            event(new \App\Events\JobMessageCreated(
-                                $jamLoaded,
-                                [$createData['user_id']],
-                                $jam->id
-                            ));
-                        } catch (\Throwable $_) {}
+                        $broadcastMessage = static function () use ($jam, $createData) {
+                            try {
+                                $jamLoaded = JobAssignmentMessage::with([
+                                    'sender',
+                                    'projectJobAssignment.user',
+                                    'projectJobAssignment.projectJob.client',
+                                ])->find($jam->id);
+                                event(new \App\Events\JobMessageCreated(
+                                    $jamLoaded,
+                                    [$createData['user_id']],
+                                    $jam->id
+                                ));
+                            } catch (\Throwable $_) {}
+                        };
+                        if ($assigneeRequired) {
+                            DB::afterCommit($broadcastMessage);
+                        } else {
+                            $broadcastMessage();
+                        }
                     } catch (\Throwable $eSend) {
                         Log::warning('send_immediately failed after assignment store', [
                             'error' => $eSend->getMessage(),
                         ]);
+                        if ($assigneeRequired) {
+                            throw $eSend;
+                        }
                     }
                 }
 
@@ -963,6 +994,9 @@ class ProjectJobAssignmentsController extends Controller
                             'row_id'  => $a['_row_id'],
                             'col_key' => $a['_col_key'],
                         ]);
+                        if ($assigneeRequired) {
+                            throw $__eCellLink;
+                        }
                     }
                 }
 
@@ -983,12 +1017,31 @@ class ProjectJobAssignmentsController extends Controller
                             'row_id'  => $a['_row_id'],
                             'col_key' => $a['_col_key'],
                         ]);
+                        if ($assigneeRequired) {
+                            throw $__eWfCellLink;
+                        }
                     }
                 }
 
                 // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly
                 // No-op for WorkItem creation - clients should send lookup ids on assignment payload instead.
             });
+        };
+
+        if ($assigneeRequired) {
+            DB::transaction(function () use ($data, $storeAssignment) {
+                foreach ($data['assignments'] as $a) {
+                    $storeAssignment($a);
+                }
+            });
+        } else {
+            foreach ($data['assignments'] as $a) {
+                // 非試用経路は従来のブロック別日時確認を維持する。
+                if ($deadlineIsPast($a)) {
+                    return back()->withErrors(['assignments' => '当日の時間は現在時刻以降を指定してください。'])->withInput();
+                }
+                $storeAssignment($a);
+            }
         }
 
         // 進行表から発信した場合は進行表に戻る
