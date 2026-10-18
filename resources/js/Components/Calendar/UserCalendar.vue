@@ -701,6 +701,7 @@ async function saveWeekBreaks() {
             :daily-breaks="localDailyBreaks"
             :default-break="defaultBreak"
             :has-diary="hasDiaryToday"
+            :overlap-layout-enabled="departmentWorkEnabled"
             @create="openActionSheet"
             @update="onUpdate"
             @event-click="openDetail"

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { evColor } from '@/Composables/useEventTypeColors';
+import { layoutTimedEvents } from '@/Helpers/calendarOverlapLayout';
 
 const props = defineProps({
     date:            { type: String,  required: true },
@@ -11,6 +12,7 @@ const props = defineProps({
     dailyBreaks:     { type: Array,   default: () => [] },
     defaultBreak:    { type: Object,  default: () => ({ start: '12:00', end: '13:00' }) },
     hasDiary:        { type: Boolean, default: false },
+    overlapLayoutEnabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['create', 'update', 'event-click', 'diary-click']);
@@ -69,6 +71,14 @@ const dayEvents = computed(() =>
     props.events
         .filter(ev => new Date(ev.starts_at).toLocaleDateString('sv-SE') === props.date)
         .sort((a, b) => eventDuration(b) - eventDuration(a))
+);
+
+const placedEvents = computed(() => props.overlapLayoutEnabled
+    ? layoutTimedEvents(dayEvents.value, ev => {
+        const start = localMin(ev.starts_at);
+        return { start, end: start + Math.max(1, Math.round(eventDuration(ev) / 60000)) };
+    })
+    : dayEvents.value.map(event => ({ event, lane: 0, lanes: 1 }))
 );
 
 function evTop(ev)    { return Math.max(0, localMin(ev.starts_at) - START_HOUR * 60) * (HOUR_H / 60); }
@@ -220,11 +230,15 @@ const selStyle = computed(() => {
     return height > 2 ? { top: `${top}px`, height: `${height}px` } : null;
 });
 
-function evStyle(ev) {
+function evStyle(ev, lane, lanes) {
     const isDragging = dragging.value?.ev?.id === ev.id && dragging.value.type === 'move';
     return {
         top:         `${evTop(ev)}px`,
         height:      `${evHeight(ev)}px`,
+        ...(props.overlapLayoutEnabled ? {
+            left: `calc(${lane * 100 / lanes}% + 3px)`,
+            width: `calc(${100 / lanes}% - 6px)`,
+        } : {}),
         zIndex:      Math.min(900, Math.max(1, Math.round(86_400_000 / Math.max(1, eventDuration(ev))))),
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
@@ -303,10 +317,11 @@ const dragStyle = computed(() => {
                         :style="selStyle" />
 
                     <!-- イベント -->
-                    <div v-for="ev in dayEvents" :key="ev.id"
-                        class="absolute inset-x-1.5 overflow-hidden rounded border px-1.5 pt-0.5 text-xs"
-                        :class="ev.is_own ? 'cursor-grab' : 'cursor-default'"
-                        :style="evStyle(ev)"
+                    <div v-for="{ event: ev, lane, lanes } in placedEvents" :key="ev.id"
+                        class="absolute overflow-hidden rounded border px-1.5 pt-0.5 text-xs"
+                        :class="[ev.is_own ? 'cursor-grab' : 'cursor-default', overlapLayoutEnabled ? '' : 'inset-x-1.5']"
+                        :title="`${ev.title}（${fmtTime(ev.starts_at)}〜${fmtTime(ev.ends_at)}）`"
+                        :style="evStyle(ev, lane, lanes)"
                         @mousedown.stop="onEventMousedown(ev, 'move', $event)"
                         @click.stop="emit('event-click', ev)">
                         <div v-if="ev.is_own" class="absolute inset-x-0 top-0 h-2 cursor-n-resize"
