@@ -1,5 +1,7 @@
 # 大まかな案件 試用進捗
 
+**2026-10-20 D15:** 大まかな案件の後続導線と一般向け権限は、評価システム完成後の段階3。現在の進捗は `EVALUATION_SCORE_MANAGER1.md`、順序は `JOB_EVALUATION_ROADMAP1.md`。既存の成功・保留の記録は維持する。
+
 更新: 2026-10-14。`BROAD_PROJECT_PLAN1.md` と `JOB_EVALUATION_CONTROL1.md` を併読する。
 
 | 段階 | 状態 | 証拠・次の作業 |

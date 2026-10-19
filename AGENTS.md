@@ -15,8 +15,10 @@ This file contains workspace-specific instructions for Codex. Read it before mak
 
 - For the work-record, calendar-input, and workload-evaluation redesign, read
   `z_instructions/JOB_EVALUATION_CONTROL1.md` first, then the current PLAN,
-  MANAGER, and PROMPT files it identifies. Older plans remain historical evidence;
-  a newer user decision can supersede them.
+  MANAGER, and PROMPT files it identifies. Read `z_instructions/JOB_EVALUATION_ROADMAP1.md`
+  for the current order: finish the evaluation system first, then input usability,
+  navigation, and MyJob/quick-input reconciliation. Older plans remain historical
+  evidence; a newer user decision can supersede them.
 - At each handoff, compare the working files with the latest available committed
   versions and recent conversation records when accessible. A `/tmp` worktree may
   have disappeared, and an untracked file in the main worktree may be older than

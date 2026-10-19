@@ -1,5 +1,7 @@
 # 依頼ジョブ新規登録画面の整理・進捗 1
 
+**2026-10-20 D15:** 既存の試用確認を保持し、他者宛て実送信や失敗時ロールバック等の未確認を評価完成後の段階4へ引き継ぐ。現在の進捗は `EVALUATION_SCORE_MANAGER1.md`、順序は `JOB_EVALUATION_ROADMAP1.md`。
+
 更新: 2026-10-18。計画は `REQUEST_JOB_FORM_PLAN1.md`。横断の決定は `JOB_EVALUATION_CONTROL1.md` D13。
 
 | 段階 | 状態 | 証拠・次の確認 |

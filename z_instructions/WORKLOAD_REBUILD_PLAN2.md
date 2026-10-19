@@ -1,5 +1,7 @@
 # WORKLOAD_REBUILD_PLAN2 — 簡易順位と詳細分析の分離
 
+**2026-10-20 D15 の後続決定:** 本書は試用分析画面の経緯と確認根拠。評価点式の完成は `EVALUATION_SCORE_PLAN1.md` を優先し、入力 UI や一般公開の未決は `JOB_EVALUATION_ROADMAP1.md` の順序で扱う。
+
 作成日: 2026-10-11。`WORKLOAD_REBUILD_PLAN1.md` の本番試用結果を受けた次段階の設計。実装前の確認用。
 
 ## 目的

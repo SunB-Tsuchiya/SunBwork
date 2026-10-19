@@ -1,5 +1,7 @@
 # 再開: 大まかな案件の試用
 
+**2026-10-20 D15:** この試用経路の未完了は `JOB_EVALUATION_ROADMAP1.md` の段階3。現在の最優先は `EVALUATION_SCORE1_PROMPT.md`。本書の「次」は評価完成まで履歴として読む。
+
 最初に `AGENTS.md`、`JOB_EVALUATION_CONTROL1.md`、`BROAD_PROJECT_PLAN1.md`、`BROAD_PROJECT_MANAGER1.md`、`JOB_INPUT1_PROMPT.md` を読む。ルート checkout の他者変更を守り、ブランチと差分を確認する。
 
 利用者は「大まかな案件」という既存区分はないと訂正した。情報出版 Super Admin メニューへ登録を先に追加し、本人の簡易予定から選ぶ。名前必須、取引先・年度任意。既存 ProjectJob との紐づけ、ProjectJob 登録時選択、Coordinator メニューは皆で使う段階まで保留。勝手に先行実装・自動紐づけしない。
