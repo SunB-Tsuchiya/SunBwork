@@ -69,6 +69,7 @@ class DiaryInteractionController extends Controller
                 ->where(function ($qq) use ($q) {
                     if (is_numeric($q)) {
                         $qq->orWhere('id', intval($q));
+                        $qq->orWhere('user_id', intval($q));
                     }
                     $qq->orWhere('content', 'like', '%' . $q . '%')
                         ->orWhereHas('user', fn($qu) => $qu->where('name', 'like', '%' . $q . '%'));
