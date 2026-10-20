@@ -124,7 +124,9 @@ class CalendarController extends Controller
 
             // EventModal 用データ（Schedule と同一）
             try {
-                $eventItemTypes = EventItemType::orderBy('id')->get(['id', 'name', 'slug'])->toArray();
+                $eventItemTypes = EventItemType::query()
+                    ->when(! app(PersonalWorkSchedule::class)->available($user), fn ($query) => $query->where('slug', '!=', 'work_schedule'))
+                    ->orderBy('id')->get(['id', 'name', 'slug'])->toArray();
             } catch (\Throwable $e) {
                 Log::error('CalendarController eventItemTypes: ' . $e->getMessage());
             }

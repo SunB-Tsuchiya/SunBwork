@@ -7,10 +7,12 @@ const props = defineProps({ initialDate: { type: String, default: '' } });
 const date = props.initialDate || new Date().toLocaleDateString('sv-SE');
 const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
 const period = ['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'day';
+const queryScoreVersion = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('score_version');
+const scoreVersion = queryScoreVersion === 'trial_time_v3' ? 'trial_time_v3' : 'trial_time_v2';
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業量分析ガイド" active="guide" :date="date" :period="period">
+    <WorkloadAnalysisShell title="作業量分析ガイド" active="guide" :date="date" :period="period" :score-version="scoreVersion">
         <div class="mx-auto max-w-5xl space-y-5">
             <section class="rounded-lg bg-white p-5 shadow sm:p-6">
                 <p class="text-xs font-semibold text-blue-700">まずは概要</p>
@@ -34,8 +36,8 @@ const period = ['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'd
                     </div>
                 </div>
                 <div class="mt-5 flex flex-wrap items-center gap-3">
-                    <Link :href="route('schedule.department_work.details', { date })" class="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">詳しい作業量分析を見る</Link>
-                    <Link :href="route('schedule.department_work.results', { date, period })" class="text-sm font-medium text-blue-700 underline">簡易順位を見る</Link>
+                    <Link :href="route('schedule.department_work.details', { date, score_version: scoreVersion })" class="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">詳しい作業量分析を見る</Link>
+                    <Link :href="route('schedule.department_work.results', { date, period, score_version: scoreVersion })" class="text-sm font-medium text-blue-700 underline">簡易順位を見る</Link>
                 </div>
             </section>
 
@@ -72,6 +74,7 @@ const period = ['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'd
                             <p><strong>残業追加点</strong>は、勤務記録の残業と実際の作業記録が重なる時間だけに付きます。最初の3時間は基本点の0.5倍、超過分は0.2倍です。記録のない残業時間は別表示します。</p>
                             <p><strong>案件登録点</strong>は登録者に5点/件です。<strong>案件管理点</strong>は、対象期間の各日について、さかのぼる14日間にチーム活動がある案件を数え、リーダー／副リーダーと作業メンバー数で調整する試験値です。どちらも成果の確定点ではありません。</p>
                             <p>「暫定合計」は作業点と会議・訪問点、それにチェックされた残業・登録・管理の点数を足した表示値です。チェックを変えても記録や保存済みの値は変わりません。</p>
+                            <p v-if="scoreVersion === 'trial_time_v3'">新しい試算では、公開範囲と業務の認定を分けます。件名を見せない業務も時間と点数だけ集計します。会議・訪問・外出と「作業（予定）」を業務候補とし、「そのほか」は自動加点しません。招待された人は承認済みの場合だけ会議の候補です。終了した予定は、削除されていなければ実施したものとして扱います。</p>
                         </div>
                     </details>
 

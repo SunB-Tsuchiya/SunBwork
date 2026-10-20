@@ -353,6 +353,7 @@ class ScheduleEventController extends Controller
         $this->checkSameDay($validated['starts_at'], $validated['ends_at']);
 
         $user = Auth::user();
+        $this->authorizeTrialWorkType($validated['event_item_type_id'] ?? null, $user);
 
         $event = Event::create([
             'user_id'               => $user->id,
@@ -415,7 +416,9 @@ class ScheduleEventController extends Controller
             'destination'           => 'nullable|string|max:255',
             'body'                  => 'nullable|string',
             'visibility'            => 'nullable|in:private,company,group,public',
+            'cancelled'             => 'sometimes|boolean',
         ]);
+        $this->authorizeTrialWorkType($validated['event_item_type_id'] ?? null, $user);
 
         $starts = $validated['starts_at'] ?? $event->starts_at;
         $ends   = $validated['ends_at']   ?? $event->ends_at;
@@ -430,7 +433,12 @@ class ScheduleEventController extends Controller
         $oldStart = $event->getRawOriginal('starts_at');
         $oldEnd   = $event->getRawOriginal('ends_at');
 
-        $event->update($validated);
+        if (array_key_exists('cancelled', $validated)) {
+            abort_unless(app(\App\Services\PersonalWorkSchedule::class)->available($user), 403);
+            $event->cancelled_at = $validated['cancelled'] ? ($event->cancelled_at ?? now()) : null;
+            unset($validated['cancelled']);
+        }
+        $event->fill($validated)->save();
         $event->load(['eventItemType:id,name', 'attendees.user:id,name']);
 
         // 時間変更による重複の再計算（旧時間帯の解除も含む）
@@ -482,6 +490,14 @@ class ScheduleEventController extends Controller
     {
         if (Carbon::parse($starts)->toDateString() !== Carbon::parse($ends)->toDateString()) {
             abort(422, 'このページの予定は日をまたいで設定できません');
+        }
+    }
+
+    private function authorizeTrialWorkType(?int $typeId, $user): void
+    {
+        if (! $typeId) return;
+        if (\App\Models\EventItemType::whereKey($typeId)->value('slug') === 'work_schedule') {
+            abort_unless(app(\App\Services\PersonalWorkSchedule::class)->available($user), 403);
         }
     }
 

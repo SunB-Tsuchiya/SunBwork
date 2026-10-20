@@ -10,6 +10,8 @@ const props = defineProps({ initialDate: { type: String, default: '' } });
 const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
 const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
 const period = ref(['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'day');
+const queryScoreVersion = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('score_version');
+const scoreVersion = ref(queryScoreVersion === 'trial_time_v3' ? 'trial_time_v3' : 'trial_time_v2');
 const weekPickerOpen = ref(false);
 const weekPicker = ref(null);
 const weekPickerMonth = ref(date.value.slice(0, 7));
@@ -223,7 +225,7 @@ async function load() {
     }
     try {
         const { data } = await axios.get(route('schedule.department_work.analysis'), {
-            params: { date: date.value, period: period.value },
+            params: { date: date.value, period: period.value, score_version: scoreVersion.value },
         });
         if (sequence !== loadSequence) return;
         people.value = data.people || [];
@@ -266,7 +268,7 @@ async function loadPerson(person, selectedPeriod, selectedDate) {
     personLoading.value = true;
     try {
         const requests = [axios.get(route('schedule.department_work.analysis'), {
-            params: { date: selectedDate, period: selectedPeriod, user_id: person.id },
+            params: { date: selectedDate, period: selectedPeriod, user_id: person.id, score_version: scoreVersion.value },
         })];
         if (selectedPeriod === 'day') requests.push(axios.get(route('schedule.department_work.index'), { params: { date: selectedDate, user_id: person.id } }));
         const [analysisResponse, scheduleResponse] = await Promise.all(requests);
@@ -326,8 +328,8 @@ function backToPersonPeriod() {
     });
 }
 
-watch([date, period], () => {
-    const url = route('schedule.department_work.results', { date: date.value, period: period.value });
+watch([date, period, scoreVersion], () => {
+    const url = route('schedule.department_work.results', { date: date.value, period: period.value, score_version: scoreVersion.value });
     window.history.replaceState(window.history.state, '', url);
     closePerson();
     load();
@@ -344,13 +346,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業実績の内訳" active="results" :date="date" :period="period">
+    <WorkloadAnalysisShell title="作業実績の内訳" active="results" :date="date" :period="period" :score-version="scoreVersion">
 
         <section class="rounded-lg bg-white p-4 shadow">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h3 class="font-semibold">作業実績の内訳</h3>
-                    <p class="mt-1 text-xs text-gray-500">時刻を記録した簡易作業と、過去のジョブ・仕事の会議を集計します。未記録は作業ゼロを意味しません。非公開の作業は本人以外の内訳に含めません。</p>
+                    <p class="mt-1 text-xs text-gray-500">時刻を記録した簡易作業と、過去のジョブ・仕事の会議を集計します。未記録は作業ゼロを意味しません。新しい試算では非公開の業務も内容を伏せて集計します。</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
                     <label v-if="period !== 'week'" class="flex items-center gap-2"><span class="whitespace-nowrap">{{ { day: '対象日', month: '対象月' }[period] }}</span>
@@ -379,6 +381,11 @@ onBeforeUnmount(() => {
                         <button v-for="[key, label] in [['day', '日'], ['week', '週'], ['month', '月']]" :key="key" type="button" class="rounded border px-3 py-1" :class="period === key ? 'border-blue-600 bg-blue-50 text-blue-700' : 'bg-white'" @click="period = key">{{ label }}</button>
                     </div>
                 </div>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-medium text-gray-700">採点方式</span>
+                <button v-for="[value, label] in [['trial_time_v2', '従来の試用点'], ['trial_time_v3', '新しい試算']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? 'border-blue-600 bg-blue-50 text-blue-800' : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
+                <span class="text-gray-600">新しい試算は比較用で、過去の記録を変更しません。</span>
             </div>
             <p v-if="period === 'week' && selectedWeekRange" class="mt-2 text-xs font-medium text-blue-800">対象週：{{ selectedWeekRange }}</p>
             <p v-if="!loading && !error" class="mt-2 text-xs text-gray-500">集計期間：{{ rangeLabel }}</p>
@@ -452,7 +459,7 @@ onBeforeUnmount(() => {
                     <div>
                         <button type="button" class="font-semibold text-blue-800 underline underline-offset-2" :aria-label="`${person.name}の詳細を表示`" @click="openPerson(person)">{{ person.name }}</button>
                         <span class="ml-2 rounded px-1.5 py-0.5 text-xs" :style="{ backgroundColor: roleColor(person.role?.code).chip, color: roleColor(person.role?.code).bar }">{{ person.role?.label || 'その他' }}</span>
-                        <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}` : '公開範囲内の認定時間なし' }}／作業 {{ pointLabel(person.work_points) }}点・会議／訪問 {{ pointLabel(person.meeting_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
+                        <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}` : '認定時間なし' }}／作業 {{ pointLabel(person.work_points) }}点・会議／訪問 {{ pointLabel(person.meeting_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
                     </div>
                     <div v-if="person.activities.length" class="space-y-2">
                         <div class="flex h-3 overflow-hidden rounded bg-gray-100" :aria-label="`${person.name}の作業種類別記録時間`">
@@ -497,7 +504,7 @@ onBeforeUnmount(() => {
                             <TimelineDiary :date="personDate" :events="personTimelineEvents" :start-hour="personTimelineHours.start" :end-hour="personTimelineHours.end" :editable="false" compact />
                         </div>
                         <div class="mt-4 flex flex-wrap gap-2 text-xs">
-                            <span v-for="[source, label] in [['quick', '簡易予定'], ['my_job', 'マイジョブ'], ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出']]" :key="source" class="rounded border bg-gray-50 px-2 py-1">{{ label }} {{ selectedPerson.source_counts?.[source] || 0 }}件</span>
+                            <span v-for="[source, label] in [['quick', '簡易予定'], ['my_job', 'マイジョブ'], ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出'], ['scheduled_work', '作業予定']]" :key="source" class="rounded border bg-gray-50 px-2 py-1">{{ label }} {{ selectedPerson.source_counts?.[source] || 0 }}件</span>
                         </div>
                         <div v-if="selectedPerson.activities?.length" class="mt-3 flex flex-wrap gap-2 text-xs">
                             <span v-for="activity in selectedPerson.activities" :key="`${activity.work_category}-${activity.activity_type}`" class="rounded border px-2 py-1" :style="chipStyle(activityColors[activity.work_category] || activityColors.other)">
@@ -506,7 +513,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div v-if="personPeriod === 'day'" class="mt-5">
                             <h3 class="font-semibold">その日の時刻表と内容</h3>
-                            <p class="mt-1 text-xs text-gray-600">集計対象外の予定も含む予定表の表示です。非公開の内容は表示しません。</p>
+                            <p class="mt-1 text-xs text-gray-600">集計対象外の予定も含む予定表の表示です。非公開の内容は表示しません。新しい試算では、非公開の業務も集計値に含むため、表示できる予定の合計とは一致しない場合があります。</p>
                             <p v-if="!orderedSchedule.length" class="mt-3 rounded border p-3 text-sm text-gray-600">表示できる予定はありません。</p>
                             <div v-else class="mt-3 space-y-2">
                                 <div v-for="item in orderedSchedule" :key="`${item.source}-${item.id}`" class="grid gap-2 rounded border p-3 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]">

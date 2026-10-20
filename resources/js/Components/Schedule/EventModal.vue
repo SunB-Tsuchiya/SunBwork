@@ -26,6 +26,7 @@ const props = defineProps({
     companies:          { type: Array,   default: () => [] },
     departments:        { type: Array,   default: () => [] },
     existingEvents:     { type: Array,   default: () => [] }, // 個人ジョブ予定との重複チェック用
+    trialEvaluationEnabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['close', 'saved', 'deleted']);
@@ -74,6 +75,7 @@ const form = ref({
 const errors        = ref({});
 const loading       = ref(false);
 const formAttendees = ref([]);
+const cancelled = ref(false);
 
 // スペース区切り JST 文字列を ISO 形式に正規化（Safari 対応）
 function normDateStr(s) { return s ? s.replace(' ', 'T') : s; }
@@ -235,6 +237,7 @@ watch(() => props.show, (v) => {
     titleManuallyEdited.value = false;
 
     if (props.event) {
+        cancelled.value = Boolean(props.event.cancelled_at);
         const s = toDateParts(new Date(props.event.starts_at));
         const e = toDateParts(new Date(props.event.ends_at));
         selectedTypeId.value    = props.event.event_item_type_id ?? null;
@@ -252,6 +255,7 @@ watch(() => props.show, (v) => {
             is_company_event:      props.event.is_company_event ?? true,
         };
     } else {
+        cancelled.value = false;
         const date     = props.defaultDate || new Date().toLocaleDateString('sv-SE');
         const startMin = props.defaultStartMin ?? 9 * 60;
         const endMin   = props.defaultEndMin   ?? (startMin + 60);
@@ -404,6 +408,7 @@ async function submit() {
         starts_at: `${date} ${startTime}:00`,
         ends_at:   `${date} ${endTime}:00`,
     };
+    if (props.event && props.trialEvaluationEnabled) payload.cancelled = cancelled.value;
 
     try {
         let res;
@@ -587,7 +592,7 @@ async function fetchDayReservations() {
 function onTrackMousedown(roomId, event) {
     activeRoomId.value = roomId;
     const el = event.currentTarget;
-    let anchorMin = tlXToMin(el, event.clientX);
+    const anchorMin = tlXToMin(el, event.clientX);
     form.value.startTime = minToTime(anchorMin);
     form.value.endTime   = minToTime(Math.min(TL_END, anchorMin + 60));
 
@@ -734,6 +739,12 @@ function fmtResTime(isoStr) {
                             <option value="public">全体公開</option>
                         </select>
                     </div>
+
+                    <!-- メモ -->
+                    <label v-if="isEdit && trialEvaluationEnabled" class="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                        <input v-model="cancelled" type="checkbox" class="mt-1 rounded" />
+                        <span>この予定を中止した（新しい試算の点数から除外）</span>
+                    </label>
 
                     <!-- メモ -->
                     <div>
