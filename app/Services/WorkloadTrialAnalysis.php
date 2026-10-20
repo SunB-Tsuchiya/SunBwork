@@ -7,7 +7,10 @@ use App\Models\Event;
 use App\Models\PersonalWorkEntry;
 use App\Models\ProjectJob;
 use App\Models\User;
+use App\Models\UserMonthlyBreak;
+use App\Models\UserMonthlySchedule;
 use App\Models\WorkRecord;
+use App\Models\Worktype;
 use App\Support\PersonalWorkActivities;
 use App\Support\PersonalWorkPoints;
 use App\Support\PersonalWorkRole;
@@ -37,6 +40,31 @@ class WorkloadTrialAnalysis
         $today = $now->toDateString();
         $currentTime = $now->format('H:i:s');
         $userById = $users->keyBy('id');
+        $firstMonth = substr($startDate, 0, 7);
+        $lastMonth = substr($endDate, 0, 7);
+        $monthlySchedules = UserMonthlySchedule::whereIn('user_id', $userIds)
+            ->whereBetween('year_month', [$firstMonth, $lastMonth])->get()
+            ->keyBy(fn ($row) => $row->user_id.'|'.$row->year_month);
+        $monthlyBreaks = UserMonthlyBreak::whereIn('user_id', $userIds)
+            ->whereBetween('year_month', [$firstMonth, $lastMonth])->get()
+            ->keyBy(fn ($row) => $row->user_id.'|'.$row->year_month);
+        $worktypes = Worktype::all()->keyBy('id');
+        $workWindows = [];
+        $workWindow = function (User $user, string $date) use ($monthlySchedules, $monthlyBreaks, $worktypes, &$workWindows): ?array {
+            $key = $user->id.'|'.$date;
+            if (array_key_exists($key, $workWindows)) return $workWindows[$key];
+            $monthKey = $user->id.'|'.substr($date, 0, 7);
+            $day = substr($date, 8, 2);
+            $worktypeId = $monthlySchedules->get($monthKey)?->schedule[$day]
+                ?? $user->userSetting?->worktype_id;
+            $breakSetting = $monthlyBreaks->get($monthKey)?->schedule[$day] ?? null;
+            $break = is_array($breakSetting) && ! empty($breakSetting['start']) && ! empty($breakSetting['end'])
+                ? ['start' => $breakSetting['start'], 'end' => $breakSetting['end']] : null;
+
+            return $workWindows[$key] = $this->schedule->workWindowFromSettings(
+                $user, $worktypeId ? $worktypes->get((int) $worktypeId) : null, $break
+            );
+        };
         $entries = PersonalWorkEntry::query()
             ->where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
@@ -103,7 +131,7 @@ class WorkloadTrialAnalysis
                 $to = $this->resolveJstCarbon($entry->sourceEvent, 'ends_at');
                 $range = $this->dateInterval($from, $to, $date);
             } else {
-                $range = $this->schedule->slotInterval($entry, $this->schedule->workWindow($user, $date));
+                $range = $this->schedule->slotInterval($entry, $workWindow($user, $date));
             }
             if ($range && $date === $today) {
                 $range[1] = min($range[1], $now->hour * 60 + $now->minute);
@@ -160,7 +188,11 @@ class WorkloadTrialAnalysis
                 $activity = $isJob ? 'my_job'
                     : (in_array($event->eventItemType?->slug, ['customer_visit', 'client_visit', 'outing'], true)
                         ? 'outing' : 'meeting');
-                for ($day = $start->copy()->startOfDay(); $day->lte($end); $day->addDay()) {
+                $firstDay = $from->copy()->startOfDay();
+                if ($firstDay->lt($start)) $firstDay = $start->copy()->startOfDay();
+                $lastDay = $to->copy()->startOfDay();
+                if ($lastDay->gt($end)) $lastDay = $end->copy()->startOfDay();
+                for ($day = $firstDay; $day->lte($lastDay); $day->addDay()) {
                     $date = $day->toDateString();
                     $range = $this->dateInterval($from, $to, $date);
                     if (! $range) continue;
@@ -259,7 +291,7 @@ class WorkloadTrialAnalysis
             $recordedDays = 0;
             $daily = [];
             foreach ($dayItems as $date => $items) {
-                $window = $this->schedule->workWindow($user, $date);
+                $window = $workWindow($user, $date);
                 $ledger = $this->minuteLedger($items, $window);
                 if ($withDaily) {
                     $dailyBreakdown = $this->splitBasePoints($ledger['activities'], $ledger['points']);

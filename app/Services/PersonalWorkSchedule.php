@@ -212,12 +212,18 @@ class PersonalWorkSchedule
         $worktypeId = UserMonthlySchedule::worktypeIdForDate($user->id, $date)
             ?? $user->userSetting?->worktype_id;
         $worktype = $worktypeId ? Worktype::find($worktypeId) : null;
+        $break = UserMonthlyBreak::breakForDate($user->id, $date);
+
+        return $this->workWindowFromSettings($user, $worktype, $break);
+    }
+
+    public function workWindowFromSettings(User $user, ?Worktype $worktype, ?array $break): ?array
+    {
         if (! $worktype) return null;
 
         $start = $this->minutes($worktype->start_time);
         $end = $this->minutes($worktype->end_time);
         if ($end <= $start) $end += 1440;
-        $break = UserMonthlyBreak::breakForDate($user->id, $date);
         $breakStart = $this->minutes($break['start'] ?? $user->userSetting?->lunch_start ?? '12:00');
         $breakEnd = $this->minutes($break['end'] ?? $user->userSetting?->lunch_end ?? '13:00');
         if ($breakStart < $start || $breakStart >= $end) {

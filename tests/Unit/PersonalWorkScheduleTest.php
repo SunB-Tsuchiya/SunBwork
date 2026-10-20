@@ -8,12 +8,27 @@ use App\Models\Event;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\User;
+use App\Models\Worktype;
 use App\Services\PersonalWorkSchedule;
 use App\Support\PersonalWorkActivities;
 use PHPUnit\Framework\TestCase;
 
 class PersonalWorkScheduleTest extends TestCase
 {
+    public function test_preloaded_work_window_uses_the_daily_break_without_database_queries(): void
+    {
+        $user = new User();
+        $worktype = new Worktype(['start_time' => '08:00:00', 'end_time' => '17:00:00']);
+
+        $window = (new PersonalWorkSchedule())->workWindowFromSettings($user, $worktype, [
+            'start' => '12:30', 'end' => '13:30',
+        ]);
+
+        $this->assertSame([
+            'start' => 480, 'end' => 1020, 'break_start' => 750, 'break_end' => 810,
+        ], $window);
+    }
+
     public function test_broad_project_name_is_visible_only_within_its_department_and_respects_private(): void
     {
         $broad = new BroadProject(['name' => '大まかな案件', 'company_id' => 1, 'department_id' => 2]);
