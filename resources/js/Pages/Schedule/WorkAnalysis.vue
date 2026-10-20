@@ -1,6 +1,6 @@
 <script setup>
 import axios from 'axios';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
@@ -9,6 +9,9 @@ import { workCategories, workActivities, activityLabel } from '@/Constants/perso
 const props = defineProps({ initialDate: { type: String, default: '' } });
 const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
 const period = ref('day');
+const weekPickerOpen = ref(false);
+const weekPicker = ref(null);
+const weekPickerMonth = ref(date.value.slice(0, 7));
 const people = ref([]);
 const range = ref('');
 const loading = ref(true);
@@ -164,6 +167,43 @@ const selectedWeekRange = computed(() => {
     const format = (value) => `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
     return `${format(sunday)}（日）～${format(saturday)}（土）`;
 });
+const weekPickerTitle = computed(() => {
+    const [year, month] = weekPickerMonth.value.split('-').map(Number);
+    return `${year}年${month}月`;
+});
+const weekPickerDays = computed(() => {
+    const [year, month] = weekPickerMonth.value.split('-').map(Number);
+    const first = new Date(Date.UTC(year, month - 1, 1));
+    first.setUTCDate(1 - first.getUTCDay());
+    return Array.from({ length: 42 }, (_, index) => {
+        const day = new Date(first);
+        day.setUTCDate(first.getUTCDate() + index);
+        const value = `${day.getUTCFullYear()}-${String(day.getUTCMonth() + 1).padStart(2, '0')}-${String(day.getUTCDate()).padStart(2, '0')}`;
+        return { value, label: day.getUTCDate(), currentMonth: day.getUTCMonth() === month - 1 };
+    });
+});
+const selectedWeekStart = computed(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date.value)) return '';
+    const [year, month, day] = date.value.split('-').map(Number);
+    const sunday = new Date(Date.UTC(year, month - 1, day));
+    sunday.setUTCDate(sunday.getUTCDate() - sunday.getUTCDay());
+    return `${sunday.getUTCFullYear()}-${String(sunday.getUTCMonth() + 1).padStart(2, '0')}-${String(sunday.getUTCDate()).padStart(2, '0')}`;
+});
+function moveWeekPickerMonth(offset) {
+    const [year, month] = weekPickerMonth.value.split('-').map(Number);
+    const next = new Date(Date.UTC(year, month - 1 + offset, 1));
+    weekPickerMonth.value = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+function chooseWeek(day) {
+    date.value = day;
+    weekPickerOpen.value = false;
+}
+function closeWeekPickerOutside(event) {
+    if (weekPickerOpen.value && !weekPicker.value?.contains(event.target)) weekPickerOpen.value = false;
+}
+function closeWeekPickerOnEscape(event) {
+    if (event.key === 'Escape') weekPickerOpen.value = false;
+}
 const monthDate = computed({
     get: () => date.value.slice(0, 7),
     set: (value) => { if (/^\d{4}-\d{2}$/.test(value)) date.value = `${value}-01`; },
@@ -286,7 +326,15 @@ function backToPersonPeriod() {
 }
 
 watch([date, period], () => { closePerson(); load(); });
-onMounted(load);
+onMounted(() => {
+    load();
+    document.addEventListener('pointerdown', closeWeekPickerOutside);
+    document.addEventListener('keydown', closeWeekPickerOnEscape);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('pointerdown', closeWeekPickerOutside);
+    document.removeEventListener('keydown', closeWeekPickerOnEscape);
+});
 </script>
 
 <template>
@@ -299,17 +347,34 @@ onMounted(load);
                     <p class="mt-1 text-xs text-gray-500">時刻を記録した簡易作業と、過去のジョブ・仕事の会議を集計します。未記録は作業ゼロを意味しません。非公開の作業は本人以外の内訳に含めません。</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                    <label class="flex items-center gap-2"><span class="whitespace-nowrap">{{ { day: '対象日', week: '週内の日付', month: '対象月' }[period] }}</span>
+                    <label v-if="period !== 'week'" class="flex items-center gap-2"><span class="whitespace-nowrap">{{ { day: '対象日', month: '対象月' }[period] }}</span>
                         <input v-if="period === 'day'" v-model="date" type="date" aria-label="対象日" class="rounded border px-2 py-1" />
-                        <input v-else-if="period === 'week'" v-model="date" type="date" aria-label="週内の日付" class="rounded border px-2 py-1" />
                         <input v-else v-model="monthDate" type="month" aria-label="対象月" class="rounded border px-2 py-1" />
                     </label>
+                    <div v-else ref="weekPicker" class="relative flex items-center gap-2">
+                        <span class="whitespace-nowrap">対象週</span>
+                        <button type="button" class="rounded border bg-white px-3 py-1 text-left" aria-label="対象週を選択" :aria-expanded="weekPickerOpen" @click="weekPickerMonth = date.slice(0, 7); weekPickerOpen = !weekPickerOpen">{{ selectedWeekRange || '週を選択' }} <span aria-hidden="true">▦</span></button>
+                        <div v-if="weekPickerOpen" class="absolute right-0 top-full z-30 mt-1 w-72 rounded-lg border border-gray-300 bg-white p-3 shadow-xl" role="dialog" aria-label="対象週を選択">
+                            <div class="mb-2 flex items-center justify-between">
+                                <button type="button" class="rounded border px-2 py-1" aria-label="前の月" @click="moveWeekPickerMonth(-1)">◀</button>
+                                <strong>{{ weekPickerTitle }}</strong>
+                                <button type="button" class="rounded border px-2 py-1" aria-label="次の月" @click="moveWeekPickerMonth(1)">▶</button>
+                            </div>
+                            <div class="grid grid-cols-7 text-center text-xs font-medium text-gray-600">
+                                <span v-for="weekday in ['日', '月', '火', '水', '木', '金', '土']" :key="weekday" class="py-1">{{ weekday }}</span>
+                            </div>
+                            <div v-for="row in 6" :key="row" class="group grid grid-cols-7">
+                                <button v-for="day in weekPickerDays.slice((row - 1) * 7, row * 7)" :key="day.value" type="button" class="h-9 border-y text-center text-sm group-hover:bg-blue-50" :class="[day.currentMonth ? 'text-gray-900' : 'text-gray-400', day.value === selectedWeekStart ? 'border-l' : '', weekPickerDays[(row - 1) * 7]?.value === selectedWeekStart ? 'border-blue-600 bg-blue-100' : 'border-transparent', day.value === date ? 'font-bold underline' : '', day.value === weekPickerDays[row * 7 - 1]?.value ? 'border-r' : '']" :aria-label="`${day.value}を含む週を選択`" @click="chooseWeek(day.value)">{{ day.label }}</button>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-600">日曜から土曜までを1週として選びます。</p>
+                        </div>
+                    </div>
                     <div class="flex gap-1">
                         <button v-for="[key, label] in [['day', '日'], ['week', '週'], ['month', '月']]" :key="key" type="button" class="rounded border px-3 py-1" :class="period === key ? 'border-blue-600 bg-blue-50 text-blue-700' : 'bg-white'" @click="period = key">{{ label }}</button>
                     </div>
                 </div>
             </div>
-            <p v-if="period === 'week' && selectedWeekRange" class="mt-2 text-xs font-medium text-blue-800">選んだ日を含む週：{{ selectedWeekRange }}</p>
+            <p v-if="period === 'week' && selectedWeekRange" class="mt-2 text-xs font-medium text-blue-800">対象週：{{ selectedWeekRange }}</p>
             <p v-if="!loading && !error" class="mt-2 text-xs text-gray-500">集計期間：{{ rangeLabel }}</p>
             <p v-if="error" class="mt-2 text-sm text-red-700" role="alert">{{ error }}</p>
             <div v-if="loading" class="mt-4 flex items-center gap-3 rounded border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-800" role="status" aria-live="polite">
