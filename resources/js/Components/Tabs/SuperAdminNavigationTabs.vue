@@ -85,6 +85,12 @@ const tabs = computed(() => [
         condition: canAccessWorkRecordTrial.value && typeof route === 'function' && route().has('superadmin.broad_projects.index'),
     },
     {
+        key: 'applicants',
+        href: tryRoute('admin.applicants.index'),
+        label: '申請者管理',
+        condition: typeof route === 'function' && route().has('admin.applicants.index'),
+    },
+    {
         key: 'scripts',
         href: tryRoute('superadmin.scripts.index'),
         label: 'スクリプト管理',
@@ -225,6 +231,13 @@ function onMobileSelect(e) {
                 :class="tab('broad_projects')"
             >
                 大まかな案件
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('admin.applicants.index')"
+                :href="route('admin.applicants.index')"
+                :class="tab('applicants')"
+            >
+                申請者管理
             </Link>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.scripts.index')"

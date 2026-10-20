@@ -25,7 +25,7 @@ const isGeneral = computed(() => page.props.auth?.companyType === 'general');
 const GENERAL_ALLOWED = [
     'dashboard', 'companies', 'users', 'departments', 'special_teams', 'diaries', 'diary_teams',
     'worktypes', 'work_records', 'leader_permissions', 'meeting_definitions',
-    'presence_board_settings', 'meeting_rooms', 'schedule_settings', 'staff_permissions',
+    'presence_board_settings', 'meeting_rooms', 'schedule_settings', 'staff_permissions', 'applicants',
 ];
 const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
 
@@ -61,6 +61,8 @@ const tabs = computed(() => [
     { key: 'leader_permissions', href: tryRoute('admin.leader_permissions.index'), label: 'Leader権限管理' },
     { key: 'meeting_definitions', href: tryRoute('admin.meeting_definitions.index'), label: '会議設定' },
     { key: 'presence_board_settings', href: tryRoute('admin.presence.board_settings'), label: '在席ボード管理' },
+    // 申請（交通費など）を、誰が使えるか（両社共通）
+    { key: 'applicants', href: tryRoute('admin.applicants.index'), label: '申請者管理' },
     { key: 'meeting_rooms',       href: tryRoute('admin.meeting-rooms.index'),    label: '会議室管理' },
     { key: 'schedule_settings',   href: tryRoute('admin.schedule-settings.edit'), label: '予定表権限設定' },
     // サンエー印刷（general）のみ: 社員情報（マイナンバー等）の閲覧権限を管理（SunA/GeneralAffairs）
@@ -211,6 +213,13 @@ function onMobileSelect(e) {
                 :class="tab('presence_board_settings')"
             >
                 在席ボード管理
+            </Link>
+            <Link
+                v-if="showTab('applicants') && typeof route === 'function' && route().has('admin.applicants.index')"
+                :href="route('admin.applicants.index')"
+                :class="tab('applicants')"
+            >
+                申請者管理
             </Link>
             <Link
                 v-if="showTab('meeting_rooms') && typeof route === 'function' && route().has('admin.meeting-rooms.index')"

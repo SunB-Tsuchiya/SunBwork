@@ -25,6 +25,7 @@ class TransportDeadlineTest extends TestCase
     {
         parent::setUp();
         config(['transport.enforce_deadline' => true]);
+        config(['applications.enforce_access' => false]);   // 申請者管理の制限は、TransportApplicantAccessTest で検証
         Carbon::setTestNow('2026-09-15 10:00:00');   // 9 月中旬: 8 月分は期限後、9 月分は期限内
         $this->sb = Company::create(['name' => '株式会社サン・ブレーン', 'code' => 'SB' . random_int(100, 999), 'company_type' => 'sunbrain', 'active' => true]);
         $this->sanei = Company::create(['name' => '株式会社サンエー印刷', 'code' => 'SA' . random_int(100, 999), 'company_type' => 'general', 'active' => true]);

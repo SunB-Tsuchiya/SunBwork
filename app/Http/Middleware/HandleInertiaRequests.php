@@ -175,6 +175,8 @@ class HandleInertiaRequests extends Middleware
                         // 差戻しされた提出物がある人にも、受付期間外でもタブを出す（修正できるようにする）
                         || \App\Models\SunA\GeneralAffairs\Nencho\Submission::where('user_id', $u->id)->where('status', 'returned')->exists();
                 })(),
+                // 申請機能（交通費など）を使える申請の種類（申請者管理のスイッチ）。ユーザー用タブの「申請」の表示に使う
+                'applicationAccess' => $request->user() ? \App\Models\UserApplicationAccess::enabledKeys($request->user()) : [],
                 // 総務の権限（社員情報・年末調整）。サンエー印刷（general）の clerk/admin と SuperAdmin のみ。それ以外は null（追加クエリなし）
                 'staffAccess' => (function () use ($request, $contextCompany) {
                     $u = $request->user();

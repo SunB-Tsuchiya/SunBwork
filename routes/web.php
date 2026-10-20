@@ -182,8 +182,12 @@ Route::get('/debug/events/send-test-completion', [App\Http\Controllers\EventCont
 // User Dashboard (default authenticated users)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'ghost'])->group(function () use ($registerTransportApplicantRoutes) {
     // 申請（ユーザー用のタブ）と、交通費の申請（本人の分）。全ロールが使える
-    Route::get('/user/applications', [App\Http\Controllers\Billing\UserApplicationHubController::class, 'index'])->name('user.applications.index');
-    Route::prefix('user/billing/transport')->name('user.billing.transport.')->group(function () use ($registerTransportApplicantRoutes) {
+    // 申請を使う権限（申請者管理のスイッチ）がない人は、サーバー側でも止める
+    Route::get('/user/applications', [App\Http\Controllers\Billing\UserApplicationHubController::class, 'index'])
+        ->middleware(App\Http\Middleware\RequireApplicationAccess::class . ':any')->name('user.applications.index');
+    Route::prefix('user/billing/transport')->name('user.billing.transport.')
+        ->middleware(App\Http\Middleware\RequireApplicationAccess::class . ':transport')
+        ->group(function () use ($registerTransportApplicantRoutes) {
         $registerTransportApplicantRoutes();
     });
 
@@ -457,6 +461,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         ->name('user.project_jobs.assignments.schedule.store');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 
+
     // Workload setting: show lists (stages, sizes, statuses, difficulties) scoped by company
     Route::get('workload-setting', [App\Http\Controllers\WorkloadSettingController::class, 'index'])
         ->name('workload_setting.index');
@@ -498,6 +503,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->group(function () use ($registerSalesAnalysisRoutes) {
         // Ziggy用: 明示的にadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+        // 申請者管理（Admin / SuperAdmin）: 申請の種類のカード → ユーザーごとのスイッチ（在席ボード管理と同じ構造）
+        Route::get('applicants', [App\Http\Controllers\Admin\ApplicantController::class, 'index'])->name('applicants.index');
+        Route::get('applicants/{feature}', [App\Http\Controllers\Admin\ApplicantController::class, 'show'])->name('applicants.show');
+        Route::post('applicants/{feature}', [App\Http\Controllers\Admin\ApplicantController::class, 'update'])->name('applicants.update');
 
         // 案件総覧
         Route::get('project-jobs', [App\Http\Controllers\Admin\ProjectJobController::class, 'index'])->name('project_jobs.index');

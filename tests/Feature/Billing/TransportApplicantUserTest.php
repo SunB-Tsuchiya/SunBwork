@@ -17,6 +17,7 @@ class TransportApplicantUserTest extends TestCase
     {
         parent::setUp();
         config(['transport.enforce_deadline' => false]);   // 既存のテストは、過去の月で入力するため、期限の強制を切る（期限の検証は TransportDeadlineTest）
+        config(['applications.enforce_access' => false]);   // 申請者管理の制限は、TransportApplicantAccessTest で検証
     }
 
     private function user(string $role = 'user', ?Company $c = null): User

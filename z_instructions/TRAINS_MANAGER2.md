@@ -100,3 +100,16 @@
   - サン・ブレーンの Clerk にも「申請」タブが新しく出る（交通費・運賃マスタ）。ユーザー用タブの「申請」は、SuperAdmin・Admin・Clerk だけに出る（確認の期間）
   - 手元の作業ツリー（`/home/w229/SunBwork`）には、これらの変更が未コミットで残っている。本番の内容と同じなので、`git fetch` のあと、該当ファイルを `git checkout origin/main -- <パス>` で揃えると、`git pull` が通る
 - **後回し事項**: `TRAINS_MANAGER2.md` の「後回し事項」（D-5 申請者の印影、D-7 dompdf の太字、D-8 お知らせを開くとユーザー用タブになる件、D-11 Excel ファイル取込、D-13 自動保存の同時編集、D-14 未申請者の一覧・定期券区間・明細 CSV、D-15 駅すぱあと API、ほか）。DB の `transport_billing_requests` と `transport_expenses.billing_request_id` は残してある（不要と確認できたら別の migration で削除）
+
+---
+
+## 申請者管理（2026-10-21 追加）
+
+Admin / SuperAdmin が、ユーザーごとのスイッチで「申請（交通費）を使える人」を決める。在席ボード管理と同じ構造（カード → ユーザー一覧）。
+
+- テーブル `user_application_access`（user_id + feature_key で一意、enabled、changed_by）。移行時に、superadmin / admin / clerk と user_id 24 を ON で投入。新規ユーザーは OFF。
+- **サーバー側で強制**（`RequireApplicationAccess`）。OFF の人は、ユーザー用の申請画面（`user.applications.index` / `user.billing.transport.*`）に URL でも入れない（過去分の閲覧・PDF も不可）。Clerk の管理画面は対象外。
+- 共有 prop `auth.applicationAccess` で「申請」タブを出し分け（UserNavigationTabs の固定ロール・ID 判定を置き換え）。
+- 画面: `Admin/ApplicantController`、`Pages/Admin/Applicants/{Index,Show}.vue`。雇用形態・部署の絞り込み、表示中の一括 ON/OFF、申請の途中（下書き・申請済み・差戻し中）がある人を OFF にする際の確認。
+- 設定 `config/applications.php` の `APPLICATION_ENFORCE_ACCESS`（本番は未設定=有効。テストの既存クラスは false）。
+- テスト: `TransportApplicantAccessTest`（Billing 全体 78 件成功）。
