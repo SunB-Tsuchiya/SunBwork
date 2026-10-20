@@ -306,13 +306,13 @@ class DepartmentWorkController extends Controller
         ]);
         $day = Carbon::createFromFormat('!Y-m-d', $params['date'], 'Asia/Tokyo');
         $start = match ($params['period']) {
-            'week' => $day->copy()->startOfWeek(),
+            'week' => $day->copy()->startOfWeek(Carbon::SUNDAY),
             'month' => $day->copy()->startOfMonth(),
             'quarter' => $day->copy()->startOfMonth()->subMonths(2),
             default => $day->copy(),
         };
         $end = match ($params['period']) {
-            'week' => $day->copy()->endOfWeek(),
+            'week' => $day->copy()->endOfWeek(Carbon::SATURDAY),
             'month' => $day->copy()->endOfMonth(),
             'quarter' => $day->copy()->endOfMonth(),
             default => $day->copy(),
