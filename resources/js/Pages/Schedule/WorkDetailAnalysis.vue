@@ -14,7 +14,7 @@ const source = ref('all');
 const people = ref([]);
 const excludedCount = ref(0);
 const range = ref('');
-const loading = ref(false);
+const loading = ref(true);
 const error = ref('');
 const includeOvertime = ref(true);
 const includeCreation = ref(true);
@@ -64,10 +64,16 @@ const totals = computed(() => filtered.value.reduce((sum, person) => {
     sources: { quick: 0, my_job: 0, assigned_job: 0, meeting: 0 } }));
 
 async function load() {
-    if (!/^\d{4}-\d{2}$/.test(month.value)) return;
     const current = ++sequence;
     loading.value = true;
     error.value = '';
+    range.value = '';
+    people.value = [];
+    if (!/^\d{4}-\d{2}$/.test(month.value)) {
+        error.value = '集計する月を選んでください。';
+        loading.value = false;
+        return;
+    }
     try {
         const { data } = await axios.get(route('schedule.department_work.analysis'), {
             params: { date: `${month.value}-01`, period: period.value },
@@ -98,7 +104,7 @@ onMounted(load);
                     <p class="mt-1 text-xs text-gray-600">情報出版の試用画面です。工程候補は同じ案件・種類・日付の記録をまとめた参考値です。完了数の確定値ではありません。</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                    <input v-model="month" type="month" aria-label="対象月" class="rounded border px-2 py-1" />
+                    <label class="flex items-center gap-2"><span class="whitespace-nowrap">{{ period === 'quarter' ? '終了月' : '対象月' }}</span><input v-model="month" type="month" :aria-label="period === 'quarter' ? '3か月の終了月' : '対象月'" class="rounded border px-2 py-1" /></label>
                     <select v-model="period" aria-label="集計期間" class="rounded border px-2 py-1">
                         <option value="month">1か月</option><option value="quarter">3か月</option>
                     </select>
@@ -116,9 +122,15 @@ onMounted(load);
                     </select>
                 </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500">対象：{{ range || `${month}-01` }} <span v-if="loading">読み込み中...</span></p>
+            <p v-if="period === 'quarter'" class="mt-2 text-xs text-gray-600">3か月は選んだ月を含む直近3か月です。</p>
+            <p v-if="!loading && !error" class="mt-2 text-xs text-gray-500">集計期間：{{ range }}</p>
             <p class="mt-1 text-xs text-gray-600">作業区分・入力元は該当する人を表示する条件です。下の件数・時間・点数は、その人の全記録の集計です。</p>
             <p v-if="error" class="mt-3 text-sm text-red-700" role="alert">{{ error }}</p>
+            <div v-if="loading" class="mt-4 flex items-center gap-3 rounded border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-800" role="status" aria-live="polite">
+                <span class="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-700" aria-hidden="true"></span>
+                選択した期間の作業量を集計中…
+            </div>
+            <div v-show="!loading && !error">
 
             <div v-if="!error" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">分析対象</div><strong class="text-xl">{{ filtered.length }}人</strong><p class="text-xs text-gray-500">対象外 {{ excludedCount }}人</p></div>
@@ -184,6 +196,7 @@ onMounted(load);
                     </div>
                     <p v-if="person.unrecorded_overtime_minutes" class="mt-2 text-xs text-amber-800">記録のない残業 {{ duration(person.unrecorded_overtime_minutes) }}</p>
                 </article>
+            </div>
             </div>
         </section>
     </WorkloadAnalysisShell>
