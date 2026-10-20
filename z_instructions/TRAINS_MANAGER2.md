@@ -9,7 +9,7 @@
 | B 申請画面の改善（SuperAdmin 上） | 🟡 実装・自動テスト済み／ユーザーのブラウザ確認待ち | 通知は未実装（D-1） |
 | C 受理（管理）画面の完成 | 🟡 実装・自動テスト済み／ユーザーのブラウザ確認中（C-1〜C-7 OK。通知とハブの確認待ち） | 総務・経理の画面は「申請」ハブ → 交通費（`/clerk/billing/transport`）。SuperAdmin の「交通費一覧」は同じ画面。通知は「お知らせ」 |
 | D ユーザー・総務への移行 | 🟡 実装・自動テスト済み／ユーザーのブラウザ確認待ち | 総務側は段階 C で完了。申請者側: `user.billing.transport.*`＋ハブ `user.applications.index` |
-| E 仕上げ・本流への報告 | ⬜ | D-10 は実装済み（確認待ち）。残り: 旧画面の削除（D-16）・更新ログ・CONSOLIDATED・本番デプロイ・本流への報告 |
+| E 仕上げ・本流への報告 | ✅ 2026-10-20 本番デプロイ済み | 更新ログ・CONSOLIDATED・本流への報告も済み。残りは、本番でのブラウザ確認と、後回し事項 |
 
 ## 決定事項
 | # | 内容 | 日付 |
@@ -81,11 +81,20 @@
 | 2026-10-20 | 不具合修正（ユーザー指摘）: 申請・再申請・期限後の依頼の通知が、同じ会社の「Clerk」だけに送られ、SuperAdmin・Admin に届かなかった（本人が Clerk で、ほかに Clerk がいないと、誰にも届かない）。宛先を「同じ会社の Clerk・Admin ＋ SuperAdmin（会社を問わない。社長が両社を共同管理するため）」に変更（本人は除く、`TransportNotifier::managers`）。差戻しのあとの申請は、「再申請しました」の別の文面に（`TransportExpenseWorkflow` が差戻しからの申請かを判定）。Pest 69件パス |
 | 2026-10-20 | ユーザー指示: 期限後の申請の依頼・許可は、先月分まで（それより前の月は、依頼も許可もできない）。`TransportDeadline::requestable`、`config/transport.php` の `request_months_back`（既定 1）、依頼・直接許可のサーバー側の検証、申請者の画面（先月より前の月は、依頼の案内の代わりに「支払いの対象外」と表示）、管理側の直接許可の月の選択肢を先月分だけに |
 | 2026-10-20 | SuperAdmin 用の交通費の画面を削除（D-16）: 旧「交通費入力」・旧「請求データ」（`BillingRequestController`・`TransportBillingRequest`・`Billed.vue`・`billing_pdf`）・「交通費一覧」「運賃マスタ」の SuperAdmin 用ルート（`superadmin.billing.transport.*`）・`SuperAdminNavigationTabs` の 2 タブを削除。管理側の画面は Clerk 用（`clerk.billing.transport.*`）だけにして、SuperAdmin も同じ画面を使う。申請者側はユーザー用（`user.billing.transport.*`）だけ。テストのルート名を付け替え。Pest 71件パス |
+| 2026-10-20 | **本番デプロイ**: 分離デプロイ（`/tmp/sunbwork-trains-deploy-20261020`）。事前確認（PHP 8.2.32・GD あり・重複 0 件・実行待ち migration なし）→ push（`3a73c5932..6bba9fa92`）→ 本番で `git pull --ff-only`・`migrate --force`（8 本 DONE）・`config:clear`・`cache:clear`・`ChangelogSeeder --force`（`ec950a363 → 6bba9fa92`）→ 事後確認（migrate:status・ルート 35 本）。ビルドは `/members` 用で、古い資産を残して追加のみ |
 
-## 本流への報告（作業完了時に記入）
-- 変更ファイル:
-- 追加 migration:
-- デプロイ状況:
-- 本番で必要な手作業:
-- 本流に影響し得る変更:
-- 後回し事項:
+## 本流への報告（2026-10-20 デプロイ時に記入）
+- **変更ファイル**:
+  - 新規・変更（交通費のみ）: `app/Http/Controllers/Billing/**`、`app/Http/Requests/Billing/Transport/SaveExpenseRequest.php`、`app/Services/Billing/Transport/**`、`app/Models/Transport{Fare,Preset,ExpenseEvent,DeadlineExtension}.php`（新規）と `TransportExpense.php`・`TransportExpenseItem.php`（変更）、`config/transport.php`、`resources/billing/transport_expense_template.xlsx`、`resources/views/billing/transport/expense_pdf.blade.php`、`resources/js/Components/Billing/Transport/**`、`resources/js/Pages/Billing/**`、`tests/Feature/Billing/**`
+  - 削除: `BillingRequestController`・`ExpenseListController`・`TransportBillingRequest`・`billing_pdf.blade.php`・`resources/js/Pages/SuperAdmin/Billing/Transport/*`（旧 SuperAdmin 用の交通費画面）
+  - **共有ファイル（追記・最小の変更）**: `routes/web.php`（交通費のルートのクロージャ 2 つ、`user.applications.index`・`user.billing.transport.*`、Clerk の `applications.index`・`billing.transport.*`。旧 SuperAdmin の交通費ルートを削除。`routes/suna.php` は触っていない）、`ClerkNavigationTabs.vue`（「申請」タブを全 Clerk に出し、リンク先をハブ `clerk.applications.index` に変更。表示条件 `showApplications` を true に）、`UserNavigationTabs.vue`（「申請」タブ追加。SuperAdmin・Admin・Clerk のみ表示の `APPLY_TAB_ROLES`）、`SuperAdminNavigationTabs.vue`（交通費の 2 タブを削除）、`resources/js/ziggy.js`（再生成）、`ChangelogSeeder`（追記のみ）、`CONSOLIDATED_01`・`CONSOLIDATED_09`（交通費の節を追記）
+- **追加 migration（8 本、本番実行済み）**: `2026_10_18_120000`（月単位の列・status の文字列化・一意制約）、`2026_10_18_130000`（company_id・charge_department_id）、`2026_10_19_100000`（片道金額・×2）、`2026_10_20_100000`（履歴）、`2026_10_20_120000`（登録した行先）、`2026_10_21_100000`（運賃マスタ・確認チェック）、`2026_10_21_120000`・`2026_10_21_130000`（期限の解除・依頼）
+- **デプロイ状況**: 2026-10-20 に本番反映済み（`ec950a363 → 6bba9fa92`。ソース `9f97d7ba3` ＋ビルド `6bba9fa92`。ChangelogSeeder 反映済み）。分離デプロイ（`/tmp/sunbwork-trains-deploy-20261020`、ブランチ `deploy/trains-expense-20261020`）。ビルドは `/members` 用で、古い資産は残して追加のみ。作業ツリー側で Pest 71 件パス、PHP 8.2 の構文検査 OK
+- **本番で必要な手作業**: なし（反映済み）。注意: 本番の `.env` に `TRANSPORT_ENFORCE_DEADLINE` を**書かない**（月末ルールが有効）。本番の GD は確認済み（Excel の ○ を描画）
+- **本流に影響し得る変更**:
+  - 本番の先頭が origin/main より少し前だったため、`git pull` で、本流の書類（z_instructions・AGENTS.md）と、`MyNumberLogs.vue`（ページ送りの `v-html` 修正）も一緒に本番に入った（私のビルドは、origin/main のソースから作っているので、画面にも反映済み）
+  - `resources/js/ziggy.js` を、origin/main のルートから再生成した結果、本流の年末調整のルート 3 本（`clerk.general_affairs.nencho.campaigns.notices.store`・`reminder`・`reminder.remove`）が追加された（origin/main の ziggy.js が、`routes/suna.php` に対して古かったため）
+  - Clerk の「申請」タブのリンク先を、年末調整側の申請一覧（`clerk.general_affairs.applications.index`）から、新しいハブ（`clerk.applications.index`）に変更した。ハブは、サンエー印刷の総務には、これまでと同じ申請の種類（年末調整など）と「申請の種類を管理」のボタンを出す。旧ページ（`SunA/GeneralAffairs/Applications/Index.vue`）の URL は、残っている。**年末調整の側で、申請一覧を変えるときは、ハブ（`resources/js/Pages/Billing/Applications/Index.vue`）にも反映が必要**
+  - サン・ブレーンの Clerk にも「申請」タブが新しく出る（交通費・運賃マスタ）。ユーザー用タブの「申請」は、SuperAdmin・Admin・Clerk だけに出る（確認の期間）
+  - 手元の作業ツリー（`/home/w229/SunBwork`）には、これらの変更が未コミットで残っている。本番の内容と同じなので、`git fetch` のあと、該当ファイルを `git checkout origin/main -- <パス>` で揃えると、`git pull` が通る
+- **後回し事項**: `TRAINS_MANAGER2.md` の「後回し事項」（D-5 申請者の印影、D-7 dompdf の太字、D-8 お知らせを開くとユーザー用タブになる件、D-11 Excel ファイル取込、D-13 自動保存の同時編集、D-14 未申請者の一覧・定期券区間・明細 CSV、D-15 駅すぱあと API、ほか）。DB の `transport_billing_requests` と `transport_expenses.billing_request_id` は残してある（不要と確認できたら別の migration で削除）
