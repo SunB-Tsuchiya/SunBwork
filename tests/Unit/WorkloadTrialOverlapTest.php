@@ -22,6 +22,7 @@ class WorkloadTrialOverlapTest extends TestCase
         self::assertSame(180, $ledger['activities']['dtp|my_job']['minutes']);
         self::assertSame(300, $ledger['activities']['dtp|meeting']['minutes']);
         self::assertEqualsWithDelta(70.0, $ledger['points'], 0.001);
+        self::assertSame(['work_points' => 30.0, 'meeting_points' => 40.0], $this->breakdown($ledger));
     }
 
     public function test_simultaneous_work_blocks_still_share_their_time(): void
@@ -49,6 +50,17 @@ class WorkloadTrialOverlapTest extends TestCase
         self::assertFalse($method->invoke($service, $job));
     }
 
+    public function test_sales_visit_is_shown_with_meetings_without_changing_total(): void
+    {
+        $ledger = $this->ledger([
+            $this->item('visit', 540, 600, 'sales_visit', 1.0, 1),
+            $this->item('work', 600, 660, 'my_job', 1.0, 0),
+        ]);
+
+        self::assertEqualsWithDelta(20.0, $ledger['points'], 0.001);
+        self::assertSame(['work_points' => 10.0, 'meeting_points' => 10.0], $this->breakdown($ledger));
+    }
+
     private function ledger(array $items): array
     {
         $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
@@ -56,6 +68,14 @@ class WorkloadTrialOverlapTest extends TestCase
         return (new ReflectionMethod($service, 'minuteLedger'))->invoke($service, $items, [
             'break_start' => 720, 'break_end' => 780,
         ]);
+    }
+
+    private function breakdown(array $ledger): array
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+
+        return (new ReflectionMethod($service, 'splitBasePoints'))
+            ->invoke($service, $ledger['activities'], $ledger['points']);
     }
 
     private function item(string $key, int $from, int $to, string $activity, float $coefficient, int $priority): array
