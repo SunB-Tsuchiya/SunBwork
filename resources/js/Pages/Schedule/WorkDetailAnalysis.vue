@@ -130,7 +130,7 @@ onMounted(load);
 
             <div class="mt-5 rounded border border-amber-200 bg-amber-50/50 p-3 text-sm">
                 <div class="font-semibold">並び方と暫定点の比較</div>
-                <p class="mt-1 text-xs text-gray-700">工程候補は同じ案件・作業種類・日付などをまとめた参考数、入力件数は記録の数です。どちらも完了数ではありません。暫定点は主に記録時間で決まります。</p>
+                <p class="mt-1 text-xs text-gray-700">工程候補は同じ案件・作業種類・日付などをまとめた参考数、入力件数は記録の数です。どちらも完了数ではありません。暫定点は主に記録時間で決まります。作業点は会議・訪問以外、会議・訪問点には打合せ・業務外出・訪問商談を含みます。</p>
                 <div class="mt-2 flex flex-wrap gap-2 text-xs">
                     <label v-for="[key, label] in [['units', '工程候補が多い順'], ['records', '入力件数が多い順'], ['points', '暫定点が高い順']]" :key="key" class="rounded border px-2 py-1" :class="sortBy === key ? 'border-blue-500 bg-blue-50 text-blue-800' : 'bg-white'">
                         <input v-model="sortBy" type="radio" name="work-detail-sort" :value="key" class="sr-only" />{{ label }}
@@ -148,7 +148,7 @@ onMounted(load);
             <div v-if="!error" class="mt-4 overflow-x-auto rounded border">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50 text-left text-xs text-gray-600">
-                        <tr><th class="px-3 py-2">表示順</th><th class="px-3 py-2">担当者</th><th class="px-3 py-2">担当</th><th class="px-3 py-2 text-right">工程候補／入力</th><th class="px-3 py-2 text-right">記録日／勤怠日（参考）</th><th class="px-3 py-2 text-right">記録時間</th><th class="px-3 py-2 text-right">作業点</th><th class="px-3 py-2 text-right">適用中の残業／登録／管理</th><th class="px-3 py-2 text-right">暫定合計</th></tr>
+                        <tr><th class="px-3 py-2">表示順</th><th class="px-3 py-2">担当者</th><th class="px-3 py-2">担当</th><th class="px-3 py-2 text-right">工程候補／入力</th><th class="px-3 py-2 text-right">記録日／勤怠日（参考）</th><th class="px-3 py-2 text-right">記録時間</th><th class="px-3 py-2 text-right">作業点</th><th class="px-3 py-2 text-right">会議・訪問点</th><th class="px-3 py-2 text-right">適用中の残業／登録／管理</th><th class="px-3 py-2 text-right">暫定合計</th></tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="(person, index) in ranked" :key="person.id" class="hover:bg-gray-50">
@@ -158,11 +158,12 @@ onMounted(load);
                             <td class="px-3 py-2 text-right tabular-nums">{{ number(person.work_units) }}／{{ number(person.records) }}</td>
                             <td class="px-3 py-2 text-right tabular-nums">{{ number(person.recorded_days) }}／{{ person.attendance_days ? number(person.attendance_days) : '—' }}<span v-if="person.attendance_days" class="ml-1 text-xs text-gray-500">({{ Math.round(person.recorded_days / person.attendance_days * 100) }}%)</span></td>
                             <td class="px-3 py-2 text-right tabular-nums">{{ duration(person.minutes) }}</td>
-                            <td class="px-3 py-2 text-right tabular-nums">{{ decimal(person.base_points) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ decimal(person.work_points) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ decimal(person.meeting_points) }}</td>
                             <td class="px-3 py-2 text-right tabular-nums" :title="`元の点数：残業 ${decimal(person.overtime_points)}／登録 ${decimal(person.creation_points)}／管理 ${decimal(person.management_points)}`">{{ appliedPoint(person, 'overtime_points', includeOvertime) }}／{{ appliedPoint(person, 'creation_points', includeCreation) }}／{{ appliedPoint(person, 'management_points', includeManagement) }}</td>
                             <td class="px-3 py-2 text-right font-semibold tabular-nums">{{ decimal(visiblePoints(person)) }}</td>
                         </tr>
-                        <tr v-if="!ranked.length"><td colspan="9" class="px-3 py-6 text-center text-gray-500">対象の記録がありません。</td></tr>
+                        <tr v-if="!ranked.length"><td colspan="10" class="px-3 py-6 text-center text-gray-500">対象の記録がありません。</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -173,6 +174,7 @@ onMounted(load);
                     <div class="mt-2 flex flex-wrap gap-1 text-xs">
                         <span v-for="[key, label] in sourceLabels" :key="key" class="rounded bg-slate-100 px-2 py-1">{{ label }} {{ number(person.source_counts?.[key]) }}件</span>
                     </div>
+                    <p class="mt-2 text-xs text-gray-600">作業 {{ decimal(person.work_points) }}点・会議／訪問 {{ decimal(person.meeting_points) }}点・基本点合計 {{ decimal(person.base_points) }}点</p>
                     <p v-if="!person.activities?.length" class="mt-2 text-xs text-gray-500">公開範囲内の作業実績なし</p>
                     <div v-else class="mt-2 space-y-1 text-xs">
                         <p v-for="activity in person.activities" :key="`${activity.work_category}-${activity.activity_type}`" class="rounded bg-gray-50 px-2 py-1">

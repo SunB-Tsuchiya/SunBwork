@@ -262,11 +262,13 @@ class WorkloadTrialAnalysis
                 $window = $this->schedule->workWindow($user, $date);
                 $ledger = $this->minuteLedger($items, $window);
                 if ($withDaily) {
+                    $dailyBreakdown = $this->splitBasePoints($ledger['activities'], $ledger['points']);
                     $daily[$date] = [
                         'date' => $date,
                         'records' => count(array_unique(array_column($items, 'key'))),
                         'minutes' => $ledger['minutes'],
                         'base_points' => round($ledger['points'], 1),
+                        ...$dailyBreakdown,
                     ];
                 }
                 if ($ledger['minutes'] > 0) $recordedDays++;
@@ -318,6 +320,7 @@ class WorkloadTrialAnalysis
                 $activity['quantities'] = $quickQuantities[$id][$key] ?? [];
                 $activities[] = $activity;
             }
+            $pointBreakdown = $this->splitBasePoints($totals, $basePoints);
             $projects = $createdProjects->get($id, collect());
             $creationPoints = $projects->count() * self::CREATION_POINTS;
             $managementPoints = 0.0;
@@ -349,6 +352,7 @@ class WorkloadTrialAnalysis
             $person = [
                 'id' => $id, 'name' => $user->name, 'role' => PersonalWorkRole::forUser($user),
                 'minutes' => $minutes, 'base_points' => round($basePoints, 1),
+                ...$pointBreakdown,
                 'scheduled_covered_minutes' => $scheduledCoveredMinutes,
                 'overtime_points' => round($overtimePoints, 1),
                 'creation_points' => round($creationPoints, 1),
@@ -372,7 +376,8 @@ class WorkloadTrialAnalysis
             if ($withDaily) {
                 for ($day = $start->copy()->startOfDay(); $day->lte($end); $day->addDay()) {
                     $date = $day->toDateString();
-                    $daily[$date] ??= ['date' => $date, 'records' => 0, 'minutes' => 0, 'base_points' => 0.0];
+                    $daily[$date] ??= ['date' => $date, 'records' => 0, 'minutes' => 0,
+                        'base_points' => 0.0, 'work_points' => 0.0, 'meeting_points' => 0.0];
                 }
                 ksort($daily);
                 $person['daily'] = array_values($daily);
@@ -388,6 +393,21 @@ class WorkloadTrialAnalysis
             'work_category' => $category, 'activity_type' => $activity,
             'coefficient' => PersonalWorkPoints::coefficient($activity),
             'priority' => $fixedAppointment || in_array($activity, ['meeting', 'sales_visit'], true) ? 1 : 0];
+    }
+
+    /** Keep the current basic total while exposing meetings, outings, and sales visits separately. */
+    private function splitBasePoints(array $activities, float $basePoints): array
+    {
+        $meetingPoints = 0.0;
+        foreach ($activities as $activity) {
+            if (in_array($activity['activity_type'] ?? null, ['meeting', 'outing', 'sales_visit'], true)) {
+                $meetingPoints += $activity['points'];
+            }
+        }
+        $base = round($basePoints, 1);
+        $meeting = round($meetingPoints, 1);
+
+        return ['work_points' => round($base - $meeting, 1), 'meeting_points' => $meeting];
     }
 
     private function isFixedAppointment(Event $event): bool

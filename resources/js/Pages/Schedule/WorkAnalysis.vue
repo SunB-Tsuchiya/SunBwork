@@ -317,11 +317,11 @@ onMounted(load);
                     </div>
                 </details>
                 <div class="mt-3 space-y-2">
-                    <div v-for="(row, index) in pointRows" :key="row.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_4rem] items-center gap-2 text-sm">
+                    <div v-for="(row, index) in pointRows" :key="row.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_8rem] items-center gap-2 text-sm">
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
                         <button type="button" class="truncate text-left font-medium text-blue-800 underline underline-offset-2" :title="`${row.name}の詳細を表示`" @click="openPerson(row)"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</button>
                         <div class="h-5 overflow-hidden rounded bg-white"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
-                        <span class="text-right font-semibold tabular-nums" :title="`適用中：作業 ${pointLabel(row.base_points)}／残業 ${pointLabel(includeOvertime ? row.overtime_points : 0)}／登録 ${pointLabel(includeCreation ? row.creation_points : 0)}／管理 ${pointLabel(includeManagement ? row.management_points : 0)}`">{{ pointLabel(visiblePoints(row)) }}点</span>
+                        <span class="text-right tabular-nums" :title="`適用中：作業 ${pointLabel(row.work_points)}／会議・訪問 ${pointLabel(row.meeting_points)}／残業 ${pointLabel(includeOvertime ? row.overtime_points : 0)}／登録 ${pointLabel(includeCreation ? row.creation_points : 0)}／管理 ${pointLabel(includeManagement ? row.management_points : 0)}`"><strong>{{ pointLabel(visiblePoints(row)) }}点</strong><small class="block text-[10px] text-gray-600">作業 {{ pointLabel(row.work_points) }}／会議・訪問 {{ pointLabel(row.meeting_points) }}</small></span>
                     </div>
                 </div>
             </div>
@@ -350,7 +350,7 @@ onMounted(load);
                     <div>
                         <button type="button" class="font-semibold text-blue-800 underline underline-offset-2" :aria-label="`${person.name}の詳細を表示`" @click="openPerson(person)">{{ person.name }}</button>
                         <span class="ml-2 rounded px-1.5 py-0.5 text-xs" :style="{ backgroundColor: roleColor(person.role?.code).chip, color: roleColor(person.role?.code).bar }">{{ person.role?.label || 'その他' }}</span>
-                        <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}` : '公開範囲内の認定時間なし' }}／作業 {{ pointLabel(person.base_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
+                        <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}` : '公開範囲内の認定時間なし' }}／作業 {{ pointLabel(person.work_points) }}点・会議／訪問 {{ pointLabel(person.meeting_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
                     </div>
                     <div v-if="person.activities.length" class="space-y-2">
                         <div class="flex h-3 overflow-hidden rounded bg-gray-100" :aria-label="`${person.name}の作業種類別記録時間`">
@@ -381,12 +381,14 @@ onMounted(load);
                     <p v-if="personLoading" class="mt-5 text-sm text-gray-600">読み込み中...</p>
                     <p v-else-if="personError" class="mt-5 text-sm text-red-700" role="alert">{{ personError }}</p>
                     <template v-else-if="selectedPerson">
-                        <div class="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                        <div class="mt-4 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
                             <div class="rounded border bg-slate-50 p-3">記録件数 <strong class="ml-2">{{ selectedPerson.records }}件</strong></div>
                             <div class="rounded border bg-slate-50 p-3">集計された作業時間 <strong class="ml-2">{{ duration(selectedPerson.minutes) }}</strong></div>
-                            <div class="rounded border bg-slate-50 p-3">暫定作業点 <strong class="ml-2">{{ pointLabel(selectedPerson.base_points) }}点</strong></div>
+                            <div class="rounded border bg-slate-50 p-3">作業点 <strong class="ml-2">{{ pointLabel(selectedPerson.work_points) }}点</strong></div>
+                            <div class="rounded border bg-slate-50 p-3">会議・訪問点 <strong class="ml-2">{{ pointLabel(selectedPerson.meeting_points) }}点</strong></div>
+                            <div class="rounded border bg-slate-50 p-3">基本点合計 <strong class="ml-2">{{ pointLabel(selectedPerson.base_points) }}点</strong></div>
                         </div>
-                        <p class="mt-2 text-xs text-gray-600">集計時間は昼休憩と重複時間を除きます。予定表にある時間の単純な合計とは異なる場合があります。暫定点は正式な人事評価ではありません。</p>
+                        <p class="mt-2 text-xs text-gray-600">作業点は会議・訪問以外、会議・訪問点には打合せ・業務外出・訪問商談を含みます。集計時間は昼休憩と重複時間を除きます。予定表にある時間の単純な合計とは異なる場合があります。暫定点は正式な人事評価ではありません。</p>
                         <div v-if="personPeriod === 'day' && personTimelineEvents.length" class="mt-3" aria-label="当日の予定タイムテーブル">
                             <h3 class="mb-1 text-sm font-semibold">当日の予定</h3>
                             <TimelineDiary :date="personDate" :events="personTimelineEvents" :start-hour="personTimelineHours.start" :end-hour="personTimelineHours.end" :editable="false" compact />
@@ -421,8 +423,8 @@ onMounted(load);
                             <p class="mt-1 text-xs text-gray-600">期間内の日別値です。日をまたぐ予定は各日に表示されるため、日別件数の合計と期間の記録件数が異なる場合があります。</p>
                             <div ref="personTable" class="mt-3 max-h-96 overflow-y-auto rounded border">
                                 <table class="w-full text-left text-sm">
-                                    <thead class="sticky top-0 bg-gray-50 text-xs text-gray-600"><tr><th class="px-3 py-2">日付</th><th class="px-3 py-2 text-right">予定数</th><th class="px-3 py-2 text-right">集計時間</th><th class="px-3 py-2 text-right">暫定作業点</th></tr></thead>
-                                    <tbody><tr v-for="day in selectedPerson.daily || []" :key="day.date" class="border-t"><td class="px-3 py-2"><button type="button" class="font-medium text-blue-800 underline underline-offset-2 hover:text-blue-600" :data-day="day.date" :aria-label="`${day.date}の作業詳細を表示`" @click="openPersonDay(day)">{{ day.date }}</button></td><td class="px-3 py-2 text-right">{{ day.records }}件</td><td class="px-3 py-2 text-right">{{ duration(day.minutes) }}</td><td class="px-3 py-2 text-right">{{ pointLabel(day.base_points) }}点</td></tr></tbody>
+                                    <thead class="sticky top-0 bg-gray-50 text-xs text-gray-600"><tr><th class="px-3 py-2">日付</th><th class="px-3 py-2 text-right">予定数</th><th class="px-3 py-2 text-right">集計時間</th><th class="px-3 py-2 text-right">作業点</th><th class="px-3 py-2 text-right">会議・訪問点</th><th class="px-3 py-2 text-right">基本点合計</th></tr></thead>
+                                    <tbody><tr v-for="day in selectedPerson.daily || []" :key="day.date" class="border-t"><td class="px-3 py-2"><button type="button" class="font-medium text-blue-800 underline underline-offset-2 hover:text-blue-600" :data-day="day.date" :aria-label="`${day.date}の作業詳細を表示`" @click="openPersonDay(day)">{{ day.date }}</button></td><td class="px-3 py-2 text-right">{{ day.records }}件</td><td class="px-3 py-2 text-right">{{ duration(day.minutes) }}</td><td class="px-3 py-2 text-right">{{ pointLabel(day.work_points) }}点</td><td class="px-3 py-2 text-right">{{ pointLabel(day.meeting_points) }}点</td><td class="px-3 py-2 text-right">{{ pointLabel(day.base_points) }}点</td></tr></tbody>
                                 </table>
                             </div>
                         </div>
