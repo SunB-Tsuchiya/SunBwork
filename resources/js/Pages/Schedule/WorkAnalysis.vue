@@ -11,7 +11,7 @@ const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
 const period = ref('day');
 const people = ref([]);
 const range = ref('');
-const loading = ref(false);
+const loading = ref(true);
 const error = ref('');
 const pointRule = ref({ points_per_hour: 10, default_coefficient: 1, coefficients: {} });
 const includeCreation = ref(true);
@@ -154,11 +154,45 @@ watch(activityOptions, (options) => {
     if (!options.some((option) => option.key === selectedActivityKey.value)) selectedActivityKey.value = options[0]?.key || '';
 });
 const rangeLabel = computed(() => range.value || date.value);
+const isoWeek = (value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+    const [year, month, day] = value.split('-').map(Number);
+    const monday = new Date(Date.UTC(year, month - 1, day));
+    monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
+    const thursday = new Date(monday);
+    thursday.setUTCDate(thursday.getUTCDate() + 3);
+    const weekYear = thursday.getUTCFullYear();
+    const firstMonday = new Date(Date.UTC(weekYear, 0, 4));
+    firstMonday.setUTCDate(firstMonday.getUTCDate() - (firstMonday.getUTCDay() + 6) % 7);
+    const week = 1 + Math.round((monday - firstMonday) / 604800000);
+    return `${weekYear}-W${String(week).padStart(2, '0')}`;
+};
+const weekDate = computed({
+    get: () => isoWeek(date.value),
+    set: (value) => {
+        const match = /^(\d{4})-W(\d{2})$/.exec(value);
+        if (!match || Number(match[2]) < 1 || Number(match[2]) > 53) return;
+        const monday = new Date(Date.UTC(Number(match[1]), 0, 4));
+        monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7 + (Number(match[2]) - 1) * 7);
+        date.value = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
+    },
+});
+const monthDate = computed({
+    get: () => date.value.slice(0, 7),
+    set: (value) => { if (/^\d{4}-\d{2}$/.test(value)) date.value = `${value}-01`; },
+});
 
 async function load() {
     const sequence = ++loadSequence;
     loading.value = true;
     error.value = '';
+    range.value = '';
+    people.value = [];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date.value)) {
+        error.value = '集計する日・週・月を選んでください。';
+        loading.value = false;
+        return;
+    }
     try {
         const { data } = await axios.get(route('schedule.department_work.analysis'), {
             params: { date: date.value, period: period.value },
@@ -278,15 +312,24 @@ onMounted(load);
                     <p class="mt-1 text-xs text-gray-500">時刻を記録した簡易作業と、過去のジョブ・仕事の会議を集計します。未記録は作業ゼロを意味しません。非公開の作業は本人以外の内訳に含めません。</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                    <input v-model="date" type="date" aria-label="集計日" class="rounded border px-2 py-1" />
+                    <label class="flex items-center gap-2"><span class="whitespace-nowrap">{{ { day: '対象日', week: '対象週', month: '対象月' }[period] }}</span>
+                        <input v-if="period === 'day'" v-model="date" type="date" aria-label="対象日" class="rounded border px-2 py-1" />
+                        <input v-else-if="period === 'week'" v-model="weekDate" type="week" aria-label="対象週" class="rounded border px-2 py-1" />
+                        <input v-else v-model="monthDate" type="month" aria-label="対象月" class="rounded border px-2 py-1" />
+                    </label>
                     <div class="flex gap-1">
                         <button v-for="[key, label] in [['day', '日'], ['week', '週'], ['month', '月']]" :key="key" type="button" class="rounded border px-3 py-1" :class="period === key ? 'border-blue-600 bg-blue-50 text-blue-700' : 'bg-white'" @click="period = key">{{ label }}</button>
                     </div>
                 </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500">対象：{{ rangeLabel }} <span v-if="loading">読み込み中...</span></p>
+            <p v-if="!loading && !error" class="mt-2 text-xs text-gray-500">集計期間：{{ rangeLabel }}</p>
             <p v-if="error" class="mt-2 text-sm text-red-700" role="alert">{{ error }}</p>
-            <div v-else class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div v-if="loading" class="mt-4 flex items-center gap-3 rounded border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-800" role="status" aria-live="polite">
+                <span class="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-700" aria-hidden="true"></span>
+                選択した期間の作業実績を集計中…
+            </div>
+            <div v-show="!loading && !error">
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">時間記録のある人</div><div class="text-xl font-semibold">{{ recordedPeople }} / {{ people.length }}人</div></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">記録件数</div><div class="text-xl font-semibold">{{ totalRecords }}件</div></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">記録された作業時間</div><div class="text-xl font-semibold">{{ duration(totalMinutes) }}</div></div>
@@ -365,6 +408,7 @@ onMounted(load);
                     </div>
                 </div>
                 </div>
+            </div>
             </div>
         </section>
         <Teleport to="body">
