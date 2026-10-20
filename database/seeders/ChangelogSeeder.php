@@ -2137,6 +2137,28 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'transport-expense-1',
+                'title' => '交通費の申請を、月ごとの申請に刷新（サン・ブレーン・サンエー印刷共通）',
+                'released_at' => '2026-10-20',
+                'summary' => '交通費を「1人1か月1申請」で入力・申請できるようになりました。入力は自動で保存され、申請書（PDF・Excel）は原本と同じ様式で出力できます。総務・経理は、受理・差戻し・請求済みを管理し、運賃マスタで運賃を自動で検算できます。',
+                'design_files' => ['z_instructions/TRAINS_PLAN2.md', 'z_instructions/TRAINS_MANAGER2.md'],
+                'claude_notes' => '両社共通（SunA には置かない。transport_* テーブル）。申請者は /user/applications → 交通費（user.billing.transport.*、全ロール可）、総務・経理は Clerk の「申請」ハブ（clerk.billing.transport.*。SuperAdmin も同じ画面）。旧 SuperAdmin 用の交通費入力・請求データ・交通費一覧は削除（DB の transport_billing_requests / billing_request_id は残す）。月末ルール: 当月末日(JST)を過ぎたら新規保存・申請不可、差戻しは期限後も可、期限後の依頼・許可は先月分まで（config/transport.php。本番の .env に TRANSPORT_ENFORCE_DEADLINE を書かない＝true）。申請タブの表示は SuperAdmin・Admin・Clerk のみ（UserNavigationTabs の APPLY_TAB_ROLES。確認後に全員へ）。本番反映は migrate（--force）8本。Excel の部門 ○ は GD で描画（GD 不可なら太字・下線にフォールバック）。PDF は dompdf の日本語フォントのサブセット化を無効にして出力。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>申請者（全ロール）</h3><ul>
+<li>「申請」→「交通費」から、月ごとに入力します。入力は自動で保存され、「申請する」で申請します（差戻しされた場合は、直して再申請できます）。</li>
+<li>Excel の行をそのまま貼り付ける「まとめて貼り付け」、よく使う行先の登録と候補、「0901 国際」のようなクイック入力、複数日への追加・複製で、たくさんの入力も楽になります。</li>
+<li>申請書（PDF・Excel）を、原本と同じ様式で出力できます。右上に「from SunBWork 申請No.」が入ります。</li>
+<li>当月末日を過ぎると申請できません。やむを得ない場合は、先月分に限り、総務・経理に「期限後の申請」を依頼できます。</li>
+</ul></section>
+<section class="cl-feature"><h3>総務・経理</h3><ul>
+<li>「申請」→「交通費」で、月ごとの申請を、部門別に一覧し、受理・差戻し（コメント必須）・請求済み・各取り消しができます。月次集計は CSV で保存できます。</li>
+<li>詳細画面で、運賃マスタとの照合（一致・相違・未検査）と、台帳での合計の自動計算、重複・休日・金額の異常などの注意が出ます。一致した行は、ボタン1つで確認済みにできます。</li>
+<li>運賃マスタ（経路と運賃の台帳）を登録できます。申請された未登録の経路は、候補に自動で溜まります。</li>
+<li>申請・再申請・期限後の依頼は、お知らせで届きます。依頼は、一覧の先頭で、許可・却下するだけです。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

@@ -11,6 +11,56 @@ use Carbon\Carbon;
 // 売上分析ルート（SuperAdmin/Admin/Clerkの各グループ内でロール別prefixとして複製登録する）
 // currentRouteContext（AppLayout.vue）がルート名プレフィックスでロールタブを判定するため、
 // 単一の共有ルート名空間にはせず、ロールごとに同名ルートをprefix複製する既存パターンに合わせる。
+// 交通費の申請者側ルート（本人の分だけ）。ユーザー用の入口（user.billing.transport.*）。全ロールが使える
+$registerTransportApplicantRoutes = function () {
+    $expense = App\Http\Controllers\Billing\Transport\ExpenseController::class;
+    $preset  = App\Http\Controllers\Billing\Transport\PresetController::class;
+    Route::get('/', [$expense, 'index'])->name('index');
+    Route::post('/', [$expense, 'store'])->name('store');
+    Route::post('autosave', [$expense, 'autosave'])->name('autosave');
+    // よく使う行き先（本人の登録）
+    Route::post('presets', [$preset, 'store'])->name('presets.store');
+    Route::put('presets/{preset}', [$preset, 'update'])->name('presets.update');
+    Route::delete('presets/{preset}', [$preset, 'destroy'])->name('presets.destroy');
+    // 期限（当月末日）を過ぎた月の申請の依頼（申請者から総務・経理へ）
+    Route::post('deadline-requests', [App\Http\Controllers\Billing\Transport\DeadlineRequestController::class, 'store'])->name('deadline_requests.store');
+    Route::delete('deadline-requests/{extension}', [App\Http\Controllers\Billing\Transport\DeadlineRequestController::class, 'destroy'])->name('deadline_requests.destroy');
+    Route::post('{expense}/submit', [$expense, 'submit'])->name('submit');
+    Route::post('{expense}/withdraw', [$expense, 'withdraw'])->name('withdraw');
+    Route::delete('{expense}', [$expense, 'destroy'])->name('destroy');
+    Route::get('{expense}/excel', [$expense, 'exportExcel'])->name('excel');
+    Route::get('{expense}/pdf', [$expense, 'exportPdf'])->name('pdf');
+};
+
+// 交通費の管理側ルート（総務・経理＝Clerk の画面: clerk.billing.transport.*。SuperAdmin も、同じ画面を使う）
+$registerTransportManageRoutes = function () {
+    $manage = App\Http\Controllers\Billing\Transport\ManageController::class;
+    $fares  = App\Http\Controllers\Billing\Transport\FareController::class;
+    Route::get('summary', [$manage, 'summary'])->name('summary');
+    // 運賃マスタ（{expense} より先に定義する）
+    Route::get('fares', [$fares, 'index'])->name('fares.index');
+    Route::post('fares', [$fares, 'store'])->name('fares.store');
+    Route::put('fares/{fare}', [$fares, 'update'])->name('fares.update');
+    Route::delete('fares/{fare}', [$fares, 'destroy'])->name('fares.destroy');
+    // 期限（当月末日）の解除（総務・経理）
+    Route::post('deadlines', [App\Http\Controllers\Billing\Transport\DeadlineController::class, 'store'])->name('deadlines.store');
+    Route::post('deadlines/{extension}/approve', [App\Http\Controllers\Billing\Transport\DeadlineController::class, 'approve'])->name('deadlines.approve');
+    Route::post('deadlines/{extension}/reject', [App\Http\Controllers\Billing\Transport\DeadlineController::class, 'reject'])->name('deadlines.reject');
+    Route::delete('deadlines/{extension}', [App\Http\Controllers\Billing\Transport\DeadlineController::class, 'destroy'])->name('deadlines.destroy');
+    Route::get('/', [$manage, 'index'])->name('index');
+    Route::get('{expense}', [$manage, 'show'])->name('show');
+    Route::post('{expense}/approve', [$manage, 'approve'])->name('approve');
+    Route::post('{expense}/return', [$manage, 'returnBack'])->name('return');
+    Route::post('{expense}/bill', [$manage, 'bill'])->name('bill');
+    Route::post('{expense}/unapprove', [$manage, 'unapprove'])->name('unapprove');
+    Route::post('{expense}/unbill', [$manage, 'unbill'])->name('unbill');
+    // 行ごとの確認チェック・運賃マスタへの登録（詳細画面）
+    Route::post('{expense}/items/check-all', [$manage, 'checkAll'])->name('items.check_all');
+    Route::post('{expense}/items/check-matched', [$manage, 'checkMatched'])->name('items.check_matched');
+    Route::post('{expense}/items/{item}/check', [$manage, 'checkItem'])->name('items.check');
+    Route::post('{expense}/items/{item}/fare', [$fares, 'fromItem'])->name('items.fare');
+};
+
 $registerSalesAnalysisRoutes = function () {
     Route::middleware('sales_analysis')->prefix('sales-analysis')->name('sales_analysis.')->group(function () {
         // ホーム画面（2026-09-03 Codexレビュー2回目により、旧DashboardController相当を「データ登録状況」へ差し替え）
@@ -130,7 +180,13 @@ Route::get('/', function () {
 Route::get('/debug/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('debug.events.send_test_completion');
 
 // User Dashboard (default authenticated users)
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'ghost'])->group(function () {
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'ghost'])->group(function () use ($registerTransportApplicantRoutes) {
+    // 申請（ユーザー用のタブ）と、交通費の申請（本人の分）。全ロールが使える
+    Route::get('/user/applications', [App\Http\Controllers\Billing\UserApplicationHubController::class, 'index'])->name('user.applications.index');
+    Route::prefix('user/billing/transport')->name('user.billing.transport.')->group(function () use ($registerTransportApplicantRoutes) {
+        $registerTransportApplicantRoutes();
+    });
+
     // ...既存コード...
     // チャットルームメッセージ送信
     Route::post('/chat/rooms/{id}/messages', [App\Http\Controllers\Chat\ChatController::class, 'sendRoomMessage'])->name('chat.rooms.messages.send');
@@ -659,21 +715,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
         Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
 
-        // SuperAdmin: 交通費管理
-        Route::prefix('billing/transport')->name('billing.transport.')->group(function () {
-            Route::get('billed', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'index'])->name('billed');
-            Route::get('list', [App\Http\Controllers\Billing\Transport\ExpenseListController::class, 'index'])->name('list');
-            Route::get('/', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'index'])->name('index');
-            Route::post('/', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'store'])->name('store');
-            Route::put('{expense}', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'update'])->name('update');
-            Route::delete('{expense}', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'destroy'])->name('destroy');
-            Route::get('{expense}/excel', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportExcel'])->name('excel');
-            Route::get('{expense}/pdf', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportPdf'])->name('pdf');
-            Route::post('billing', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'store'])->name('billing.store');
-            Route::get('billing/{billing}/pdf', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'exportPdf'])->name('billing.pdf');
-            Route::get('billing/{billing}/excel', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'exportExcel'])->name('billing.excel');
-        });
-
         // SuperAdmin: スクリプト管理
         Route::get('scripts', [App\Http\Controllers\SuperAdmin\ScriptManagementController::class, 'index'])->name('scripts.index');
         Route::post('scripts/assign', [App\Http\Controllers\SuperAdmin\ScriptManagementController::class, 'assign'])->name('scripts.assign');
@@ -793,8 +834,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'clerk'])
     ->prefix('clerk')
     ->name('clerk.')
-    ->group(function () use ($registerSalesAnalysisRoutes) {
+    ->group(function () use ($registerSalesAnalysisRoutes, $registerTransportManageRoutes) {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+        // 申請ハブ（両社共通。交通費、サンエー印刷の総務は年末調整などの申請の種類も）
+        Route::get('applications', [App\Http\Controllers\Billing\ApplicationHubController::class, 'index'])->name('applications.index');
+
+        // 交通費（総務・経理の受理・請求済み・月次集計）。両社共通（会社ごとに絞り込み）
+        Route::prefix('billing/transport')->name('billing.transport.')->group(function () use ($registerTransportManageRoutes) {
+            $registerTransportManageRoutes();
+            Route::get('{expense}/excel', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportExcel'])->name('excel');
+            Route::get('{expense}/pdf', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportPdf'])->name('pdf');
+        });
 
         // お知らせ管理（送信側）
         Route::get('announcements', [App\Http\Controllers\Clerk\AnnouncementController::class, 'index'])->name('announcements.index');

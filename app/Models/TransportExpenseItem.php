@@ -18,11 +18,18 @@ class TransportExpenseItem extends Model
         'station_to',
         'fare_type',
         'amount',
+        'base_amount',
+        'auto_double',
+        'checked_at',
+        'checked_by',
     ];
 
     protected $casts = [
         'occurrence_date' => 'date:Y-m-d',
         'amount' => 'integer',
+        'base_amount' => 'integer',
+        'auto_double' => 'boolean',
+        'checked_at' => 'datetime',
         'sort_order' => 'integer',
     ];
 

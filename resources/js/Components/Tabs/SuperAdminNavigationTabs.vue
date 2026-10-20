@@ -85,18 +85,6 @@ const tabs = computed(() => [
         condition: canAccessWorkRecordTrial.value && typeof route === 'function' && route().has('superadmin.broad_projects.index'),
     },
     {
-        key: 'billing_transport_input',
-        href: tryRoute('superadmin.billing.transport.index'),
-        label: '交通費入力',
-        condition: typeof route === 'function' && route().has('superadmin.billing.transport.index'),
-    },
-    {
-        key: 'billing_transport_list',
-        href: tryRoute('superadmin.billing.transport.list'),
-        label: '交通費一覧',
-        condition: typeof route === 'function' && route().has('superadmin.billing.transport.list'),
-    },
-    {
         key: 'scripts',
         href: tryRoute('superadmin.scripts.index'),
         label: 'スクリプト管理',
@@ -237,20 +225,6 @@ function onMobileSelect(e) {
                 :class="tab('broad_projects')"
             >
                 大まかな案件
-            </Link>
-            <Link
-                v-if="typeof route === 'function' && route().has('superadmin.billing.transport.index')"
-                :href="route('superadmin.billing.transport.index')"
-                :class="tab('billing_transport_input')"
-            >
-                交通費入力
-            </Link>
-            <Link
-                v-if="typeof route === 'function' && route().has('superadmin.billing.transport.list')"
-                :href="route('superadmin.billing.transport.list')"
-                :class="tab('billing_transport_list')"
-            >
-                交通費一覧
             </Link>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.scripts.index')"

@@ -18,8 +18,8 @@ const showTab = (key) => !isGeneral.value || generalAllowed.includes(key);
 
 // Clerk カラー: purple
 const isKeiri = computed(() => isGeneral.value && page.props.auth?.clerkKind === 'keiri');
-// 「申請」タブはサンエー印刷（general）の総務のみ（SunA/GeneralAffairs）
-const showApplications = computed(() => isGeneral.value && !isKeiri.value);
+// 「申請」タブは全 Clerk に表示（交通費は両社共通。年末調整などの種類は、ハブでサンエー印刷の総務にだけ出す）
+const showApplications = computed(() => true);
 // 「社員情報」タブ: サンエー印刷の総務で、社員情報を見る権限がある人（管理者は常に可）
 const showEmployees = computed(() => isGeneral.value && Boolean(page.props.auth?.staffAccess?.viewEmployees));
 const tab = (key) => [
@@ -40,7 +40,7 @@ const tabs = computed(() => [
     { key: 'announcements', href: tryRoute('clerk.announcements.index'), label: 'お知らせ通知' },
     { key: 'calendar', href: tryRoute('clerk.calendar'), label: 'カレンダー' },
     { key: 'reminders', href: tryRoute('clerk.reminders.index'), label: 'リマインダー設定' },
-    { key: 'applications', href: tryRoute('clerk.general_affairs.applications.index'), label: '申請', condition: showApplications.value },
+    { key: 'applications', href: tryRoute('clerk.applications.index'), label: '申請', condition: showApplications.value },
     { key: 'employees', href: tryRoute('clerk.general_affairs.employees.index'), label: '社員情報', condition: showEmployees.value },
     { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
     {
@@ -91,7 +91,7 @@ function onMobileSelect(e) {
             </Link>
             <Link
                 v-if="showApplications"
-                :href="route('clerk.general_affairs.applications.index')"
+                :href="route('clerk.applications.index')"
                 :class="tab('applications')"
             >
                 申請

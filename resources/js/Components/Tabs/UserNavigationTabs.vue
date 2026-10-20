@@ -9,10 +9,15 @@ const props = defineProps({
 const isSunbrain = computed(() => usePage().props.auth?.companyType === 'sunbrain');
 // 一般会社（サンエー印刷等）はジョブ系タブを出さない。サン・ブレーンは従来どおり全タブ
 const isGeneral = computed(() => usePage().props.auth?.companyType === 'general');
-const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings', 'nencho'];
+const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings', 'nencho', 'applications'];
 // 「年末調整」タブ: 自分が対象者になっている受付中の受付がある人にだけ表示（会社タイプ問わず。SunA/GeneralAffairs）
 const nenchoAvailable = computed(() => Boolean(usePage().props.auth?.nenchoAvailable));
 const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
+
+// 「申請」タブ（交通費など）。申請の機能は全ロールが使えるが、確認の期間のため、タブは SuperAdmin・Admin・Clerk にだけ出す。
+// 全員に広げるときは、この配列を使う判定（showApply）を、常に true にする。
+const APPLY_TAB_ROLES = ['superadmin', 'admin', 'clerk'];
+const showApply = computed(() => APPLY_TAB_ROLES.includes(usePage().props.auth?.user?.user_role));
 
 // User カラー: blue
 const tab = (key) => [
@@ -36,6 +41,7 @@ const tabs = computed(() => [
     { key: 'team_rooms', href: tryRoute('team-rooms.index'), label: 'チームルーム' },
     { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value },
     { key: 'nencho', href: tryRoute('user.general_affairs.nencho.index'), label: '年末調整', condition: nenchoAvailable.value },
+    { key: 'applications', href: tryRoute('user.applications.index'), label: '申請', condition: showApply.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
 ].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
@@ -91,6 +97,9 @@ function onMobileSelect(e) {
             </Link>
             <Link v-if="nenchoAvailable" :href="route('user.general_affairs.nencho.index')" :class="tab('nencho')">
                 年末調整
+            </Link>
+            <Link v-if="showApply && showTab('applications')" :href="route('user.applications.index')" :class="tab('applications')">
+                申請
             </Link>
             <Link :href="route('user.settings.index')" :class="tab('settings')">
                 設定

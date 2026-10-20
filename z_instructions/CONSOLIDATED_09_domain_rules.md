@@ -847,3 +847,21 @@ class MyNSystemTest extends TestCase
 - 案内: `NoticeService`。受付開始のお知らせ（対象者全員）と未提出者への催促（未入力・入力中・差戻し）を既存の `Announcement` で送り、履歴を `suna_ga_nencho_notices` に残す。カレンダーのリマインダーは `campaigns.calendar_reminder_id` で紐づけ、受付の日付・タイトル変更時に同期する。専用の通知機構は作らない。
 - 日本語フォームの入力規則（全角テキスト、半角数字、金額の自動カンマ、1欄の日付入力、例の常時表示、郵便番号からの住所補完）は CLAUDE.md と `Components/SunA/GeneralAffairs/Nencho/Fields` を正とする。
 - 本番反映時は migrate（`--force`）、権限付与、申請の種類への年末調整登録（`feature_key=nencho`）が必要。
+
+
+## 交通費（TRAINS）（2026-10-20）
+
+- 配置: 両社共通（SunA には置かない）。`app/**/Billing/Transport`、`transport_*` テーブル。詳細設計は `z_instructions/TRAINS_PLAN2.md`、実績と後回しは `TRAINS_MANAGER2.md`。
+- 申請の単位は「ユーザー × 対象月 = 1 申請」（`transport_expenses`、`user_id + billing_month` に一意制約）。発生日は対象月の月初〜月末のみ（`SaveExpenseRequest`）。サーバーでも、全角整形・金額の整数化・往復の「片道×2」の検算を行う。
+- 状態: 下書き → 申請済み →（受理／差戻し）→ 請求済み。遷移は `TransportExpenseWorkflow` だけで行う（操作の瞬間に状態を再確認、`transport_expense_events` に履歴、通知）。申請者が編集できるのは下書き・差戻しのみ。
+- 期限（月末ルール）: `TransportDeadline`。当月末日（JST の 23:59:59）を過ぎたら、新規の保存・自動保存・申請と、下書きの申請・取り下げは不可。差戻しされたものは期限後も直して再申請できる。総務・経理の受理・差戻し・請求済みは、期限の影響を受けない。期限後の画面は閲覧のみ（PDF/Excel の出力・下書きの削除は可）。
+- 期限後の申請: 申請者が依頼 → 総務・経理が許可・却下（`transport_deadline_extensions`: requested / granted / rejected）。許可された人のその月だけ期限が解除される。依頼・許可できるのは先月分まで（`config('transport.request_months_back')`）。総務・経理による依頼なしの直接の許可もできる。許可の記録（誰が・いつ・理由）が残る。
+- 設定（`config/transport.php`）: `enforce_deadline`（環境変数 `TRANSPORT_ENFORCE_DEADLINE`。**本番では設定しない＝true**。false にすると期限が効かない）、`request_months_back`、`max_row_amount`（金額の目安の上限）、`recheck_after_days`。
+- 通知は「お知らせ」（`Announcement`）で送る（`TransportNotifier`）。申請・再申請・期限後の依頼 → 同じ会社の Clerk・Admin と SuperAdmin（本人は除く）。受理・差戻し・請求済み・期限の許可／見送り → 申請者。
+- 会社の分離: `transport_expenses.company_id`（申請時の会社）で絞り込む。総務・経理は自社の申請だけ、SuperAdmin は全社。部門（請求先）は `charge_department_id`（会社に登録された部署。NULL = 共通）。
+- 運賃マスタ（`transport_fares`、会社ごと）: 経路（方向を問わない。駅名は「駅」・ヶ/ケ・全角半角のゆれを正規化した `route_key`）ごとに IC・切符の片道運賃。検査済みの運賃だけが照合の対象。申請時に、台帳に無い経路は「未検査」で自動に溜まる（`TransportFareStock`）。
+- 検算（`TransportFareChecker`）: 運賃の照合（往復＝片道×2）、台帳での合計の自動計算、重複・休日（会社の休日カレンダーを読み取り専用で利用）・金額の異常・区間の誤り・前回との違い。行ごとの「確認済み」と、一致した行の一括確認。
+- 出力: PDF は `expense_pdf.blade.php`（原本 PDF の寸法で絶対配置。30 行/枚）、Excel は `resources/billing/transport_expense_template.xlsx`（原本 Excel から、旧様式シート・印影・サンプル値を除いたもの）に流し込む。部門の ○ は GD で描画する。右上に「from SunBWork 申請No.」を入れる。dompdf の日本語フォントは、サブセット化すると Chrome 等で表示されないため無効にしている（太字用フォントが無いので、PDF では太字を使わない）。
+- 旧 SuperAdmin 用の交通費画面・旧「請求データ」は削除済み。DB の `transport_billing_requests` と `transport_expenses.billing_request_id` は、データ保護のため残してある。
+- 本番反映: migrate（`--force`）8 本。ChangelogSeeder の反映。本番サーバーで GD が使えるか確認する。
+
