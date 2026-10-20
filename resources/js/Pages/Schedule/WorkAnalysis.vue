@@ -8,7 +8,8 @@ import { workCategories, workActivities, activityLabel } from '@/Constants/perso
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
 const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
-const period = ref('day');
+const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
+const period = ref(['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'day');
 const weekPickerOpen = ref(false);
 const weekPicker = ref(null);
 const weekPickerMonth = ref(date.value.slice(0, 7));
@@ -325,7 +326,12 @@ function backToPersonPeriod() {
     });
 }
 
-watch([date, period], () => { closePerson(); load(); });
+watch([date, period], () => {
+    const url = route('schedule.department_work.results', { date: date.value, period: period.value });
+    window.history.replaceState(window.history.state, '', url);
+    closePerson();
+    load();
+});
 onMounted(() => {
     load();
     document.addEventListener('pointerdown', closeWeekPickerOutside);
@@ -338,7 +344,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業実績の内訳" active="results" :date="date">
+    <WorkloadAnalysisShell title="作業実績の内訳" active="results" :date="date" :period="period">
 
         <section class="rounded-lg bg-white p-4 shadow">
             <div class="flex flex-wrap items-center justify-between gap-3">
