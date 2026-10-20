@@ -321,7 +321,7 @@ onMounted(load);
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
                         <button type="button" class="truncate text-left font-medium text-blue-800 underline underline-offset-2" :title="`${row.name}の詳細を表示`" @click="openPerson(row)"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</button>
                         <div class="h-5 overflow-hidden rounded bg-white"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
-                        <span class="text-right tabular-nums" :title="`適用中：作業 ${pointLabel(row.work_points)}／会議・訪問 ${pointLabel(row.meeting_points)}／残業 ${pointLabel(includeOvertime ? row.overtime_points : 0)}／登録 ${pointLabel(includeCreation ? row.creation_points : 0)}／管理 ${pointLabel(includeManagement ? row.management_points : 0)}`"><strong>{{ pointLabel(visiblePoints(row)) }}点</strong><small class="block text-[10px] text-gray-600">作業 {{ pointLabel(row.work_points) }}／会議・訪問 {{ pointLabel(row.meeting_points) }}</small></span>
+                        <span class="whitespace-nowrap text-right tabular-nums"><strong>{{ pointLabel(visiblePoints(row)) }}点</strong></span>
                     </div>
                 </div>
             </div>
