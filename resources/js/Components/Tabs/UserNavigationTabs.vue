@@ -17,7 +17,12 @@ const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
 // 「申請」タブ（交通費など）。申請の機能は全ロールが使えるが、確認の期間のため、タブは SuperAdmin・Admin・Clerk にだけ出す。
 // 全員に広げるときは、この配列を使う判定（showApply）を、常に true にする。
 const APPLY_TAB_ROLES = ['superadmin', 'admin', 'clerk'];
-const showApply = computed(() => APPLY_TAB_ROLES.includes(usePage().props.auth?.user?.user_role));
+// 上のロール以外で、テストとして「申請」タブを出す人（user_id）。24 = 中川さん（外出が多いため、交通費のテストユーザー）
+const APPLY_TAB_USER_IDS = [24];
+const showApply = computed(() => {
+    const u = usePage().props.auth?.user;
+    return APPLY_TAB_ROLES.includes(u?.user_role) || APPLY_TAB_USER_IDS.includes(u?.id);
+});
 
 // User カラー: blue
 const tab = (key) => [

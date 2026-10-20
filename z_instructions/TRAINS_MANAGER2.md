@@ -25,6 +25,7 @@
 | 10 | 入力補助は C 案で実装: ①まとめて貼り付け（Excel 行・タブ/カンマ区切り、確認画面つき）②登録した行先＋候補（登録と過去12か月の履歴）＋クイック入力 ③複数日に追加・複製・Enter で次の行。④Excel ファイル取込は見送り（D-11） | 2026-10-20 |
 | 11 | 総務・経理の検算は B 案で実装: 運賃マスタ（検査済み/未検査/登録したい・検算ボタン・申請から自動で未検査に溜める）＋申請の照合（行ごと）＋自動チェック（重複・休日・金額の異常・区間の誤り・前回との違い）＋行ごとの確認チェック＋差戻しコメントへの行指定。C 案の 7〜9（未申請者の一覧・定期券区間・明細CSV）は未実装（D-14） | 2026-10-20 |
 | 12 | 段階 D: 申請者の入口は、ユーザー用のタブメニューの「申請」→「交通費」（`/user/applications` → `/user/billing/transport`）。機能は全ロールが自分の分を使える。確認期間中は「申請」タブの表示を SuperAdmin・Admin・Clerk だけに限定（`UserNavigationTabs.vue` の `APPLY_TAB_ROLES`。全員に広げるときは `showApply` を常に true に）。SuperAdmin 用の旧ボタン・画面は、移行の確認後に削除する（D-16） | 2026-10-20 |
+| 13 | 「申請」タブの表示を、ロール（SuperAdmin・Admin・Clerk）に加えて、user_id 24（中川さん。外出が多いため、交通費のテストユーザー）にも出す（`UserNavigationTabs.vue` の `APPLY_TAB_USER_IDS`）。全員に広げるときは、`showApply` を常に true に | 2026-10-20 |
 | 6 | 経理を含める: 総務・経理の両方の Clerk が受理できる（clerkKind で分けない） | 2026-10-18 |
 
 ## 後回し事項（Deferred Backlog）
@@ -82,6 +83,7 @@
 | 2026-10-20 | ユーザー指示: 期限後の申請の依頼・許可は、先月分まで（それより前の月は、依頼も許可もできない）。`TransportDeadline::requestable`、`config/transport.php` の `request_months_back`（既定 1）、依頼・直接許可のサーバー側の検証、申請者の画面（先月より前の月は、依頼の案内の代わりに「支払いの対象外」と表示）、管理側の直接許可の月の選択肢を先月分だけに |
 | 2026-10-20 | SuperAdmin 用の交通費の画面を削除（D-16）: 旧「交通費入力」・旧「請求データ」（`BillingRequestController`・`TransportBillingRequest`・`Billed.vue`・`billing_pdf`）・「交通費一覧」「運賃マスタ」の SuperAdmin 用ルート（`superadmin.billing.transport.*`）・`SuperAdminNavigationTabs` の 2 タブを削除。管理側の画面は Clerk 用（`clerk.billing.transport.*`）だけにして、SuperAdmin も同じ画面を使う。申請者側はユーザー用（`user.billing.transport.*`）だけ。テストのルート名を付け替え。Pest 71件パス |
 | 2026-10-20 | **本番デプロイ**: 分離デプロイ（`/tmp/sunbwork-trains-deploy-20261020`）。事前確認（PHP 8.2.32・GD あり・重複 0 件・実行待ち migration なし）→ push（`3a73c5932..6bba9fa92`）→ 本番で `git pull --ff-only`・`migrate --force`（8 本 DONE）・`config:clear`・`cache:clear`・`ChangelogSeeder --force`（`ec950a363 → 6bba9fa92`）→ 事後確認（migrate:status・ルート 35 本）。ビルドは `/members` 用で、古い資産を残して追加のみ |
+| 2026-10-20 | 「申請」タブを、user_id 24（中川さん）にも表示（`APPLY_TAB_USER_IDS`）。Vue のみの変更のため、本番は `git pull --ff-only`・`config:clear`・`cache:clear` だけ（migrate・seed なし）。ビルドは `/members` 用で、古い資産を残して追加のみ |
 
 ## 本流への報告（2026-10-20 デプロイ時に記入）
 - **変更ファイル**:
