@@ -5,10 +5,12 @@ import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.v
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
 const date = props.initialDate || new Date().toLocaleDateString('sv-SE');
+const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
+const period = ['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'day';
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業量分析ガイド" active="guide" :date="date">
+    <WorkloadAnalysisShell title="作業量分析ガイド" active="guide" :date="date" :period="period">
         <div class="mx-auto max-w-5xl space-y-5">
             <section class="rounded-lg bg-white p-5 shadow sm:p-6">
                 <p class="text-xs font-semibold text-blue-700">まずは概要</p>
@@ -33,7 +35,7 @@ const date = props.initialDate || new Date().toLocaleDateString('sv-SE');
                 </div>
                 <div class="mt-5 flex flex-wrap items-center gap-3">
                     <Link :href="route('schedule.department_work.details', { date })" class="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">詳しい作業量分析を見る</Link>
-                    <Link :href="route('schedule.department_work.results', { date })" class="text-sm font-medium text-blue-700 underline">簡易順位を見る</Link>
+                    <Link :href="route('schedule.department_work.results', { date, period })" class="text-sm font-medium text-blue-700 underline">簡易順位を見る</Link>
                 </div>
             </section>
 

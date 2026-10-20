@@ -7,7 +7,8 @@ import { workCategories, activityLabel } from '@/Constants/personalWorkActivitie
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
 const month = ref((props.initialDate || new Date().toLocaleDateString('sv-SE')).slice(0, 7));
-const period = ref('month');
+const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
+const period = ref(queryPeriod === 'quarter' ? 'quarter' : 'month');
 const role = ref('all');
 const category = ref('all');
 const source = ref('all');
@@ -89,13 +90,17 @@ async function load() {
     }
 }
 
-watch([month, period], load);
+watch([month, period], () => {
+    const url = route('schedule.department_work.details', { date: `${month.value}-01`, period: period.value });
+    window.history.replaceState(window.history.state, '', url);
+    load();
+});
 watch([includeOvertime, includeCreation, includeManagement], () => { sortBy.value = 'points'; });
 onMounted(load);
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業量分析" active="details" :date="`${month}-01`">
+    <WorkloadAnalysisShell title="作業量分析" active="details" :date="`${month}-01`" period="month">
 
         <section class="rounded-lg bg-white p-4 shadow">
             <div class="flex flex-wrap items-start justify-between gap-3">

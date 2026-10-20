@@ -217,7 +217,12 @@ async function finishDay() {
     }
 }
 
-watch(date, () => { resetForm(); loadDay(); });
+watch(date, () => {
+    const url = route('schedule.work_record_trial.page', { date: date.value });
+    window.history.replaceState(window.history.state, '', url);
+    resetForm();
+    loadDay();
+});
 watch(myJobSearch, (value, _oldValue, onCleanup) => {
     const term = value.trim();
     if (!term) {

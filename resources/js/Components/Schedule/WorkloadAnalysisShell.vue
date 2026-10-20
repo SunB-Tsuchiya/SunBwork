@@ -8,12 +8,13 @@ const props = defineProps({
     title: { type: String, required: true },
     active: { type: String, required: true },
     date: { type: String, required: true },
+    period: { type: String, default: 'day' },
 });
 
 const scheduleHref = computed(() => route('schedule.index', { date: props.date, tab: 'work' }));
-const resultsHref = computed(() => route('schedule.department_work.results', { date: props.date }));
+const resultsHref = computed(() => route('schedule.department_work.results', { date: props.date, period: props.period }));
 const detailsHref = computed(() => route('schedule.department_work.details', { date: props.date }));
-const guideHref = computed(() => route('schedule.department_work.guide', { date: props.date }));
+const guideHref = computed(() => route('schedule.department_work.guide', { date: props.date, period: props.period }));
 const recordTrialHref = computed(() => route('schedule.work_record_trial.page', { date: props.date }));
 const tabClass = (key) => [
     'rounded-t px-4 py-2 text-sm font-semibold',
