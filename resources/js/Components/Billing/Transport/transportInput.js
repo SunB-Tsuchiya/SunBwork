@@ -158,21 +158,26 @@ export function parseDays(text, month) {
 
 const katakana = (s) => nfkc(s).toLowerCase().replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
 
-/** 候補（登録＋履歴）から、キーワードに最も合うものを選ぶ。完全一致 > 前方一致 > 部分一致（行先・駅名）。同点は登録済み・使った回数の多い順 */
-export function findSuggestion(keyword, suggestions) {
+/** 候補（登録＋履歴）から、キーワードに合うものを、合う順に返す。完全一致 > 前方一致 > 部分一致（行先・駅名）。同点は登録済み・使った回数の多い順 */
+export function findSuggestions(keyword, suggestions, limit = 8) {
     const k = katakana(keyword).replace(/\s+/g, '');
-    if (!k) return null;
-    let best = null, bestScore = 0;
-    for (const s of suggestions) {
+    if (!k) return [];
+    const scored = [];
+    suggestions.forEach((s, idx) => {
         const d = katakana(s.destination).replace(/\s+/g, '');
         let score = 0;
         if (d === k) score = 4;
         else if (d.startsWith(k)) score = 3;
         else if (d.includes(k)) score = 2;
         else if (katakana(`${s.station_from}${s.station_to}`).includes(k)) score = 1;
-        if (score > bestScore) { best = s; bestScore = score; }   // suggestions は登録済み・回数順に並んでいるので、同点では先のものが残る
-    }
-    return best;
+        if (score > 0) scored.push({ s, score, idx });   // suggestions は登録済み・回数順に並んでいるので、同点では元の順を保つ
+    });
+    return scored.sort((x, y) => y.score - x.score || x.idx - y.idx).slice(0, limit).map((x) => x.s);
+}
+
+/** 最も合う 1 件 */
+export function findSuggestion(keyword, suggestions) {
+    return findSuggestions(keyword, suggestions, 1)[0] ?? null;
 }
 
 /**
@@ -189,7 +194,7 @@ export function parseQuick(text, month, suggestions) {
         dates.push(d);
     }
     const keyword = tokens.slice(i).join(' ');
-    return { dates, keyword, suggestion: findSuggestion(keyword, suggestions) };
+    return { dates, keyword, suggestion: findSuggestion(keyword, suggestions), candidates: findSuggestions(keyword, suggestions) };
 }
 
 /** 候補を、明細の行に当てはめる（日付は変えない） */
