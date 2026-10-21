@@ -304,6 +304,7 @@ class DepartmentWorkController extends Controller
             'date' => ['required', 'date_format:Y-m-d'],
             'period' => ['required', Rule::in(['day', 'week', 'month', 'quarter'])],
             'user_id' => ['nullable', 'integer', 'min:1'],
+            'score_version' => ['nullable', Rule::in(['trial_time_v2', 'trial_time_v3'])],
         ]);
         $day = Carbon::createFromFormat('!Y-m-d', $params['date'], 'Asia/Tokyo');
         $start = match ($params['period']) {
