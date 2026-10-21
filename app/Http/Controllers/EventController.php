@@ -1937,7 +1937,9 @@ class EventController extends Controller
             $statuses = [];
         }
 
-        $eventItemTypes = EventItemType::orderBy('sort_order')->get(['id', 'name', 'slug', 'coefficient']);
+        $eventItemTypes = EventItemType::query()
+            ->when(! app(PersonalWorkSchedule::class)->available($user), fn ($query) => $query->where('slug', '!=', 'work_schedule'))
+            ->orderBy('sort_order')->get(['id', 'name', 'slug', 'coefficient']);
 
         $props = [
             'date'           => $date,

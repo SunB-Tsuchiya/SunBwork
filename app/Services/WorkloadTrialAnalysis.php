@@ -31,8 +31,9 @@ class WorkloadTrialAnalysis
 
     public function __construct(private PersonalWorkSchedule $schedule) {}
 
-    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false): array
+    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false, string $scoreVersion = 'trial_time_v2'): array
     {
+        $v3 = $scoreVersion === 'trial_time_v3';
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
         $startDate = $start->toDateString();
         $endDate = $end->toDateString();
@@ -81,15 +82,7 @@ class WorkloadTrialAnalysis
                 'sourceEvent.projectJobAssignment:id,project_job_id,user_id,sender_id,job_type,stage_id,work_item_type_id',
                 'sourceEvent.projectJobAssignment.projectJob.coordinators:id',
                 'sourceEvent.projectJobAssignment.projectJob:id,title,company_id,user_id,show_on_department_schedule',
-            ])->get()->filter(function (PersonalWorkEntry $entry) use ($viewer) {
-                if (! PersonalWorkActivities::allows($entry->work_category, $entry->activity_type)) return false;
-                if ($entry->source_event_id) {
-                    return $entry->sourceEvent && ! $this->schedule->eventForViewer(
-                        $entry->sourceEvent, $viewer, $entry->work_date->toDateString(), (int) $entry->user_id, $entry
-                    )['private'];
-                }
-                return ! $this->schedule->entryForViewer($entry, $viewer)['private'];
-            })->values();
+            ])->get()->filter(fn (PersonalWorkEntry $entry) => $this->entryCounts($entry, $viewer, $v3))->values();
         $entryByEvent = $entries->whereNotNull('source_event_id')
             ->keyBy(fn ($entry) => $entry->user_id.'|'.$entry->source_event_id);
 
@@ -111,7 +104,7 @@ class WorkloadTrialAnalysis
             ])->get();
         $attendees = DB::table('schedule_attendees')->whereIn('event_id', $events->pluck('id'))
             ->whereIn('user_id', $userIds)->where('status', '!=', 'declined')
-            ->get(['event_id', 'user_id'])->groupBy('event_id');
+            ->get(['event_id', 'user_id', 'status'])->groupBy('event_id');
         $copies = $events->filter(fn ($event) => $event->is_materialized_copy && $event->source_schedule_event_id)
             ->mapWithKeys(fn ($event) => [$event->user_id.'|'.$event->source_schedule_event_id => true]);
 
@@ -139,7 +132,7 @@ class WorkloadTrialAnalysis
             if (! $range || $range[1] <= $range[0]) continue;
             $intervals[$entry->user_id][$date][] = $this->item(
                 $key, $range, $entry->work_category, $activity,
-                $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent)
+                $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent, $scoreVersion)
             );
             $recordKeys[$entry->user_id][$key] = true;
             $assignment = $entry->sourceEvent?->projectJobAssignment;
@@ -162,13 +155,15 @@ class WorkloadTrialAnalysis
         }
 
         foreach ($events as $event) {
+            if (! $this->eventCounts($event, $v3)) continue;
             $from = $this->resolveJstCarbon($event, 'starts_at');
             $to = $this->resolveJstCarbon($event, 'ends_at');
             if (! $from || ! $to || $to->lte($from) || $to->gt($now)) continue;
             $assignment = $event->projectJobAssignment;
             $isJob = $assignment && $assignment->user_id;
-            $isMeeting = ! $isJob && $this->isFixedAppointment($event);
-            if (! $isJob && ! $isMeeting) continue;
+            $isMeeting = ! $isJob && $this->isFixedAppointment($event, $scoreVersion);
+            $isScheduledWork = $v3 && $this->isScheduledWork($event);
+            if (! $isJob && ! $isMeeting && ! $isScheduledWork) continue;
             $people = [(int) $event->user_id];
             if ($event->is_company_event && $isMeeting) {
                 foreach ($attendees->get($event->id, collect()) as $attendee) $people[] = (int) $attendee->user_id;
@@ -176,18 +171,18 @@ class WorkloadTrialAnalysis
             foreach (array_unique($people) as $personId) {
                 $user = $userById->get($personId);
                 if (! $user || ($isJob && (int) $assignment->user_id !== $personId)) continue;
+                if (! $this->attendeeCounts($attendees->get($event->id, collect()), $personId, (int) $event->user_id, $v3)) continue;
                 if ($personId !== (int) $event->user_id && $copies->has($personId.'|'.$event->id)) continue;
                 $result = $entryByEvent->get($personId.'|'.$event->id);
                 if ($result) continue; // The result entry already represents this interval.
-                $detail = $this->schedule->eventForViewer(
+                if (! $v3 && $this->schedule->eventForViewer(
                     $event, $viewer, $from->toDateString(), $personId, null,
                     $personId === (int) $viewer->id && $attendees->get($event->id, collect())->contains('user_id', $viewer->id)
-                );
-                if ($detail['private']) continue;
+                )['private']) continue;
                 $category = $isJob ? $this->jobCategory($user, $assignment->job_type) : $this->roleCategory($user);
-                $activity = $isJob ? 'my_job'
+                $activity = $isJob ? 'my_job' : ($isScheduledWork ? 'unspecified'
                     : (in_array($event->eventItemType?->slug, ['customer_visit', 'client_visit', 'outing'], true)
-                        ? 'outing' : 'meeting');
+                        ? 'outing' : 'meeting'));
                 $firstDay = $from->copy()->startOfDay();
                 if ($firstDay->lt($start)) $firstDay = $start->copy()->startOfDay();
                 $lastDay = $to->copy()->startOfDay();
@@ -196,14 +191,15 @@ class WorkloadTrialAnalysis
                     $date = $day->toDateString();
                     $range = $this->dateInterval($from, $to, $date);
                     if (! $range) continue;
-                    $key = ($isJob ? 'job-' : 'meeting-').$event->id.'-'.$personId;
+                    $key = ($isJob ? 'job-' : ($isScheduledWork ? 'scheduled-work-' : 'meeting-')).$event->id.'-'.$personId;
                     $intervals[$personId][$date][] = $this->item($key, $range, $category, $activity, $isMeeting);
                     $recordKeys[$personId][$key] = true;
                     $source = $isJob
                         ? ((int) $assignment->sender_id === $personId ? 'my_job' : 'assigned_job')
-                        : 'meeting';
+                        : ($isScheduledWork ? 'scheduled_work' : 'meeting');
                     $sourceRecords[$personId][$source][$key] = true;
-                    $reference = $isJob ? $this->jobUnitReference($assignment) : 'meeting-'.$event->id;
+                    $reference = $isJob ? $this->jobUnitReference($assignment)
+                        : ($isScheduledWork ? 'scheduled-work-'.$event->id : 'meeting-'.$event->id);
                     $workUnits[$personId][$date.'|'.$category.'|'.$activity.'|'.$reference] = true;
                 }
             }
@@ -442,14 +438,51 @@ class WorkloadTrialAnalysis
         return ['work_points' => round($base - $meeting, 1), 'meeting_points' => $meeting];
     }
 
-    private function isFixedAppointment(Event $event): bool
+    private function isFixedAppointment(Event $event, string $scoreVersion = 'trial_time_v2'): bool
     {
+        if ($scoreVersion === 'trial_time_v3') {
+            return ! $event->project_job_assignment_id && ($event->meeting_definition_id
+                || in_array($event->eventItemType?->slug, [
+                    'meeting_internal', 'meeting_client', 'conference',
+                    'customer_visit', 'client_visit', 'outing',
+                ], true));
+        }
         return ! $event->project_job_assignment_id && ($event->is_company_event
             || $event->meeting_definition_id
             || in_array($event->eventItemType?->slug, [
                 'meeting_internal', 'meeting_client', 'conference',
                 'customer_visit', 'client_visit', 'outing',
             ], true));
+    }
+
+    private function isScheduledWork(Event $event): bool
+    {
+        return ! $event->project_job_assignment_id && $event->eventItemType?->slug === 'work_schedule';
+    }
+
+    private function eventCounts(Event $event, bool $v3): bool
+    {
+        return ! $v3 || ! $event->cancelled_at;
+    }
+
+    private function entryCounts(PersonalWorkEntry $entry, User $viewer, bool $v3): bool
+    {
+        if (! PersonalWorkActivities::allows($entry->work_category, $entry->activity_type)) return false;
+        // An explicit work entry remains scoreable when its title and notes are hidden from the viewer.
+        if ($v3) return ! $entry->source_event_id
+            || ($entry->sourceEvent && ! $entry->sourceEvent->cancelled_at);
+        if ($entry->source_event_id) {
+            return $entry->sourceEvent && ! $this->schedule->eventForViewer(
+                $entry->sourceEvent, $viewer, $entry->work_date->toDateString(), (int) $entry->user_id, $entry
+            )['private'];
+        }
+        return ! $this->schedule->entryForViewer($entry, $viewer)['private'];
+    }
+
+    private function attendeeCounts(Collection $attendees, int $personId, int $ownerId, bool $v3): bool
+    {
+        return ! $v3 || $personId === $ownerId
+            || $attendees->contains(fn ($row) => (int) $row->user_id === $personId && $row->status === 'accepted');
     }
 
     private function jobUnitReference($assignment): string

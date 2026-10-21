@@ -4,10 +4,13 @@ namespace Tests\Unit;
 
 use App\Models\Event;
 use App\Models\EventItemType;
+use App\Models\PersonalWorkEntry;
+use App\Models\User;
 use App\Services\PersonalWorkSchedule;
 use App\Services\WorkloadTrialAnalysis;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use Illuminate\Support\Collection;
 
 class WorkloadTrialOverlapTest extends TestCase
 {
@@ -48,6 +51,67 @@ class WorkloadTrialOverlapTest extends TestCase
 
         self::assertTrue($method->invoke($service, $outing));
         self::assertFalse($method->invoke($service, $job));
+    }
+
+    public function test_v3_does_not_treat_a_shared_other_event_as_a_meeting(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $method = new ReflectionMethod($service, 'isFixedAppointment');
+        $other = new Event(['is_company_event' => true]);
+        $other->setRelation('eventItemType', new EventItemType(['slug' => 'other']));
+        $meeting = new Event(['is_company_event' => false]);
+        $meeting->setRelation('eventItemType', new EventItemType(['slug' => 'meeting_internal']));
+
+        self::assertTrue($method->invoke($service, $other, 'trial_time_v2'));
+        self::assertFalse($method->invoke($service, $other, 'trial_time_v3'));
+        self::assertTrue($method->invoke($service, $meeting, 'trial_time_v3'));
+    }
+
+    public function test_v3_counts_a_work_schedule_as_work_and_only_accepted_guests(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $work = new Event(['is_company_event' => false]);
+        $work->setRelation('eventItemType', new EventItemType(['slug' => 'work_schedule']));
+        self::assertTrue((new ReflectionMethod($service, 'isScheduledWork'))->invoke($service, $work));
+        self::assertFalse((new ReflectionMethod($service, 'isFixedAppointment'))->invoke($service, $work, 'trial_time_v3'));
+
+        $attendees = new Collection([
+            (object) ['user_id' => 2, 'status' => 'pending'],
+            (object) ['user_id' => 3, 'status' => 'accepted'],
+        ]);
+        $counts = new ReflectionMethod($service, 'attendeeCounts');
+        self::assertTrue($counts->invoke($service, $attendees, 1, 1, true));
+        self::assertFalse($counts->invoke($service, $attendees, 2, 1, true));
+        self::assertTrue($counts->invoke($service, $attendees, 3, 1, true));
+        self::assertTrue($counts->invoke($service, $attendees, 2, 1, false));
+    }
+
+    public function test_v3_scores_a_private_work_entry_without_revealing_its_detail(): void
+    {
+        $schedule = $this->createMock(PersonalWorkSchedule::class);
+        $schedule->method('entryForViewer')->willReturn(['private' => true]);
+        $service = new WorkloadTrialAnalysis($schedule);
+        $entry = new PersonalWorkEntry(['work_category' => 'dtp', 'entry_visibility' => 'private']);
+        $viewer = new User();
+        $counts = new ReflectionMethod($service, 'entryCounts');
+
+        self::assertFalse($counts->invoke($service, $entry, $viewer, false));
+        self::assertTrue($counts->invoke($service, $entry, $viewer, true));
+    }
+
+    public function test_v3_excludes_a_cancelled_event_and_its_linked_work_entry(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $event = new Event();
+        $event->setDateFormat('Y-m-d H:i:s');
+        $event->cancelled_at = '2026-10-21 12:00:00';
+        $eventCounts = new ReflectionMethod($service, 'eventCounts');
+        self::assertTrue($eventCounts->invoke($service, $event, false));
+        self::assertFalse($eventCounts->invoke($service, $event, true));
+
+        $entry = new PersonalWorkEntry(['work_category' => 'dtp', 'source_event_id' => 5]);
+        $entry->setRelation('sourceEvent', $event);
+        self::assertFalse((new ReflectionMethod($service, 'entryCounts'))->invoke($service, $entry, new User(), true));
     }
 
     public function test_sales_visit_is_shown_with_meetings_without_changing_total(): void

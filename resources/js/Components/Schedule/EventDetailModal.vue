@@ -75,6 +75,7 @@ async function materialize() {
             <div class="absolute inset-0 bg-black/40" @click="$emit('close')" />
             <div class="relative z-10 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
                 <h2 class="mb-1 text-lg font-semibold text-gray-800">{{ event.title }}</h2>
+                <p v-if="event.cancelled_at" class="mb-2 text-sm font-semibold text-amber-800">中止済み・新しい試算の点数対象外</p>
 
                 <div class="mb-4 space-y-1 text-sm text-gray-500">
                     <p>{{ formatDatetime(event.starts_at) }} 〜 {{ formatDatetime(event.ends_at) }}</p>

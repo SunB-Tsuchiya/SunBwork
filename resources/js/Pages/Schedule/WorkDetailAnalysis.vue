@@ -9,6 +9,8 @@ const props = defineProps({ initialDate: { type: String, default: '' } });
 const month = ref((props.initialDate || new Date().toLocaleDateString('sv-SE')).slice(0, 7));
 const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
 const period = ref(queryPeriod === 'quarter' ? 'quarter' : 'month');
+const queryScoreVersion = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('score_version');
+const scoreVersion = ref(queryScoreVersion === 'trial_time_v3' ? 'trial_time_v3' : 'trial_time_v2');
 const role = ref('all');
 const category = ref('all');
 const source = ref('all');
@@ -33,7 +35,7 @@ const roleColors = {
 };
 const sourceLabels = [
     ['quick', '簡易実績'], ['my_job', 'マイジョブ'],
-    ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出'],
+    ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出'], ['scheduled_work', '作業予定'],
 ];
 const categoryLabel = (code) => workCategories.find(([key]) => key === code)?.[1] || 'その他';
 const number = (value) => Number(value || 0).toLocaleString('ja-JP');
@@ -62,7 +64,7 @@ const totals = computed(() => filtered.value.reduce((sum, person) => {
     for (const [key] of sourceLabels) sum.sources[key] += Number(person.source_counts?.[key] || 0);
     return sum;
 }, { units: 0, records: 0, minutes: 0, recorded: 0,
-    sources: { quick: 0, my_job: 0, assigned_job: 0, meeting: 0 } }));
+    sources: { quick: 0, my_job: 0, assigned_job: 0, meeting: 0, scheduled_work: 0 } }));
 
 async function load() {
     const current = ++sequence;
@@ -77,7 +79,7 @@ async function load() {
     }
     try {
         const { data } = await axios.get(route('schedule.department_work.analysis'), {
-            params: { date: `${month.value}-01`, period: period.value },
+            params: { date: `${month.value}-01`, period: period.value, score_version: scoreVersion.value },
         });
         if (current !== sequence) return;
         people.value = data.people || [];
@@ -90,8 +92,8 @@ async function load() {
     }
 }
 
-watch([month, period], () => {
-    const url = route('schedule.department_work.details', { date: `${month.value}-01`, period: period.value });
+watch([month, period, scoreVersion], () => {
+    const url = route('schedule.department_work.details', { date: `${month.value}-01`, period: period.value, score_version: scoreVersion.value });
     window.history.replaceState(window.history.state, '', url);
     load();
 });
@@ -100,7 +102,7 @@ onMounted(load);
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業量分析" active="details" :date="`${month}-01`" period="month">
+    <WorkloadAnalysisShell title="作業量分析" active="details" :date="`${month}-01`" period="month" :score-version="scoreVersion">
 
         <section class="rounded-lg bg-white p-4 shadow">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -126,6 +128,11 @@ onMounted(load);
                         <option v-for="[code, label] in sourceLabels" :key="code" :value="code">{{ label }}</option>
                     </select>
                 </div>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-medium text-gray-700">採点方式</span>
+                <button v-for="[value, label] in [['trial_time_v2', '従来の試用点'], ['trial_time_v3', '新しい試算']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? 'border-blue-600 bg-blue-50 text-blue-800' : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
+                <span class="text-gray-600">新しい試算は比較用で、過去の記録を変更しません。</span>
             </div>
             <p v-if="period === 'quarter'" class="mt-2 text-xs text-gray-600">3か月は選んだ月を含む直近3か月です。</p>
             <p v-if="!loading && !error" class="mt-2 text-xs text-gray-500">集計期間：{{ range }}</p>

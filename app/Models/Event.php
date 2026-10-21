@@ -45,6 +45,7 @@ class Event extends Model
         'ends_at'              => 'datetime',
         'is_company_event'     => 'boolean',
         'is_materialized_copy' => 'boolean',
+        'cancelled_at' => 'datetime',
     ];
 
     public function user()

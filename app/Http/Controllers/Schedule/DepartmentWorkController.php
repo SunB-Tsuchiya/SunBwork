@@ -55,6 +55,7 @@ class DepartmentWorkController extends Controller
         $params = $request->validate([
             'date' => ['nullable', 'date_format:Y-m-d'],
             'user_id' => ['nullable', 'integer', 'min:1'],
+            'score_version' => ['nullable', Rule::in(['trial_time_v2', 'trial_time_v3'])],
         ]);
         $date = $params['date'] ?? now()->toDateString();
 
@@ -336,7 +337,7 @@ class DepartmentWorkController extends Controller
             'period' => $params['period'],
             'start' => $start->toDateString(), 'end' => $end->toDateString(),
             'excluded_count' => $allUsers->count() - $users->count(),
-            'score_version' => 'trial_time_v2',
+            'score_version' => $params['score_version'] ?? 'trial_time_v2',
             'point_rule' => [
                 'points_per_hour' => PersonalWorkPoints::POINTS_PER_HOUR,
                 'default_coefficient' => PersonalWorkPoints::DEFAULT_COEFFICIENT,
@@ -347,7 +348,7 @@ class DepartmentWorkController extends Controller
                 'management_points_per_active_day' => WorkloadTrialAnalysis::MANAGEMENT_POINTS_PER_ACTIVE_DAY,
                 'deputy_factor' => WorkloadTrialAnalysis::DEPUTY_FACTOR,
             ],
-            'people' => $this->trial->analyze($viewer, $users, $start, $end, $individual),
+            'people' => $this->trial->analyze($viewer, $users, $start, $end, $individual, $params['score_version'] ?? 'trial_time_v2'),
         ]);
     }
 

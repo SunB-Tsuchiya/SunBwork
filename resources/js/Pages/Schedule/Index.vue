@@ -66,6 +66,7 @@ const workDate = ref(props.initialDate);
                 :departments="departments"
                 :worktypes="worktypes"
                 :daily-worktypes="dailyWorktypes"
+                :trial-evaluation-enabled="workEnabled"
                 :default-worktype="defaultWorktype" />
         </div>
         </template>
