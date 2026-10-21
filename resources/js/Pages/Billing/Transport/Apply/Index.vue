@@ -175,17 +175,38 @@ function onDestinationChange(i, value) {
     if (s) rows.value[i] = applySuggestion(r, s);
 }
 
-// クイック入力: 「0901 国際」＋ Enter（先頭の日付は複数可: 「0901 0903 国際」）
+// クイック入力: 「0901 国際」と入れると、合う行先の候補が出るので、選ぶ（先頭の日付は複数可: 「0901 0903 国際」）
+const quickFocused = ref(false);
+const quickActive = ref(0);
+const quickParsed = computed(() => (quickText.value.trim() ? parseQuick(quickText.value, props.month, props.suggestions) : null));
+// 行先のキーワードが無いとき（日付だけ、または空）は、登録済みの行先を候補に出す
+const quickCandidates = computed(() => {
+    const q = quickParsed.value;
+    if (!q) return [];
+    return q.keyword ? q.candidates : registered.value.slice(0, 8);
+});
+const quickOpen = computed(() => quickFocused.value && quickText.value.trim() !== '');
+watch(quickText, () => { quickActive.value = 0; quickMessage.value = ''; });
+
+function pickQuick(s) {
+    const q = quickParsed.value;
+    const dates = q?.dates?.length ? q.dates : [null];
+    addRows(dates.map((d) => applySuggestion({ ...newRow(), occurrence_date: d }, s)));
+    quickMessage.value = `追加しました: ${s.destination}（${dates.filter(Boolean).map(shortDate).join('、') || '日付なし'}）`;
+    quickText.value = '';
+}
+function onQuickKey(e) {
+    if (!quickOpen.value || !quickCandidates.value.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); quickActive.value = (quickActive.value + 1) % quickCandidates.value.length; }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); quickActive.value = (quickActive.value - 1 + quickCandidates.value.length) % quickCandidates.value.length; }
+}
 function onQuickEnter() {
     quickMessage.value = '';
     if (!quickText.value.trim()) return;
-    const q = parseQuick(quickText.value, props.month, props.suggestions);
-    if (!q.keyword) { quickMessage.value = '日付のあとに、行先のキーワードを入れてください。例：　0901 国際'; return; }
-    if (!q.suggestion) { quickMessage.value = `「${q.keyword}」に合う行先が、登録・履歴にありません。`; return; }
-    const dates = q.dates.length ? q.dates : [null];
-    addRows(dates.map((d) => applySuggestion({ ...newRow(), occurrence_date: d }, q.suggestion)));
-    quickMessage.value = `追加しました: ${q.suggestion.destination}（${dates.filter(Boolean).map(shortDate).join('、') || '日付なし'}）`;
-    quickText.value = '';
+    const q = quickParsed.value;
+    if (!q.keyword) { quickMessage.value = '日付のあとに、行先の文字を入れてください。例：　0901 国際'; return; }
+    if (!q.candidates.length) { quickMessage.value = `「${q.keyword}」に合う行先が、登録・履歴にありません。`; return; }
+    pickQuick(q.candidates[quickActive.value] ?? q.candidates[0]);
 }
 
 function duplicateRow(i) {
@@ -552,14 +573,39 @@ async function changeMonth(e) {
                     <div class="flex flex-wrap items-center gap-3">
                         <button type="button" @click="addRow"
                             class="rounded border border-blue-400 bg-white px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100">＋ 行を追加</button>
-                        <div class="flex min-w-[16rem] flex-1 items-center gap-2">
+                        <div class="relative flex min-w-[16rem] flex-1 items-center gap-2">
                             <label class="shrink-0 text-sm font-medium text-gray-700">クイック入力</label>
-                            <input type="text" v-model="quickText" @keydown.enter.prevent="onQuickEnter"
-                                class="w-full max-w-xs rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none" />
+                            <div class="relative w-full max-w-xs">
+                                <input type="text" v-model="quickText" autocomplete="off" placeholder="例：0901 国際"
+                                    @focus="quickFocused = true" @blur="quickFocused = false"
+                                    @keydown="onQuickKey" @keydown.enter.prevent="onQuickEnter" @keydown.esc="quickFocused = false"
+                                    class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none" />
+                                <!-- 候補の窓: 選ぶと、その行先（区間・金額つき）が追加される -->
+                                <div v-if="quickOpen" class="absolute left-0 top-full z-30 mt-1 w-[26rem] max-w-[90vw] overflow-hidden rounded border border-gray-300 bg-white shadow-lg">
+                                    <p class="border-b bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
+                                        <template v-if="quickParsed?.keyword">候補をクリックして選びます（{{ quickParsed.dates.length ? quickParsed.dates.map(shortDate).join('、') + ' に追加' : '日付なしで追加' }}）</template>
+                                        <template v-else>行先の文字を入れると絞り込めます。登録した行先から選べます</template>
+                                    </p>
+                                    <ul v-if="quickCandidates.length" class="max-h-64 overflow-y-auto">
+                                        <li v-for="(s, i) in quickCandidates" :key="`${s.destination}|${s.station_from}|${s.station_to}|${s.purpose}`"
+                                            @mousedown.prevent="pickQuick(s)" @mouseenter="quickActive = i"
+                                            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm"
+                                            :class="i === quickActive ? 'bg-blue-50' : ''">
+                                            <span class="min-w-0">
+                                                <span class="font-medium text-gray-800">{{ s.destination }}</span>
+                                                <span v-if="s.station_from || s.station_to" class="ml-2 text-xs text-gray-500">{{ s.station_from }}－{{ s.station_to }}</span>
+                                                <span class="ml-2 rounded px-1 text-[10px]" :class="s.registered ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'">{{ s.registered ? '登録' : '履歴' }}</span>
+                                            </span>
+                                            <span class="shrink-0 text-xs text-gray-600">{{ (s.base_amount * (s.auto_double && s.purpose === 'round_trip' ? 2 : 1)).toLocaleString() }}円</span>
+                                        </li>
+                                    </ul>
+                                    <p v-else class="px-3 py-3 text-sm text-gray-500">「{{ quickParsed?.keyword }}」に合う行先が、登録・履歴にありません。</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <p class="mt-1 text-xs text-gray-500">
-                        クイック入力の例：　0901 国際　＋ Enter　→　9月1日に、「国際」で始まる登録済みの行先（区間・金額つき）を追加します。日付は複数できます（0901 0903 国際）。
+                        クイック入力の例：　「0901 国際」と入れると、「国際」に合う行先の候補が出るので、クリックして選びます。選ぶと、9月1日の明細として、区間・金額つきで追加されます。日付は複数できます（0901 0903 国際）。
                     </p>
                     <p v-if="quickMessage" class="mt-1 text-sm" :class="quickMessage.startsWith('追加しました') ? 'text-green-700' : 'text-red-600'">{{ quickMessage }}</p>
 

@@ -57,7 +57,7 @@ const featureHref = (type) => (FEATURE_ROUTES[type.feature_key] ? route(FEATURE_
                 </Link>
 
                 <!-- 申請の種類（年末調整など。サンエー印刷の総務のみ） -->
-                <template v-if="showTypes" v-for="type in types" :key="type.id">
+                <template v-for="type in (showTypes ? types : [])" :key="type.id">
                     <Link v-if="featureHref(type)" :href="featureHref(type)" class="block rounded-lg border border-purple-200 bg-purple-50 p-4 transition hover:bg-purple-100">
                         <h4 class="font-semibold text-purple-900">{{ type.name }}</h4>
                         <p v-if="type.description" class="mt-2 whitespace-pre-wrap break-words text-sm text-gray-600">{{ type.description }}</p>
