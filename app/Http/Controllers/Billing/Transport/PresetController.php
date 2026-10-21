@@ -76,8 +76,8 @@ class PresetController extends Controller
             'base_amount.integer'  => '金額は数字で入力してください。',
         ]);
 
-        // ×2 は用件が往復のときだけ有効
-        $data['auto_double'] = $data['auto_double'] && $data['purpose'] === 'round_trip';
+        // ×2（往復）は、用件が「打合せ（往復）」か「その他」のときだけ有効
+        $data['auto_double'] = $data['auto_double'] && in_array($data['purpose'], TransportExpenseItem::DOUBLE_PURPOSES, true);
         $data['purpose_text'] = $data['purpose'] === 'other' ? ($data['purpose_text'] ?? null) : null;
         $data['station_from'] = $data['station_from'] ?? '';
         $data['station_to'] = $data['station_to'] ?? '';

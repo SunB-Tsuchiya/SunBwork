@@ -228,7 +228,7 @@ class ExpenseController extends Controller
 
             // 往復の「片道×2」は、サーバーでも検算して合計（amount）をそろえる。×2 は用件が往復のときだけ有効
             $items = collect($data['items'])->values()->map(function ($it) {
-                $doubled = !empty($it['auto_double']) && $it['purpose'] === 'round_trip';
+                $doubled = !empty($it['auto_double']) && in_array($it['purpose'], TransportExpenseItem::DOUBLE_PURPOSES, true);
                 if ($doubled) {
                     $base = $it['base_amount'] ?? intdiv((int) $it['amount'], 2);
                     return array_merge($it, ['auto_double' => true, 'base_amount' => $base, 'amount' => $base * 2]);

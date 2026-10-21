@@ -596,7 +596,7 @@ async function changeMonth(e) {
                                                 <span v-if="s.station_from || s.station_to" class="ml-2 text-xs text-gray-500">{{ s.station_from }}－{{ s.station_to }}</span>
                                                 <span class="ml-2 rounded px-1 text-[10px]" :class="s.registered ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'">{{ s.registered ? '登録' : '履歴' }}</span>
                                             </span>
-                                            <span class="shrink-0 text-xs text-gray-600">{{ (s.base_amount * (s.auto_double && s.purpose === 'round_trip' ? 2 : 1)).toLocaleString() }}円</span>
+                                            <span class="shrink-0 text-xs text-gray-600">{{ (s.base_amount * (s.auto_double && (s.purpose === 'round_trip' || s.purpose === 'other') ? 2 : 1)).toLocaleString() }}円</span>
                                         </li>
                                     </ul>
                                     <p v-else class="px-3 py-3 text-sm text-gray-500">「{{ quickParsed?.keyword }}」に合う行先が、登録・履歴にありません。</p>

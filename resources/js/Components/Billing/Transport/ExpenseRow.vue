@@ -43,7 +43,8 @@ function onTextBlur(field, e) {
 }
 
 // ─ 金額（円・整数・入力中にカンマ。往復は片道×2 にできる） ─
-const isRoundTrip = computed(() => props.modelValue.purpose === 'round_trip');
+// 「片道の金額を×2（往復）」は、「打合せ（往復）」と「その他」で使える
+const canDouble = computed(() => ['round_trip', 'other'].includes(props.modelValue.purpose));
 const baseText = ref(formatYen(props.modelValue.base_amount ?? props.modelValue.amount));
 watch(() => props.modelValue.base_amount, (v) => {
     if (parseYen(baseText.value) !== v) baseText.value = formatYen(v);
@@ -54,7 +55,7 @@ function applyAmount(base, doubled) {
         ...props.modelValue,
         base_amount: base,
         auto_double: doubled,
-        amount: base * (isRoundTrip.value && doubled ? 2 : 1),
+        amount: base * (canDouble.value && doubled ? 2 : 1),
     });
 }
 function onAmountInput(e) {
@@ -70,11 +71,11 @@ function onAmountBlur(e) {
     e.target.value = baseText.value;
     applyAmount(n, props.modelValue.auto_double);
 }
-// 用件を変えたとき: 往復なら「×2」を自動でチェック、往復以外なら外して金額を片道に戻す
+// 用件を変えたとき: 往復なら「×2」を自動でチェック、「その他」は今の状態のまま、それ以外は外して金額を片道に戻す
 function onPurposeChange(e) {
     const purpose = e.target.value;
     const base = props.modelValue.base_amount ?? props.modelValue.amount;
-    const doubled = purpose === 'round_trip';
+    const doubled = purpose === 'round_trip' || (purpose === 'other' && !!props.modelValue.auto_double);
     emit('update:modelValue', {
         ...props.modelValue,
         purpose,
@@ -86,7 +87,7 @@ function onPurposeChange(e) {
 function onDoubleChange(e) {
     applyAmount(props.modelValue.base_amount ?? props.modelValue.amount, e.target.checked);
 }
-watch(isRoundTrip, (val) => {
+watch(canDouble, (val) => {
     if (!val && props.modelValue.auto_double) {
         applyAmount(props.modelValue.base_amount ?? props.modelValue.amount, false);
     }
@@ -153,12 +154,13 @@ const inputCls = 'w-full rounded border border-gray-300 px-2 py-1 text-sm focus:
         <td class="px-2 py-1">
             <div class="space-y-1">
                 <div class="flex items-center gap-1">
-                    <input type="text" inputmode="numeric" :value="baseText" :disabled="readonly"
+                    <input type="text" inputmode="numeric" :value="readonly ? formatYen(modelValue.amount) : baseText" :disabled="readonly"
                         @input="onAmountInput" @blur="onAmountBlur" @keydown.enter.prevent="$emit('next')"
                         class="w-24 rounded border border-gray-300 px-2 py-1 text-right text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-50" />
                     <span class="text-sm text-gray-500">円</span>
                 </div>
-                <label v-if="isRoundTrip && !readonly" class="flex cursor-pointer select-none items-center gap-1">
+                <p v-if="readonly && modelValue.auto_double" class="text-xs text-gray-500">（片道 {{ formatYen(modelValue.base_amount) }}円 ×2）</p>
+                <label v-if="canDouble && !readonly" class="flex cursor-pointer select-none items-center gap-1">
                     <input type="checkbox" :checked="modelValue.auto_double" @change="onDoubleChange"
                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                     <span class="text-xs text-gray-600">片道の金額を×2（往復）</span>

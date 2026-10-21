@@ -199,7 +199,7 @@ export function parseQuick(text, month, suggestions) {
 
 /** 候補を、明細の行に当てはめる（日付は変えない） */
 export function applySuggestion(row, s) {
-    const doubled = !!s.auto_double && s.purpose === 'round_trip';
+    const doubled = !!s.auto_double && (s.purpose === 'round_trip' || s.purpose === 'other');
     return {
         ...row,
         destination: s.destination, purpose: s.purpose, purpose_text: s.purpose_text ?? '',

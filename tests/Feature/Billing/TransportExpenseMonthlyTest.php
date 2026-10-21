@@ -100,6 +100,25 @@ class TransportExpenseMonthlyTest extends TestCase
         $this->assertSame('2行目の金額は数字で入力してください。', session('errors')->first('items.1.amount'));
     }
 
+    public function test_用件がその他でも_往復の2倍が使え_出力の用件にICは付かない(): void
+    {
+        $u = $this->actor();
+        $this->actingAs($u)->post(route('user.billing.transport.store'), $this->payload([
+            $this->item(['occurrence_date' => '2026-08-01', 'purpose' => 'other', 'purpose_text' => '研修', 'fare_type' => 'ic', 'base_amount' => 200, 'auto_double' => true, 'amount' => 200]),
+            $this->item(['occurrence_date' => '2026-08-02', 'purpose' => 'other', 'purpose_text' => '研修', 'fare_type' => 'ic', 'base_amount' => 200, 'auto_double' => false, 'amount' => 200]),
+        ]))->assertSessionHasNoErrors();
+
+        $e = TransportExpense::first();
+        $this->assertSame([400, 200], $e->items->pluck('amount')->all());
+        $this->assertSame([true, false], $e->items->pluck('auto_double')->all());
+
+        // 用件には、IC／切符の区別を付けない
+        $this->assertSame('研修', \App\Services\Billing\Transport\TransportExpenseExporter::purposeLabel($e->items->first()));
+        $round = $this->item(['occurrence_date' => '2026-07-05', 'purpose' => 'round_trip', 'fare_type' => 'ic']);
+        $this->actingAs($u)->post(route('user.billing.transport.store'), $this->payload([$round], '2026-07'))->assertSessionHasNoErrors();
+        $this->assertSame('打合せ（往復）', \App\Services\Billing\Transport\TransportExpenseExporter::purposeLabel(TransportExpense::where('billing_month', '2026-07')->first()->items->first()));
+    }
+
     public function test_往復の片道金額と_2倍_は保存して同じ状態で復元できる(): void
     {
         $u = $this->actor();

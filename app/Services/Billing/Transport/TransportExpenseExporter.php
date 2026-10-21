@@ -105,10 +105,10 @@ class TransportExpenseExporter
         return 'from SunBWork　申請No.' . $expense->id;
     }
 
-    /** 用件ラベル（IC のとき「(IC)」を添える。Excel・PDF で統一） */
+    /** 用件ラベル（Excel・PDF で統一。IC／切符の区別は用件に付けない） */
     public static function purposeLabel($item): string
     {
-        return $item->purpose_label . ($item->fare_type === 'ic' ? '(IC)' : '');
+        return $item->purpose_label;
     }
 
     public static function title(TransportExpense $expense): string

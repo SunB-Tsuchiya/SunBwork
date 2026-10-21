@@ -41,6 +41,9 @@ class TransportExpenseItem extends Model
         'other'       => 'その他',
     ];
 
+    /** 「片道の金額を×2（往復）」が使える用件（その他の用件でも、往復のことがあるため） */
+    public const DOUBLE_PURPOSES = ['round_trip', 'other'];
+
     public function expense(): BelongsTo
     {
         return $this->belongsTo(TransportExpense::class, 'transport_expense_id');

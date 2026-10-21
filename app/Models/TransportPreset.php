@@ -29,6 +29,6 @@ class TransportPreset extends Model
     /** 合計金額（×2 のときは片道×2） */
     public function getAmountAttribute(): int
     {
-        return $this->base_amount * ($this->auto_double && $this->purpose === 'round_trip' ? 2 : 1);
+        return $this->base_amount * ($this->auto_double && in_array($this->purpose, TransportExpenseItem::DOUBLE_PURPOSES, true) ? 2 : 1);
     }
 }

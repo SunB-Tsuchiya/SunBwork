@@ -29,7 +29,7 @@ function addNew() {
     router.post(route(props.routeBase + 'presets.store'), {
         destination: d.destination, purpose: d.purpose, purpose_text: d.purpose_text,
         station_from: d.station_from, station_to: d.station_to, fare_type: d.fare_type,
-        base_amount: parseYen(d.amountText) ?? 0, auto_double: d.auto_double && d.purpose === 'round_trip',
+        base_amount: parseYen(d.amountText) ?? 0, auto_double: d.auto_double && ['round_trip', 'other'].includes(d.purpose),
     }, {
         preserveScroll: true, preserveState: true,
         onSuccess: () => { draft.value = blank(); },
@@ -49,7 +49,7 @@ function save(p) {
     router.put(route(props.routeBase + 'presets.update', { preset: p.id }), {
         destination: p.destination, purpose: p.purpose, purpose_text: p.purpose_text,
         station_from: p.station_from, station_to: p.station_to, fare_type: p.fare_type,
-        base_amount: parseYen(p.amountText) ?? 0, auto_double: p.auto_double && p.purpose === 'round_trip',
+        base_amount: parseYen(p.amountText) ?? 0, auto_double: p.auto_double && ['round_trip', 'other'].includes(p.purpose),
     }, {
         preserveScroll: true, preserveState: true,
         onError: (e) => { errors.value = e; },
@@ -106,7 +106,7 @@ const cell = 'w-full rounded border border-gray-300 px-2 py-1 text-xs focus:bord
                                     <span class="text-xs text-gray-500">円</span>
                                 </span>
                             </label>
-                            <label v-if="draft.purpose === 'round_trip'" class="col-span-2 flex items-end gap-1 pb-1 text-xs text-gray-600">
+                            <label v-if="['round_trip', 'other'].includes(draft.purpose)" class="col-span-2 flex items-end gap-1 pb-1 text-xs text-gray-600">
                                 <input type="checkbox" v-model="draft.auto_double" /> 片道の金額を×2（往復）
                             </label>
                             <div class="col-span-2 flex items-end justify-end md:col-span-1">
@@ -153,7 +153,7 @@ const cell = 'w-full rounded border border-gray-300 px-2 py-1 text-xs focus:bord
                                         <input type="text" inputmode="numeric" v-model="p.amountText" @blur="onAmount(p)" :class="cell + ' w-24 text-right'" />
                                         <span class="text-xs text-gray-500">円</span>
                                     </div>
-                                    <label v-if="p.purpose === 'round_trip'" class="mt-1 flex items-center gap-1 text-xs text-gray-600">
+                                    <label v-if="['round_trip', 'other'].includes(p.purpose)" class="mt-1 flex items-center gap-1 text-xs text-gray-600">
                                         <input type="checkbox" v-model="p.auto_double" /> 片道の金額を×2（往復）
                                     </label>
                                 </td>

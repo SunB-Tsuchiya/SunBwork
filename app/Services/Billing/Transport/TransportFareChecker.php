@@ -133,7 +133,7 @@ class TransportFareChecker
                     if ($one === null) {
                         $fare['state'] = $m->status === TransportFare::STATUS_VERIFIED ? 'none' : 'unverified';   // 検査済みでも、この種別（IC/切符）の運賃が無い
                     } else {
-                        $expected = $one * self::legs($it->purpose);
+                        $expected = $one * (self::legs($it->purpose) === 2 || ($it->purpose === 'other' && $it->auto_double) ? 2 : 1);
                         $fare['registered'] = $one;
                         $fare['expected'] = $expected;
                         $fare['diff'] = $it->amount - $expected;
