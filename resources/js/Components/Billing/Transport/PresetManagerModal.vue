@@ -17,6 +17,27 @@ watch(() => props.presets, (v) => {
 
 const errors = ref({});
 
+// 新しく登録する（申請の入力とは関係なく、ここで直接登録できる）
+const blank = () => ({ destination: '', purpose: 'round_trip', purpose_text: '', station_from: '', station_to: '', fare_type: 'ic', amountText: '', auto_double: true });
+const draft = ref(blank());
+const adding = ref(false);
+function addNew() {
+    errors.value = {};
+    const d = draft.value;
+    if (!d.destination.trim()) { errors.value = { destination: '行先を入力してください。' }; return; }
+    adding.value = true;
+    router.post(route(props.routeBase + 'presets.store'), {
+        destination: d.destination, purpose: d.purpose, purpose_text: d.purpose_text,
+        station_from: d.station_from, station_to: d.station_to, fare_type: d.fare_type,
+        base_amount: parseYen(d.amountText) ?? 0, auto_double: d.auto_double && d.purpose === 'round_trip',
+    }, {
+        preserveScroll: true, preserveState: true,
+        onSuccess: () => { draft.value = blank(); },
+        onError: (e) => { errors.value = e; },
+        onFinish: () => { adding.value = false; },
+    });
+}
+
 function norm(p, field) { p[field] = normalizeText(p[field]); }
 function onAmount(p) {
     const n = parseYen(p.amountText);
@@ -52,8 +73,47 @@ const cell = 'w-full rounded border border-gray-300 px-2 py-1 text-xs focus:bord
                 </div>
                 <div class="overflow-y-auto px-5 py-4">
                     <p class="mb-3 text-xs text-gray-500">
-                        登録は、入力した行の「登録」ボタンでできます。ここでは、登録の修正と削除ができます。行先を入力すると、候補として出ます（過去の入力履歴も、自動で候補に出ます）。
+                        下の「新しく登録する」に入力して、行先を登録できます（申請の入力行の「登録」ボタンでも登録できます）。登録の修正と削除もここでできます。行先を入力すると、候補として出ます（過去の入力履歴も、自動で候補に出ます）。
                     </p>
+
+                    <div class="mb-4 rounded border border-blue-200 bg-blue-50 p-3">
+                        <p class="mb-2 text-sm font-semibold text-blue-900">新しく登録する</p>
+                        <div class="grid grid-cols-2 gap-2 md:grid-cols-6">
+                            <label class="col-span-2 text-xs text-gray-600">行先
+                                <input type="text" v-model="draft.destination" @blur="draft.destination = normalizeText(draft.destination)" :class="cell + ' mt-0.5'" placeholder="例：国際交流基金" />
+                            </label>
+                            <label class="text-xs text-gray-600">用件
+                                <select v-model="draft.purpose" :class="cell + ' mt-0.5'">
+                                    <option v-for="(label, key) in purposes" :key="key" :value="key">{{ label }}</option>
+                                </select>
+                            </label>
+                            <label class="col-span-2 text-xs text-gray-600">区間（定期区間外の駅から）
+                                <span class="mt-0.5 flex items-center gap-1">
+                                    <input type="text" v-model="draft.station_from" @blur="draft.station_from = normalizeText(draft.station_from)" :class="cell" placeholder="池袋" />
+                                    <span class="text-gray-400">－</span>
+                                    <input type="text" v-model="draft.station_to" @blur="draft.station_to = normalizeText(draft.station_to)" :class="cell" placeholder="新宿" />
+                                </span>
+                            </label>
+                            <label class="text-xs text-gray-600">IC/切符
+                                <select v-model="draft.fare_type" :class="cell + ' mt-0.5'"><option value="ic">IC</option><option value="ticket">切符</option></select>
+                            </label>
+                            <label v-if="draft.purpose === 'other'" class="col-span-2 text-xs text-gray-600 md:col-span-3">用件の内容
+                                <input type="text" v-model="draft.purpose_text" @blur="draft.purpose_text = normalizeText(draft.purpose_text)" :class="cell + ' mt-0.5'" />
+                            </label>
+                            <label class="text-xs text-gray-600">金額（片道または合計）
+                                <span class="mt-0.5 flex items-center gap-1">
+                                    <input type="text" inputmode="numeric" v-model="draft.amountText" @blur="(() => { const n = parseYen(draft.amountText); if (n !== null) draft.amountText = formatYen(n); })()" :class="cell + ' text-right'" />
+                                    <span class="text-xs text-gray-500">円</span>
+                                </span>
+                            </label>
+                            <label v-if="draft.purpose === 'round_trip'" class="col-span-2 flex items-end gap-1 pb-1 text-xs text-gray-600">
+                                <input type="checkbox" v-model="draft.auto_double" /> 片道の金額を×2（往復）
+                            </label>
+                            <div class="col-span-2 flex items-end justify-end md:col-span-1">
+                                <button type="button" :disabled="adding" @click="addNew" class="rounded bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">登録する</button>
+                            </div>
+                        </div>
+                    </div>
                     <div v-if="Object.keys(errors).length" class="mb-3 rounded bg-red-50 p-2 text-sm text-red-600">
                         <ul class="list-inside list-disc"><li v-for="(m, k) in errors" :key="k">{{ m }}</li></ul>
                     </div>

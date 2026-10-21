@@ -8,6 +8,7 @@ import ExpenseRow from '@/Components/Billing/Transport/ExpenseRow.vue';
 import PasteImportModal from '@/Components/Billing/Transport/PasteImportModal.vue';
 import MultiDateModal from '@/Components/Billing/Transport/MultiDateModal.vue';
 import PresetManagerModal from '@/Components/Billing/Transport/PresetManagerModal.vue';
+import FareHelpModal from '@/Components/Billing/Transport/FareHelpModal.vue';
 import { shortDate } from '@/Components/Billing/Transport/transportNormalize';
 import { parseQuick, applySuggestion } from '@/Components/Billing/Transport/transportInput';
 
@@ -130,6 +131,7 @@ watch(() => JSON.stringify([props.month, props.expense]), loadFromProps, { immed
 // ─── 入力補助（まとめて貼り付け・クイック入力・登録した行先・複数日・複製） ────────────
 const showPaste = ref(false);
 const showPresets = ref(false);
+const showFareHelp = ref(false);
 const multiTarget = ref(null);    // 複数日に追加する行の番号
 const quickText = ref('');
 const quickMessage = ref('');
@@ -493,6 +495,14 @@ async function changeMonth(e) {
                         :label="`${d.station_from}－${d.station_to}　${d.amount.toLocaleString()}円${d.registered ? '　★登録' : ''}`" />
                 </datalist>
 
+                <!-- 記載のしかたの注意（定期区間外の駅から） -->
+                <div class="mb-3 flex flex-wrap items-center gap-2 rounded border-2 border-amber-400 bg-amber-50 px-4 py-3">
+                    <span class="text-base font-bold text-amber-900">⚠ 定期区間外の駅から記載してください</span>
+                    <button type="button" @click="showFareHelp = true" title="記載のしかたを見る" aria-label="記載のしかたを見る"
+                        class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white hover:bg-amber-600">?</button>
+                    <span class="text-xs text-amber-800">（「?」で、例を見られます）</span>
+                </div>
+
                 <!-- 明細 -->
                 <div class="overflow-x-auto">
                     <table class="w-full border-collapse text-sm">
@@ -558,6 +568,8 @@ async function changeMonth(e) {
                             class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50">まとめて貼り付け</button>
                         <button type="button" @click="showPresets = true"
                             class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50">登録した行先（{{ registered.length }}件）</button>
+                        <button type="button" @click="showPresets = true"
+                            class="rounded border border-blue-400 bg-white px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50">＋ 行先の登録</button>
                         <button v-if="previousItems.length" type="button" @click="copyPrevious"
                             class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50">前月の内容をコピー</button>
                         <span class="text-xs text-gray-500">発生日は {{ periodLabel }} の範囲で入力します。用紙は1枚に{{ rowsPerPage }}行です。</span>
@@ -647,6 +659,7 @@ async function changeMonth(e) {
             :has-rows="rows.some((r) => !isBlankRow(r))" @close="showPaste = false" @apply="onPasteApply" />
         <MultiDateModal v-if="multiTarget !== null" :month="month" :description="multiDescription"
             @close="multiTarget = null" @apply="onMultiApply" />
+        <FareHelpModal v-if="showFareHelp" @close="showFareHelp = false" />
         <PresetManagerModal v-if="showPresets" :presets="registered" :purposes="purposes" :route-base="routeBase" @close="showPresets = false" />
     </AppLayout>
 </template>
