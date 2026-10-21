@@ -125,39 +125,34 @@ const pointRows = computed(() => {
     return rows.map((row) => ({ ...row, width: `${(visiblePoints(row) / max) * 100}%` }));
 });
 const pointLabel = (value) => Number(value || 0).toFixed(1);
-const selectedActivityKey = ref('');
-const activityKey = (activity) => `${activity.work_category}|${activity.activity_type || 'legacy'}`;
-const activityOptions = computed(() => {
-    const options = new Map();
-    for (const person of people.value) {
-        for (const activity of person.activities || []) {
-            const key = activityKey(activity);
-            if (!options.has(key)) options.set(key, {
-                key, category: activity.work_category,
-                label: `${categoryName(activity.work_category)}／${activity.activity_type ? activityLabel(activity.activity_type, activity.work_category) : '旧記録'}`,
-            });
-        }
-    }
-    return [...options.values()];
+const comparisonCategory = ref('all');
+const comparisonRole = ref('all');
+const comparisonCategories = computed(() => workCategories.filter(([code]) => people.value.some((person) =>
+    (person.activities || []).some((activity) => activity.work_category === code && Number(activity.minutes || 0) > 0))));
+const comparisonPeople = computed(() => people.value.filter((person) =>
+    comparisonRole.value === 'all' || (person.role?.code || 'other') === comparisonRole.value));
+const comparisonRows = computed(() => {
+    const rows = comparisonPeople.value.map((person) => {
+        const categories = Object.entries((person.activities || []).reduce((totals, activity) => {
+            totals[activity.work_category] = (totals[activity.work_category] || 0) + Number(activity.minutes || 0);
+            return totals;
+        }, {})).filter(([category]) => comparisonCategory.value === 'all' || category === comparisonCategory.value);
+        const minutes = categories.reduce((sum, [, value]) => sum + value, 0);
+        return { ...person, comparisonMinutes: minutes, comparisonCategories: categories };
+    }).filter((person) => person.comparisonMinutes > 0)
+        .sort((a, b) => b.comparisonMinutes - a.comparisonMinutes || a.name.localeCompare(b.name, 'ja'));
+    const max = Math.max(1, ...rows.map((row) => row.comparisonMinutes));
+    return rows.map((row) => ({ ...row, segments: row.comparisonCategories.map(([category, minutes]) => ({
+        category, minutes, width: `${(minutes / max) * 100}%`,
+    })) }));
 });
-const selectedActivity = computed(() => activityOptions.value.find((option) => option.key === selectedActivityKey.value) || activityOptions.value[0]);
-const rankingRows = computed(() => {
-    if (!selectedActivity.value) return [];
-    const rows = people.value.map((person) => {
-        const activity = (person.activities || []).find((row) => activityKey(row) === selectedActivity.value.key);
-        return { id: person.id, name: person.name, role: person.role, minutes: Number(activity?.minutes || 0),
-            records: Number(activity?.records || 0), quantities: activity?.quantities || {},
-            value: Number(activity?.minutes || 0) };
-    }).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'ja'));
-    const max = Math.max(1, ...rows.map((row) => row.value));
-    return rows.map((row) => ({ ...row, width: `${(row.value / max) * 100}%` }));
-});
+const comparisonMissingCount = computed(() => comparisonPeople.value.length - comparisonRows.value.length);
 const categorySegments = (person) => Object.entries((person.activities || []).reduce((totals, activity) => {
     totals[activity.work_category] = (totals[activity.work_category] || 0) + Number(activity.minutes || 0);
     return totals;
 }, {})).map(([category, minutes]) => ({ category, minutes, width: `${(minutes / maxPersonMinutes.value) * 100}%` }));
-watch(activityOptions, (options) => {
-    if (!options.some((option) => option.key === selectedActivityKey.value)) selectedActivityKey.value = options[0]?.key || '';
+watch(comparisonCategories, (options) => {
+    if (comparisonCategory.value !== 'all' && !options.some(([code]) => code === comparisonCategory.value)) comparisonCategory.value = 'all';
 });
 const rangeLabel = computed(() => range.value || date.value);
 const selectedWeekRange = computed(() => {
@@ -412,8 +407,9 @@ onBeforeUnmount(() => {
                     <h4 class="font-semibold">暫定ポイント順位 <span class="ml-1 text-xs font-normal text-amber-800">試用・係数は調整可能</span></h4>
                     <span class="text-sm text-gray-600">部署の記録合計 {{ pointLabel(totalPoints) }}点</span>
                 </div>
-                <p class="mt-1 text-xs text-gray-600">記録時間×10点/時×種類係数に、記録と重なる残業の追加点、案件登録1件{{ pointRule.creation_points }}点、直近14日にチーム作業が動いた管理案件の暫定点を加えます。通常作成・複製・一括取込は同点。過去の登録者は移行時のリーダーから推定しています。</p>
-                <div class="mt-2 flex flex-wrap gap-3 text-xs"><label><input v-model="includeOvertime" type="checkbox" class="mr-1 rounded" />残業追加点</label><label><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label><label><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label></div>
+                <p v-if="scoreVersion === 'trial_time_v3'" class="mt-1 text-xs text-gray-600">記録時間×10点/時×種類係数に、1日2時間までの認定残業の追加点を加えます。案件登録・案件管理の自動加点はありません。登録件数と管理案件数は参考情報です。</p>
+                <p v-else class="mt-1 text-xs text-gray-600">記録時間×10点/時×種類係数に、記録と重なる残業の追加点、案件登録1件{{ pointRule.creation_points }}点、直近14日にチーム作業が動いた管理案件の暫定点を加えます。通常作成・複製・一括取込は同点。過去の登録者は移行時のリーダーから推定しています。</p>
+                <div class="mt-2 flex flex-wrap gap-3 text-xs"><label><input v-model="includeOvertime" type="checkbox" class="mr-1 rounded" />残業追加点</label><label v-if="scoreVersion !== 'trial_time_v3'"><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label><label v-if="scoreVersion !== 'trial_time_v3'"><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label></div>
                 <p class="mt-1 text-xs text-gray-600">チェックした点だけで合計と順位を再計算します。保存済みの記録は変わりません。</p>
                 <details class="mt-2 text-xs text-gray-600">
                     <summary class="cursor-pointer text-amber-900">仮係数を見る</summary>
@@ -434,21 +430,30 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
             </div>
-            <div v-if="selectedActivity" class="min-w-0 rounded-lg border p-4">
+            <div class="min-w-0 rounded-lg border p-4">
                 <div class="flex flex-wrap items-center gap-2">
-                    <h4 class="mr-auto font-semibold">同じ作業種類の記録量を比較</h4>
-                    <select v-model="selectedActivityKey" aria-label="比較する作業種類" class="rounded border px-2 py-1 text-sm">
-                        <option v-for="option in activityOptions" :key="option.key" :value="option.key">{{ option.label }}</option>
+                    <h4 class="mr-auto font-semibold">作業区分別の記録時間</h4>
+                    <select v-model="comparisonRole" aria-label="比較する担当" class="rounded border px-2 py-1 text-sm">
+                        <option value="all">全担当</option>
+                        <option v-for="role in visibleRoles" :key="role.code" :value="role.code">{{ role.label }}</option>
+                    </select>
+                    <select v-model="comparisonCategory" aria-label="比較する作業区分" class="rounded border px-2 py-1 text-sm">
+                        <option value="all">全作業区分</option>
+                        <option v-for="[code, label] in comparisonCategories" :key="code" :value="code">{{ label }}</option>
                     </select>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">同じ作業種類の記録時間を比較します。未記録は0表示ですが、作業をしていないという意味ではありません。</p>
+                <p class="mt-1 text-xs text-gray-500">全作業区分では記録した作業内容を色分けし、担当を選ぶと同じ担当内で比較します。記録時間のない{{ comparisonMissingCount }}人は省略しています。未記録は無作業を意味しません。</p>
+                <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600" aria-label="作業区分の色">
+                    <span v-for="[code, label] in comparisonCategories" :key="code" class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" :style="{ backgroundColor: activityColors[code]?.border || activityColors.other.border }"></span>{{ label }}</span>
+                </div>
                 <div class="mt-3 space-y-2">
-                    <div v-for="(row, index) in rankingRows" :key="row.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_5.5rem] items-center gap-2 text-sm">
+                    <div v-for="(row, index) in comparisonRows" :key="row.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_5.5rem] items-center gap-2 text-sm">
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
                         <button type="button" class="truncate text-left font-medium text-blue-800 underline underline-offset-2" :title="`${row.name}の詳細を表示`" @click="openPerson(row)"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</button>
-                        <div class="h-5 overflow-hidden rounded bg-gray-100"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
-                        <span class="text-right tabular-nums">{{ duration(row.value) }}<small class="ml-1 text-gray-500">{{ row.records }}件</small></span>
+                        <div class="flex h-5 overflow-hidden rounded bg-gray-100"><div v-for="segment in row.segments" :key="segment.category" class="h-full" :style="{ width: segment.width, backgroundColor: activityColors[segment.category]?.border || activityColors.other.border }" :title="`${categoryName(segment.category)} ${duration(segment.minutes)}`"></div></div>
+                        <span class="text-right tabular-nums">{{ duration(row.comparisonMinutes) }}</span>
                     </div>
+                    <p v-if="!comparisonRows.length" class="py-3 text-center text-sm text-gray-500">この条件の記録時間はありません。</p>
                 </div>
             </div>
             </div>

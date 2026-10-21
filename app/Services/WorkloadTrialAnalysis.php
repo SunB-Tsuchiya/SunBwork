@@ -26,6 +26,7 @@ class WorkloadTrialAnalysis
     public const CREATION_POINTS = 5.0;
     public const OVERTIME_BONUS_FIRST_THREE_HOURS = 0.5;
     public const OVERTIME_BONUS_AFTER_THREE_HOURS = 0.2;
+    public const V3_OVERTIME_BONUS_MINUTES_PER_DAY = 120;
     public const MANAGEMENT_POINTS_PER_ACTIVE_DAY = 0.5;
     public const DEPUTY_FACTOR = 0.8;
 
@@ -208,8 +209,12 @@ class WorkloadTrialAnalysis
             }
         }
 
-        $workRecords = WorkRecord::whereIn('user_id', $userIds)
-            ->whereBetween('date', [$startDate, $endDate])->get()->groupBy('user_id');
+        $monthStart = Carbon::createFromFormat('!Y-m-d', $startDate, 'Asia/Tokyo')->startOfMonth()->toDateString();
+        $monthEnd = Carbon::createFromFormat('!Y-m-d', $endDate, 'Asia/Tokyo')->endOfMonth()->toDateString();
+        $monthlyWorkRecords = WorkRecord::whereIn('user_id', $userIds)
+            ->whereBetween('date', [$monthStart, $monthEnd])->get()->groupBy('user_id');
+        $workRecords = $monthlyWorkRecords->map(fn ($records) => $records->filter(fn ($record) =>
+            $record->date->toDateString() >= $startDate && $record->date->toDateString() <= $endDate));
         $createdProjects = ProjectJob::query()->where('company_id', $viewer->company_id)
             ->whereIn('created_by_user_id', $userIds)
             ->whereBetween('created_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
@@ -330,11 +335,7 @@ class WorkloadTrialAnalysis
                     }
                     $recognized = min((int) $work->overtime_minutes, $covered);
                     $unrecordedOvertime += max(0, (int) $work->overtime_minutes - $recognized);
-                    $first = min(180, $recognized);
-                    $later = max(0, $recognized - 180);
-                    $overtimePoints += ($first * self::OVERTIME_BONUS_FIRST_THREE_HOURS
-                        + $later * self::OVERTIME_BONUS_AFTER_THREE_HOURS)
-                        / 60 * PersonalWorkPoints::POINTS_PER_HOUR;
+                    $overtimePoints += $this->overtimeBonusPoints($recognized, $v3);
                 }
             }
             foreach ($workRecords->get($id, collect()) as $work) {
@@ -353,7 +354,7 @@ class WorkloadTrialAnalysis
             }
             $pointBreakdown = $this->splitBasePoints($totals, $basePoints);
             $projects = $createdProjects->get($id, collect());
-            $creationPoints = $projects->count() * self::CREATION_POINTS;
+            $creationPoints = $v3 ? 0.0 : $projects->count() * self::CREATION_POINTS;
             $managementPoints = 0.0;
             $activeProjects = 0;
             $projectDays = 0;
@@ -377,8 +378,10 @@ class WorkloadTrialAnalysis
                     ->filter(fn ($memberId) => $memberId !== (int) $project->user_id && ! in_array($memberId, $managers, true))
                     ->unique()->count();
                 $teamFactor = 1 + min(0.6, $members * 0.15);
-                $managementPoints += $days * self::MANAGEMENT_POINTS_PER_ACTIVE_DAY
-                    * ($leader ? 1 : self::DEPUTY_FACTOR) * $teamFactor;
+                if (! $v3) {
+                    $managementPoints += $days * self::MANAGEMENT_POINTS_PER_ACTIVE_DAY
+                        * ($leader ? 1 : self::DEPUTY_FACTOR) * $teamFactor;
+                }
             }
             $person = [
                 'id' => $id, 'name' => $user->name, 'role' => PersonalWorkRole::forUser($user),
@@ -390,6 +393,10 @@ class WorkloadTrialAnalysis
                 'management_points' => round($managementPoints, 1),
                 'points' => round($basePoints + $overtimePoints + $creationPoints + $managementPoints, 1),
                 'unrecorded_overtime_minutes' => $unrecordedOvertime,
+                'monthly_overtime_minutes' => $monthlyWorkRecords->get($id, collect())
+                    ->groupBy(fn ($record) => $record->date->format('Y-m'))
+                    ->map(fn ($records) => $records->sum(fn ($record) => max(0, (int) $record->overtime_minutes)))
+                    ->all(),
                 'active_managed_projects' => $activeProjects,
                 'active_project_days' => $projectDays,
                 'created_projects' => $projects->count(),
@@ -424,6 +431,20 @@ class WorkloadTrialAnalysis
             'work_category' => $category, 'activity_type' => $activity,
             'coefficient' => PersonalWorkPoints::coefficient($activity),
             'priority' => $fixedAppointment || in_array($activity, ['meeting', 'sales_visit'], true) ? 1 : 0];
+    }
+
+    private function overtimeBonusPoints(int $recognizedMinutes, bool $v3): float
+    {
+        if ($v3) {
+            return min(self::V3_OVERTIME_BONUS_MINUTES_PER_DAY, $recognizedMinutes)
+                / 60 * self::OVERTIME_BONUS_FIRST_THREE_HOURS * PersonalWorkPoints::POINTS_PER_HOUR;
+        }
+
+        $first = min(180, $recognizedMinutes);
+        $later = max(0, $recognizedMinutes - 180);
+        return ($first * self::OVERTIME_BONUS_FIRST_THREE_HOURS
+            + $later * self::OVERTIME_BONUS_AFTER_THREE_HOURS)
+            / 60 * PersonalWorkPoints::POINTS_PER_HOUR;
     }
 
     /** Keep the current basic total while exposing meetings, outings, and sales visits separately. */

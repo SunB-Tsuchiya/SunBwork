@@ -56,6 +56,12 @@ const sortValue = (person) => sortBy.value === 'records' ? Number(person.records
     : (sortBy.value === 'points' ? visiblePoints(person) : Number(person.work_units || 0));
 const ranked = computed(() => [...filtered.value]
     .sort((a, b) => sortValue(b) - sortValue(a) || a.name.localeCompare(b.name, 'ja')));
+const registrationRanking = computed(() => [...filtered.value]
+    .filter((person) => Number(person.created_projects || 0) > 0)
+    .sort((a, b) => Number(b.created_projects || 0) - Number(a.created_projects || 0) || a.name.localeCompare(b.name, 'ja')));
+const maxRegistrations = computed(() => Math.max(1, ...registrationRanking.value.map((person) => Number(person.created_projects || 0))));
+const overtimeOverTarget = computed(() => filtered.value.filter((person) =>
+    Object.values(person.monthly_overtime_minutes || {}).some((minutes) => Number(minutes) > 45 * 60)).length);
 const totals = computed(() => filtered.value.reduce((sum, person) => {
     sum.units += Number(person.work_units || 0);
     sum.records += Number(person.records || 0);
@@ -151,6 +157,21 @@ onMounted(load);
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">記録時間</div><strong class="text-xl">{{ duration(totals.minutes) }}</strong><p class="text-xs text-gray-500">重複・昼休憩を除外</p></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">入力元</div><p v-for="[key, label] in sourceLabels" :key="key" class="text-xs">{{ label }} {{ number(totals.sources[key]) }}件</p></div>
             </div>
+            <div v-if="!error" class="mt-2 text-xs text-gray-600">勤怠の月45時間目標を超えた人：{{ overtimeOverTarget }}人。これは点数の減点条件ではなく、上長が確認するための表示です。</div>
+
+            <div v-if="!error && period === 'month'" class="mt-5 rounded border p-3">
+                <h4 class="font-semibold">{{ month }} 案件登録件数</h4>
+                <p class="mt-1 text-xs text-gray-600">登録を促すための参考順位です。登録件数は評価点に加えません。担当などの上部の絞り込みを反映します。</p>
+                <div v-if="registrationRanking.length" class="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div v-for="(person, index) in registrationRanking" :key="person.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_3rem] items-center gap-2 text-sm">
+                        <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
+                        <span class="truncate" :title="person.name"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColors[person.role?.code] || roleColors.other }"></span>{{ person.name }}</span>
+                        <span class="h-3 overflow-hidden rounded bg-gray-100"><span class="block h-full rounded bg-sky-500" :style="{ width: `${Number(person.created_projects || 0) / maxRegistrations * 100}%` }"></span></span>
+                        <strong class="text-right tabular-nums">{{ number(person.created_projects) }}件</strong>
+                    </div>
+                </div>
+                <p v-else class="mt-3 text-sm text-gray-500">この条件で登録された案件はありません。</p>
+            </div>
 
             <div class="mt-5 rounded border border-amber-200 bg-amber-50/50 p-3 text-sm">
                 <div class="font-semibold">並び方と暫定点の比較</div>
@@ -163,10 +184,10 @@ onMounted(load);
                 <p class="mt-1 text-xs text-gray-600">表示順は記録を見るための並び替えで、能力や成果の順位ではありません。</p>
                 <div class="mt-2 flex flex-wrap gap-4 text-xs">
                     <label><input v-model="includeOvertime" type="checkbox" class="mr-1 rounded" />残業追加点</label>
-                    <label><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label>
-                    <label><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label>
+                    <label v-if="scoreVersion !== 'trial_time_v3'"><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label>
+                    <label v-if="scoreVersion !== 'trial_time_v3'"><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label>
                 </div>
-                <p class="mt-1 text-xs text-gray-600">切り替えると「暫定点順」で再表示します。下の内訳と合計には、チェックした点だけを反映します。</p>
+                <p class="mt-1 text-xs text-gray-600">{{ scoreVersion === 'trial_time_v3' ? '新しい試算では案件登録・管理の自動加点はありません。' : '切り替えると「暫定点順」で再表示します。下の内訳と合計には、チェックした点だけを反映します。' }}</p>
             </div>
 
             <div v-if="!error" class="mt-4 overflow-x-auto rounded border">
@@ -199,6 +220,7 @@ onMounted(load);
                         <span v-for="[key, label] in sourceLabels" :key="key" class="rounded bg-slate-100 px-2 py-1">{{ label }} {{ number(person.source_counts?.[key]) }}件</span>
                     </div>
                     <p class="mt-2 text-xs text-gray-600">作業 {{ decimal(person.work_points) }}点・会議／訪問 {{ decimal(person.meeting_points) }}点・基本点合計 {{ decimal(person.base_points) }}点</p>
+                    <p class="mt-1 text-xs text-gray-600">勤怠残業：<span v-for="(minutes, targetMonth) in person.monthly_overtime_minutes" :key="targetMonth" class="mr-2">{{ targetMonth }} {{ duration(minutes) }}<strong v-if="Number(minutes) > 45 * 60" class="ml-1 text-amber-800">45時間超</strong></span></p>
                     <p v-if="!person.activities?.length" class="mt-2 text-xs text-gray-500">公開範囲内の作業実績なし</p>
                     <div v-else class="mt-2 space-y-1 text-xs">
                         <p v-for="activity in person.activities" :key="`${activity.work_category}-${activity.activity_type}`" class="rounded bg-gray-50 px-2 py-1">

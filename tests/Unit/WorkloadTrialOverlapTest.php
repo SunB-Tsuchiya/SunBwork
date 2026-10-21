@@ -128,6 +128,18 @@ class WorkloadTrialOverlapTest extends TestCase
         self::assertSame(['work_points' => 10.0, 'meeting_points' => 10.0], $this->breakdown($ledger));
     }
 
+    public function test_v3_overtime_bonus_stops_after_two_hours_while_v2_retains_its_old_rates(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $bonus = new ReflectionMethod($service, 'overtimeBonusPoints');
+
+        self::assertSame(5.0, $bonus->invoke($service, 60, true));
+        self::assertSame(10.0, $bonus->invoke($service, 120, true));
+        self::assertSame(10.0, $bonus->invoke($service, 180, true));
+        self::assertSame(15.0, $bonus->invoke($service, 180, false));
+        self::assertSame(17.0, $bonus->invoke($service, 240, false));
+    }
+
     private function ledger(array $items): array
     {
         $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
