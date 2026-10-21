@@ -161,7 +161,7 @@ onMounted(load);
 
             <div v-if="!error && period === 'month'" class="mt-5 rounded border p-3">
                 <h4 class="font-semibold">{{ month }} 案件登録件数</h4>
-                <p class="mt-1 text-xs text-gray-600">登録を促すための参考順位です。登録件数は評価点に加えません。担当などの上部の絞り込みを反映します。</p>
+                <p class="mt-1 text-xs text-gray-600">登録を確認するための件数順位です。{{ scoreVersion === 'trial_time_v3' ? '新しい試算では登録件数を点数に加えません。' : '従来の試用点では登録1件につき5点を加えます。' }}担当などの上部の絞り込みを反映します。</p>
                 <div v-if="registrationRanking.length" class="mt-3 grid gap-2 sm:grid-cols-2">
                     <div v-for="(person, index) in registrationRanking" :key="person.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_3rem] items-center gap-2 text-sm">
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
