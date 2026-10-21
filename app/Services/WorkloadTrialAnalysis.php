@@ -171,7 +171,10 @@ class WorkloadTrialAnalysis
             foreach (array_unique($people) as $personId) {
                 $user = $userById->get($personId);
                 if (! $user || ($isJob && (int) $assignment->user_id !== $personId)) continue;
-                if (! $this->attendeeCounts($attendees->get($event->id, collect()), $personId, (int) $event->user_id, $v3)) continue;
+                if (! $this->attendeeCounts(
+                    $attendees->get($event->id, collect()), $personId, (int) $event->user_id,
+                    $v3, $to->toDateString() < $today
+                )) continue;
                 if ($personId !== (int) $event->user_id && $copies->has($personId.'|'.$event->id)) continue;
                 $result = $entryByEvent->get($personId.'|'.$event->id);
                 if ($result) continue; // The result entry already represents this interval.
@@ -479,10 +482,11 @@ class WorkloadTrialAnalysis
         return ! $this->schedule->entryForViewer($entry, $viewer)['private'];
     }
 
-    private function attendeeCounts(Collection $attendees, int $personId, int $ownerId, bool $v3): bool
+    private function attendeeCounts(Collection $attendees, int $personId, int $ownerId, bool $v3, bool $afterDayEnd): bool
     {
         return ! $v3 || $personId === $ownerId
-            || $attendees->contains(fn ($row) => (int) $row->user_id === $personId && $row->status === 'accepted');
+            || $attendees->contains(fn ($row) => (int) $row->user_id === $personId
+                && ($row->status === 'accepted' || ($afterDayEnd && $row->status === 'pending')));
     }
 
     private function jobUnitReference($assignment): string
