@@ -67,7 +67,7 @@ class WorkloadTrialOverlapTest extends TestCase
         self::assertTrue($method->invoke($service, $meeting, 'trial_time_v3'));
     }
 
-    public function test_v3_counts_a_work_schedule_as_work_and_only_accepted_guests(): void
+    public function test_v3_counts_a_work_schedule_and_pending_guests_after_the_day_ends(): void
     {
         $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
         $work = new Event(['is_company_event' => false]);
@@ -78,12 +78,15 @@ class WorkloadTrialOverlapTest extends TestCase
         $attendees = new Collection([
             (object) ['user_id' => 2, 'status' => 'pending'],
             (object) ['user_id' => 3, 'status' => 'accepted'],
+            (object) ['user_id' => 4, 'status' => 'declined'],
         ]);
         $counts = new ReflectionMethod($service, 'attendeeCounts');
-        self::assertTrue($counts->invoke($service, $attendees, 1, 1, true));
-        self::assertFalse($counts->invoke($service, $attendees, 2, 1, true));
-        self::assertTrue($counts->invoke($service, $attendees, 3, 1, true));
-        self::assertTrue($counts->invoke($service, $attendees, 2, 1, false));
+        self::assertTrue($counts->invoke($service, $attendees, 1, 1, true, false));
+        self::assertFalse($counts->invoke($service, $attendees, 2, 1, true, false));
+        self::assertTrue($counts->invoke($service, $attendees, 2, 1, true, true));
+        self::assertTrue($counts->invoke($service, $attendees, 3, 1, true, false));
+        self::assertFalse($counts->invoke($service, $attendees, 4, 1, true, true));
+        self::assertTrue($counts->invoke($service, $attendees, 2, 1, false, false));
     }
 
     public function test_v3_scores_a_private_work_entry_without_revealing_its_detail(): void
