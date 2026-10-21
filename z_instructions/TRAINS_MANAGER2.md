@@ -113,3 +113,8 @@ Admin / SuperAdmin が、ユーザーごとのスイッチで「申請（交通�
 - 画面: `Admin/ApplicantController`、`Pages/Admin/Applicants/{Index,Show}.vue`。雇用形態・部署の絞り込み、表示中の一括 ON/OFF、申請の途中（下書き・申請済み・差戻し中）がある人を OFF にする際の確認。
 - 設定 `config/applications.php` の `APPLICATION_ENFORCE_ACCESS`（本番は未設定=有効。テストの既存クラスは false）。
 - テスト: `TransportApplicantAccessTest`（Billing 全体 78 件成功）。
+
+## 通知の宛先を総務・経理（Clerk）だけにした（2026-10-22）
+- 申請・再申請・期限後の申請の依頼の通知は、**同じ会社の Clerk だけ**に届く（Admin・SuperAdmin・本人・他社には届かない）。`TransportNotifier::managers()`。
+- 受理などの操作ができる人（Admin・SuperAdmin）は変わらない。通知が来ないだけ。
+- 会社に Clerk がいない場合は、誰にも届かない（フォールバックなし）。

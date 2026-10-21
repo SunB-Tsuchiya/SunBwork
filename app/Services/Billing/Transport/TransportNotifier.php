@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 class TransportNotifier
 {
     /**
-     * 申請・再申請 → 管理側（総務・経理・Admin・SuperAdmin）へ。
+     * 申請・再申請 → 同じ会社の総務・経理（Clerk）へ。
      *
      * @param bool $resubmit 差戻しのあとの再申請か（文面を分ける）
      */
@@ -33,14 +33,12 @@ class TransportNotifier
     }
 
     /**
-     * 通知を受け取る管理側の人: 同じ会社の総務・経理（Clerk）と Admin、および SuperAdmin（社長。両社を共同で管理するため、会社を問わない）。操作した本人は除く。
+     * 通知を受け取る管理側の人: 同じ会社の総務・経理（Clerk）だけ。Admin・SuperAdmin には送らない（操作はできる）。操作した本人は除く。
      */
     private function managers(?int $companyId, int $exceptUserId): array
     {
         return User::query()
-            ->where(fn ($q) => $q
-                ->where(fn ($w) => $w->whereIn('user_role', ['clerk', 'admin'])->where('company_id', $companyId))
-                ->orWhere('user_role', 'superadmin'))
+            ->where('user_role', 'clerk')->where('company_id', $companyId)
             ->where('id', '!=', $exceptUserId)
             ->pluck('id')->all();
     }

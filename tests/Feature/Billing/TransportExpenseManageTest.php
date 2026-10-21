@@ -238,7 +238,7 @@ class TransportExpenseManageTest extends TestCase
         $this->actingAs($this->user('user', $this->sb))->get(route('clerk.applications.index'))->assertStatus(403);
     }
 
-    public function test_申請と再申請は_同じ会社の総務経理とAdmin_およびSuperAdminに通知され_本人と他社のAdminには届かない(): void
+    public function test_申請と再申請は_同じ会社の総務経理にだけ通知され_Admin_SuperAdmin_本人_他社には届かない(): void
     {
         $applicantClerk = $this->user('clerk', $this->sb, '総務の太郎');   // 総務の人が、自分の交通費をユーザーとして申請する場合
         $adminSb = $this->user('admin', $this->sb);
@@ -254,25 +254,24 @@ class TransportExpenseManageTest extends TestCase
         $id = $this->actingAs($applicantClerk)->postJson(route('user.billing.transport.autosave'), $body)->assertOk()->json('id');
         $this->actingAs($applicantClerk)->post(route('user.billing.transport.submit', ['expense' => $id]))->assertSessionHasNoErrors();
 
-        // 申請: 管理側（同じ会社の Clerk・Admin、SuperAdmin）に届く。本人・他社の Admin には届かない
-        foreach ([$adminSb, $superadmin, $superadminSanei, $clerkSb] as $u) {
-            $this->assertCount(1, $this->inbox($u), "{$u->user_role} に届く");
-            $this->assertStringContainsString('申請しました', $this->inbox($u)->first()->title);
-            $this->assertStringNotContainsString('再申請', $this->inbox($u)->first()->title);
+        // 申請: 同じ会社の総務・経理（Clerk）にだけ届く。Admin・SuperAdmin・本人・他社の Admin には届かない
+        $this->assertCount(1, $this->inbox($clerkSb));
+        $this->assertStringContainsString('申請しました', $this->inbox($clerkSb)->first()->title);
+        $this->assertStringNotContainsString('再申請', $this->inbox($clerkSb)->first()->title);
+        foreach ([$adminSb, $superadmin, $superadminSanei, $applicantClerk, $adminSanei] as $u) {
+            $this->assertCount(0, $this->inbox($u), "{$u->user_role} には届かない");
         }
-        $this->assertCount(0, $this->inbox($applicantClerk));
-        $this->assertCount(0, $this->inbox($adminSanei));
 
         // 差戻し → 再申請: 「再申請しました」で、同じ人たちに届く
         $this->actingAs($clerkSb)->post(route('clerk.billing.transport.return', ['expense' => $id]), ['comment' => '金額を確認してください'])->assertSessionHasNoErrors();
         $this->actingAs($applicantClerk)->post(route('user.billing.transport.submit', ['expense' => $id]))->assertSessionHasNoErrors();
 
-        foreach ([$adminSb, $superadmin, $superadminSanei] as $u) {
-            $this->assertCount(2, $this->inbox($u));
-            $last = $this->inbox($u)->last();
-            $this->assertStringContainsString('総務の太郎さんが2026年8月分を再申請しました', $last->title);
-            $this->assertStringContainsString('差戻しのあと、修正して再申請されました', $last->content);
+        $this->assertCount(2, $this->inbox($clerkSb));
+        $last = $this->inbox($clerkSb)->last();
+        $this->assertStringContainsString('総務の太郎さんが2026年8月分を再申請しました', $last->title);
+        $this->assertStringContainsString('差戻しのあと、修正して再申請されました', $last->content);
+        foreach ([$adminSb, $superadmin, $superadminSanei, $adminSanei] as $u) {
+            $this->assertCount(0, $this->inbox($u), "{$u->user_role} には届かない");
         }
-        $this->assertCount(0, $this->inbox($adminSanei));
     }
 }
