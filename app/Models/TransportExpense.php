@@ -23,6 +23,7 @@ class TransportExpense extends Model
         'reviewed_by',
         'reviewed_at',
         'review_comment',
+        'applicant_comment',
         'billed_at',
     ];
 

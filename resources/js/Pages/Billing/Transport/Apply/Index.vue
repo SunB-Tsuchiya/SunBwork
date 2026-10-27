@@ -104,6 +104,7 @@ let lastSaved = '';                    // 最後に保存できた状態（JSON�
 let skipUnloadGuard = false;           // 出力（ダウンロード）などで、離脱の確認を出さない間
 
 const chargeDeptId = ref(props.defaultDeptId);   // null = 共通
+const applicantComment = ref('');                // 申請者のコメント（申請・再申請に添える。書きかけも自動保存）
 const rows = ref([newRow()]);
 const errors = ref({});
 const submitting = ref(false);
@@ -115,6 +116,7 @@ function loadFromProps() {
     autosaveState.value = 'clean';
     if (props.expense) {
         chargeDeptId.value = props.expense.charge_department_id;
+        applicantComment.value = props.expense.applicant_comment ?? '';
         rows.value = props.expense.items.length
             ? props.expense.items.map((it) => ({
                 occurrence_date: it.occurrence_date, destination: it.destination ?? '', purpose: it.purpose,
@@ -125,6 +127,7 @@ function loadFromProps() {
             : [newRow()];
     } else {
         chargeDeptId.value = props.defaultDeptId;
+        applicantComment.value = '';
         rows.value = [newRow()];
     }
     lastSaved = JSON.stringify(payload());   // 読み込んだ状態が「保存済み」の基準
@@ -277,6 +280,7 @@ function payload() {
     return {
         billing_month: props.month,
         charge_department_id: chargeDeptId.value,
+        applicant_comment: applicantComment.value,
         items: rows.value.slice(0, n).map(({ companions, ...r }, i) => ({ ...r, companion_ids: (companions ?? []).map((c) => c.id), sort_order: i })),
     };
 }
@@ -388,7 +392,7 @@ function saveAndSubmit() {
     if (!confirm(`${monthLabel(props.month)}の交通費（合計 ${totalAmount.value.toLocaleString()} 円）を申請します。よろしいですか？`)) return;
     save(() => {
         if (!curId.value) return;
-        router.post(rt('submit', { expense: curId.value }), {}, {
+        router.post(rt('submit', { expense: curId.value }), { comment: applicantComment.value }, {
             preserveScroll: true,
             onError: (e) => { errors.value = e; },
         });
@@ -646,6 +650,22 @@ async function changeMonth(e) {
                         <li v-for="(msg, i) in otherErrors" :key="i">{{ msg }}</li>
                         <li v-if="!otherErrors.length">発生日に誤りがあります。赤い行を確認してください。</li>
                     </ul>
+                </div>
+
+                <!-- 申請者のコメント（任意）: 記載の理由・差戻しへの返事など。申請すると、履歴に残り、総務・経理の確認画面に出ます -->
+                <div v-if="editable" class="mt-6 rounded border border-gray-200 bg-gray-50 p-3">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">
+                        {{ status === 'returned' ? '差戻しへのコメント（任意）' : '申請者のコメント（任意）' }}
+                    </label>
+                    <textarea v-model="applicantComment" rows="3" maxlength="1000"
+                        class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                        :placeholder="status === 'returned'
+                            ? '例：3行目：飲み会のあと、会社には戻らず直帰しました。この記載で正しいです。'
+                            : '例：3行目：出先から、そのまま懇親会に行ったため、会社には戻っていません。'"></textarea>
+                    <p class="mt-1 text-xs text-gray-500">
+                        入れなくても、申請できます。行を指定するときは、「3行目：…」のように書くと、わかりやすくなります（書きかけは、自動で保存されます）。
+                        <span class="float-right">{{ applicantComment.length }} / 1000</span>
+                    </p>
                 </div>
 
                 <!-- 自動保存の状態 -->

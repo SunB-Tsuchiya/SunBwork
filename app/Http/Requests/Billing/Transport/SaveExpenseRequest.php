@@ -45,6 +45,7 @@ class SaveExpenseRequest extends FormRequest
         return [
             'billing_month'           => ['required', 'date_format:Y-m'],
             'charge_department_id'    => ['nullable', 'integer'],
+            'applicant_comment'       => ['nullable', 'string', 'max:1000'],
             'items'                   => ['required', 'array', 'min:1', 'max:200'],
             'items.*.occurrence_date' => ['nullable', 'date_format:Y-m-d'],
             'items.*.destination'     => ['nullable', 'string', 'max:100'],
@@ -109,6 +110,7 @@ class SaveExpenseRequest extends FormRequest
             'items.*.purpose_text.max' => ':position行目の用件の内容は 100 文字以内で入力してください。',
             'items.*.via_stations.max'  => ':position行目の経由地は ' . TransportExpenseItem::MAX_VIA . ' か所までです。',
             'items.*.companion_ids.max' => ':position行目の同行者は ' . TransportExpenseItem::MAX_COMPANIONS . ' 人までです。',
+            'applicant_comment.max' => '申請者のコメントは 1000 文字以内で入力してください。',
             'items.max' => '明細は 200 行までです。',
             'items.min' => '明細を 1 行以上入力してください。',
         ];

@@ -61,7 +61,8 @@ class TransportExpenseWorkflow
             switch ($action) {
                 case 'submit':
                     $attrs += ['submitted_at' => now(), 'billing_date' => now()->toDateString(),
-                        'reviewed_by' => null, 'reviewed_at' => null, 'review_comment' => null, 'billed_at' => null];
+                        'reviewed_by' => null, 'reviewed_at' => null, 'review_comment' => null, 'billed_at' => null,
+                        'applicant_comment' => null];   // 書きかけのコメントは、履歴（下の event）に残して、空に戻す
                     break;
                 case 'withdraw':
                     $attrs += ['submitted_at' => null];
@@ -102,7 +103,7 @@ class TransportExpenseWorkflow
             } catch (\Throwable $e) {
                 logger()->warning('TransportFareStock: 運賃マスタへの自動登録に失敗しました', ['error' => $e->getMessage()]);
             }
-            $this->notifier->submitted($fresh, $actor, $fromStatus === TransportExpense::STATUS_RETURNED);   // 差戻しのあとなら「再申請」
+            $this->notifier->submitted($fresh, $actor, $fromStatus === TransportExpense::STATUS_RETURNED, $comment);   // 差戻しのあとなら「再申請」
         } else {
             $this->notifier->reviewed($fresh, $actor, $action, $comment);
         }

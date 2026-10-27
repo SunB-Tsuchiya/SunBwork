@@ -129,6 +129,9 @@ class ManageController extends Controller
                 'review_comment'  => $expense->review_comment,
                 'billed_at'       => $expense->billed_at?->timezone('Asia/Tokyo')->format('Y/m/d H:i'),
                 'check_summary'   => $check['summary'],
+                // 申請者のコメント: 最新の申請（再申請）に添えられたもの
+                'applicant_comment' => ($sub = $expense->events->where('action', 'submit')->sortByDesc('id')->first()) && $sub->comment
+                    ? ['comment' => $sub->comment, 'at' => $sub->created_at->timezone('Asia/Tokyo')->format('Y/m/d H:i')] : null,
                 'items'           => TransportExpenseExporter::sortedItems($expense)->map(fn ($it, $i) => [
                     'id'              => $it->id,
                     'check'           => $check['items'][$i],

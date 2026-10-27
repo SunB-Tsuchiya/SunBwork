@@ -105,6 +105,7 @@ class ExpenseController extends Controller
                 'reviewed_at'     => $expense->reviewed_at?->timezone('Asia/Tokyo')->format('Y/m/d H:i'),
                 'reviewer_name'   => $expense->reviewer?->name,
                 'review_comment'  => $expense->review_comment,
+                'applicant_comment' => $expense->applicant_comment,   // 次に申請するときのコメント（書きかけ）
                 'editable'        => $expense->isEditableByApplicant(),
                 'deletable'       => $expense->isEditableByApplicant(),   // 下書き・差戻しは、期限後でも削除できる（残った下書きを片付けられる）
                 'events'          => $expense->events->map(fn ($ev) => [
@@ -264,6 +265,8 @@ class ExpenseController extends Controller
                 // 旧・数字コード（サン・ブレーン様式の表示用）。共通 = 0、対応する部署が無ければ 0
                 'department_code'      => $deptId ? (TransportExpense::codeForDepartmentName($deptName) ?? 0) : 0,
                 'total_amount'         => $items->sum('amount'),
+                // 申請者のコメント（書きかけ。申請すると履歴に残り、空に戻る）。空は NULL
+                'applicant_comment'    => ($c = trim((string) ($data['applicant_comment'] ?? ''))) === '' ? null : $c,
             ];
             if ($expense) {
                 $expense->update($attrs);
@@ -317,7 +320,9 @@ class ExpenseController extends Controller
             return back()->withErrors(['submit' => implode(' ', $errors)]);
         }
 
-        $this->workflow->apply($expense, $request->user(), 'submit');
+        // 申請者のコメント（差戻しへの返事・記載の理由など）。画面から送られたもの、なければ書きかけを使う
+        $comment = $request->validate(['comment' => ['nullable', 'string', 'max:1000']])['comment'] ?? null;
+        $this->workflow->apply($expense, $request->user(), 'submit', $comment ?? $expense->applicant_comment);
 
         return redirect()->route($this->routeBase($request) . 'index', ['month' => $expense->billing_month])
             ->with('success', '交通費を申請しました。印刷した用紙を提出してください。');

@@ -16,13 +16,16 @@ class TransportNotifier
      *
      * @param bool $resubmit 差戻しのあとの再申請か（文面を分ける）
      */
-    public function submitted(TransportExpense $expense, User $actor, bool $resubmit = false): void
+    public function submitted(TransportExpense $expense, User $actor, bool $resubmit = false, ?string $comment = null): void
     {
         $verb = $resubmit ? '再申請しました' : '申請しました';
         $name = $expense->user->name;
         $body = $name . 'さんが' . self::monthLabel($expense) . 'の交通費（合計 ' . number_format($expense->total_amount) . ' 円）を' . $verb . '。';
         if ($resubmit) {
             $body .= "\n差戻しのあと、修正して再申請されました。";
+        }
+        if ($comment) {
+            $body .= "\n\n申請者のコメント:\n" . $comment;
         }
 
         $this->send($actor, $this->managers($expense->company_id, $actor->id),

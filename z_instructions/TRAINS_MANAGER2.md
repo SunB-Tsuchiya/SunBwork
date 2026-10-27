@@ -137,3 +137,13 @@ Admin / SuperAdmin が、ユーザーごとのスイッチで「申請（交通�
 **DB:** `transport_expense_item_companions`（明細・社員、削除で連動）、`transport_expense_items.via_stations` / `transport_presets.via_stations`（JSON）。migration `2026_10_27_100000_add_companions_and_via_to_transport`（本番で実行が必要）。
 
 **主なファイル:** `TransportCompanionMatcher`（新規）、`TransportFareChecker::routeFare()`、`TransportFareStock`、`SaveExpenseRequest`、`ExpenseController`、`ManageController::show`、`UserPickerModal.vue`（新規。お知らせの個別選択モーダルと同じ見た目の部品。お知らせ画面は触っていない）、`ExpenseRow.vue`、`Apply/Index.vue`、`PresetManagerModal.vue`、`Manage/Show.vue`、テスト `TransportCompanionTest`。
+
+## 申請者のコメント（2026-10-28 追加）
+**目的:** 差戻しや、Clerk の疑問（例：「出先から飲み会に行き、会社に戻っていないがよいか」）に対して、「この記載で間違っていない」という返事を、再申請に添えられるようにする（以前は、ノーコメントで再申請するしかなかった）。
+
+**仕様（確定: 申請全体に 1 つの欄）:** 申請画面に「申請者のコメント（任意。差戻しのあとは「差戻しへのコメント」）」の欄（1000 文字まで）。行を指定するときは「3行目：…」と書く（Clerk の差戻しコメントと同じ形）。
+- 書きかけは自動保存（`transport_expenses.applicant_comment`）。申請（再申請）すると、履歴（`transport_expense_events.comment`）に残し、この列は空に戻す。
+- 申請の POST で `comment` を送れば、それを優先。送らなければ書きかけを使う。どちらも無くても申請できる（必須にしない）。
+- Clerk の確認画面の上部に、最新の申請（再申請）のコメントを目立つ囲みで表示。履歴にも、申請・差戻し・再申請の順にコメントが並ぶ。
+- 総務・経理への通知（申請・再申請）の本文に、「申請者のコメント」を添える。
+- migration `2026_10_28_100000_add_applicant_comment_to_transport_expenses`（本番で実行が必要）。テスト `TransportApplicantCommentTest`。

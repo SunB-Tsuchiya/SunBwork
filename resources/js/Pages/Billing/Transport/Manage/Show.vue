@@ -146,6 +146,12 @@ function insertFlagged() {
                     <div v-if="expense.billed_at" class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">請求済み</dt><dd class="text-gray-800">{{ expense.billed_at }}</dd></div>
                 </dl>
 
+                <!-- 申請者のコメント（最新の申請・再申請に添えられたもの） -->
+                <div v-if="expense.applicant_comment" class="mb-4 rounded border border-blue-300 bg-blue-50 p-3 text-sm">
+                    <p class="mb-1 text-xs font-semibold text-blue-900">申請者のコメント <span class="ml-1 font-normal text-blue-700">（{{ expense.applicant_comment.at }}）</span></p>
+                    <p class="whitespace-pre-wrap text-gray-800">{{ expense.applicant_comment.comment }}</p>
+                </div>
+
                 <!-- 検算の要約 -->
                 <div class="mb-3 flex flex-wrap items-center gap-2 text-xs">
                     <span class="rounded px-2 py-1" :class="sum.diff ? 'bg-red-100 text-red-700 font-semibold' : 'bg-gray-100 text-gray-500'">運賃の相違 {{ sum.diff }}件</span>
