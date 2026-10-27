@@ -297,11 +297,21 @@ class WorkloadTrialAnalysis
             $overtimePoints = 0.0;
             $unrecordedOvertime = 0;
             $recordedDays = 0;
-            $timeBreakdown = ['job' => 0.0, 'quick' => 0.0, 'meeting' => 0.0, 'other' => 0.0];
+            $timeBreakdown = ['job' => 0.0, 'quick' => 0.0, 'meeting' => 0.0, 'other' => 0.0, 'overtime' => 0.0];
             $daily = [];
             foreach ($dayItems as $date => $items) {
                 $window = $workWindow($user, $date);
-                $ledger = $this->minuteLedger($items, $window);
+                $work = $workRecords->get($id, collect())->first(fn ($row) => $row->date->toDateString() === $date);
+                $overtimeRange = null;
+                if ($work && $work->overtime_minutes > 0) {
+                    $scheduledEnd = $work->scheduled_end
+                        ? $this->clockMinutes($work->scheduled_end)
+                        : ($window['end'] ?? 1050);
+                    $actualEnd = $this->clockMinutes($work->end_time);
+                    if ($actualEnd < $scheduledEnd) $actualEnd += 1440;
+                    $overtimeRange = [$scheduledEnd, $actualEnd];
+                }
+                $ledger = $this->minuteLedger($items, $window, $overtimeRange);
                 if ($withDaily) {
                     $dailyBreakdown = $this->splitBasePoints($ledger['activities'], $ledger['points']);
                     $daily[$date] = [
@@ -330,18 +340,19 @@ class WorkloadTrialAnalysis
                     $totals[$key]['records'] = ($totals[$key]['records'] ?? 0) + count($activity['records']);
                     $totals[$key]['days'][$date] = true;
                 }
-                $work = $workRecords->get($id, collect())->first(fn ($row) => $row->date->toDateString() === $date);
                 if ($work && $work->overtime_minutes > 0) {
-                    $scheduledEnd = $work->scheduled_end
-                        ? $this->clockMinutes($work->scheduled_end)
-                        : ($window['end'] ?? 1050);
-                    $actualEnd = $this->clockMinutes($work->end_time);
-                    if ($actualEnd < $scheduledEnd) $actualEnd += 1440;
                     $covered = 0;
                     foreach ($ledger['covered'] as $minute) {
-                        if ($minute >= $scheduledEnd && $minute < $actualEnd) $covered++;
+                        if ($minute >= $overtimeRange[0] && $minute < $overtimeRange[1]) $covered++;
                     }
                     $recognized = min((int) $work->overtime_minutes, $covered);
+                    if ($covered > 0 && $recognized > 0) {
+                        $ratio = $recognized / $covered;
+                        foreach ($ledger['overtime_breakdown_minutes'] as $group => $groupMinutes) {
+                            $timeBreakdown[$group] -= $groupMinutes * $ratio;
+                        }
+                        $timeBreakdown['overtime'] += $recognized;
+                    }
                     $unrecordedOvertime += max(0, (int) $work->overtime_minutes - $recognized);
                     $overtimePoints += $this->overtimeBonusPoints($recognized, $v3);
                 }
@@ -527,7 +538,7 @@ class WorkloadTrialAnalysis
             .'-type-'.($assignment->work_item_type_id ?: 'none');
     }
 
-    private function minuteLedger(array $items, ?array $window): array
+    private function minuteLedger(array $items, ?array $window, ?array $overtimeRange = null): array
     {
         $lunchFrom = $window['break_start'] ?? 720;
         $lunchTo = $window['break_end'] ?? 780;
@@ -535,6 +546,7 @@ class WorkloadTrialAnalysis
         $covered = [];
         $points = 0.0;
         $timeBreakdown = ['job' => 0.0, 'quick' => 0.0, 'meeting' => 0.0, 'other' => 0.0];
+        $overtimeBreakdown = $timeBreakdown;
         for ($minute = 0; $minute < 1440; $minute++) {
             if ($minute >= $lunchFrom && $minute < $lunchTo) continue;
             $active = array_values(array_filter($items, fn ($item) => $item['from'] <= $minute && $item['to'] > $minute));
@@ -545,6 +557,9 @@ class WorkloadTrialAnalysis
             $share = 1 / count($active);
             foreach ($active as $item) {
                 $timeBreakdown[$item['time_group'] ?? 'other'] += $share;
+                if ($overtimeRange && $minute >= $overtimeRange[0] && $minute < $overtimeRange[1]) {
+                    $overtimeBreakdown[$item['time_group'] ?? 'other'] += $share;
+                }
                 $key = $item['work_category'].'|'.$item['activity_type'];
                 $activities[$key]['work_category'] = $item['work_category'];
                 $activities[$key]['activity_type'] = $item['activity_type'];
@@ -557,11 +572,13 @@ class WorkloadTrialAnalysis
         }
         return ['minutes' => count($covered), 'points' => $points, 'activities' => $activities,
             'time_breakdown_minutes' => $timeBreakdown,
+            'overtime_breakdown_minutes' => $overtimeBreakdown,
             'covered' => $covered];
     }
 
     private function wholeMinuteBreakdown(array $values, int $total): array
     {
+        $values = array_map(fn ($minutes) => max(0.0, $minutes), $values);
         $whole = array_map(fn ($minutes) => (int) floor($minutes), $values);
         $remainder = $total - array_sum($whole);
         $order = array_keys($values);

@@ -67,6 +67,21 @@ class WorkloadTrialOverlapTest extends TestCase
             $whole->invoke($service, ['job' => 1.5, 'quick' => 1.5, 'meeting' => 0, 'other' => 0], 3));
     }
 
+    public function test_overtime_tracks_only_covered_minutes_in_its_window(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $item = new ReflectionMethod($service, 'item');
+        $ledger = (new ReflectionMethod($service, 'minuteLedger'))->invoke($service, [
+            $item->invoke($service, 'job', [540, 660], 'dtp', 'my_job', false, 'job'),
+            $item->invoke($service, 'meeting', [630, 690], 'shinko', 'meeting', true, 'meeting'),
+        ], ['break_start' => 720, 'break_end' => 780], [600, 690]);
+
+        self::assertSame(150, $ledger['minutes']);
+        self::assertSame(30.0, $ledger['overtime_breakdown_minutes']['job']);
+        self::assertSame(60.0, $ledger['overtime_breakdown_minutes']['meeting']);
+        self::assertSame(90.0, array_sum($ledger['overtime_breakdown_minutes']));
+    }
+
     public function test_business_outing_is_a_fixed_appointment_but_a_job_is_not(): void
     {
         $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));

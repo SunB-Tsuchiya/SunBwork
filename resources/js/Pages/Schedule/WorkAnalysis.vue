@@ -128,8 +128,9 @@ const pointLabel = (value) => Number(value || 0).toFixed(1);
 const comparisonCategory = ref('all');
 const comparisonRole = ref('all');
 const timeGroups = [
-    ['job', 'ジョブ作業', '#2563eb'], ['quick', '簡易作業', '#16a34a'],
-    ['meeting', '会議・訪問', '#f59e0b'], ['other', 'その他の業務予定', '#8b5cf6'],
+    ['job', 'ジョブ作業', '#6366f1'], ['quick', '簡易作業', '#ec4899'],
+    ['meeting', '会議・訪問', '#10b981'], ['other', 'その他の業務予定', '#64748b'],
+    ['overtime', '認定残業', '#ef4444'],
 ];
 const timeRows = computed(() => [...comparisonPeople.value]
     .filter((person) => Number(person.minutes || 0) > 0)
@@ -454,7 +455,7 @@ onBeforeUnmount(() => {
                         <option v-for="role in visibleRoles" :key="role.code" :value="role.code">{{ role.label }}</option>
                     </select>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">重複と昼休憩を除いた時間です。棒の長さは総時間、色は時間の内訳です。記録のない{{ timeMissingCount }}人は省略しています。記録時間は勤務態度や成果を示すものではありません。</p>
+                <p class="mt-1 text-xs text-gray-500">重複と昼休憩を除いた時間です。棒の長さは総時間、色は時間の内訳です。認定残業は作業の種類より優先して赤で示し、総時間には一度だけ含めます。記録のない{{ timeMissingCount }}人は省略しています。記録時間は勤務態度や成果を示すものではありません。</p>
                 <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600" aria-label="時間内訳の色">
                     <span v-for="[key, label, color] in timeGroups" :key="key" class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" :style="{ backgroundColor: color }"></span>{{ label }}</span>
                 </div>
