@@ -9,6 +9,7 @@ import PasteImportModal from '@/Components/Billing/Transport/PasteImportModal.vu
 import MultiDateModal from '@/Components/Billing/Transport/MultiDateModal.vue';
 import PresetManagerModal from '@/Components/Billing/Transport/PresetManagerModal.vue';
 import FareHelpModal from '@/Components/Billing/Transport/FareHelpModal.vue';
+import ViaHelpModal from '@/Components/Billing/Transport/ViaHelpModal.vue';
 import UserPickerModal from '@/Components/Billing/Transport/UserPickerModal.vue';
 import { shortDate } from '@/Components/Billing/Transport/transportNormalize';
 import { parseQuick, applySuggestion } from '@/Components/Billing/Transport/transportInput';
@@ -136,6 +137,7 @@ watch(() => JSON.stringify([props.month, props.expense]), loadFromProps, { immed
 const showPaste = ref(false);
 const showPresets = ref(false);
 const showFareHelp = ref(false);
+const showViaHelp = ref(false);
 const companionTarget = ref(null);   // 同行者を選んでいる行の番号
 function onCompanionsApply(ids) {
     const i = companionTarget.value;
@@ -534,6 +536,8 @@ async function changeMonth(e) {
                     <button type="button" @click="showFareHelp = true" title="記載のしかたを見る" aria-label="記載のしかたを見る"
                         class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white hover:bg-amber-600">?</button>
                     <span class="text-xs text-amber-800">（「?」で、例を見られます）</span>
+                    <button type="button" @click="showViaHelp = true"
+                        class="ml-auto rounded border border-amber-400 bg-white px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100">経由地の入れ方（JR・メトロ・都営など、会社が変わるとき）</button>
                 </div>
 
                 <!-- 明細 -->
@@ -718,6 +722,7 @@ async function changeMonth(e) {
         <MultiDateModal v-if="multiTarget !== null" :month="month" :description="multiDescription"
             @close="multiTarget = null" @apply="onMultiApply" />
         <FareHelpModal v-if="showFareHelp" @close="showFareHelp = false" />
+        <ViaHelpModal v-if="showViaHelp" @close="showViaHelp = false" />
         <UserPickerModal v-if="companionTarget !== null" :users="colleagues" :selected="(rows[companionTarget]?.companions ?? []).map((c) => c.id)"
             title="同行者を選択" @close="companionTarget = null" @apply="onCompanionsApply" />
         <PresetManagerModal v-if="showPresets" :presets="registered" :purposes="purposes" :route-base="routeBase" @close="showPresets = false" />
