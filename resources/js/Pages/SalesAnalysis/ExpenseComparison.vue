@@ -25,14 +25,21 @@ const departmentTabs = computed(() => [
     ...props.enabledDepartmentKeys.map((k) => ({ key: k, label: props.departmentLabels[k] ?? k })),
     { key: 'shared', label: '共通費' },
 ]);
-const departmentKey = ref(props.enabledDepartmentKeys[0] ?? 'planning');
+const initialDepartmentKey = new URLSearchParams(window.location.search).get('department_key');
+const departmentKey = ref(
+    departmentTabs.value.some((t) => t.key === initialDepartmentKey) ? initialDepartmentKey : (props.enabledDepartmentKeys[0] ?? 'planning'),
+);
 
 const metaLoading = ref(false);
 const metaError = ref('');
 const fiscalYears = ref([]);
 const categories = ref([]);
 const selectedCategory = ref('');
+// 基準年度（支払先別の依存度の対象年度。複数年推移では強調表示する）。取込済みの年度の間だけ移動できる
 const vendorFiscalYear = ref(null);
+// ユーザーが基準年度を操作した後は、データのある最新年度への自動寄せをしない
+let baseYearTouched = false;
+const urlParams = new URLSearchParams(window.location.search);
 
 const trendLoading = ref(false);
 const trendData = ref(null);
@@ -40,6 +47,30 @@ const trendError = ref('');
 const vendorLoading = ref(false);
 const vendorData = ref(null);
 const vendorError = ref('');
+
+const baseYearIndex = computed(() => fiscalYears.value.indexOf(vendorFiscalYear.value));
+const canGoPrevYear = computed(() => baseYearIndex.value > 0);
+const canGoNextYear = computed(() => baseYearIndex.value >= 0 && baseYearIndex.value < fiscalYears.value.length - 1);
+const setBaseYear = (fy) => {
+    baseYearTouched = true;
+    vendorFiscalYear.value = fy;
+};
+const goPrevYear = () => { if (canGoPrevYear.value) setBaseYear(fiscalYears.value[baseYearIndex.value - 1]); };
+const goNextYear = () => { if (canGoNextYear.value) setBaseYear(fiscalYears.value[baseYearIndex.value + 1]); };
+const goLatestYear = () => setBaseYear(fiscalYears.value[fiscalYears.value.length - 1] ?? null);
+
+// 選択中の部署・科目で金額のある会計年度（基準年度にデータが無いときの案内用）
+const yearsWithData = computed(() => (trendData.value?.years ?? []).filter((y) => y.amount > 0).map((y) => y.fiscal_year));
+
+const syncQueryString = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('department_key', departmentKey.value);
+    if (selectedCategory.value) url.searchParams.set('category', selectedCategory.value);
+    if (vendorFiscalYear.value) url.searchParams.set('fiscal_year', String(vendorFiscalYear.value));
+    window.history.replaceState(null, '', url);
+};
+
+let initialQueryApplied = false;
 
 const fetchMeta = async () => {
     if (!props.supportsExpenses) return;
@@ -54,8 +85,13 @@ const fetchMeta = async () => {
         });
         fiscalYears.value = response.data.fiscal_years;
         categories.value = response.data.categories;
-        selectedCategory.value = categories.value[0] ?? '';
-        vendorFiscalYear.value = fiscalYears.value[fiscalYears.value.length - 1] ?? null;
+        // 初回のみURLクエリの科目・年度を復元する（部署切替後は先頭の科目・最新年度から始める）
+        const qCategory = initialQueryApplied ? null : urlParams.get('category');
+        const qYear = initialQueryApplied ? NaN : Number(urlParams.get('fiscal_year'));
+        selectedCategory.value = categories.value.includes(qCategory) ? qCategory : (categories.value[0] ?? '');
+        baseYearTouched = fiscalYears.value.includes(qYear);
+        vendorFiscalYear.value = baseYearTouched ? qYear : (fiscalYears.value[fiscalYears.value.length - 1] ?? null);
+        initialQueryApplied = true;
     } catch (e) {
         metaError.value = 'データの取得に失敗しました。';
         fiscalYears.value = [];
@@ -79,7 +115,7 @@ const renderTrendChart = () => {
             datasets: [{
                 label: selectedCategory.value,
                 data: trendData.value.years.map((y) => y.amount),
-                backgroundColor: '#4F46E5',
+                backgroundColor: trendData.value.years.map((y) => (y.fiscal_year === vendorFiscalYear.value ? '#4F46E5' : '#C7D2FE')),
             }],
         },
         options: {
@@ -107,6 +143,11 @@ const fetchTrend = async () => {
         });
         if (requestSeq !== trendRequestSeq) return; // より新しいリクエストが既に発行されている
         trendData.value = response.data;
+        // 基準年度を触っていなければ、この部署・科目でデータのある最新年度に寄せる
+        if (!baseYearTouched) {
+            const withData = response.data.years.filter((y) => y.amount > 0).map((y) => y.fiscal_year);
+            if (withData.length) vendorFiscalYear.value = withData[withData.length - 1];
+        }
     } catch (e) {
         if (requestSeq !== trendRequestSeq) return;
         trendData.value = null;
@@ -121,6 +162,12 @@ const fetchTrend = async () => {
     await nextTick();
     renderTrendChart();
 };
+
+// 支払先別グラフの棒1本あたりの太さ・行の高さ・軸ラベル分の余白（px）。件数が変わっても1本の見た目は一定にする
+const VENDOR_BAR_THICKNESS = 18;
+const VENDOR_ROW_HEIGHT = 34;
+const VENDOR_AXIS_PADDING = 44;
+const vendorChartHeight = computed(() => (vendorData.value?.vendors?.length ?? 0) * VENDOR_ROW_HEIGHT + VENDOR_AXIS_PADDING);
 
 const vendorChartRef = ref(null);
 let vendorChartInstance = null;
@@ -137,6 +184,8 @@ const renderVendorChart = () => {
                 label: '金額',
                 data: vendorData.value.vendors.map((v) => v.amount),
                 backgroundColor: '#0EA5E9',
+                // 支払先の数に関わらず棒の太さを固定する（少ないと太く、多いと細くなるのを防ぐ）
+                barThickness: VENDOR_BAR_THICKNESS,
             }],
         },
         options: {
@@ -146,7 +195,11 @@ const renderVendorChart = () => {
             // 優先してしまい、親が縦長でも横幅基準で縮んだ高さに描画してしまう
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, ticks: { callback: (v) => `¥${Number(v).toLocaleString()}` } } },
+            scales: {
+                x: { beginAtZero: true, ticks: { font: { size: 10 }, callback: (v) => `¥${Number(v).toLocaleString()}` } },
+                // 支払先名は件数が少なくても多くても省略せず全件表示する
+                y: { ticks: { font: { size: 10 }, autoSkip: false } },
+            },
         },
     });
 };
@@ -184,7 +237,12 @@ watch(selectedCategory, () => {
     fetchTrend();
     fetchVendors();
 });
-watch(vendorFiscalYear, fetchVendors);
+watch(vendorFiscalYear, () => {
+    fetchVendors();
+    renderTrendChart();
+    syncQueryString();
+});
+watch([departmentKey, selectedCategory], syncQueryString);
 
 onMounted(() => {
     if (props.supportsExpenses) fetchMeta();
@@ -214,6 +272,16 @@ onMounted(() => {
                         :class="departmentKey === tab.key ? 'bg-gray-700 text-white' : 'text-gray-600 hover:bg-gray-100'"
                         @click="departmentKey = tab.key"
                     >{{ tab.label }}</button>
+                </div>
+
+                <div v-if="fiscalYears.length" class="mb-3 flex flex-wrap items-center gap-2">
+                    <label class="text-xs font-medium text-gray-700">基準年度</label>
+                    <button type="button" :disabled="!canGoPrevYear" class="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40" @click="goPrevYear">← 前年度</button>
+                    <select :value="vendorFiscalYear" class="rounded-md border-gray-300 text-sm font-bold shadow-sm focus:border-indigo-500 focus:ring-indigo-500" @change="setBaseYear(Number($event.target.value))">
+                        <option v-for="fy in fiscalYears" :key="fy" :value="fy">{{ fiscalPeriodLabel(fy) }}</option>
+                    </select>
+                    <button type="button" :disabled="!canGoNextYear" class="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40" @click="goNextYear">翌年度 →</button>
+                    <button type="button" :disabled="!canGoNextYear" class="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-1 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-40" @click="goLatestYear">最新年度</button>
                 </div>
 
                 <p v-if="metaLoading" class="text-xs text-gray-500">読み込み中...</p>
@@ -256,7 +324,7 @@ onMounted(() => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="y in trendData.years" :key="y.fiscal_year" class="border-t">
+                            <tr v-for="y in trendData.years" :key="y.fiscal_year" class="border-t" :class="y.fiscal_year === vendorFiscalYear ? 'bg-indigo-50 font-semibold' : ''">
                                 <td class="py-1">
                                     {{ fiscalPeriodLabel(y.fiscal_year) }}
                                     <span v-if="y.is_shared_split" class="ml-1 rounded bg-purple-100 px-1 text-[10px] font-semibold text-purple-700">折半</span>
@@ -271,17 +339,17 @@ onMounted(() => {
                 <div class="rounded bg-white p-4 shadow">
                     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold text-gray-900">支払先別の依存度（{{ selectedCategory }}）</h3>
-                        <div class="flex items-center gap-2">
-                            <label class="text-xs font-medium text-gray-700">会計年度</label>
-                            <select v-model.number="vendorFiscalYear" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option v-for="fy in fiscalYears" :key="fy" :value="fy">{{ fiscalPeriodLabel(fy) }}</option>
-                            </select>
-                        </div>
                     </div>
 
                     <p v-if="vendorLoading" class="text-xs text-gray-500">読み込み中...</p>
                     <p v-else-if="vendorError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ vendorError }}</p>
-                    <p v-else-if="vendorData && !vendorData.has_data" class="text-xs text-gray-500">この会計年度・科目のデータはありません。</p>
+                    <p v-else-if="vendorData && !vendorData.has_data" class="text-xs text-gray-500">
+                        {{ fiscalPeriodLabel(vendorFiscalYear) }}のこの科目のデータはありません。
+                        <template v-if="yearsWithData.length">
+                            データのある年度:
+                            <button v-for="fy in yearsWithData" :key="fy" type="button" class="mr-1 rounded border border-indigo-300 px-1.5 text-indigo-700 hover:bg-indigo-50" @click="setBaseYear(fy)">{{ fiscalPeriodLabel(fy) }}</button>
+                        </template>
+                    </p>
                     <!--
                         canvasは常時マウントしたままにする（複数年推移グラフと同じ理由。2026-10-09）。
                         支払先が多い科目（外注加工費等は数十社になる）では、外側の表示枠の高さを常に
@@ -290,8 +358,8 @@ onMounted(() => {
                         外側の表示枠サイズに合わせて棒を圧縮してしまい、支払先が多い科目だけ棒とラベルが
                         ずれて見える不具合があったため、ラッパーを二重にして解消した。2026-10-09）
                     -->
-                    <div v-show="!vendorLoading && !vendorError && vendorData?.has_data" class="max-h-44 overflow-y-auto">
-                        <div :style="{ height: `${vendorData?.vendors?.length ? Math.max(60, vendorData.vendors.length * 24) : 60}px` }">
+                    <div v-show="!vendorLoading && !vendorError && vendorData?.has_data" class="max-h-72 overflow-y-auto">
+                        <div :style="{ height: `${vendorChartHeight}px` }">
                             <canvas ref="vendorChartRef"></canvas>
                         </div>
                     </div>
