@@ -84,12 +84,28 @@ function insertText(text) {
     nextTick(() => commentEl.value?.focus());
 }
 function insertRow(n) { insertText(`${n}行目：`); }
+// ─── 同行者の突き合わせ ───
+const VERDICTS = {
+    match:       { label: '○ 同行者の申請と一致', cls: 'bg-green-100 text-green-800' },
+    amount_diff: { label: '△ 金額が違います', cls: 'bg-red-100 text-red-800' },
+    route_diff:  { label: '区間が違います（確認してください）', cls: 'bg-amber-100 text-amber-900' },
+    candidate:   { label: '同じ日付で、行先が違う行があります（候補）', cls: 'bg-amber-100 text-amber-900' },
+    none:        { label: '同行者の申請に、この日の行がありません', cls: 'bg-amber-100 text-amber-900' },
+    no_expense:  { label: '同行者の、この月の申請がありません', cls: 'bg-amber-100 text-amber-900' },
+    draft:       { label: '同行者の申請は、まだ下書きです', cls: 'bg-gray-100 text-gray-600' },
+};
+const verdictOf = (v) => VERDICTS[v] ?? { label: v, cls: 'bg-gray-100 text-gray-600' };
+const hasReview = (it) => (it.companion_review?.companions?.length ?? 0) + (it.companion_review?.named_by?.length ?? 0) > 0;
+const routeText = (r) => [r.station_from, ...(r.via_stations ?? []), r.station_to].filter(Boolean).join(' － ');
+const reviewIssues = (it) => (it.companion_review?.companions ?? []).filter((c) => !['match', 'draft'].includes(c.verdict)).length;
+const statusLabel = (s) => props.statusLabels[s] ?? s;
 /** 運賃の相違・注意のある行を、コメントの文にする */
 function rowReasons(it) {
     const out = [];
     const f = it.check.fare;
     if (f.state === 'diff') out.push(`運賃が台帳と違います（申請 ${yen(it.amount)}／台帳 ${yen(f.expected)}、差 ${f.diff > 0 ? '+' : ''}${f.diff}円）`);
     for (const fl of it.check.flags) if (fl.level === 'warn') out.push(fl.label);
+    for (const c of it.companion_review?.companions ?? []) if (c.verdict === 'amount_diff') out.push(`同行者（${c.name}さん）の申請と、金額が違います`);
     return out;
 }
 const flaggedLines = computed(() => props.expense.items.map((it, i) => ({ n: i + 1, reasons: rowReasons(it) })).filter((x) => x.reasons.length));
@@ -171,8 +187,9 @@ function insertFlagged() {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(it, i) in expense.items" :key="it.id" class="border-b border-gray-100 align-top"
-                                :class="it.check.fare.state === 'diff' ? 'bg-red-50' : (it.check.flags.some((f) => f.level === 'warn') ? 'bg-amber-50' : '')">
+                            <template v-for="(it, i) in expense.items" :key="it.id">
+                            <tr class="border-b border-gray-100 align-top"
+                                :class="it.check.fare.state === 'diff' ? 'bg-red-50' : (it.check.flags.some((f) => f.level === 'warn') || (it.companion_review?.companions ?? []).some((c) => c.verdict === 'amount_diff') ? 'bg-amber-50' : '')">
                                 <td class="px-1 py-1.5 text-center text-xs text-gray-400">
                                     <button type="button" class="rounded px-1 hover:bg-purple-100 hover:text-purple-700" title="差戻しのコメントに「○行目：」を入れる" @click="insertRow(i + 1)">{{ i + 1 }}</button>
                                 </td>
@@ -182,7 +199,10 @@ function insertFlagged() {
                                 <td class="px-2 py-1.5 text-center text-gray-700">{{ shortDate(it.occurrence_date) }}</td>
                                 <td class="px-2 py-1.5 text-gray-800">{{ it.destination }}</td>
                                 <td class="px-2 py-1.5 text-gray-700">{{ it.purpose_label }}</td>
-                                <td class="px-2 py-1.5 text-gray-700">{{ it.station_from }} － {{ it.station_to }}</td>
+                                <td class="px-2 py-1.5 text-gray-700">
+                                    {{ it.station_from }} － <template v-for="(v, k) in (it.via_stations ?? [])" :key="k"><span class="text-xs text-gray-500">{{ v }}</span> － </template>{{ it.station_to }}
+                                    <div v-if="(it.via_stations ?? []).length" class="text-xs text-gray-400">経由 {{ it.via_stations.length }}か所</div>
+                                </td>
                                 <td class="px-2 py-1.5 text-center">
                                     <span class="rounded px-1.5 py-0.5 text-xs" :class="it.fare_type === 'ic' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'">{{ it.fare_type === 'ic' ? 'IC' : '切符' }}</span>
                                 </td>
@@ -193,6 +213,10 @@ function insertFlagged() {
                                 <td class="px-2 py-1.5 text-xs">
                                     <!-- 運賃マスタとの照合 -->
                                     <div v-if="it.check.fare.state === 'match'" class="text-green-700">○ 台帳と一致（片道 {{ yen(it.check.fare.registered) }}<span v-if="it.check.fare.expected !== it.check.fare.registered"> → {{ yen(it.check.fare.expected) }}</span>）</div>
+                                    <div v-if="it.check.fare.via_used && it.check.fare.legs?.length" class="mt-0.5 text-gray-500">
+                                        区間ごとの合計:
+                                        <span v-for="(lg, k) in it.check.fare.legs" :key="k" class="mr-1 whitespace-nowrap">{{ lg.from }}－{{ lg.to }} {{ lg.fare !== null ? yen(lg.fare) : '台帳に無し' }}</span>
+                                    </div>
                                     <div v-else-if="it.check.fare.state === 'diff'" class="font-semibold text-red-700">
                                         △ 台帳 {{ yen(it.check.fare.expected) }}／申請 {{ yen(it.amount) }}（差 {{ it.check.fare.diff > 0 ? '+' : '' }}{{ it.check.fare.diff }}円）
                                     </div>
@@ -209,6 +233,32 @@ function insertFlagged() {
                                     </div>
                                 </td>
                             </tr>
+                            <!-- 同行者の突き合わせ（日付・行先が同じ行を、同行者の申請から探した結果） -->
+                            <tr v-if="hasReview(it)" class="border-b border-gray-100 bg-gray-50/60">
+                                <td></td>
+                                <td colspan="8" class="px-2 pb-2 pt-0.5 text-xs">
+                                    <div v-for="c in it.companion_review.companions" :key="'c' + c.user_id" class="mt-1">
+                                        <span class="font-medium text-gray-700">同行者 {{ c.name }}さん</span>
+                                        <span class="ml-1 rounded px-1.5 py-0.5" :class="verdictOf(c.verdict).cls">{{ verdictOf(c.verdict).label }}</span>
+                                        <Link v-if="c.expense_id" :href="rt('show', { expense: c.expense_id })" class="ml-1 text-purple-700 hover:underline">申請を開く（{{ statusLabel(c.status) }}）</Link>
+                                        <div v-for="r in c.rows" :key="r.id" class="ml-3 mt-0.5 text-gray-600">
+                                            └ {{ r.destination }}／{{ routeText(r) }}／{{ r.fare_type === 'ic' ? 'IC' : '切符' }} {{ yen(r.amount) }}<span v-if="r.base_amount">（片道 {{ yen(r.base_amount) }} ×2）</span>
+                                            <span v-if="r.fare_state === 'diff'" class="ml-1 text-red-700">（台帳 {{ yen(r.fare_expected) }} と違う）</span>
+                                            <span v-else-if="r.fare_state === 'match'" class="ml-1 text-green-700">（台帳と一致）</span>
+                                            <span v-if="r.verdict && r.verdict !== 'match' && c.rows.length > 1" class="ml-1 rounded px-1 py-0.5" :class="verdictOf(r.verdict).cls">{{ verdictOf(r.verdict).label }}</span>
+                                        </div>
+                                    </div>
+                                    <div v-for="n in it.companion_review.named_by" :key="'n' + n.expense_id" class="mt-1">
+                                        <span class="font-medium text-gray-700">{{ n.applicant_name }}さんの申請で、この人が同行者に選ばれています</span>
+                                        <span class="ml-1 rounded px-1.5 py-0.5" :class="verdictOf(n.verdict).cls">{{ verdictOf(n.verdict).label }}</span>
+                                        <Link :href="rt('show', { expense: n.expense_id })" class="ml-1 text-purple-700 hover:underline">申請を開く（{{ statusLabel(n.status) }}）</Link>
+                                        <div class="ml-3 mt-0.5 text-gray-600">
+                                            └ {{ n.row.destination }}／{{ routeText(n.row) }}／{{ n.row.fare_type === 'ic' ? 'IC' : '切符' }} {{ yen(n.row.amount) }}<span v-if="n.row.base_amount">（片道 {{ yen(n.row.base_amount) }} ×2）</span>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            </template>
                         </tbody>
                         <tfoot>
                             <tr class="border-t-2 border-gray-300">

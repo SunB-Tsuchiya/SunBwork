@@ -41,7 +41,7 @@ class ExpenseController extends Controller
 
         $expense = TransportExpense::where('user_id', $user->id)
             ->where('billing_month', $month)
-            ->with(['items', 'reviewer:id,name', 'events.user:id,name'])
+            ->with(['items.companions.user:id,name', 'reviewer:id,name', 'events.user:id,name'])
             ->first();
 
         // 部門の選択肢: 会社に登録された有効な部署（＋共通）。初期値は本人の所属（選択肢に無ければ共通）
@@ -56,7 +56,7 @@ class ExpenseController extends Controller
             ->first()?->items
             ->map(fn ($it) => [
                 'destination' => $it->destination, 'purpose' => $it->purpose, 'purpose_text' => $it->purpose_text,
-                'station_from' => $it->station_from, 'station_to' => $it->station_to,
+                'station_from' => $it->station_from, 'station_to' => $it->station_to, 'via_stations' => $it->via_stations ?? [],
                 'fare_type' => $it->fare_type, 'amount' => $it->amount,
             ])->values() ?? [];
 
@@ -118,6 +118,8 @@ class ExpenseController extends Controller
                     'purpose_text'    => $it->purpose_text,
                     'station_from'    => $it->station_from,
                     'station_to'      => $it->station_to,
+                    'via_stations'    => $it->via_stations ?? [],
+                    'companions'      => $it->companions->map(fn ($c) => ['id' => $c->user_id, 'name' => $c->user?->name ?? '（退職・削除）'])->values(),
                     'fare_type'       => $it->fare_type,
                     'amount'          => $it->amount,
                     'base_amount'     => $it->base_amount ?? $it->amount,   // 旧データ（片道の記録なし）は合計のまま
@@ -125,9 +127,27 @@ class ExpenseController extends Controller
                 ])->values(),
             ] : null,
             'previousItems'      => $previousItems,
+            'colleagues'         => $this->colleagues($user, $companyId),
             'suggestions'        => $this->suggestions($user->id),
             'history'            => $history,
         ]);
+    }
+
+    /**
+     * 同行者に選べる人: 同じ会社の社員（本人・ゴーストは除く）。申請者管理で OFF の人も選べる（名前を載せるだけ）。
+     */
+    private function colleagues($user, ?int $companyId): array
+    {
+        if (!$companyId) {
+            return [];
+        }
+        return \App\Models\User::with(['department:id,name', 'positionTitle:id,name'])
+            ->where('company_id', $companyId)->where('is_ghost', false)->whereNull('ghost_owner_id')->where('id', '!=', $user->id)
+            ->orderBy('name')->get()
+            ->map(fn ($u) => [
+                'id' => $u->id, 'name' => $u->name, 'department' => $u->department?->name ?? '未所属',
+                'position_title' => $u->positionTitle?->name, 'employment_type' => $u->employment_type ?? 'regular',
+            ])->values()->all();
     }
 
     /**
@@ -168,7 +188,7 @@ class ExpenseController extends Controller
             $out[$k] = [
                 'id' => $p->id, 'registered' => true,
                 'destination' => $p->destination, 'purpose' => $p->purpose, 'purpose_text' => $p->purpose_text,
-                'station_from' => $p->station_from ?? '', 'station_to' => $p->station_to ?? '', 'fare_type' => $p->fare_type,
+                'station_from' => $p->station_from ?? '', 'station_to' => $p->station_to ?? '', 'via_stations' => $p->via_stations ?? [], 'fare_type' => $p->fare_type,
                 'base_amount' => $p->base_amount, 'auto_double' => $p->auto_double, 'amount' => $p->amount,
                 'count' => $history[$k]['count'] ?? 0,
             ];
@@ -258,7 +278,13 @@ class ExpenseController extends Controller
 
             $expense->items()->delete();
             foreach ($items as $i => $item) {
-                $expense->items()->create(array_merge($item, ['sort_order' => $i]));
+                $companionIds = $item['companion_ids'] ?? [];
+                unset($item['companion_ids']);
+                $item['via_stations'] = ($item['via_stations'] ?? []) ?: null;
+                $created = $expense->items()->create(array_merge($item, ['sort_order' => $i]));
+                foreach ($companionIds as $uid) {
+                    $created->companions()->create(['user_id' => $uid]);
+                }
             }
         });
 

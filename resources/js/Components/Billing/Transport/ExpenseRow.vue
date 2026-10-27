@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { normalizeText, parseYen, formatYen, parseOccurrenceDate } from './transportNormalize';
 
 const props = defineProps({
@@ -11,7 +11,7 @@ const props = defineProps({
     error:      { type: String, default: '' },
 });
 
-const emit = defineEmits(['update:modelValue', 'remove', 'duplicate', 'multi', 'register', 'next', 'destination-change']);
+const emit = defineEmits(['update:modelValue', 'remove', 'duplicate', 'multi', 'register', 'next', 'destination-change', 'companions']);
 
 function update(field, value) {
     emit('update:modelValue', { ...props.modelValue, [field]: value });
@@ -41,6 +41,31 @@ function onTextBlur(field, e) {
     e.target.value = next;
     update(field, next);
 }
+
+// ─ 経由地（路線が変わる駅を、出発と到着の間に順番どおり入れる。入れなくてもよい） ─
+const MAX_VIA = 5;
+const via = computed(() => props.modelValue.via_stations ?? []);
+const companions = computed(() => props.modelValue.companions ?? []);
+const viaEls = ref([]);
+function setVia(list) { update('via_stations', list); }
+async function addVia() {
+    if (via.value.length >= MAX_VIA) return;
+    setVia([...via.value, '']);
+    await nextTick();
+    viaEls.value[via.value.length - 1]?.focus();
+}
+function onViaInput(k, v) {
+    const next = [...via.value];
+    next[k] = v;
+    setVia(next);
+}
+function onViaBlur(k, e) {
+    const text = normalizeText(e.target.value);
+    const next = [...via.value];
+    next[k] = text;
+    setVia(next.filter((s) => s !== ''));   // 空のまま離れたら、その欄は消す
+}
+function removeVia(k) { setVia(via.value.filter((_, i) => i !== k)); }
 
 // ─ 金額（円・整数・入力中にカンマ。往復は片道×2 にできる） ─
 // 「片道の金額を×2（往復）」は、「打合せ（往復）」と「その他」で使える
@@ -135,6 +160,24 @@ const inputCls = 'w-full rounded border border-gray-300 px-2 py-1 text-sm focus:
                 <input type="text" :value="modelValue.station_to" :disabled="readonly"
                     @input="update('station_to', $event.target.value)" @blur="onTextBlur('station_to', $event)"
                     class="w-24 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-50" />
+            </div>
+            <!-- 経由地（路線が変わる駅）。入れなくてもよい -->
+            <div v-if="via.length || !readonly" class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                <template v-for="(v, k) in via" :key="k">
+                    <span class="text-gray-400">経由</span>
+                    <input ref="viaEls" type="text" :value="v" :disabled="readonly"
+                        @input="onViaInput(k, $event.target.value)" @blur="onViaBlur(k, $event)"
+                        class="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none disabled:bg-gray-50" />
+                    <button v-if="!readonly" type="button" class="text-gray-400 hover:text-red-600" title="この経由地を消す" @click="removeVia(k)">✕</button>
+                </template>
+                <button v-if="!readonly && via.length < MAX_VIA" type="button" class="text-blue-600 hover:underline"
+                    title="路線が変わる駅を、順番に入れます（入れなくてもかまいません）" @click="addVia">＋経由地</button>
+            </div>
+            <!-- 同行者（同じ会社の社員。入れなくてもよい） -->
+            <div v-if="companions.length || !readonly" class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                <span v-for="c in companions" :key="c.id" class="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-800">同行 {{ c.name }}</span>
+                <button v-if="!readonly" type="button" class="text-blue-600 hover:underline"
+                    title="一緒に行った人を選びます（入れなくてもかまいません）" @click="$emit('companions')">{{ companions.length ? '同行者を変更' : '＋同行者' }}</button>
             </div>
         </td>
 

@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TransportPreset extends Model
 {
     protected $fillable = [
-        'user_id', 'destination', 'purpose', 'purpose_text', 'station_from', 'station_to',
+        'user_id', 'destination', 'purpose', 'purpose_text', 'station_from', 'station_to', 'via_stations',
         'fare_type', 'base_amount', 'auto_double',
     ];
 
     protected $casts = [
         'base_amount' => 'integer',
         'auto_double' => 'boolean',
+        'via_stations' => 'array',
     ];
 
     /** 1 人が登録できる上限 */

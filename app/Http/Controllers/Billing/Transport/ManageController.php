@@ -106,6 +106,7 @@ class ManageController extends Controller
 
         $expense->load(['user:id,name,department_id', 'user.department:id,name', 'company:id,name', 'chargeDepartment:id,name', 'reviewer:id,name', 'items', 'events.user:id,name']);
         $check = $this->checker->check($expense, true);   // 運賃マスタとの照合・重複・休日・金額の異常・前回との比較
+        $companions = app(\App\Services\Billing\Transport\TransportCompanionMatcher::class)->forExpense($expense);   // 同行者の突き合わせ
 
         return Inertia::render('Billing/Transport/Manage/Show', [
             'routeBase'    => $this->routeBase($request),
@@ -131,6 +132,8 @@ class ManageController extends Controller
                 'items'           => TransportExpenseExporter::sortedItems($expense)->map(fn ($it, $i) => [
                     'id'              => $it->id,
                     'check'           => $check['items'][$i],
+                    'via_stations'    => $it->via_stations ?? [],
+                    'companion_review' => $companions[$it->id] ?? ['companions' => [], 'named_by' => []],
                     'occurrence_date' => $it->occurrence_date?->toDateString(),
                     'destination'     => $it->destination,
                     'purpose_label'   => $it->purpose_label,

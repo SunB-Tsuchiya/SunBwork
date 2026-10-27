@@ -121,24 +121,20 @@ class TransportFareChecker
             // ── 運賃マスタとの照合 ──
             $fare = ['state' => 'skip', 'expected' => null, 'registered' => null, 'diff' => null, 'fare_id' => null, 'recheck' => false, 'status' => null, 'reported' => null];
             if ($routeOk && $from !== $to) {
-                $m = $fares[$key] ?? null;
-                if (!$m) {
-                    $fare['state'] = 'none';
-                } else {
-                    $fare['fare_id'] = $m->id;
-                    $fare['status'] = $m->status;
-                    $fare['recheck'] = $m->needsRecheck();
-                    $fare['reported'] = $m->reported_fare;
-                    $one = $m->status === TransportFare::STATUS_VERIFIED ? $m->fareFor($it->fare_type) : null;
-                    if ($one === null) {
-                        $fare['state'] = $m->status === TransportFare::STATUS_VERIFIED ? 'none' : 'unverified';   // 検査済みでも、この種別（IC/切符）の運賃が無い
-                    } else {
-                        $expected = $one * (self::legs($it->purpose) === 2 || ($it->purpose === 'other' && $it->auto_double) ? 2 : 1);
-                        $fare['registered'] = $one;
-                        $fare['expected'] = $expected;
-                        $fare['diff'] = $it->amount - $expected;
-                        $fare['state'] = $it->amount === $expected ? 'match' : 'diff';
-                    }
+                $r = $this->routeFare($it, $fares);
+                $fare['state'] = $r['state'];
+                $fare['fare_id'] = $r['fare_id'];
+                $fare['status'] = $r['status'];
+                $fare['recheck'] = $r['recheck'];
+                $fare['reported'] = $r['reported'];
+                $fare['legs'] = $r['legs'];
+                $fare['via_used'] = $r['via_used'];
+                if ($r['one'] !== null) {
+                    $expected = $r['one'] * (self::legs($it->purpose) === 2 || ($it->purpose === 'other' && $it->auto_double) ? 2 : 1);
+                    $fare['registered'] = $r['one'];
+                    $fare['expected'] = $expected;
+                    $fare['diff'] = $it->amount - $expected;
+                    $fare['state'] = $it->amount === $expected ? 'match' : 'diff';
                 }
             }
 
@@ -172,6 +168,75 @@ class TransportFareChecker
         }
 
         return ['items' => $out, 'summary' => $summary];
+    }
+
+    /**
+     * 片道の運賃を台帳から求める。通しの区間（出発－到着）が検査済みならそれを使い、なければ、経由地で区切った区間の運賃を足す。
+     * 戻り値: state（match/diff の判定前の none・unverified）、one（片道。求められなければ null）、legs（区間ごとの内訳）、via_used（区間の合計を使ったか）ほか
+     */
+    private function routeFare(TransportExpenseItem $it, array $fares): array
+    {
+        $out = ['state' => 'none', 'one' => null, 'fare_id' => null, 'status' => null, 'recheck' => false, 'reported' => null, 'legs' => [], 'via_used' => false];
+        $through = $fares[TransportFare::routeKey($it->station_from, $it->station_to)] ?? null;
+        if ($through) {
+            $out['fare_id'] = $through->id;
+            $out['status'] = $through->status;
+            $out['recheck'] = $through->needsRecheck();
+            $out['reported'] = $through->reported_fare;
+            $one = $through->status === TransportFare::STATUS_VERIFIED ? $through->fareFor($it->fare_type) : null;
+            if ($one !== null) {
+                $out['one'] = $one;
+                return $out;
+            }
+            $out['state'] = $through->status === TransportFare::STATUS_VERIFIED ? 'none' : 'unverified';   // 検査済みでも、この種別（IC/切符）の運賃が無い
+        }
+
+        // 経由地があれば、区間ごとに台帳から探して足す（通しが使えないとき）
+        $points = $it->routePoints();
+        if (count($points) <= 2) {
+            return $out;
+        }
+        $sum = 0;
+        $missing = false;
+        $unverified = false;
+        $recheck = false;
+        for ($k = 0; $k < count($points) - 1; $k++) {
+            $a = $points[$k];
+            $b = $points[$k + 1];
+            if (TransportFare::normalizeStation($a) === TransportFare::normalizeStation($b)) {
+                continue;
+            }
+            $m = $fares[TransportFare::routeKey($a, $b)] ?? null;
+            $leg = ['from' => $a, 'to' => $b, 'fare' => null, 'state' => 'none'];
+            if ($m) {
+                $f = $m->status === TransportFare::STATUS_VERIFIED ? $m->fareFor($it->fare_type) : null;
+                if ($f !== null) {
+                    $leg['fare'] = $f;
+                    $leg['state'] = 'ok';
+                    $sum += $f;
+                    $recheck = $recheck || $m->needsRecheck();
+                } else {
+                    $leg['state'] = $m->status === TransportFare::STATUS_VERIFIED ? 'none' : 'unverified';
+                    $unverified = $unverified || $leg['state'] === 'unverified';
+                    $missing = $missing || $leg['state'] === 'none';
+                }
+            } else {
+                $missing = true;
+            }
+            $out['legs'][] = $leg;
+        }
+        if (!$out['legs']) {
+            return $out;
+        }
+        $out['via_used'] = true;
+        if (!$missing && !$unverified) {
+            $out['one'] = $sum;
+            $out['recheck'] = $recheck;
+            $out['state'] = 'match';
+        } else {
+            $out['state'] = $missing ? 'none' : 'unverified';
+        }
+        return $out;
     }
 
     private function flag(string $type, string $level, string $label, string $detail): array

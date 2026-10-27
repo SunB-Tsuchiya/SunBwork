@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TransportExpenseItem extends Model
 {
@@ -16,6 +17,7 @@ class TransportExpenseItem extends Model
         'purpose_text',
         'station_from',
         'station_to',
+        'via_stations',
         'fare_type',
         'amount',
         'base_amount',
@@ -29,6 +31,7 @@ class TransportExpenseItem extends Model
         'amount' => 'integer',
         'base_amount' => 'integer',
         'auto_double' => 'boolean',
+        'via_stations' => 'array',
         'checked_at' => 'datetime',
         'sort_order' => 'integer',
     ];
@@ -43,6 +46,25 @@ class TransportExpenseItem extends Model
 
     /** 「片道の金額を×2（往復）」が使える用件（その他の用件でも、往復のことがあるため） */
     public const DOUBLE_PURPOSES = ['round_trip', 'other'];
+
+    /** 経由地の上限・同行者の上限（1 行あたり） */
+    public const MAX_VIA = 5;
+    public const MAX_COMPANIONS = 5;
+
+    /** 同行者（選んだ社員） */
+    public function companions(): HasMany
+    {
+        return $this->hasMany(TransportExpenseItemCompanion::class, 'transport_expense_item_id');
+    }
+
+    /** 区間の駅を順に並べたもの（出発 → 経由地 → 到着）。空の駅は除く */
+    public function routePoints(): array
+    {
+        return array_values(array_filter(
+            array_merge([$this->station_from], $this->via_stations ?? [], [$this->station_to]),
+            fn ($s) => trim((string) $s) !== ''
+        ));
+    }
 
     public function expense(): BelongsTo
     {

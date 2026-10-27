@@ -203,7 +203,7 @@ export function applySuggestion(row, s) {
     return {
         ...row,
         destination: s.destination, purpose: s.purpose, purpose_text: s.purpose_text ?? '',
-        station_from: s.station_from ?? '', station_to: s.station_to ?? '', fare_type: s.fare_type,
+        station_from: s.station_from ?? '', station_to: s.station_to ?? '', via_stations: s.via_stations ?? [], fare_type: s.fare_type,
         base_amount: s.base_amount, auto_double: doubled, amount: s.base_amount * (doubled ? 2 : 1),
     };
 }

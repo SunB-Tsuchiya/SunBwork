@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Services\Billing\Transport\TransportCompany;
 use App\Models\TransportExpense;
 use App\Models\TransportExpenseItem;
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,6 +31,9 @@ class SaveExpenseRequest extends FormRequest
             $it['amount'] = self::yen($it['amount'] ?? 0);
             $it['base_amount'] = isset($it['base_amount']) && $it['base_amount'] !== '' ? self::yen($it['base_amount']) : null;
             $it['auto_double'] = filter_var($it['auto_double'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $it['via_stations'] = self::viaList($it['via_stations'] ?? []);
+            $it['companion_ids'] = collect(is_array($it['companion_ids'] ?? null) ? $it['companion_ids'] : [])
+                ->filter(fn ($v) => is_numeric($v))->map(fn ($v) => (int) $v)->unique()->values()->all();
             return $it;
         })->all();
 
@@ -52,6 +56,10 @@ class SaveExpenseRequest extends FormRequest
             'items.*.amount'          => ['required', 'integer', 'min:0', 'max:9999999'],
             'items.*.base_amount'     => ['nullable', 'integer', 'min:0', 'max:9999999'],
             'items.*.auto_double'     => ['boolean'],
+            'items.*.via_stations'    => ['nullable', 'array', 'max:' . TransportExpenseItem::MAX_VIA],
+            'items.*.via_stations.*'  => ['string', 'max:100'],
+            'items.*.companion_ids'   => ['nullable', 'array', 'max:' . TransportExpenseItem::MAX_COMPANIONS],
+            'items.*.companion_ids.*' => ['integer'],
         ];
     }
 
@@ -66,6 +74,16 @@ class SaveExpenseRequest extends FormRequest
             if ($deptId !== null && $deptId !== '' && !Department::where('id', $deptId)->where('active', true)
                 ->where('company_id', TransportCompany::idFor($this->user()))->exists()) {
                 $v->errors()->add('charge_department_id', '部門は、会社に登録された部署から選んでください。');
+            }
+            // 同行者は、同じ会社の社員のみ（本人・ゴーストは選べない）
+            $companyId = TransportCompany::idFor($this->user());
+            $allIds = collect($this->input('items', []))->flatMap(fn ($it) => $it['companion_ids'] ?? [])->unique()->values();
+            $valid = $allIds->isEmpty() ? collect() : User::whereIn('id', $allIds)->where('company_id', $companyId)
+                ->where('is_ghost', false)->whereNull('ghost_owner_id')->where('id', '!=', $this->user()->id)->pluck('id');
+            foreach ($this->input('items', []) as $i => $it) {
+                if (collect($it['companion_ids'] ?? [])->diff($valid)->isNotEmpty()) {
+                    $v->errors()->add("items.$i.companion_ids", ($i + 1) . '行目の同行者は、同じ会社の社員から選んでください。');
+                }
             }
             [$start, $end] = TransportExpense::monthRange($this->input('billing_month'));
             foreach ($this->input('items', []) as $i => $it) {
@@ -89,6 +107,8 @@ class SaveExpenseRequest extends FormRequest
             'items.*.station_from.max' => ':position行目の出発駅は 100 文字以内で入力してください。',
             'items.*.station_to.max'   => ':position行目の到着駅は 100 文字以内で入力してください。',
             'items.*.purpose_text.max' => ':position行目の用件の内容は 100 文字以内で入力してください。',
+            'items.*.via_stations.max'  => ':position行目の経由地は ' . TransportExpenseItem::MAX_VIA . ' か所までです。',
+            'items.*.companion_ids.max' => ':position行目の同行者は ' . TransportExpenseItem::MAX_COMPANIONS . ' 人までです。',
             'items.max' => '明細は 200 行までです。',
             'items.min' => '明細を 1 行以上入力してください。',
         ];
@@ -110,6 +130,19 @@ class SaveExpenseRequest extends FormRequest
         }
         $s = mb_convert_kana($s, 'ASKV', 'UTF-8');
         return trim(preg_replace('/[\s　]+/u', '　', $s));
+    }
+
+    /** 経由地: 駅名を整え、空は除き、重複する連続は 1 つに（上限を超えたぶんは、検証で弾くので、切らない） */
+    public static function viaList(mixed $v): array
+    {
+        $out = [];
+        foreach (is_array($v) ? $v : [] as $s) {
+            $s = self::zenkaku(is_string($s) ? $s : null);
+            if ($s !== null && $s !== '') {
+                $out[] = $s;
+            }
+        }
+        return $out;
     }
 
     /** 金額: 全角・カンマ・「円」を取り除いて整数に（数字として読めなければ元の値を返してバリデーションで弾く） */

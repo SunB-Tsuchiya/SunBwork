@@ -9,6 +9,7 @@ import PasteImportModal from '@/Components/Billing/Transport/PasteImportModal.vu
 import MultiDateModal from '@/Components/Billing/Transport/MultiDateModal.vue';
 import PresetManagerModal from '@/Components/Billing/Transport/PresetManagerModal.vue';
 import FareHelpModal from '@/Components/Billing/Transport/FareHelpModal.vue';
+import UserPickerModal from '@/Components/Billing/Transport/UserPickerModal.vue';
 import { shortDate } from '@/Components/Billing/Transport/transportNormalize';
 import { parseQuick, applySuggestion } from '@/Components/Billing/Transport/transportInput';
 
@@ -31,6 +32,7 @@ const props = defineProps({
     deadlineRequest:    { type: Object, default: null },   // この月の、期限後の申請の依頼（requested 依頼中 / rejected 見送り）
     previousItems:      { type: Array, default: () => [] },
     suggestions:        { type: Array, default: () => [] },
+    colleagues:         { type: Array, default: () => [] },   // 同行者に選べる人（同じ会社の社員）
     history:            { type: Array, default: () => [] },
 });
 
@@ -86,7 +88,8 @@ const lockedByDeadline = computed(() => props.deadline.passed && !props.deadline
 function newRow() {
     return {
         occurrence_date: null, destination: '', purpose: 'round_trip', purpose_text: '',
-        station_from: '', station_to: '', fare_type: 'ic', base_amount: 0, auto_double: true, amount: 0,   // 初期値は往復（×2 チェック済み）
+        station_from: '', station_to: '', via_stations: [], companions: [],   // 経由地・同行者は、入れなくてもよい
+        fare_type: 'ic', base_amount: 0, auto_double: true, amount: 0,   // 初期値は往復（×2 チェック済み）
     };
 }
 
@@ -115,6 +118,7 @@ function loadFromProps() {
             ? props.expense.items.map((it) => ({
                 occurrence_date: it.occurrence_date, destination: it.destination ?? '', purpose: it.purpose,
                 purpose_text: it.purpose_text ?? '', station_from: it.station_from ?? '', station_to: it.station_to ?? '',
+                via_stations: it.via_stations ?? [], companions: it.companions ?? [],
                 fare_type: it.fare_type, base_amount: it.base_amount ?? it.amount, auto_double: !!it.auto_double, amount: it.amount,   // 保存したときの状態（片道の金額・×2）をそのまま復元
             }))
             : [newRow()];
@@ -132,6 +136,14 @@ watch(() => JSON.stringify([props.month, props.expense]), loadFromProps, { immed
 const showPaste = ref(false);
 const showPresets = ref(false);
 const showFareHelp = ref(false);
+const companionTarget = ref(null);   // 同行者を選んでいる行の番号
+function onCompanionsApply(ids) {
+    const i = companionTarget.value;
+    if (i !== null && rows.value[i]) {
+        rows.value[i] = { ...rows.value[i], companions: ids.map((id) => ({ id, name: props.colleagues.find((u) => u.id === id)?.name ?? '' })) };
+    }
+    companionTarget.value = null;
+}
 const multiTarget = ref(null);    // 複数日に追加する行の番号
 const quickText = ref('');
 const quickMessage = ref('');
@@ -235,7 +247,7 @@ function registerRow(i) {
     if (!r.destination?.trim()) { quickMessage.value = '登録するには、先に行先を入力してください。'; return; }
     router.post(rt('presets.store'), {
         destination: r.destination, purpose: r.purpose, purpose_text: r.purpose_text,
-        station_from: r.station_from, station_to: r.station_to, fare_type: r.fare_type,
+        station_from: r.station_from, station_to: r.station_to, via_stations: r.via_stations ?? [], fare_type: r.fare_type,
         base_amount: r.base_amount ?? r.amount, auto_double: r.auto_double,
     }, { preserveScroll: true, preserveState: true, onError: (e) => { errors.value = e; } });
 }
@@ -249,7 +261,7 @@ function copyPrevious() {
     if (rows.value.some((r) => r.destination || r.amount) && !confirm('入力中の内容は前月の内容で置き換わります。よろしいですか？')) return;
     rows.value = props.previousItems.map((it) => ({
         ...newRow(), ...it, occurrence_date: null, base_amount: it.amount, auto_double: false,   // 前月の金額は往復ぶん込みなので、×2 は外す
-        purpose_text: it.purpose_text ?? '',
+        purpose_text: it.purpose_text ?? '', via_stations: it.via_stations ?? [], companions: [],   // 経由地は引き継ぐ。同行者は、その日ごとに違うので引き継がない
     }));
 }
 
@@ -263,7 +275,7 @@ function payload() {
     return {
         billing_month: props.month,
         charge_department_id: chargeDeptId.value,
-        items: rows.value.slice(0, n).map((r, i) => ({ ...r, sort_order: i })),
+        items: rows.value.slice(0, n).map(({ companions, ...r }, i) => ({ ...r, companion_ids: (companions ?? []).map((c) => c.id), sort_order: i })),
     };
 }
 const snapshot = computed(() => JSON.stringify(payload()));
@@ -553,7 +565,7 @@ async function changeMonth(e) {
                             <ExpenseRow v-for="(row, i) in rows" :key="i" v-model="rows[i]"
                                 :purposes="purposes" :index="i" :month="month" :readonly="!editable"
                                 :error="rowError(i)" @remove="removeRow(i)"
-                                @duplicate="duplicateRow(i)" @multi="multiTarget = i" @register="registerRow(i)"
+                                @duplicate="duplicateRow(i)" @multi="multiTarget = i" @register="registerRow(i)" @companions="companionTarget = i"
                                 @next="onNext(i)" @destination-change="onDestinationChange(i, $event)" />
                         </tbody>
                         <tfoot>
@@ -706,6 +718,8 @@ async function changeMonth(e) {
         <MultiDateModal v-if="multiTarget !== null" :month="month" :description="multiDescription"
             @close="multiTarget = null" @apply="onMultiApply" />
         <FareHelpModal v-if="showFareHelp" @close="showFareHelp = false" />
+        <UserPickerModal v-if="companionTarget !== null" :users="colleagues" :selected="(rows[companionTarget]?.companions ?? []).map((c) => c.id)"
+            title="同行者を選択" @close="companionTarget = null" @apply="onCompanionsApply" />
         <PresetManagerModal v-if="showPresets" :presets="registered" :purposes="purposes" :route-base="routeBase" @close="showPresets = false" />
     </AppLayout>
 </template>

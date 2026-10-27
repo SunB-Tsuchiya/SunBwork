@@ -58,6 +58,7 @@ class PresetController extends Controller
             'purpose_text' => SaveExpenseRequest::zenkaku($request->input('purpose_text')),
             'station_from' => SaveExpenseRequest::zenkaku($request->input('station_from')),
             'station_to'   => SaveExpenseRequest::zenkaku($request->input('station_to')),
+            'via_stations' => SaveExpenseRequest::viaList($request->input('via_stations', [])),
             'base_amount'  => SaveExpenseRequest::yen($request->input('base_amount', 0)),
             'auto_double'  => filter_var($request->input('auto_double', false), FILTER_VALIDATE_BOOLEAN),
         ]);
@@ -68,6 +69,8 @@ class PresetController extends Controller
             'purpose_text' => ['nullable', 'string', 'max:100'],
             'station_from' => ['nullable', 'string', 'max:100'],
             'station_to'   => ['nullable', 'string', 'max:100'],
+            'via_stations' => ['nullable', 'array', 'max:' . TransportExpenseItem::MAX_VIA],
+            'via_stations.*' => ['string', 'max:100'],
             'fare_type'    => ['required', 'in:ic,ticket'],
             'base_amount'  => ['required', 'integer', 'min:0', 'max:9999999'],
             'auto_double'  => ['boolean'],
@@ -81,6 +84,7 @@ class PresetController extends Controller
         $data['purpose_text'] = $data['purpose'] === 'other' ? ($data['purpose_text'] ?? null) : null;
         $data['station_from'] = $data['station_from'] ?? '';
         $data['station_to'] = $data['station_to'] ?? '';
+        $data['via_stations'] = ($data['via_stations'] ?? []) ?: null;
 
         return $data;
     }

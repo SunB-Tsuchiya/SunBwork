@@ -12,13 +12,16 @@ defineEmits(['close']);
 
 const local = ref([]);
 watch(() => props.presets, (v) => {
-    local.value = v.map((p) => ({ ...p, amountText: formatYen(p.base_amount), saving: false }));
+    local.value = v.map((p) => ({ ...p, amountText: formatYen(p.base_amount), viaText: (p.via_stations ?? []).join('、'), saving: false }));
 }, { immediate: true, deep: true });
 
 const errors = ref({});
 
+// 経由地は「池袋、新宿」のように、「、」「,」で区切って入れる
+const parseVia = (text) => String(text ?? '').split(/[、,，]/).map((s) => normalizeText(s.trim())).filter(Boolean);
+
 // 新しく登録する（申請の入力とは関係なく、ここで直接登録できる）
-const blank = () => ({ destination: '', purpose: 'round_trip', purpose_text: '', station_from: '', station_to: '', fare_type: 'ic', amountText: '', auto_double: true });
+const blank = () => ({ destination: '', purpose: 'round_trip', purpose_text: '', station_from: '', station_to: '', viaText: '', fare_type: 'ic', amountText: '', auto_double: true });
 const draft = ref(blank());
 const adding = ref(false);
 function addNew() {
@@ -28,7 +31,7 @@ function addNew() {
     adding.value = true;
     router.post(route(props.routeBase + 'presets.store'), {
         destination: d.destination, purpose: d.purpose, purpose_text: d.purpose_text,
-        station_from: d.station_from, station_to: d.station_to, fare_type: d.fare_type,
+        station_from: d.station_from, station_to: d.station_to, via_stations: parseVia(d.viaText), fare_type: d.fare_type,
         base_amount: parseYen(d.amountText) ?? 0, auto_double: d.auto_double && ['round_trip', 'other'].includes(d.purpose),
     }, {
         preserveScroll: true, preserveState: true,
@@ -48,7 +51,7 @@ function save(p) {
     p.saving = true;
     router.put(route(props.routeBase + 'presets.update', { preset: p.id }), {
         destination: p.destination, purpose: p.purpose, purpose_text: p.purpose_text,
-        station_from: p.station_from, station_to: p.station_to, fare_type: p.fare_type,
+        station_from: p.station_from, station_to: p.station_to, via_stations: parseVia(p.viaText), fare_type: p.fare_type,
         base_amount: parseYen(p.amountText) ?? 0, auto_double: p.auto_double && ['round_trip', 'other'].includes(p.purpose),
     }, {
         preserveScroll: true, preserveState: true,
@@ -93,6 +96,9 @@ const cell = 'w-full rounded border border-gray-300 px-2 py-1 text-xs focus:bord
                                     <span class="text-gray-400">－</span>
                                     <input type="text" v-model="draft.station_to" @blur="draft.station_to = normalizeText(draft.station_to)" :class="cell" placeholder="新宿" />
                                 </span>
+                            </label>
+                            <label class="col-span-2 text-xs text-gray-600">経由地（路線が変わる駅。なくてもよい）
+                                <input type="text" v-model="draft.viaText" :class="cell + ' mt-0.5'" placeholder="例：池袋（複数なら「、」で区切る）" />
                             </label>
                             <label class="text-xs text-gray-600">IC/切符
                                 <select v-model="draft.fare_type" :class="cell + ' mt-0.5'"><option value="ic">IC</option><option value="ticket">切符</option></select>
@@ -144,6 +150,7 @@ const cell = 'w-full rounded border border-gray-300 px-2 py-1 text-xs focus:bord
                                         <span class="text-gray-400">－</span>
                                         <input type="text" v-model="p.station_to" @blur="norm(p, 'station_to')" :class="cell" />
                                     </div>
+                                    <input type="text" v-model="p.viaText" :class="cell + ' mt-1'" placeholder="経由地（なくてもよい。「、」で区切る）" />
                                 </td>
                                 <td class="px-2 py-1 text-center">
                                     <select v-model="p.fare_type" :class="cell"><option value="ic">IC</option><option value="ticket">切符</option></select>

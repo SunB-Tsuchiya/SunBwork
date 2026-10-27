@@ -118,3 +118,22 @@ Admin / SuperAdmin が、ユーザーごとのスイッチで「申請（交通�
 - 申請・再申請・期限後の申請の依頼の通知は、**同じ会社の Clerk だけ**に届く（Admin・SuperAdmin・本人・他社には届かない）。`TransportNotifier::managers()`。
 - 受理などの操作ができる人（Admin・SuperAdmin）は変わらない。通知が来ないだけ。
 - 会社に Clerk がいない場合は、誰にも届かない（フォールバックなし）。
+
+## 同行者・経由地（2026-10-27 追加。Clerk の要望）
+**目的:** 二人が同行したとき、請求は別々でも、Clerk が「日付・行先が合う二人の申請」を突き合わせて、運賃が合っているかを確認できるようにする。
+
+**確定した仕様（ユーザーと 1 問ずつ確認）**
+1. 同行した二人が、それぞれ自分の交通費を申請する（A）。片方が相手を同行者に選べばよい。**選ばれた側（相手が自分を選んでいない場合）の申請画面にも、「○○さんの申請で同行者に選ばれています」と情報を出す。**
+2. 突き合わせは、**日付が同じ＋行先が同じ**（全角半角・空白のゆれは直して比べる）行を「対応する行」とする。日付だけ同じで行先が違う行は「候補」、同じ日付の行が無ければ「なし」。
+3. 経由地があるときの台帳の運賃: **通しの区間（出発－到着）が検査済みならそれを優先**、なければ経由地で区切った区間の運賃を足す。区間のどれかが台帳に無ければ未検査（区間ごとの候補を台帳に溜める）。
+4. 同行者に選べるのは**同じ会社の社員のみ**（本人・ゴースト除く）。申請者管理で OFF の人も選べる（名前を載せるだけ）。
+5. 紙の用紙（PDF・Excel）には**出さない**（用紙のレイアウトは変えない。確認は Web の画面で）。
+6. 申請者は、同行者も経由地も、入れても入れなくてもよい。
+
+**既定（私が決めた点）:** 1 行あたり同行者 5 人まで・経由地 5 か所まで。「複製」「複数日」は両方を引き継ぎ、「前月の内容をコピー」は経由地だけ引き継ぐ。登録した行先（プリセット）は経由地を持てる（同行者は持たない）。同行者の申請が下書きのあいだは、中身を見せず「下書き」とだけ出す（管理側に下書きを見せない原則）。
+
+**突き合わせの判定（`TransportCompanionMatcher`）:** match（区間・金額とも同じ）／amount_diff（区間は同じで金額が違う）／route_diff（区間が違う。家の最寄り駅が違うなど正当なこともあるので「確認」扱い）／candidate／none／no_expense／draft。
+
+**DB:** `transport_expense_item_companions`（明細・社員、削除で連動）、`transport_expense_items.via_stations` / `transport_presets.via_stations`（JSON）。migration `2026_10_27_100000_add_companions_and_via_to_transport`（本番で実行が必要）。
+
+**主なファイル:** `TransportCompanionMatcher`（新規）、`TransportFareChecker::routeFare()`、`TransportFareStock`、`SaveExpenseRequest`、`ExpenseController`、`ManageController::show`、`UserPickerModal.vue`（新規。お知らせの個別選択モーダルと同じ見た目の部品。お知らせ画面は触っていない）、`ExpenseRow.vue`、`Apply/Index.vue`、`PresetManagerModal.vue`、`Manage/Show.vue`、テスト `TransportCompanionTest`。
