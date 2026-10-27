@@ -131,12 +131,15 @@ class WorkloadTrialAnalysis
                 $range[1] = min($range[1], $now->hour * 60 + $now->minute);
             }
             if (! $range || $range[1] <= $range[0]) continue;
+            $assignment = $entry->sourceEvent?->projectJobAssignment;
+            $fixedAppointment = $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent, $scoreVersion);
             $intervals[$entry->user_id][$date][] = $this->item(
                 $key, $range, $entry->work_category, $activity,
-                $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent, $scoreVersion)
+                $fixedAppointment,
+                $assignment ? 'job' : ($fixedAppointment ? 'meeting'
+                    : (($entry->sourceEvent && $this->isScheduledWork($entry->sourceEvent)) ? 'other' : 'quick'))
             );
             $recordKeys[$entry->user_id][$key] = true;
-            $assignment = $entry->sourceEvent?->projectJobAssignment;
             $source = $assignment
                 ? ((int) $assignment->sender_id === (int) $entry->user_id ? 'my_job' : 'assigned_job')
                 : 'quick';
@@ -196,7 +199,8 @@ class WorkloadTrialAnalysis
                     $range = $this->dateInterval($from, $to, $date);
                     if (! $range) continue;
                     $key = ($isJob ? 'job-' : ($isScheduledWork ? 'scheduled-work-' : 'meeting-')).$event->id.'-'.$personId;
-                    $intervals[$personId][$date][] = $this->item($key, $range, $category, $activity, $isMeeting);
+                    $intervals[$personId][$date][] = $this->item($key, $range, $category, $activity, $isMeeting,
+                        $isJob ? 'job' : ($isScheduledWork ? 'other' : 'meeting'));
                     $recordKeys[$personId][$key] = true;
                     $source = $isJob
                         ? ((int) $assignment->sender_id === $personId ? 'my_job' : 'assigned_job')
@@ -293,6 +297,7 @@ class WorkloadTrialAnalysis
             $overtimePoints = 0.0;
             $unrecordedOvertime = 0;
             $recordedDays = 0;
+            $timeBreakdown = ['job' => 0.0, 'quick' => 0.0, 'meeting' => 0.0, 'other' => 0.0];
             $daily = [];
             foreach ($dayItems as $date => $items) {
                 $window = $workWindow($user, $date);
@@ -309,6 +314,9 @@ class WorkloadTrialAnalysis
                 }
                 if ($ledger['minutes'] > 0) $recordedDays++;
                 $minutes += $ledger['minutes'];
+                foreach ($ledger['time_breakdown_minutes'] as $group => $groupMinutes) {
+                    $timeBreakdown[$group] += $groupMinutes;
+                }
                 if ($window) {
                     $scheduledCoveredMinutes += count(array_filter($ledger['covered'],
                         fn ($minute) => $minute >= $window['start'] && $minute < $window['end']));
@@ -386,6 +394,7 @@ class WorkloadTrialAnalysis
             $person = [
                 'id' => $id, 'name' => $user->name, 'role' => PersonalWorkRole::forUser($user),
                 'minutes' => $minutes, 'base_points' => round($basePoints, 1),
+                'time_breakdown_minutes' => $this->wholeMinuteBreakdown($timeBreakdown, $minutes),
                 ...$pointBreakdown,
                 'scheduled_covered_minutes' => $scheduledCoveredMinutes,
                 'overtime_points' => round($overtimePoints, 1),
@@ -425,10 +434,11 @@ class WorkloadTrialAnalysis
         return $people;
     }
 
-    private function item(string $key, array $range, string $category, string $activity, bool $fixedAppointment = false): array
+    private function item(string $key, array $range, string $category, string $activity, bool $fixedAppointment = false, string $timeGroup = 'other'): array
     {
         return ['key' => $key, 'from' => max(0, $range[0]), 'to' => min(1440, $range[1]),
             'work_category' => $category, 'activity_type' => $activity,
+            'time_group' => in_array($activity, ['meeting', 'outing', 'sales_visit'], true) ? 'meeting' : $timeGroup,
             'coefficient' => PersonalWorkPoints::coefficient($activity),
             'priority' => $fixedAppointment || in_array($activity, ['meeting', 'sales_visit'], true) ? 1 : 0];
     }
@@ -524,6 +534,7 @@ class WorkloadTrialAnalysis
         $activities = [];
         $covered = [];
         $points = 0.0;
+        $timeBreakdown = ['job' => 0.0, 'quick' => 0.0, 'meeting' => 0.0, 'other' => 0.0];
         for ($minute = 0; $minute < 1440; $minute++) {
             if ($minute >= $lunchFrom && $minute < $lunchTo) continue;
             $active = array_values(array_filter($items, fn ($item) => $item['from'] <= $minute && $item['to'] > $minute));
@@ -533,6 +544,7 @@ class WorkloadTrialAnalysis
             $covered[] = $minute;
             $share = 1 / count($active);
             foreach ($active as $item) {
+                $timeBreakdown[$item['time_group'] ?? 'other'] += $share;
                 $key = $item['work_category'].'|'.$item['activity_type'];
                 $activities[$key]['work_category'] = $item['work_category'];
                 $activities[$key]['activity_type'] = $item['activity_type'];
@@ -544,7 +556,19 @@ class WorkloadTrialAnalysis
             }
         }
         return ['minutes' => count($covered), 'points' => $points, 'activities' => $activities,
+            'time_breakdown_minutes' => $timeBreakdown,
             'covered' => $covered];
+    }
+
+    private function wholeMinuteBreakdown(array $values, int $total): array
+    {
+        $whole = array_map(fn ($minutes) => (int) floor($minutes), $values);
+        $remainder = $total - array_sum($whole);
+        $order = array_keys($values);
+        usort($order, fn ($a, $b) => ($values[$b] - floor($values[$b])) <=> ($values[$a] - floor($values[$a])));
+        foreach (array_slice($order, 0, $remainder) as $group) $whole[$group]++;
+
+        return $whole;
     }
 
     private function dateInterval(?Carbon $from, ?Carbon $to, string $date): ?array

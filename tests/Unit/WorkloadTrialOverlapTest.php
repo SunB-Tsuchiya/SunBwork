@@ -40,6 +40,33 @@ class WorkloadTrialOverlapTest extends TestCase
         self::assertSame(60.0, $ledger['activities']['dtp|revision']['minutes']);
     }
 
+    public function test_time_breakdown_uses_recognized_minutes_after_meeting_priority_and_overlap(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $item = new ReflectionMethod($service, 'item');
+        $ledger = $this->ledger([
+            $item->invoke($service, 'job', [540, 660], 'dtp', 'my_job', false, 'job'),
+            $item->invoke($service, 'quick', [540, 660], 'dtp', 'revision', false, 'quick'),
+            $item->invoke($service, 'meeting', [600, 690], 'shinko', 'meeting', true, 'quick'),
+        ]);
+
+        self::assertSame(150, $ledger['minutes']);
+        self::assertSame(30.0, $ledger['time_breakdown_minutes']['job']);
+        self::assertSame(30.0, $ledger['time_breakdown_minutes']['quick']);
+        self::assertSame(90.0, $ledger['time_breakdown_minutes']['meeting']);
+        self::assertSame(0.0, $ledger['time_breakdown_minutes']['other']);
+        self::assertSame(150.0, array_sum($ledger['time_breakdown_minutes']));
+    }
+
+    public function test_fractional_overlap_is_rounded_without_changing_total_minutes(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $whole = new ReflectionMethod($service, 'wholeMinuteBreakdown');
+
+        self::assertSame(['job' => 2, 'quick' => 1, 'meeting' => 0, 'other' => 0],
+            $whole->invoke($service, ['job' => 1.5, 'quick' => 1.5, 'meeting' => 0, 'other' => 0], 3));
+    }
+
     public function test_business_outing_is_a_fixed_appointment_but_a_job_is_not(): void
     {
         $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));

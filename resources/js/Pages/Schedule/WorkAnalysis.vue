@@ -127,6 +127,21 @@ const pointRows = computed(() => {
 const pointLabel = (value) => Number(value || 0).toFixed(1);
 const comparisonCategory = ref('all');
 const comparisonRole = ref('all');
+const timeGroups = [
+    ['job', 'ジョブ作業', '#2563eb'], ['quick', '簡易作業', '#16a34a'],
+    ['meeting', '会議・訪問', '#f59e0b'], ['other', 'その他の業務予定', '#8b5cf6'],
+];
+const timeRows = computed(() => [...comparisonPeople.value]
+    .filter((person) => Number(person.minutes || 0) > 0)
+    .sort((a, b) => Number(b.minutes || 0) - Number(a.minutes || 0) || a.name.localeCompare(b.name, 'ja'))
+    .map((person) => ({
+        ...person,
+        segments: timeGroups.map(([key, label, color]) => ({
+            key, label, color, minutes: Number(person.time_breakdown_minutes?.[key] || 0),
+            width: `${Number(person.time_breakdown_minutes?.[key] || 0) / maxPersonMinutes.value * 100}%`,
+        })).filter((segment) => segment.minutes > 0),
+    })));
+const timeMissingCount = computed(() => comparisonPeople.value.length - timeRows.value.length);
 const comparisonCategories = computed(() => workCategories.filter(([code]) => people.value.some((person) =>
     (person.activities || []).some((activity) => activity.work_category === code && Number(activity.minutes || 0) > 0))));
 const comparisonPeople = computed(() => people.value.filter((person) =>
@@ -430,7 +445,36 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
             </div>
-            <div class="min-w-0 rounded-lg border p-4">
+            <div class="min-w-0 space-y-3">
+            <div class="rounded-lg border p-4">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h4 class="mr-auto font-semibold">認定された記録時間の内訳</h4>
+                    <select v-model="comparisonRole" aria-label="時間内訳を比較する担当" class="rounded border px-2 py-1 text-sm">
+                        <option value="all">全担当</option>
+                        <option v-for="role in visibleRoles" :key="role.code" :value="role.code">{{ role.label }}</option>
+                    </select>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">重複と昼休憩を除いた時間です。棒の長さは総時間、色は時間の内訳です。記録のない{{ timeMissingCount }}人は省略しています。記録時間は勤務態度や成果を示すものではありません。</p>
+                <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600" aria-label="時間内訳の色">
+                    <span v-for="[key, label, color] in timeGroups" :key="key" class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" :style="{ backgroundColor: color }"></span>{{ label }}</span>
+                </div>
+                <div class="mt-3 space-y-2">
+                    <div v-for="(row, index) in timeRows" :key="row.id" class="rounded border border-gray-100 px-2 py-1.5 text-sm">
+                        <div class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_5.5rem] items-center gap-2">
+                            <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
+                            <button type="button" class="truncate text-left font-medium text-blue-800 underline underline-offset-2" :title="`${row.name}の詳細を表示`" @click="openPerson(row)">{{ row.name }}</button>
+                            <div class="flex h-5 overflow-hidden rounded bg-gray-100"><div v-for="segment in row.segments" :key="segment.key" class="h-full" :style="{ width: segment.width, backgroundColor: segment.color }" :title="`${segment.label} ${duration(segment.minutes)}`"></div></div>
+                            <strong class="text-right tabular-nums">{{ duration(row.minutes) }}</strong>
+                        </div>
+                        <div class="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-0.5 text-xs text-gray-600">
+                            <span v-for="segment in row.segments" :key="segment.key"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: segment.color }"></span>{{ segment.label }} {{ duration(segment.minutes) }}</span>
+                        </div>
+                    </div>
+                    <p v-if="!timeRows.length" class="py-3 text-center text-sm text-gray-500">この条件の認定時間はありません。</p>
+                </div>
+            </div>
+            <details class="rounded-lg border p-4">
+                <summary class="cursor-pointer font-semibold">作業区分で比較する</summary>
                 <div class="flex flex-wrap items-center gap-2">
                     <h4 class="mr-auto font-semibold">作業区分別の記録時間</h4>
                     <select v-model="comparisonRole" aria-label="比較する担当" class="rounded border px-2 py-1 text-sm">
@@ -455,6 +499,7 @@ onBeforeUnmount(() => {
                     </div>
                     <p v-if="!comparisonRows.length" class="py-3 text-center text-sm text-gray-500">この条件の記録時間はありません。</p>
                 </div>
+            </details>
             </div>
             </div>
             <div v-if="!error" class="mt-5">
