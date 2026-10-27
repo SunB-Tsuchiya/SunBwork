@@ -1,6 +1,8 @@
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-3" @click.self="$emit('close')">
+        <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-3">
+            <!-- 背景クリックで閉じる。外枠に @click.self を付けると、テキスト選択でモーダル内から押して
+                 外で離したときも共通の親（外枠）へ click が飛んで閉じてしまうため、背景要素だけで受ける -->
             <div class="absolute inset-0 bg-black/40 cursor-pointer" @click="$emit('close')" />
             <div class="relative w-full max-w-sm rounded-xl bg-white shadow-2xl overflow-y-auto max-h-[90dvh]" @click.stop>
                 <!-- タイトル -->

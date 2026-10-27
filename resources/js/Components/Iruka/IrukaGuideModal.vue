@@ -1,6 +1,6 @@
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-[60] flex items-center justify-center p-4" @click.self="$emit('close')">
+        <div v-if="show" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/50" @click="$emit('close')" />
             <div class="relative w-full max-w-lg rounded-xl bg-white shadow-2xl" @click.stop>
 
