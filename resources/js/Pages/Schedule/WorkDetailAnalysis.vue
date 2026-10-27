@@ -159,10 +159,10 @@ onMounted(load);
             </div>
             <div v-if="!error" class="mt-2 text-xs text-gray-600">勤怠の月45時間目標を超えた人：{{ overtimeOverTarget }}人。これは点数の減点条件ではなく、上長が確認するための表示です。</div>
 
-            <div v-if="!error && period === 'month'" class="mt-5 rounded border p-3">
-                <h4 class="font-semibold">{{ month }} 案件登録件数</h4>
+            <details v-if="!error && period === 'month'" :key="month" class="mt-5 rounded border p-3">
+                <summary class="cursor-pointer font-semibold">{{ month }} 案件登録件数（{{ registrationRanking.length }}人）</summary>
                 <p class="mt-1 text-xs text-gray-600">登録を確認するための件数順位です。{{ scoreVersion === 'trial_time_v3' ? '新しい試算では登録件数を点数に加えません。' : '従来の試用点では登録1件につき5点を加えます。' }}担当などの上部の絞り込みを反映します。</p>
-                <div v-if="registrationRanking.length" class="mt-3 grid gap-2 sm:grid-cols-2">
+                <div v-if="registrationRanking.length" class="mt-3 space-y-2">
                     <div v-for="(person, index) in registrationRanking" :key="person.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_3rem] items-center gap-2 text-sm">
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
                         <span class="truncate" :title="person.name"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColors[person.role?.code] || roleColors.other }"></span>{{ person.name }}</span>
@@ -171,7 +171,7 @@ onMounted(load);
                     </div>
                 </div>
                 <p v-else class="mt-3 text-sm text-gray-500">この条件で登録された案件はありません。</p>
-            </div>
+            </details>
 
             <div class="mt-5 rounded border border-amber-200 bg-amber-50/50 p-3 text-sm">
                 <div class="font-semibold">並び方と暫定点の比較</div>
