@@ -116,7 +116,7 @@ function insertFlagged() {
 </script>
 
 <template>
-    <AppLayout title="交通費の確認">
+    <AppLayout title="交通費の確認" :fluid="true">
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route(routeBase + 'index', { month: expense.billing_month })"
@@ -177,13 +177,14 @@ function insertFlagged() {
                             <tr class="border-b-2 border-gray-300 bg-gray-50 text-xs text-gray-600">
                                 <th class="w-8 px-1 py-2 text-center font-normal text-gray-400">行</th>
                                 <th class="w-10 px-1 py-2 text-center">確認</th>
-                                <th class="px-2 py-2 text-center">発生日</th>
-                                <th class="px-2 py-2 text-left">行先</th>
-                                <th class="px-2 py-2 text-left">用件</th>
-                                <th class="px-2 py-2 text-left">区間</th>
-                                <th class="px-2 py-2 text-center">IC/切符</th>
-                                <th class="px-2 py-2 text-right">金額</th>
-                                <th class="px-2 py-2 text-left">運賃の照合・注意</th>
+                                <th class="whitespace-nowrap px-2 py-2 text-center">発生日</th>
+                                <th class="min-w-[10rem] px-2 py-2 text-left">行先</th>
+                                <th class="whitespace-nowrap px-2 py-2 text-left">用件</th>
+                                <th class="whitespace-nowrap px-2 py-2 text-left">区間</th>
+                                <th class="whitespace-nowrap px-2 py-2 text-center">IC/切符</th>
+                                <th class="whitespace-nowrap px-2 py-2 text-right">金額</th>
+                                <th class="whitespace-nowrap px-2 py-2 text-left">備考</th>
+                                <th class="min-w-[20rem] px-2 py-2 text-left">運賃の照合・注意</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -196,19 +197,20 @@ function insertFlagged() {
                                 <td class="px-1 py-1.5 text-center">
                                     <input type="checkbox" :checked="it.check.checked" :disabled="!canCheck" @change="toggleChecked(it, $event)" />
                                 </td>
-                                <td class="px-2 py-1.5 text-center text-gray-700">{{ shortDate(it.occurrence_date) }}</td>
+                                <td class="whitespace-nowrap px-2 py-1.5 text-center text-gray-700">{{ shortDate(it.occurrence_date) }}</td>
                                 <td class="px-2 py-1.5 text-gray-800">{{ it.destination }}</td>
-                                <td class="px-2 py-1.5 text-gray-700">{{ it.purpose_label }}</td>
-                                <td class="px-2 py-1.5 text-gray-700">
+                                <td class="whitespace-nowrap px-2 py-1.5 text-gray-700">{{ it.purpose_label }}</td>
+                                <td class="whitespace-nowrap px-2 py-1.5 text-gray-700">
                                     {{ it.station_from }} － <template v-for="(v, k) in (it.via_stations ?? [])" :key="k"><span class="text-xs text-gray-500">{{ v }}</span> － </template>{{ it.station_to }}
                                     <div v-if="(it.via_stations ?? []).length" class="text-xs text-gray-400">経由 {{ it.via_stations.length }}か所</div>
                                 </td>
-                                <td class="px-2 py-1.5 text-center">
+                                <td class="whitespace-nowrap px-2 py-1.5 text-center">
                                     <span class="rounded px-1.5 py-0.5 text-xs" :class="it.fare_type === 'ic' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'">{{ it.fare_type === 'ic' ? 'IC' : '切符' }}</span>
                                 </td>
-                                <td class="px-2 py-1.5 text-right font-medium text-gray-900">
-                                    {{ it.amount.toLocaleString() }} 円
-                                    <span v-if="it.base_amount" class="ml-1 text-xs font-normal text-gray-500">（片道 {{ it.base_amount.toLocaleString() }} ×2）</span>
+                                <!-- 金額: 右揃え（桁と「円」がそろう）。往復などのメモは、別の「備考」の列に -->
+                                <td class="whitespace-nowrap px-2 py-1.5 text-right font-medium tabular-nums text-gray-900">{{ it.amount.toLocaleString() }}<span class="ml-0.5 text-xs font-normal text-gray-500">円</span></td>
+                                <td class="whitespace-nowrap px-2 py-1.5 text-xs text-gray-500">
+                                    <template v-if="it.base_amount">片道 {{ it.base_amount.toLocaleString() }}円 ×2</template>
                                 </td>
                                 <td class="px-2 py-1.5 text-xs">
                                     <!-- 運賃マスタとの照合 -->
@@ -236,7 +238,7 @@ function insertFlagged() {
                             <!-- 同行者の突き合わせ（日付・行先が同じ行を、同行者の申請から探した結果） -->
                             <tr v-if="hasReview(it)" class="border-b border-gray-100 bg-gray-50/60">
                                 <td></td>
-                                <td colspan="8" class="px-2 pb-2 pt-0.5 text-xs">
+                                <td colspan="9" class="px-2 pb-2 pt-0.5 text-xs">
                                     <div v-for="c in it.companion_review.companions" :key="'c' + c.user_id" class="mt-1">
                                         <span class="font-medium text-gray-700">同行者 {{ c.name }}さん</span>
                                         <span class="ml-1 rounded px-1.5 py-0.5" :class="verdictOf(c.verdict).cls">{{ verdictOf(c.verdict).label }}</span>
@@ -263,8 +265,8 @@ function insertFlagged() {
                         <tfoot>
                             <tr class="border-t-2 border-gray-300">
                                 <td colspan="7" class="px-2 py-2 text-right text-sm font-medium text-gray-700">合計（{{ expense.items.length }}行）</td>
-                                <td class="px-2 py-2 text-right font-bold text-gray-900">{{ expense.total_amount.toLocaleString() }} 円</td>
-                                <td></td>
+                                <td class="whitespace-nowrap px-2 py-2 text-right font-bold tabular-nums text-gray-900">{{ expense.total_amount.toLocaleString() }}<span class="ml-0.5 text-xs font-normal text-gray-500">円</span></td>
+                                <td colspan="2"></td>
                             </tr>
                         </tfoot>
                     </table>
