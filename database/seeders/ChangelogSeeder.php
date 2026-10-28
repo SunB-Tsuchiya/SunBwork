@@ -167,6 +167,15 @@ class ChangelogSeeder extends Seeder
         $this->seedDiaryAttachments();
         $entries = [
             [
+                'version' => 'schedule-invitation-trial-1',
+                'title' => '会議招待を承認した予定の表示と試用評価の条件を整理',
+                'released_at' => '2026-10-28',
+                'summary' => '承認した招待会議は本人の予定として表示します。情報出版Super Adminの新しい試算では、11月以降の招待会議について承認状態と社員の同日勤怠を確認します。',
+                'design_files' => ['z_instructions/EVALUATION_SCORE_PLAN1.md'],
+                'claude_notes' => 'Codex実装。元イベントへの参照を維持し、承認時に独立コピーを作らない。V3の11月以降だけ参加者acceptedを必須にし、正社員・契約社員は始終業付き勤怠日も確認。派遣・業務委託はacceptedのみ。V2と10月までのV3は従来どおり。正式評価への切替は未承認。',
+                'body' => '<section class="cl-feature"><h3>会議の招待</h3><ul><li>承認した会議は自分の予定として会議の色で表示</li><li>自分用のコピーは任意の編集操作と明記</li><li>11月以降の新しい試算は承認済みの招待のみを対象とし、社員は当日の勤怠記録も確認</li></ul></section>',
+            ],
+            [
                 'version'      => 'clerk-calendar-3',
                 'title'        => 'Clerkカレンダー：SuperAdminで会社が未選択のとき色設定・予定が読み込めない不具合を修正',
                 'released_at'  => '2026-08-20',
