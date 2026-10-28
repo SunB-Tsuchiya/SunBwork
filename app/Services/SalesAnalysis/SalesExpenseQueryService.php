@@ -412,6 +412,7 @@ class SalesExpenseQueryService
             'categories' => [],
             'month_totals' => array_fill(0, 12, 0.0),
             'previous_month_totals' => array_fill(0, 12, 0.0),
+            'vanished_vendors' => [],
             'total_amount' => 0.0,
             'previous_total_amount' => null,
         ];
@@ -522,12 +523,52 @@ class SalesExpenseQueryService
         return array_merge($empty, [
             'has_data' => true,
             'previous_has_data' => $previousHasData,
+            'vanished_vendors' => $previousHasData ? $this->vanishedVendors($categories, $previousVendorMonths) : [],
             'categories' => $categories,
             'month_totals' => $monthTotals,
             'previous_month_totals' => $previousMonthTotals,
             'total_amount' => $total,
             'previous_total_amount' => $previousHasData ? array_sum($previousMonthTotals) : null,
         ]);
+    }
+
+    /**
+     * 比較年度にあって当年（実績月まで）に無い支払先（注目ポイントの「消えた可能性」）。比較年度の月は
+     * YTD時は最終実績月までに切ってあるので、「同じ期間に払っていたのに今年は払っていない」支払先になる。
+     * 当年に科目ごと無い場合も含める（科目名の表記ゆれは名寄せ済み）。
+     *
+     * @param  array<int, array>  $categories 当年の科目（groups→vendors）
+     * @param  array<string, array<string, array<int, float>>>  $previousVendorMonths
+     * @return array<int, array{category: string, vendor_name: string, previous_total_amount: float, category_vanished: bool}>
+     */
+    private function vanishedVendors(array $categories, array $previousVendorMonths): array
+    {
+        $current = [];
+        foreach ($categories as $c) {
+            foreach ($c['groups'] as $g) {
+                foreach ($g['vendors'] as $v) {
+                    $current[$c['category']][$v['vendor_name']] = true;
+                }
+            }
+        }
+
+        $result = [];
+        foreach ($previousVendorMonths as $category => $vendors) {
+            foreach ($vendors as $vendorName => $months12) {
+                $total = array_sum($months12);
+                if ($total > 0 && ! isset($current[$category][$vendorName])) {
+                    $result[] = [
+                        'category' => $category,
+                        'vendor_name' => $vendorName,
+                        'previous_total_amount' => $total,
+                        'category_vanished' => ! isset($current[$category]),
+                    ];
+                }
+            }
+        }
+        usort($result, fn ($a, $b) => $b['previous_total_amount'] <=> $a['previous_total_amount']);
+
+        return $result;
     }
 
     /**

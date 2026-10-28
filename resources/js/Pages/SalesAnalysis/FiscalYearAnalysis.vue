@@ -575,6 +575,10 @@ onMounted(() => {
                         <h3 class="text-sm font-semibold text-gray-900">経費（参考情報）</h3>
                         <p class="text-xs text-gray-500">売上とは別集計の経費データです。粗利計算は行っていません。</p>
                     </div>
+                    <Link
+                        :href="route(rn('expense_comparison'), { department_key: expenseDepartmentKey, fiscal_year: fiscalYear, view: 'sheet' })"
+                        class="rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-100"
+                    >部署シートで開く（Excel形式・前年比較）→</Link>
                     <div class="flex gap-1 rounded border bg-white p-1 text-xs">
                         <button
                             v-for="tab in expenseDepartmentTabs"

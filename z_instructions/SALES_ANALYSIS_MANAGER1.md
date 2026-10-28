@@ -369,7 +369,7 @@
 |---|---|---|---|
 | 24-1 | 比較年度・表示モード（金額/前年差/前年比%）・最終実績月・YTD比較 | 🔄 | 実装・テスト完了、ブラウザ確認待ち。`actualMonths()`（ファイル全体で金額>0の最後の月）、`departmentSheet(fy, dept, ?compareFy, ?period)`（YTD時は比較年度の月を最終実績月以降ゼロにする）、レスポンスに`actual_months`/`is_partial`/`compare_period`/`previous_month_totals`、科目・支払先に`previous_months`を追加。画面は比較年度セレクト・比較期間（同期間/通年。期の途中のみ）・表示モード切替。小計行は差分モードで空欄。テスト+5件（SalesAnalysis+Unit 433件成功）。実データ（2020〜2025年度は全て12か月実績）で比較年度指定・月別合計の一致を確認。YTDは実データに期の途中の年度が無いためテストで検証 |
 | 24-1b | 経費の名寄せ（`sales_expense_aliases`・設定画面・集計への反映） | 🔄 | 実装・テスト完了、ブラウザ確認待ち。マイグレーション`2026_10_28_120000`（売上DB）、`SalesExpenseAliasService`、`ExpenseAliasController`、`ExpenseAliases.vue`、ナビ「経費の名寄せ」、QueryServiceの全集計に読み替えを反映。テスト+10件（SalesAnalysis+Unit 443件成功）。本番デプロイ時は`php artisan migrate --force`が必要（売上DB）。デプロイ後にユーザーが画面で候補を承認する |
-| 24-2 | 注目ポイントのパネル（±30%かつ10万円以上／新規／消えた可能性）＋画面間リンク | ⬜ | |
+| 24-2 | 注目ポイントのパネル（±30%かつ10万円以上／新規／消えた可能性）＋画面間リンク | 🔄 | 実装・テスト完了、ブラウザ確認待ち。`departmentSheet()`に`vanished_vendors`（比較年度の同期間に払いがあり当年は無い支払先。科目ごと消えた場合も含む）を追加、`ExpenseHighlights.vue`（基準は画面で変更・localStorage保存、各欄8件表示＋すべて表示、行クリックで表の該当行へスクロール・強調）、`ExpenseSheetTable`に`focusRow`。リンク: 期別分析の経費セクション→部署シート（部署・年度を引き継ぐ）、科目別比較→「◯◯を部署シートで見る」。支払先名→支払先カルテのリンクはカルテ自体が24-3のため24-3で追加。テスト+2件（SalesAnalysis+Unit 445件成功） |
 | 24-3 | 支払先カルテ（新タブ。名寄せ・年度推移・内訳・月別・ランキング） | ⬜ | |
 | 24-4 | 部署比較タブ＋Excel出力 | ⬜ | |
 | 24-5 | メモ機能（`sales_expense_notes`新設・マイグレーションあり） | ⬜ | |

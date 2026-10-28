@@ -497,4 +497,43 @@ class SalesExpenseQueryServiceTest extends TestCase
         $this->assertSame(1000.0, $sheet['previous_total_amount']);
         $this->assertSame(1000.0, $sheet['previous_month_totals'][0]);
     }
+
+    public function test_department_sheet_lists_vanished_vendors_within_compared_period()
+    {
+        $this->markCompanyAsSunbrain();
+
+        // 前年: A社は4月と12月、B社は4月のみ、Z社（科目ごと消えた）は4月。当年は4月まで実績でA社だけ
+        $this->seedImport(2024, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 100, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 12, 'amount' => 9000, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'B社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 300, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '旧科目', 'category_order' => 2, 'vendor_name' => 'Z社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 500, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '運賃', 'category_order' => 3, 'vendor_name' => 'Y社', 'calendar_year' => 2024, 'calendar_month' => 12, 'amount' => 800, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 150, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $ytd = $this->service()->departmentSheet(2025, 'production');
+        $vanished = collect($ytd['vanished_vendors']);
+        // 同期間（4月まで）に払っていたB社とZ社だけ。12月だけの運賃Y社は同期間外なので含めない
+        $this->assertSame(['Z社', 'B社'], $vanished->pluck('vendor_name')->all()); // 金額の大きい順
+        $this->assertTrue($vanished->firstWhere('vendor_name', 'Z社')['category_vanished']);
+        $this->assertFalse($vanished->firstWhere('vendor_name', 'B社')['category_vanished']);
+        $this->assertSame(300.0, $vanished->firstWhere('vendor_name', 'B社')['previous_total_amount']);
+
+        // 通年比較ではY社も含まれる
+        $full = collect($this->service()->departmentSheet(2025, 'production', null, 'full')['vanished_vendors']);
+        $this->assertContains('Y社', $full->pluck('vendor_name')->all());
+    }
+
+    public function test_department_sheet_has_no_vanished_vendors_without_previous_data()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 150, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $this->assertSame([], $this->service()->departmentSheet(2025, 'production')['vanished_vendors']);
+    }
 }

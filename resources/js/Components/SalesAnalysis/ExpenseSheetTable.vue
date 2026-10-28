@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useSalesChart } from '@/Composables/useSalesChart';
 
 // 経費「部署シート」表（Phase23）。Excelの部署シート（科目→会社名→4月〜3月→累計、小計・合計）を
@@ -30,6 +30,27 @@ watch(() => props.resetKey, () => {
 watch(categoryNames, (names) => {
     expanded.value = new Set([...expanded.value].filter((n) => names.includes(n)));
 });
+
+// 注目ポイントなどからの「この行へ移動」: 科目を開き、該当行へスクロールして数秒だけ強調する
+const rootRef = ref(null);
+const highlightKey = ref(null);
+const rowKey = (category, vendor = null) => JSON.stringify([category, vendor]);
+let highlightTimer = null;
+const focusRow = async (category, vendor = null) => {
+    if (!categoryNames.value.includes(category)) return;
+    expanded.value = new Set([...expanded.value, category]);
+    await nextTick();
+    const key = rowKey(category, vendor);
+    const el = [...(rootRef.value?.querySelectorAll('[data-row]') ?? [])].find((e) => e.dataset.row === key)
+        ?? [...(rootRef.value?.querySelectorAll('[data-row]') ?? [])].find((e) => e.dataset.row === rowKey(category));
+    if (!el) return;
+    highlightKey.value = el.dataset.row;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => { highlightKey.value = null; }, 3000);
+};
+defineExpose({ focusRow });
+const rowHighlight = (category, vendor = null) => (highlightKey.value === rowKey(category, vendor) ? '[&>td]:!bg-amber-100' : '');
 
 const toggle = (name) => {
     const next = new Set(expanded.value);
@@ -80,7 +101,7 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
 </script>
 
 <template>
-    <div>
+    <div ref="rootRef">
         <div class="mb-2 flex flex-wrap items-center gap-2 text-xs">
             <button type="button" class="rounded-md border border-gray-300 bg-white px-2 py-1 text-gray-700 hover:bg-gray-50" @click="toggleAll">
                 {{ allExpanded ? '全部閉じる' : '全部開く' }}
@@ -135,7 +156,7 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
                 </thead>
                 <tbody>
                     <template v-for="c in sheet.categories" :key="c.category">
-                        <tr class="cursor-pointer font-semibold hover:bg-gray-50" @click="toggle(c.category)">
+                        <tr class="cursor-pointer font-semibold hover:bg-gray-50" :class="rowHighlight(c.category)" :data-row="rowKey(c.category)" @click="toggle(c.category)">
                             <td class="sticky left-0 z-10 border-b bg-gray-50 px-2 py-1.5">
                                 <span class="mr-1 inline-block w-3 text-gray-400">{{ expanded.has(c.category) ? '▾' : '▸' }}</span>{{ c.category }}
                                 <span v-if="c.is_shared_split" class="ml-1 rounded bg-purple-100 px-1 text-[10px] font-semibold text-purple-700">サンエー印刷と折半</span>
@@ -152,7 +173,7 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
 
                         <template v-if="expanded.has(c.category)">
                             <template v-for="(g, gi) in c.groups" :key="gi">
-                                <tr v-for="v in orderedVendors(g)" :key="v.vendor_name" class="hover:bg-indigo-50/40">
+                                <tr v-for="v in orderedVendors(g)" :key="v.vendor_name" class="hover:bg-indigo-50/40" :class="rowHighlight(c.category, v.vendor_name)" :data-row="rowKey(c.category, v.vendor_name)">
                                     <td class="sticky left-0 z-10 border-b bg-white py-1 pl-7 pr-2">{{ v.vendor_name }}</td>
                                     <td v-for="(amt, i) in v.months" :key="i" class="border-b px-2 py-1 text-right" :class="cellCls(amt, v.previous_months[i])" :style="heatStyle(amt, maxVendorCell)">{{ cellText(amt, v.previous_months[i]) }}</td>
                                     <td class="border-b border-l px-2 py-1 text-right" :class="cellCls(v.total_amount, sum(v.previous_months))">{{ totalText(v.total_amount, sum(v.previous_months)) }}</td>

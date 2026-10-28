@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import ExpenseSheetTable from '@/Components/SalesAnalysis/ExpenseSheetTable.vue';
+import ExpenseHighlights from '@/Components/SalesAnalysis/ExpenseHighlights.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
@@ -48,6 +49,15 @@ const viewMode = ref(urlParams.get('view') === 'sheet' ? 'sheet' : 'compare');
 const sheetLoading = ref(false);
 const sheetData = ref(null);
 const sheetError = ref('');
+// 部署シートの表（注目ポイントや科目別比較から、特定の科目・支払先の行へ移動するために参照する）
+const sheetTableRef = ref(null);
+// 科目別比較から「部署シートで見る」で遷移した直後、シートの読み込みが終わってから移動するための保留
+const pendingFocus = ref(null);
+const focusSheetRow = ({ category, vendor = null }) => sheetTableRef.value?.focusRow(category, vendor);
+const openInSheet = (category) => {
+    pendingFocus.value = { category };
+    viewMode.value = 'sheet';
+};
 // 比較年度（null=基準年度の前年度）と比較期間（null=自動: 期の途中なら同期間、通年なら通年）。Phase24-1
 const compareYear = ref(null);
 const comparePeriod = ref(null);
@@ -215,6 +225,11 @@ const fetchSheet = async () => {
     } finally {
         if (requestSeq === sheetRequestSeq) sheetLoading.value = false;
     }
+    if (requestSeq !== sheetRequestSeq || !pendingFocus.value || !sheetData.value?.has_data) return;
+    const target = pendingFocus.value;
+    pendingFocus.value = null;
+    await nextTick();
+    focusSheetRow(target);
 };
 
 const vendorChartRef = ref(null);
@@ -383,7 +398,15 @@ onMounted(() => {
                     >経費Excel取込へ</Link>
                 </div>
                 <div v-else-if="viewMode === 'compare'">
-                    <label class="mb-1 block text-xs font-medium text-gray-700">科目</label>
+                    <div class="mb-1 flex items-center justify-between gap-2">
+                        <label class="block text-xs font-medium text-gray-700">科目</label>
+                        <button
+                            v-if="selectedCategory"
+                            type="button"
+                            class="rounded border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-100"
+                            @click="openInSheet(selectedCategory)"
+                        >「{{ selectedCategory }}」を部署シートで見る →</button>
+                    </div>
                     <div class="flex flex-wrap gap-1">
                         <button
                             v-for="c in categories"
@@ -529,7 +552,8 @@ onMounted(() => {
                 </p>
                 <!-- 読み込み中も表を残す（比較条件の変更のたびに、科目の開閉状態や表示モードが初期化されないように） -->
                 <div v-if="sheetData?.has_data" :class="sheetLoading ? 'opacity-60' : ''">
-                    <ExpenseSheetTable :sheet="sheetData" :reset-key="departmentKey" />
+                    <ExpenseHighlights :sheet="sheetData" @focus="focusSheetRow" />
+                    <ExpenseSheetTable ref="sheetTableRef" :sheet="sheetData" :reset-key="departmentKey" />
                 </div>
             </div>
         </div>

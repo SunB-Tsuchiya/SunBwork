@@ -2226,6 +2226,24 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'expense-highlights-1',
+                'title' => '経費の部署シートに「注目ポイント」と画面間のリンクを追加',
+                'released_at' => '2026-10-29',
+                'summary' => '部署シートの上に、大きく増減した科目・支払先、新規の支払先、消えた可能性のある支払先をまとめて表示します。クリックすると、表の該当の行へ移動します。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase24-2。DB・ルート変更なし。departmentSheet() に vanished_vendors（比較年度の同期間に払いがあり当年は無い支払先）を追加。ExpenseHighlights.vue（基準は画面で変更・localStorage 保存）。期別分析の経費セクション／科目別比較から部署シートへのリンク。支払先カルテへのリンクは24-3で追加。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費：注目ポイント（部署シート）</h3><ul>
+<li>比較する年度（期の途中は同じ期間）と比べて、大きく増減した科目・支払先、新規の支払先、消えた可能性のある支払先を、一覧にまとめて表示します。</li>
+<li>「大きな増減」の基準（％・万円）は、画面で変えられます。行をクリックすると、表の該当の行へ移動して強調されます。</li>
+</ul></section>
+<section class="cl-feature"><h3>経費：画面間のリンク</h3><ul>
+<li>期別分析の経費セクションから、同じ部署・年度の部署シートを開けます。</li>
+<li>科目別比較から、選んでいる科目を部署シートで開けます。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {
