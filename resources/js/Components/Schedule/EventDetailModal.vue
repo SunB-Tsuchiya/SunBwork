@@ -38,7 +38,7 @@ async function respond(status) {
             { status },
             { headers: { 'X-CSRF-TOKEN': CSRF() } },
         );
-        const label = status === 'accepted' ? '承認しました' : '辞退しました';
+        const label = status === 'accepted' ? '承認し、自分の予定に登録しました' : '辞退しました';
         showToast(label, status === 'accepted' ? 'success' : 'info', 3000);
         emit('responded', { eventId: props.event.id, status });
         emit('close');
@@ -58,7 +58,7 @@ async function materialize() {
             {},
             { headers: { 'X-CSRF-TOKEN': CSRF() } },
         );
-        showToast('実績として記録しました', 'success', 3000);
+        showToast('自分用の予定をコピーしました', 'success', 3000);
         emit('materialized');
         emit('close');
     } catch {
@@ -115,15 +115,15 @@ async function materialize() {
                 <!-- 承認済みバッジ -->
                 <div v-else-if="event.as_attendee && event.my_attendee_status === 'accepted'"
                     class="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                    ✓ 承認済み
+                    ✓ 承認済み・自分の予定に登録済み
                 </div>
 
-                <!-- 実績として記録する（招待された会議のみ・自分名義にコピーして以後自由編集できるようにする） -->
-                <div v-if="!event.is_own && event.as_attendee" class="mb-4 flex items-center gap-1.5">
+                <!-- 任意の独立コピー。承認や評価のための必須操作ではない。 -->
+                <div v-if="!event.is_own && event.as_attendee && event.my_attendee_status === 'accepted'" class="mb-4 flex items-center gap-1.5">
                     <button
                         class="rounded-md border border-emerald-400 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
                         :disabled="materializing"
-                        @click="materialize">実績として記録する</button>
+                        @click="materialize">自分用にコピーして編集</button>
                     <div class="group relative flex">
                         <span
                             class="flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-gray-300 text-[10px] font-bold text-gray-500">？</span>

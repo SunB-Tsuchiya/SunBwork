@@ -26,7 +26,11 @@ export function evColor(ev) {
         text: ev._custom_text_color ?? '#fff',
         border: ev._custom_border_color ?? ev._custom_color,
     };
-    if (!ev.is_own) return DEFAULT_OVERLAY_COLOR;
+    // An accepted invitation is part of the attendee's own schedule while
+    // remaining linked to the organizer's event for later time changes.
+    if (!ev.is_own && !(ev.as_attendee && ev.my_attendee_status === 'accepted')) {
+        return DEFAULT_OVERLAY_COLOR;
+    }
     const slug = ev.event_item_type?.slug;
     return EVENT_TYPE_COLORS[slug] ?? DEFAULT_OWN_COLOR;
 }
