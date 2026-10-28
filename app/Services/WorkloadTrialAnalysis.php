@@ -99,10 +99,15 @@ class WorkloadTrialAnalysis
             ->keyBy(fn ($entry) => $entry->user_id.'|'.$entry->source_event_id);
 
         $events = Event::query()
-            ->whereBetween('starts_at', [
+            ->when($v3, function ($query) use ($start, $end) {
+                // Fetch every overlapping interval, including events that began several days earlier.
+                // Keep a buffer for the mixed JST/UTC storage; dateInterval applies the exact JST range.
+                $query->where('starts_at', '<=', $end->copy()->addDays(2)->endOfDay()->toDateTimeString())
+                    ->where('ends_at', '>=', $start->copy()->subDay()->toDateTimeString());
+            }, fn ($query) => $query->whereBetween('starts_at', [
                 $start->copy()->subDay()->toDateTimeString(),
                 $end->copy()->addDays(2)->endOfDay()->toDateTimeString(),
-            ])
+            ]))
             ->where(function ($query) use ($userIds) {
                 $query->whereIn('user_id', $userIds)
                     ->orWhereHas('attendees', fn ($attendee) => $attendee->whereIn('user_id', $userIds)
