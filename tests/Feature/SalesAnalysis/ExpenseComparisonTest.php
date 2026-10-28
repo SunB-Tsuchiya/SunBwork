@@ -123,6 +123,32 @@ class ExpenseComparisonTest extends TestCase
         $response->assertJsonPath('previous_has_data', false);
     }
 
+    public function test_sheet_endpoint_accepts_compare_options()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2025);
+        $this->seedImport(2023);
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $response = $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.sheet', [
+            'department_key' => 'planning',
+            'fiscal_year' => 2025,
+            'compare_fiscal_year' => 2023,
+            'compare_period' => 'full',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('previous_fiscal_year', 2023);
+        $response->assertJsonPath('previous_has_data', true);
+        $response->assertJsonPath('compare_period', 'full');
+
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.sheet', [
+            'department_key' => 'planning',
+            'fiscal_year' => 2025,
+            'compare_period' => 'invalid',
+        ]))->assertStatus(422);
+    }
+
     public function test_sheet_endpoint_validates_parameters()
     {
         $this->markCompanyAsSunbrain();

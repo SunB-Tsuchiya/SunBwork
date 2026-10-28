@@ -403,4 +403,98 @@ class SalesExpenseQueryServiceTest extends TestCase
         $this->assertFalse($this->service()->departmentSheet(2025, 'ondemand')['has_data']);
         $this->assertCount(12, $this->service()->departmentSheet(2030, 'production')['months']);
     }
+
+    public function test_actual_months_is_last_month_with_amount_across_all_departments()
+    {
+        $this->markCompanyAsSunbrain();
+
+        // 企画は4〜5月、制作は7月にだけ金額あり（6月は全部署ゼロ）→ 最終実績月は7月=4か月目
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'planning', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 100, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'planning', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 5, 'amount' => 100, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'B社', 'calendar_year' => 2025, 'calendar_month' => 7, 'amount' => 100, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'B社', 'calendar_year' => 2025, 'calendar_month' => 8, 'amount' => 0, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $this->assertSame(4, $this->service()->actualMonths(2025));
+        $this->assertSame(0, $this->service()->actualMonths(2030));
+
+        // 企画シートでも、最終実績月はファイル全体（7月まで）で判定される
+        $sheet = $this->service()->departmentSheet(2025, 'planning');
+        $this->assertSame(4, $sheet['actual_months']);
+        $this->assertTrue($sheet['is_partial']);
+    }
+
+    public function test_department_sheet_compares_same_period_when_fiscal_year_is_partial()
+    {
+        $this->markCompanyAsSunbrain();
+
+        // 前年は通年で4月1000・12月9000。当年は4月だけ実績（期の途中）
+        $this->seedImport(2024, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 12, 'amount' => 9000, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 1500, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        // 既定=YTD: 前年も4月までの累計（1000）で比較し、12月分は含めない
+        $ytd = $this->service()->departmentSheet(2025, 'production');
+        $this->assertSame('ytd', $ytd['compare_period']);
+        $this->assertSame(1, $ytd['actual_months']);
+        $this->assertSame(1000.0, $ytd['previous_total_amount']);
+        $this->assertSame(50.0, $ytd['categories'][0]['diff_pct']);
+        $vendor = $ytd['categories'][0]['groups'][0]['vendors'][0];
+        $this->assertSame(1000.0, $vendor['previous_months'][0]);
+        $this->assertSame(0.0, $vendor['previous_months'][8]); // 12月はYTD範囲外でゼロ
+
+        // 通年を明示: 前年は10000
+        $full = $this->service()->departmentSheet(2025, 'production', null, 'full');
+        $this->assertSame('full', $full['compare_period']);
+        $this->assertSame(10000.0, $full['previous_total_amount']);
+        $this->assertSame(9000.0, $full['categories'][0]['groups'][0]['vendors'][0]['previous_months'][8]);
+    }
+
+    public function test_department_sheet_uses_full_period_when_fiscal_year_is_complete()
+    {
+        $this->markCompanyAsSunbrain();
+
+        $this->seedImport(2024, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+        // 3月に金額がある=12か月分そろった年度
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 1500, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2026, 'calendar_month' => 3, 'amount' => 100, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $sheet = $this->service()->departmentSheet(2025, 'production', null, 'ytd');
+        $this->assertFalse($sheet['is_partial']);
+        $this->assertSame('full', $sheet['compare_period']); // 通年の年度ではytd指定でも通年扱い
+        $this->assertSame(12, $sheet['actual_months']);
+    }
+
+    public function test_department_sheet_supports_custom_compare_year_and_month_totals()
+    {
+        $this->markCompanyAsSunbrain();
+
+        $this->seedImport(2023, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2023, 'calendar_month' => 4, 'amount' => 400, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '旧科目', 'category_order' => 2, 'vendor_name' => 'Z社', 'calendar_year' => 2023, 'calendar_month' => 4, 'amount' => 600, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 800, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        // 2024年度は未取込 → 既定の前年度比較はデータ無し、2023年度を指定すれば比較できる
+        $this->assertFalse($this->service()->departmentSheet(2025, 'production')['previous_has_data']);
+
+        $sheet = $this->service()->departmentSheet(2025, 'production', 2023);
+        $this->assertTrue($sheet['previous_has_data']);
+        $this->assertSame(2023, $sheet['previous_fiscal_year']);
+        $this->assertSame(100.0, $sheet['categories'][0]['diff_pct']);
+        // 当年に無い科目（旧科目）も、比較年度の部署合計には含まれる
+        $this->assertSame(1000.0, $sheet['previous_total_amount']);
+        $this->assertSame(1000.0, $sheet['previous_month_totals'][0]);
+    }
 }

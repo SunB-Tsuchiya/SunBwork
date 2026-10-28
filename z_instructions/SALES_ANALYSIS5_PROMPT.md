@@ -16,3 +16,6 @@
 ## 注意
 - 作業ツリーの `routes/web.php` などには他機能の未コミット変更が混在している。デプロイは `origin/main` ベースの別worktreeで自分の変更だけを適用する（VITE_APP_BASE_PATH=/members を環境変数で渡してビルド、旧ビルド資産は削除せず残す）。
 - routes追加後は Ziggy 再生成（`php artisan ziggy:generate resources/js/ziggy.js`）。
+
+## Phase24（フェーズ2）の状況
+設計はPLAN1.md Phase24、進捗はMANAGER1.mdのPhase24表（24-1〜24-6）を参照。確定事項: 経費Excelは「数値が入っていれば確定」（セル色に意味なし）→暫定月の印は不要、最終実績月＝金額が入っている最後の会計月（ファイル全体）。期の途中の年度は同期間（YTD）比較が既定。

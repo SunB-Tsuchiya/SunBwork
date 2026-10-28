@@ -48,6 +48,9 @@ const viewMode = ref(urlParams.get('view') === 'sheet' ? 'sheet' : 'compare');
 const sheetLoading = ref(false);
 const sheetData = ref(null);
 const sheetError = ref('');
+// 比較年度（null=基準年度の前年度）と比較期間（null=自動: 期の途中なら同期間、通年なら通年）。Phase24-1
+const compareYear = ref(null);
+const comparePeriod = ref(null);
 
 const trendLoading = ref(false);
 const trendData = ref(null);
@@ -59,6 +62,13 @@ const vendorError = ref('');
 const baseYearIndex = computed(() => fiscalYears.value.indexOf(vendorFiscalYear.value));
 const canGoPrevYear = computed(() => baseYearIndex.value > 0);
 const canGoNextYear = computed(() => baseYearIndex.value >= 0 && baseYearIndex.value < fiscalYears.value.length - 1);
+// 比較年度の選択肢（基準年度以外の取込済み年度）
+const compareYearOptions = computed(() => fiscalYears.value.filter((fy) => fy !== vendorFiscalYear.value));
+// 「◯月まで実績」表示用の月名（最終実績月）
+const actualMonthLabel = computed(() => {
+    const d = sheetData.value;
+    return d && d.actual_months > 0 ? `${d.months[d.actual_months - 1].calendar_month}月` : '';
+});
 const setBaseYear = (fy) => {
     baseYearTouched = true;
     vendorFiscalYear.value = fy;
@@ -189,7 +199,12 @@ const fetchSheet = async () => {
     sheetError.value = '';
     try {
         const response = await axios.get(route(rn('api.expense_comparison.sheet')), {
-            params: { department_key: departmentKey.value, fiscal_year: vendorFiscalYear.value },
+            params: {
+                department_key: departmentKey.value,
+                fiscal_year: vendorFiscalYear.value,
+                ...(compareYear.value ? { compare_fiscal_year: compareYear.value } : {}),
+                ...(comparePeriod.value ? { compare_period: comparePeriod.value } : {}),
+            },
         });
         if (requestSeq !== sheetRequestSeq) return;
         sheetData.value = response.data;
@@ -271,11 +286,15 @@ watch(selectedCategory, () => {
     fetchVendors();
 });
 watch(vendorFiscalYear, () => {
+    // 基準年度が変わったら、比較年度・比較期間は既定（前年度・自動）に戻す
+    compareYear.value = null;
+    comparePeriod.value = null;
     fetchVendors();
     renderTrendChart();
     fetchSheet();
     syncQueryString();
 });
+watch([compareYear, comparePeriod], fetchSheet);
 watch([departmentKey, selectedCategory, viewMode], syncQueryString);
 // 部署切替時はfetchMeta内で年度が再設定されるまで古い表示を残さない
 watch(departmentKey, () => { sheetData.value = null; });
@@ -473,12 +492,45 @@ onMounted(() => {
                 <h3 class="mb-2 text-sm font-semibold text-gray-900">
                     {{ departmentTabs.find((t) => t.key === departmentKey)?.label }}シート（{{ fiscalPeriodLabel(vendorFiscalYear) }}）
                 </h3>
-                <p v-if="sheetLoading" class="text-xs text-gray-500">読み込み中...</p>
-                <p v-else-if="sheetError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ sheetError }}</p>
+                <div v-if="sheetData?.has_data" class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                    <span class="rounded bg-gray-100 px-2 py-1 text-gray-600">{{ actualMonthLabel }}まで実績{{ sheetData.is_partial ? '（期の途中）' : '' }}</span>
+                    <label class="flex items-center gap-1 text-gray-700">
+                        比較年度
+                        <select
+                            :value="compareYear ?? ''"
+                            class="rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            @change="compareYear = $event.target.value ? Number($event.target.value) : null"
+                        >
+                            <option value="">前年度（{{ fiscalPeriodLabel(vendorFiscalYear - 1) }}）</option>
+                            <option v-for="fy in compareYearOptions.filter((y) => y !== vendorFiscalYear - 1)" :key="fy" :value="fy">{{ fiscalPeriodLabel(fy) }}</option>
+                        </select>
+                    </label>
+                    <div v-if="sheetData.is_partial" class="flex items-center gap-1">
+                        <span class="text-gray-700">比較期間</span>
+                        <button
+                            type="button"
+                            class="rounded px-2 py-1"
+                            :class="sheetData.compare_period === 'ytd' ? 'bg-gray-700 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-100'"
+                            @click="comparePeriod = 'ytd'"
+                        >同期間（4月〜{{ actualMonthLabel }}）</button>
+                        <button
+                            type="button"
+                            class="rounded px-2 py-1"
+                            :class="sheetData.compare_period === 'full' ? 'bg-gray-700 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-100'"
+                            @click="comparePeriod = 'full'"
+                        >通年</button>
+                    </div>
+                    <span v-if="sheetData.is_partial && sheetData.compare_period === 'ytd'" class="text-gray-400">期の途中のため、比較年度も同じ月までの累計で比べています</span>
+                </div>
+                <p v-if="sheetLoading" class="mb-2 text-xs text-gray-500">読み込み中...</p>
+                <p v-if="sheetError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ sheetError }}</p>
                 <p v-else-if="sheetData && !sheetData.has_data" class="text-xs text-gray-500">
                     {{ fiscalPeriodLabel(vendorFiscalYear) }}のこの部署の経費データはありません。上の「基準年度」で、取り込み済みの別の年度を選んでください。
                 </p>
-                <ExpenseSheetTable v-else-if="sheetData" :sheet="sheetData" :reset-key="departmentKey" />
+                <!-- 読み込み中も表を残す（比較条件の変更のたびに、科目の開閉状態や表示モードが初期化されないように） -->
+                <div v-if="sheetData?.has_data" :class="sheetLoading ? 'opacity-60' : ''">
+                    <ExpenseSheetTable :sheet="sheetData" :reset-key="departmentKey" />
+                </div>
             </div>
         </div>
     </SalesAnalysisShell>

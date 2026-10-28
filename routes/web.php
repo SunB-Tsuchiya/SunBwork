@@ -115,6 +115,12 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/expense-comparison/vendors', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'vendors'])->name('api.expense_comparison.vendors');
         Route::get('api/expense-comparison/sheet', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'sheet'])->name('api.expense_comparison.sheet');
 
+        // 経費の名寄せ設定（新規。Phase24。年度ごとに表記が変わる科目名を正式名へ読み替える）
+        Route::get('expense-aliases', [App\Http\Controllers\SalesAnalysis\ExpenseAliasController::class, 'index'])->name('expense_aliases');
+        Route::get('api/expense-aliases', [App\Http\Controllers\SalesAnalysis\ExpenseAliasController::class, 'data'])->name('api.expense_aliases.data');
+        Route::post('api/expense-aliases', [App\Http\Controllers\SalesAnalysis\ExpenseAliasController::class, 'save'])->name('api.expense_aliases.save');
+        Route::post('api/expense-aliases/approve-suggestions', [App\Http\Controllers\SalesAnalysis\ExpenseAliasController::class, 'approveSuggestions'])->name('api.expense_aliases.approve');
+
         // 同月比較（新規。2026-09-04 Codexレビュー2回目 10.4節・PLAN1.md「6D. 同月比較 詳細設計」）
         Route::get('same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'index'])->name('same_month_comparison');
         Route::get('api/same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'summary'])->name('api.same_month_comparison');

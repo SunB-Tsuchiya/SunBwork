@@ -2207,6 +2207,25 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'expense-compare-2',
+                'title' => '経費の部署シートに、年度の比較と「経費の名寄せ」を追加',
+                'released_at' => '2026-10-29',
+                'summary' => '部署シートで比較する年度を選べるようになり、期の途中の年度は同じ月までで比べます。年度ごとに表記が変わる科目名をまとめる「経費の名寄せ」も追加しました。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase24-1/24-1b。比較年度・比較期間（ytd/full）・最終実績月（金額>0の最後の会計月、ファイル全体で判定）。名寄せは売上DBの sales_expense_aliases（マイグレーションあり）と SalesExpenseAliasService、集計時に別名→正式名へ読み替え（取込データは書き換えない）。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費：部署シートの年度比較</h3><ul>
+<li>比較する年度を選べます（初期値は前年度）。表示は「金額」「前年差」「前年比%」で切り替えられます。</li>
+<li>期の途中の年度は、比較する年度も同じ月までの累計で比べます（「通年」にも切り替えられます）。見出しに「◯月まで実績」と出ます。</li>
+</ul></section>
+<section class="cl-feature"><h3>経費：経費の名寄せ（設定・取込）</h3><ul>
+<li>経費Excelは年度ごとに科目名の表記が変わります（例：外注加工→外注加工費）。同じ科目をひとつにまとめると、年度をまたいで正しく比べられます。</li>
+<li>候補を確認して統合でき、手動での統合・解除もできます。取り込んだデータは書き換えず、表示するときだけ読み替えます。</li>
+<li>部署シート、科目別比較、期別分析の経費に反映されます。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

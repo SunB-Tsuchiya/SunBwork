@@ -55,6 +55,7 @@ const tabGroups = [
         label: '設定・取込',
         tabs: [
             { key: 'client_groups', route: 'client_groups.index', label: '得意先統合設定' },
+            { key: 'expense_aliases', route: 'expense_aliases', label: '経費の名寄せ' },
             // 年度別データ取込・経費取込の2本は入口を1つにまとめている（実機フィードバック対応、2026-10-09）
             { key: 'import_hub', route: 'import_hub', label: 'Excel取込' },
             { key: 'import_history', route: 'import_history.index', label: '取込履歴' },

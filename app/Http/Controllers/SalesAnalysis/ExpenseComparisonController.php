@@ -102,11 +102,21 @@ class ExpenseComparisonController extends Controller
 
         $data = array_merge(
             $this->validatedDepartmentKey($request, $companyId),
-            $request->validate(['fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100']])
+            $request->validate([
+                'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+                // 比較年度（省略時は前年度）と比較期間（省略時は期の途中ならytd、通年ならfull）
+                'compare_fiscal_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+                'compare_period' => ['nullable', Rule::in(['ytd', 'full'])],
+            ])
         );
 
         return response()->json(
-            $this->expenseQueryService->forCompany($companyId)->departmentSheet((int) $data['fiscal_year'], $data['department_key'])
+            $this->expenseQueryService->forCompany($companyId)->departmentSheet(
+                (int) $data['fiscal_year'],
+                $data['department_key'],
+                isset($data['compare_fiscal_year']) ? (int) $data['compare_fiscal_year'] : null,
+                $data['compare_period'] ?? null,
+            )
         );
     }
 }

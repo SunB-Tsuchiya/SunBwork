@@ -13,11 +13,41 @@ class SalesExpenseQueryService
 {
     private ?int $companyId = null;
 
+    private ?SalesExpenseAliasService $aliasService = null;
+
     public function forCompany(int $companyId): self
     {
         $this->companyId = $companyId;
+        $this->aliasService = null;
 
         return $this;
+    }
+
+    /** 科目名の名寄せ（Phase24）。取込データは元の名前のまま持ち、集計時に正式名へ読み替える */
+    private function aliases(): SalesExpenseAliasService
+    {
+        return $this->aliasService ??= (new SalesExpenseAliasService())->forCompany($this->requireCompanyId());
+    }
+
+    /**
+     * 月別集計の行を、科目名の名寄せ後の名前で合算し直す（別名の行は同じ科目として月ごとに足す）。
+     * category_orderは別名どうしで小さい方（Excelでより前に登場した位置）を採る。
+     *
+     * @param  \Illuminate\Support\Collection<int, object>  $rows category, calendar_year, calendar_month, category_order, amount
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function mergeCategoryRows($rows, string $departmentKey)
+    {
+        return $rows
+            ->groupBy(fn ($r) => $this->aliases()->canonicalCategory($departmentKey, $r->category) . '|' . $r->calendar_year . '|' . $r->calendar_month)
+            ->map(fn ($group) => (object) [
+                'category' => $this->aliases()->canonicalCategory($departmentKey, $group->first()->category),
+                'calendar_year' => $group->first()->calendar_year,
+                'calendar_month' => $group->first()->calendar_month,
+                'category_order' => $group->min('category_order'),
+                'amount' => $group->sum(fn ($r) => (float) $r->amount),
+            ])
+            ->values();
     }
 
     private function requireCompanyId(): int
@@ -79,6 +109,8 @@ class SalesExpenseQueryService
             ->groupBy('category', 'calendar_year', 'calendar_month')
             ->get();
 
+        $rows = $this->mergeCategoryRows($rows, $departmentKey);
+
         // インポート自体は存在しても、その部署に該当する行が無い場合は「データ無し」として扱う
         // （例: 共有シートの経費が無いまま企画/制作/オンデマンドだけ取り込まれているケース）
         if ($rows->isEmpty()) {
@@ -90,6 +122,9 @@ class SalesExpenseQueryService
             ->where('is_shared_split', true)
             ->distinct()
             ->pluck('category')
+            ->map(fn ($c) => $this->aliases()->canonicalCategory($departmentKey, $c))
+            ->unique()
+            ->values()
             ->all();
 
         $sequence = $this->fiscalMonthSequence($fiscalYear);
@@ -148,7 +183,7 @@ class SalesExpenseQueryService
 
         $rows = SalesExpenseLineItem::where('sales_expense_import_id', $importId)
             ->where('department_key', $departmentKey)
-            ->where('category', $category)
+            ->whereIn('category', $this->aliases()->categoryNamesFor($departmentKey, $category))
             ->selectRaw('vendor_name, subtotal_group, MAX(subtotal_label) as subtotal_label, SUM(amount) as amount, MAX(is_shared_split) as is_shared_split')
             ->groupBy('vendor_name', 'subtotal_group')
             ->get();
@@ -261,7 +296,7 @@ class SalesExpenseQueryService
 
         $rows = SalesExpenseLineItem::where('sales_expense_import_id', $importId)
             ->where('department_key', $departmentKey)
-            ->where('category', $category)
+            ->whereIn('category', $this->aliases()->categoryNamesFor($departmentKey, $category))
             ->selectRaw('vendor_name, SUM(amount) as amount')
             ->groupBy('vendor_name')
             ->get();
@@ -315,24 +350,68 @@ class SalesExpenseQueryService
     }
 
     /**
-     * 部署シート（Phase23）: Excelの部署シート（科目→会社名→4月〜3月→累計、小計・合計）を1画面で
-     * 再現するためのデータ。科目はExcel登場順、小計グループ・支払先もExcel登場順（支払先は明細の
-     * 登録順=MIN(id)から復元）。前年度の同部署データから、科目・支払先ごとの前年合計を付加する。
-     *
-     * @return array{has_data: bool, fiscal_year: int, previous_fiscal_year: int, previous_has_data: bool, months: array<int, array{calendar_year:int, calendar_month:int}>, categories: array<int, array>, month_totals: array<int, float>, total_amount: float, previous_total_amount: ?float}
+     * その年度のファイル全体（全部署）で金額（>0）が入っている最後の会計月までの月数（1〜12。データ無しは0）。
+     * 経費Excelは「数値が入っていれば確定」（2026-10-28ユーザー確認）なので、これを最終実績月とみなす。
+     * 部署ごとではなくファイル全体で判定する（ある部署の月がたまたま0円でも実績月として扱うため）。
      */
-    public function departmentSheet(int $fiscalYear, string $departmentKey): array
+    public function actualMonths(int $fiscalYear): int
     {
+        $importId = $this->activeImportId($fiscalYear);
+        if ($importId === null) {
+            return 0;
+        }
+
+        $totals = SalesExpenseLineItem::where('sales_expense_import_id', $importId)
+            ->selectRaw('calendar_year, calendar_month, SUM(amount) as amount')
+            ->groupBy('calendar_year', 'calendar_month')
+            ->get()
+            ->mapWithKeys(fn ($r) => ["{$r->calendar_year}-{$r->calendar_month}" => (float) $r->amount]);
+
+        $last = 0;
+        foreach ($this->fiscalMonthSequence($fiscalYear) as $i => [$y, $m]) {
+            if (($totals["{$y}-{$m}"] ?? 0.0) > 0) {
+                $last = $i + 1;
+            }
+        }
+
+        return $last;
+    }
+
+    /**
+     * 部署シート（Phase23/24）: Excelの部署シート（科目→会社名→4月〜3月→累計、小計・合計）を1画面で
+     * 再現するためのデータ。科目はExcel登場順、小計グループ・支払先もExcel登場順（支払先は明細の
+     * 登録順=MIN(id)から復元）。比較年度（既定は前年度）の月別金額・合計を付加する。
+     *
+     * 期の途中の年度（最終実績月が3月より前）は、既定で比較年度も同じ月までの累計で比較する（YTD比較）。
+     * `$comparePeriod`で'ytd'（同期間）/'full'（通年）を明示できる。
+     *
+     * @return array<string, mixed>
+     */
+    public function departmentSheet(int $fiscalYear, string $departmentKey, ?int $compareFiscalYear = null, ?string $comparePeriod = null): array
+    {
+        $compareFiscalYear ??= $fiscalYear - 1;
         $sequence = $this->fiscalMonthSequence($fiscalYear);
         $months = array_map(fn ($m) => ['calendar_year' => $m[0], 'calendar_month' => $m[1]], $sequence);
+        $actualMonths = $this->actualMonths($fiscalYear);
+        $isPartial = $actualMonths > 0 && $actualMonths < 12;
+        $period = in_array($comparePeriod, ['ytd', 'full'], true) ? $comparePeriod : ($isPartial ? 'ytd' : 'full');
+        // 通年の年度ではYTDと通年が同じ意味になるため、レスポンス上は常に'full'とする
+        if (! $isPartial) {
+            $period = 'full';
+        }
+
         $empty = [
             'has_data' => false,
             'fiscal_year' => $fiscalYear,
-            'previous_fiscal_year' => $fiscalYear - 1,
+            'previous_fiscal_year' => $compareFiscalYear,
             'previous_has_data' => false,
+            'actual_months' => $actualMonths,
+            'is_partial' => $isPartial,
+            'compare_period' => $period,
             'months' => $months,
             'categories' => [],
             'month_totals' => array_fill(0, 12, 0.0),
+            'previous_month_totals' => array_fill(0, 12, 0.0),
             'total_amount' => 0.0,
             'previous_total_amount' => null,
         ];
@@ -352,21 +431,28 @@ class SalesExpenseQueryService
             return $empty;
         }
 
+        // 科目名を名寄せ後の正式名へ読み替える（以降のグルーピングは正式名で行い、別名の行は月ごとに合算される）
+        foreach ($rows as $r) {
+            $r->category = $this->aliases()->canonicalCategory($departmentKey, $r->category);
+        }
+
         $monthIndex = [];
         foreach ($sequence as $i => [$y, $m]) {
             $monthIndex["{$y}-{$m}"] = $i;
         }
 
-        [$previousCategoryTotals, $previousVendorTotals, $previousHasData] = $this->previousSheetTotals($fiscalYear - 1, $departmentKey);
+        // YTD比較: 比較年度の月を、当年の最終実績月より後ろはゼロにする
+        $limit = $period === 'ytd' ? $actualMonths : 12;
+        [$previousCategoryMonths, $previousVendorMonths, $previousHasData] = $this->previousSheetMonths($compareFiscalYear, $departmentKey, $limit);
 
         $monthTotals = array_fill(0, 12, 0.0);
-        $categories = $rows->groupBy('category')->map(function ($categoryRows, $category) use ($monthIndex, &$monthTotals, $previousCategoryTotals, $previousVendorTotals, $previousHasData) {
+        $categories = $rows->groupBy('category')->map(function ($categoryRows, $category) use ($monthIndex, &$monthTotals, $previousCategoryMonths, $previousVendorMonths, $previousHasData) {
             $categoryMonths = array_fill(0, 12, 0.0);
 
-            $groups = $categoryRows->groupBy('subtotal_group')->sortKeys()->map(function ($groupRows) use ($monthIndex, &$categoryMonths, $category, $previousVendorTotals, $previousHasData) {
+            $groups = $categoryRows->groupBy('subtotal_group')->sortKeys()->map(function ($groupRows) use ($monthIndex, &$categoryMonths, $category, $previousVendorMonths, $previousHasData) {
                 $groupMonths = array_fill(0, 12, 0.0);
 
-                $vendors = $groupRows->groupBy(fn ($r) => $r->vendor_name ?? '（内訳未記入）')->map(function ($vendorRows, $vendorName) use ($monthIndex, &$groupMonths, &$categoryMonths, $category, $previousVendorTotals, $previousHasData) {
+                $vendors = $groupRows->groupBy(fn ($r) => $r->vendor_name ?? '（内訳未記入）')->map(function ($vendorRows, $vendorName) use ($monthIndex, &$groupMonths, &$categoryMonths, $category, $previousVendorMonths, $previousHasData) {
                     $vendorMonths = array_fill(0, 12, 0.0);
                     foreach ($vendorRows as $r) {
                         $i = $monthIndex["{$r->calendar_year}-{$r->calendar_month}"] ?? null;
@@ -378,11 +464,11 @@ class SalesExpenseQueryService
                         $categoryMonths[$i] += (float) $r->amount;
                     }
                     $total = array_sum($vendorMonths);
-                    $previous = $previousVendorTotals[$category][$vendorName] ?? null;
+                    $previousMonths = $previousVendorMonths[$category][$vendorName] ?? null;
 
                     return array_merge(
-                        ['vendor_name' => $vendorName, 'months' => $vendorMonths, 'total_amount' => $total, 'first_id' => (int) $vendorRows->min('first_id')],
-                        $this->previousComparison($total, $previous, $previousHasData)
+                        ['vendor_name' => $vendorName, 'months' => $vendorMonths, 'total_amount' => $total, 'first_id' => (int) $vendorRows->min('first_id'), 'previous_months' => $previousMonths ?? array_fill(0, 12, 0.0)],
+                        $this->previousComparison($total, $previousMonths === null ? null : array_sum($previousMonths), $previousHasData)
                     );
                 })->sortBy('first_id')->values()->map(function ($v) {
                     unset($v['first_id']);
@@ -402,7 +488,7 @@ class SalesExpenseQueryService
                 $monthTotals[$i] += $v;
             }
             $total = array_sum($categoryMonths);
-            $previous = $previousCategoryTotals[$category] ?? null;
+            $previousMonths = $previousCategoryMonths[$category] ?? null;
 
             return array_merge([
                 'category' => $category,
@@ -410,8 +496,9 @@ class SalesExpenseQueryService
                 'is_shared_split' => $categoryRows->contains(fn ($r) => (bool) $r->is_shared_split),
                 'months' => $categoryMonths,
                 'total_amount' => $total,
+                'previous_months' => $previousMonths ?? array_fill(0, 12, 0.0),
                 'groups' => $groups,
-            ], $this->previousComparison($total, $previous, $previousHasData));
+            ], $this->previousComparison($total, $previousMonths === null ? null : array_sum($previousMonths), $previousHasData));
         })->sortBy('category_order')->values()->map(function ($c) {
             unset($c['category_order']);
 
@@ -424,22 +511,32 @@ class SalesExpenseQueryService
         }
         unset($c);
 
+        // 比較年度の部署合計（当年に無くなった科目も含む正確な合計）
+        $previousMonthTotals = array_fill(0, 12, 0.0);
+        foreach ($previousCategoryMonths as $months12) {
+            foreach ($months12 as $i => $v) {
+                $previousMonthTotals[$i] += $v;
+            }
+        }
+
         return array_merge($empty, [
             'has_data' => true,
             'previous_has_data' => $previousHasData,
             'categories' => $categories,
             'month_totals' => $monthTotals,
+            'previous_month_totals' => $previousMonthTotals,
             'total_amount' => $total,
-            'previous_total_amount' => $previousHasData ? array_sum($previousCategoryTotals) : null,
+            'previous_total_amount' => $previousHasData ? array_sum($previousMonthTotals) : null,
         ]);
     }
 
     /**
-     * 前年度（無ければデータ無し）の科目別・科目×支払先別の年間合計。
+     * 比較年度（無ければデータ無し）の、科目別・科目×支払先別の月別金額（会計年度順の12要素）。
+     * `$limit`が12未満のときは、その月数より後ろの月をゼロにする（YTD比較用）。
      *
-     * @return array{0: array<string, float>, 1: array<string, array<string, float>>, 2: bool}
+     * @return array{0: array<string, array<int, float>>, 1: array<string, array<string, array<int, float>>>, 2: bool}
      */
-    private function previousSheetTotals(int $fiscalYear, string $departmentKey): array
+    private function previousSheetMonths(int $fiscalYear, string $departmentKey, int $limit): array
     {
         $importId = $this->activeImportId($fiscalYear);
         if ($importId === null) {
@@ -448,23 +545,44 @@ class SalesExpenseQueryService
 
         $rows = SalesExpenseLineItem::where('sales_expense_import_id', $importId)
             ->where('department_key', $departmentKey)
-            ->selectRaw('category, vendor_name, SUM(amount) as amount')
-            ->groupBy('category', 'vendor_name')
+            ->selectRaw('category, vendor_name, calendar_year, calendar_month, SUM(amount) as amount')
+            ->groupBy('category', 'vendor_name', 'calendar_year', 'calendar_month')
             ->get();
 
         if ($rows->isEmpty()) {
             return [[], [], false];
         }
 
-        $categoryTotals = [];
-        $vendorTotals = [];
-        foreach ($rows as $r) {
-            $name = $r->vendor_name ?? '（内訳未記入）';
-            $categoryTotals[$r->category] = ($categoryTotals[$r->category] ?? 0.0) + (float) $r->amount;
-            $vendorTotals[$r->category][$name] = ($vendorTotals[$r->category][$name] ?? 0.0) + (float) $r->amount;
+        $monthIndex = [];
+        foreach ($this->fiscalMonthSequence($fiscalYear) as $i => [$y, $m]) {
+            $monthIndex["{$y}-{$m}"] = $i;
         }
 
-        return [$categoryTotals, $vendorTotals, true];
+        $categoryMonths = [];
+        $vendorMonths = [];
+        foreach ($rows as $r) {
+            $i = $monthIndex["{$r->calendar_year}-{$r->calendar_month}"] ?? null;
+            if ($i === null || $i >= $limit) {
+                continue;
+            }
+            $name = $r->vendor_name ?? '（内訳未記入）';
+            $category = $this->aliases()->canonicalCategory($departmentKey, $r->category);
+            $categoryMonths[$category] ??= array_fill(0, 12, 0.0);
+            $vendorMonths[$category][$name] ??= array_fill(0, 12, 0.0);
+            $categoryMonths[$category][$i] += (float) $r->amount;
+            $vendorMonths[$category][$name][$i] += (float) $r->amount;
+        }
+
+        // 比較年度にデータ自体はあるが、YTDの範囲に金額が無い支払先・科目も「あった」として扱うため、
+        // 範囲外の行も存在だけは登録しておく（新規判定が「前年に存在しない」ことを意味するように）
+        foreach ($rows as $r) {
+            $name = $r->vendor_name ?? '（内訳未記入）';
+            $category = $this->aliases()->canonicalCategory($departmentKey, $r->category);
+            $categoryMonths[$category] ??= array_fill(0, 12, 0.0);
+            $vendorMonths[$category][$name] ??= array_fill(0, 12, 0.0);
+        }
+
+        return [$categoryMonths, $vendorMonths, true];
     }
 
     /**
