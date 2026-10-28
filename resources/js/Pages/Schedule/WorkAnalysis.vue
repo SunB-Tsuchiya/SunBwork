@@ -509,13 +509,13 @@ onBeforeUnmount(() => {
             </div>
             </div>
             <div v-if="!error" class="mt-5">
-                <p class="mb-2 text-xs text-gray-500">人別の記録時間は、期間内で最も長い人を棒の全幅として比較します。色は作業区分の内訳です。表示順はユーザー一覧の任意順です。</p>
+                <p class="mb-2 text-xs text-gray-500">人別の記録時間は、期間内で最も長い人を棒の全幅として比較します。色は作業区分の内訳です。記録日は認定された仕事時間がある日、勤怠日は出退勤時刻がある日です。どちらも有休や所定勤務日数を判定した値ではありません。表示順はユーザー一覧の任意順です。</p>
                 <div class="grid items-start gap-3 lg:grid-cols-2">
                 <div v-for="person in people" :key="person.id" class="min-w-0 space-y-2 rounded-lg border border-gray-200 p-3 text-sm">
                     <div>
                         <button type="button" class="font-semibold text-blue-800 underline underline-offset-2" :aria-label="`${person.name}の詳細を表示`" @click="openPerson(person)">{{ person.name }}</button>
                         <span class="ml-2 rounded px-1.5 py-0.5 text-xs" :style="{ backgroundColor: roleColor(person.role?.code).chip, color: roleColor(person.role?.code).bar }">{{ person.role?.label || 'その他' }}</span>
-                        <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}` : '認定時間なし' }}／作業 {{ pointLabel(person.work_points) }}点・会議／訪問 {{ pointLabel(person.meeting_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
+                        <p class="text-xs text-gray-500">記録日 {{ person.recorded_days || 0 }}日／勤怠日 {{ person.attendance_days || 0 }}日・{{ person.records || 0 }}件・{{ duration(person.minutes) }}／作業 {{ pointLabel(person.work_points) }}点・会議／訪問 {{ pointLabel(person.meeting_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
                     </div>
                     <div v-if="person.activities.length" class="space-y-2">
                         <div class="flex h-3 overflow-hidden rounded bg-gray-100" :aria-label="`${person.name}の作業種類別記録時間`">
