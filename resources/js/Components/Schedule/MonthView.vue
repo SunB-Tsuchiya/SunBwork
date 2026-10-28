@@ -64,7 +64,9 @@ function isToday(d) {
 
 function eventColor(e) {
     if (e._custom_color) return e._custom_text_color ? '' : 'text-white';
-    if (!e.is_own) return 'bg-gray-200 text-gray-600';
+    if (!e.is_own && !(e.as_attendee && e.my_attendee_status === 'accepted')) {
+        return 'bg-gray-200 text-gray-600';
+    }
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
     return colors[(e.id ?? 0) % colors.length] + ' text-white';
 }
