@@ -23,6 +23,8 @@ class WorkloadTrialAnalysis
 {
     use CalculatesEventTime;
 
+    private const INVITED_MEETING_EVIDENCE_FROM = '2026-11-01';
+
     public const CREATION_POINTS = 5.0;
     public const OVERTIME_BONUS_FIRST_THREE_HOURS = 0.5;
     public const OVERTIME_BONUS_AFTER_THREE_HOURS = 0.2;
@@ -44,6 +46,15 @@ class WorkloadTrialAnalysis
         $userById = $users->keyBy('id');
         $firstMonth = substr($startDate, 0, 7);
         $lastMonth = substr($endDate, 0, 7);
+        $monthStart = Carbon::createFromFormat('!Y-m-d', $startDate, 'Asia/Tokyo')->startOfMonth()->toDateString();
+        $monthEnd = Carbon::createFromFormat('!Y-m-d', $endDate, 'Asia/Tokyo')->endOfMonth()->toDateString();
+        $monthlyWorkRecords = WorkRecord::whereIn('user_id', $userIds)
+            ->whereBetween('date', [$monthStart, $monthEnd])->get()->groupBy('user_id');
+        $workRecords = $monthlyWorkRecords->map(fn ($records) => $records->filter(fn ($record) =>
+            $record->date->toDateString() >= $startDate && $record->date->toDateString() <= $endDate));
+        $attendanceDates = $workRecords->flatMap(fn ($records, $userId) => $records
+            ->filter(fn ($record) => filled($record->start_time) && filled($record->end_time))
+            ->mapWithKeys(fn ($record) => [$userId.'|'.$record->date->toDateString() => true]));
         $monthlySchedules = UserMonthlySchedule::whereIn('user_id', $userIds)
             ->whereBetween('year_month', [$firstMonth, $lastMonth])->get()
             ->keyBy(fn ($row) => $row->user_id.'|'.$row->year_month);
@@ -179,6 +190,16 @@ class WorkloadTrialAnalysis
                     $attendees->get($event->id, collect()), $personId, (int) $event->user_id,
                     $v3, $to->toDateString() < $today
                 )) continue;
+                if ($v3 && $isMeeting && $from->toDateString() >= self::INVITED_MEETING_EVIDENCE_FROM
+                    && ($personId !== (int) $event->user_id || $event->is_materialized_copy)) {
+                    $sourceId = $event->is_materialized_copy ? $event->source_schedule_event_id : $event->id;
+                    if ($sourceId && ! $this->approvedAttendeeCounts(
+                        $attendees->get($sourceId, collect()), $personId, $this->isEmployee($user),
+                        $attendanceDates->has($personId.'|'.$from->toDateString())
+                    )) continue;
+                    if (! $sourceId && $this->isEmployee($user)
+                        && ! $attendanceDates->has($personId.'|'.$from->toDateString())) continue;
+                }
                 if ($personId !== (int) $event->user_id && $copies->has($personId.'|'.$event->id)) continue;
                 $result = $entryByEvent->get($personId.'|'.$event->id);
                 if ($result) continue; // The result entry already represents this interval.
@@ -213,12 +234,6 @@ class WorkloadTrialAnalysis
             }
         }
 
-        $monthStart = Carbon::createFromFormat('!Y-m-d', $startDate, 'Asia/Tokyo')->startOfMonth()->toDateString();
-        $monthEnd = Carbon::createFromFormat('!Y-m-d', $endDate, 'Asia/Tokyo')->endOfMonth()->toDateString();
-        $monthlyWorkRecords = WorkRecord::whereIn('user_id', $userIds)
-            ->whereBetween('date', [$monthStart, $monthEnd])->get()->groupBy('user_id');
-        $workRecords = $monthlyWorkRecords->map(fn ($records) => $records->filter(fn ($record) =>
-            $record->date->toDateString() >= $startDate && $record->date->toDateString() <= $endDate));
         $createdProjects = ProjectJob::query()->where('company_id', $viewer->company_id)
             ->whereIn('created_by_user_id', $userIds)
             ->whereBetween('created_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
@@ -529,6 +544,17 @@ class WorkloadTrialAnalysis
         return ! $v3 || $personId === $ownerId
             || $attendees->contains(fn ($row) => (int) $row->user_id === $personId
                 && ($row->status === 'accepted' || ($afterDayEnd && $row->status === 'pending')));
+    }
+
+    private function approvedAttendeeCounts(Collection $attendees, int $personId, bool $attendanceRequired, bool $hasAttendance): bool
+    {
+        return $attendees->contains(fn ($row) => (int) $row->user_id === $personId
+            && $row->status === 'accepted') && (! $attendanceRequired || $hasAttendance);
+    }
+
+    private function isEmployee(User $user): bool
+    {
+        return ! in_array($user->employment_type ?? 'regular', ['dispatch', 'outsource'], true);
     }
 
     private function jobUnitReference($assignment): string

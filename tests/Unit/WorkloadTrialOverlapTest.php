@@ -131,6 +131,28 @@ class WorkloadTrialOverlapTest extends TestCase
         self::assertTrue($counts->invoke($service, $attendees, 2, 1, false, false));
     }
 
+    public function test_new_invitation_rule_requires_acceptance_and_employee_attendance(): void
+    {
+        $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
+        $counts = new ReflectionMethod($service, 'approvedAttendeeCounts');
+        $employee = new ReflectionMethod($service, 'isEmployee');
+        $attendees = new Collection([
+            (object) ['user_id' => 2, 'status' => 'pending'],
+            (object) ['user_id' => 3, 'status' => 'accepted'],
+            (object) ['user_id' => 4, 'status' => 'declined'],
+        ]);
+
+        self::assertFalse($counts->invoke($service, $attendees, 2, true, true));
+        self::assertFalse($counts->invoke($service, $attendees, 3, true, false));
+        self::assertTrue($counts->invoke($service, $attendees, 3, true, true));
+        self::assertTrue($counts->invoke($service, $attendees, 3, false, false));
+        self::assertFalse($counts->invoke($service, $attendees, 4, false, true));
+        self::assertTrue($employee->invoke($service, new User(['employment_type' => 'regular'])));
+        self::assertTrue($employee->invoke($service, new User(['employment_type' => 'contract'])));
+        self::assertFalse($employee->invoke($service, new User(['employment_type' => 'dispatch'])));
+        self::assertFalse($employee->invoke($service, new User(['employment_type' => 'outsource'])));
+    }
+
     public function test_v3_scores_a_private_work_entry_without_revealing_its_detail(): void
     {
         $schedule = $this->createMock(PersonalWorkSchedule::class);
