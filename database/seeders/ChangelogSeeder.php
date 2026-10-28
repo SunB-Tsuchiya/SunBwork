@@ -2188,6 +2188,25 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'expense-sheet-1',
+                'title' => '売上分析の経費比較に「部署シート」と「基準年度」を追加',
+                'released_at' => '2026-10-28',
+                'summary' => '経費比較で、Excel の部署シートと同じ「科目→支払先→月→累計」を1画面で見られる「部署シート」タブを追加しました。基準年度を前後に選べるようになり、データが無いときの案内も出ます。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase23。DB 変更なし。部署シートは SalesExpenseQueryService::departmentSheet()（科目=category_order 順、小計グループ・支払先=Excel 登場順（支払先は MIN(id)）、前年度合計付き）と ExpenseSheetTable.vue。ルート api.expense_comparison.sheet（superadmin/admin/clerk）。基準年度バーは取込済み年度の間だけ移動できる。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費比較：部署シート（新しいタブ）</h3><ul>
+<li>Excel の部署ごとのシートと同じ形で、科目・支払先・4月〜3月・累計を1画面で見られます。科目をクリックすると支払先が開き、「全部開く」で一度に全部を開けます。</li>
+<li>Excel の小計行・合計行を再現しています。支払先の並びは「Excel の順」と「金額の大きい順」を切り替えられ、金額の濃淡も表示できます。</li>
+<li>前年度との比較（増減の割合）が、科目と支払先ごとに出ます。前年に無かった支払先は「新規」と表示されます。</li>
+</ul></section>
+<section class="cl-feature"><h3>経費比較：基準年度</h3><ul>
+<li>「前年度／翌年度」と年度の選択で、取り込み済みの年度の間を移動できます。複数年推移のグラフでは、基準年度が濃い色で表示されます。</li>
+<li>データが無いときは、取込画面へのボタンや、データのある年度の案内が出ます。支払先別のグラフは、支払先の数に関わらず棒の太さが一定になりました。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

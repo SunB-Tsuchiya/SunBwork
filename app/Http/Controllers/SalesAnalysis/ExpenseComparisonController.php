@@ -93,4 +93,20 @@ class ExpenseComparisonController extends Controller
             $this->expenseQueryService->forCompany($companyId)->vendorComparison((int) $data['fiscal_year'], $data['department_key'], $data['category'])
         );
     }
+
+    /** 部署シート（Phase23）: Excelの部署シートを1画面で再現するための科目×支払先×月のデータ */
+    public function sheet(Request $request)
+    {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        abort_unless(SalesExpenses::supportsExpensesFor($companyId), 403);
+
+        $data = array_merge(
+            $this->validatedDepartmentKey($request, $companyId),
+            $request->validate(['fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100']])
+        );
+
+        return response()->json(
+            $this->expenseQueryService->forCompany($companyId)->departmentSheet((int) $data['fiscal_year'], $data['department_key'])
+        );
+    }
 }

@@ -105,12 +105,50 @@ class ExpenseComparisonTest extends TestCase
         $response->assertJsonPath('previous_has_data', false);
     }
 
+    public function test_sheet_endpoint_returns_department_sheet()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2025);
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $response = $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.sheet', [
+            'department_key' => 'planning',
+            'fiscal_year' => 2025,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('has_data', true);
+        $response->assertJsonPath('categories.0.category', '外注加工費');
+        $response->assertJsonPath('categories.0.groups.0.vendors.0.vendor_name', 'A社');
+        $response->assertJsonPath('previous_has_data', false);
+    }
+
+    public function test_sheet_endpoint_validates_parameters()
+    {
+        $this->markCompanyAsSunbrain();
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.sheet', [
+            'department_key' => 'unknown',
+            'fiscal_year' => 2025,
+        ]))->assertStatus(422);
+
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.sheet', [
+            'department_key' => 'planning',
+        ]))->assertStatus(422);
+    }
+
     public function test_endpoints_forbidden_for_non_sunbrain_company()
     {
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
 
         $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.meta', [
             'department_key' => 'planning',
+        ]))->assertForbidden();
+
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.sheet', [
+            'department_key' => 'planning',
+            'fiscal_year' => 2025,
         ]))->assertForbidden();
     }
 

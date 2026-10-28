@@ -2175,6 +2175,36 @@ index: `(sales_expense_import_id, department_key, category)`、`(sales_expense_i
 
 ---
 
+### Phase 23: 経費「部署シート」ビュー（Excelのストリップをウェブで再現）
+
+**背景（2026-10-28ユーザー要望）**: 経費はExcelでは部署ごとのシート（科目→会社名→4月〜3月→累計、小計①②・合計行）に
+なっており「部署の全体」が1枚で見える。現状のウェブは科目を1つずつ開かないと全体が見えない。
+Excelの良さ（科目→支払先→月が1枚で完結）を取り込み、ウェブならではの見やすさを加える。
+
+**配置（ユーザー確認済み: 案A）**: 経費比較ページ（`ExpenseComparison.vue`）に「科目別比較（既存）／部署シート（新規）」の
+タブ切替を追加。基準年度バー・部署タブは共用する。
+
+**23.1 画面（フェーズ1の範囲）**
+- 列: 科目・支払先 / 4月〜3月 / 累計 / 構成比 / 前年比。
+- 科目見出し行に月別合計・累計・部署総経費に占める割合・前年度比。その下に支払先行（既定はExcel登場順、金額順に切替可）。
+  Excelの小計行（小計①②）と最終「合計」行を再現。折半科目はバッジ。
+- 「全部開く／全部閉じる」。初期は科目を閉じ、科目合計行だけで全体を見渡せる。
+- 見出し行・左端列を固定（sticky）、金額の濃淡（ヒートマップ）。支払先単位の前年比（前年に無ければ「新規」）。
+
+**23.2 バックエンド**: `SalesExpenseQueryService::departmentSheet(fiscalYear, departmentKey)`を追加（migration不要）。
+支払先のExcel順は明細の登録順（`MIN(id)`）から復元。前年度の同部署データを同じレスポンスに含めて前年比を計算する。
+`ExpenseComparisonController::sheet`（ルート`api.expense_comparison.sheet`）。
+
+**23.3 スコープ外（フェーズ2以降で検討）**: 基準年度と前年度の並列表示／4部署の合計・科目構成の一覧／
+画面と同形のExcel出力／「請求書未着（暫定）」月の印（Excelの運用メモ。現状DBに保持していない）。
+
+**23.4 変更ファイル**: `SalesExpenseQueryService.php` / `ExpenseComparisonController.php` / `routes/web.php`＋`resources/js/ziggy.js` /
+`ExpenseComparison.vue` / `Components/SalesAnalysis/ExpenseSheetTable.vue`（新規）/ `ExpenseComparisonTest.php`・`SalesExpenseQueryServiceTest.php`。
+
+**23.5 実装順序**: ①QueryService＋Unitテスト → ②Controller＋Featureテスト → ③Vue（タブ・シート表） → ④npm run build・SalesAnalysisテスト。
+
+---
+
 ## 11. テスト受入基準
 
 ### 権限

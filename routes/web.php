@@ -113,6 +113,7 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/expense-comparison/meta', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'meta'])->name('api.expense_comparison.meta');
         Route::get('api/expense-comparison/trend', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'trend'])->name('api.expense_comparison.trend');
         Route::get('api/expense-comparison/vendors', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'vendors'])->name('api.expense_comparison.vendors');
+        Route::get('api/expense-comparison/sheet', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'sheet'])->name('api.expense_comparison.sheet');
 
         // 同月比較（新規。2026-09-04 Codexレビュー2回目 10.4節・PLAN1.md「6D. 同月比較 詳細設計」）
         Route::get('same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'index'])->name('same_month_comparison');

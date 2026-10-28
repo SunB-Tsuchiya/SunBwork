@@ -1,6 +1,8 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
+import ExpenseSheetTable from '@/Components/SalesAnalysis/ExpenseSheetTable.vue';
+import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import { useSalesChart } from '@/Composables/useSalesChart';
@@ -41,6 +43,12 @@ const vendorFiscalYear = ref(null);
 let baseYearTouched = false;
 const urlParams = new URLSearchParams(window.location.search);
 
+// 表示切替: 科目別比較（compare）／部署シート（sheet。Excelの部署シートを1画面で再現。Phase23）
+const viewMode = ref(urlParams.get('view') === 'sheet' ? 'sheet' : 'compare');
+const sheetLoading = ref(false);
+const sheetData = ref(null);
+const sheetError = ref('');
+
 const trendLoading = ref(false);
 const trendData = ref(null);
 const trendError = ref('');
@@ -65,6 +73,7 @@ const yearsWithData = computed(() => (trendData.value?.years ?? []).filter((y) =
 const syncQueryString = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('department_key', departmentKey.value);
+    url.searchParams.set('view', viewMode.value);
     if (selectedCategory.value) url.searchParams.set('category', selectedCategory.value);
     if (vendorFiscalYear.value) url.searchParams.set('fiscal_year', String(vendorFiscalYear.value));
     window.history.replaceState(null, '', url);
@@ -169,6 +178,30 @@ const VENDOR_ROW_HEIGHT = 34;
 const VENDOR_AXIS_PADDING = 44;
 const vendorChartHeight = computed(() => (vendorData.value?.vendors?.length ?? 0) * VENDOR_ROW_HEIGHT + VENDOR_AXIS_PADDING);
 
+// 部署切替・年度切替が続いたとき、古い応答が新しい表示を上書きしないよう連番ガードを設ける
+let sheetRequestSeq = 0;
+
+const fetchSheet = async () => {
+    if (!props.supportsExpenses || viewMode.value !== 'sheet' || !vendorFiscalYear.value) return;
+
+    const requestSeq = ++sheetRequestSeq;
+    sheetLoading.value = true;
+    sheetError.value = '';
+    try {
+        const response = await axios.get(route(rn('api.expense_comparison.sheet')), {
+            params: { department_key: departmentKey.value, fiscal_year: vendorFiscalYear.value },
+        });
+        if (requestSeq !== sheetRequestSeq) return;
+        sheetData.value = response.data;
+    } catch (e) {
+        if (requestSeq !== sheetRequestSeq) return;
+        sheetData.value = null;
+        sheetError.value = e.response?.data?.message ?? 'データの取得に失敗しました。';
+    } finally {
+        if (requestSeq === sheetRequestSeq) sheetLoading.value = false;
+    }
+};
+
 const vendorChartRef = ref(null);
 let vendorChartInstance = null;
 
@@ -240,9 +273,20 @@ watch(selectedCategory, () => {
 watch(vendorFiscalYear, () => {
     fetchVendors();
     renderTrendChart();
+    fetchSheet();
     syncQueryString();
 });
-watch([departmentKey, selectedCategory], syncQueryString);
+watch([departmentKey, selectedCategory, viewMode], syncQueryString);
+// 部署切替時はfetchMeta内で年度が再設定されるまで古い表示を残さない
+watch(departmentKey, () => { sheetData.value = null; });
+watch([departmentKey, viewMode], fetchSheet);
+// 科目別比較へ戻ったとき、非表示中に更新できなかったグラフを描き直す
+watch(viewMode, async (mode) => {
+    if (mode !== 'compare') return;
+    await nextTick();
+    renderTrendChart();
+    renderVendorChart();
+});
 
 onMounted(() => {
     if (props.supportsExpenses) fetchMeta();
@@ -262,6 +306,21 @@ onMounted(() => {
         <div v-else class="space-y-4">
             <div class="rounded bg-white p-4 shadow">
                 <p class="mb-2 text-xs text-gray-500">売上とは別集計の経費データです。粗利計算は行っていません。科目ごとの複数年推移・支払先への依存度を参考情報として表示します。</p>
+
+                <div class="mb-3 flex gap-1 border-b text-sm">
+                    <button
+                        type="button"
+                        class="-mb-px border-b-2 px-3 py-1.5"
+                        :class="viewMode === 'compare' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        @click="viewMode = 'compare'"
+                    >科目別比較</button>
+                    <button
+                        type="button"
+                        class="-mb-px border-b-2 px-3 py-1.5"
+                        :class="viewMode === 'sheet' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        @click="viewMode = 'sheet'"
+                    >部署シート</button>
+                </div>
 
                 <div class="mb-3 flex flex-wrap gap-1 rounded border bg-gray-50 p-1 text-xs">
                     <button
@@ -286,8 +345,25 @@ onMounted(() => {
 
                 <p v-if="metaLoading" class="text-xs text-gray-500">読み込み中...</p>
                 <p v-else-if="metaError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ metaError }}</p>
-                <p v-else-if="!categories.length" class="text-xs text-gray-500">この部署の経費データはまだ取り込まれていません。</p>
-                <div v-else>
+                <!--
+                    データが無いときも行き止まりにしない。取込が1件も無い場合は取込画面へ、
+                    その部署にだけ無い場合は他の部署タブ・取込済み年度の案内を出す
+                -->
+                <div v-else-if="!categories.length" class="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-gray-700">
+                    <template v-if="!fiscalYears.length">
+                        <p class="font-semibold">この会社の経費データは、まだ1件も取り込まれていません。</p>
+                        <p class="mt-1 text-gray-600">経費のExcelを取り込むと、年度の選択・科目ごとの複数年推移・支払先別の依存度が表示されます。</p>
+                    </template>
+                    <template v-else>
+                        <p class="font-semibold">「{{ departmentTabs.find((t) => t.key === departmentKey)?.label }}」には、取り込み済みの経費データがありません。</p>
+                        <p class="mt-1 text-gray-600">他の部署タブを選ぶか、データを取り込んでください。（取込済みの年度: {{ fiscalYears.map((fy) => fiscalPeriodLabel(fy)).join('、') }}）</p>
+                    </template>
+                    <Link
+                        :href="route(rn('expense_import.create'))"
+                        class="mt-2 inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
+                    >経費Excel取込へ</Link>
+                </div>
+                <div v-else-if="viewMode === 'compare'">
                     <label class="mb-1 block text-xs font-medium text-gray-700">科目</label>
                     <div class="flex flex-wrap gap-1">
                         <button
@@ -303,7 +379,7 @@ onMounted(() => {
             </div>
 
             <!-- 画面全体を使えるようになったため、複数年推移と支払先比較を横に並べて見比べられるようにしている（lg以上） -->
-            <div v-if="selectedCategory" class="grid gap-4 lg:grid-cols-2 lg:items-start">
+            <div v-if="viewMode === 'compare' && selectedCategory" class="grid gap-4 lg:grid-cols-2 lg:items-start">
                 <div class="rounded bg-white p-4 shadow">
                     <h3 class="mb-2 text-sm font-semibold text-gray-900">複数年推移（{{ selectedCategory }}）</h3>
                     <p v-if="trendLoading" class="text-xs text-gray-500">読み込み中...</p>
@@ -390,6 +466,19 @@ onMounted(() => {
                         <p v-if="!vendorData.previous_has_data" class="mt-2 text-[11px] text-gray-400">{{ fiscalPeriodLabel(vendorData.previous_fiscal_year) }}のデータが無いため、前年比較はできません。</p>
                     </template>
                 </div>
+            </div>
+
+            <!-- 部署シート: Excelの部署シート（科目→支払先→月→累計、小計・合計）を1画面で再現（Phase23） -->
+            <div v-if="viewMode === 'sheet' && !metaLoading && !metaError && categories.length" class="rounded bg-white p-4 shadow">
+                <h3 class="mb-2 text-sm font-semibold text-gray-900">
+                    {{ departmentTabs.find((t) => t.key === departmentKey)?.label }}シート（{{ fiscalPeriodLabel(vendorFiscalYear) }}）
+                </h3>
+                <p v-if="sheetLoading" class="text-xs text-gray-500">読み込み中...</p>
+                <p v-else-if="sheetError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ sheetError }}</p>
+                <p v-else-if="sheetData && !sheetData.has_data" class="text-xs text-gray-500">
+                    {{ fiscalPeriodLabel(vendorFiscalYear) }}のこの部署の経費データはありません。上の「基準年度」で、取り込み済みの別の年度を選んでください。
+                </p>
+                <ExpenseSheetTable v-else-if="sheetData" :sheet="sheetData" :reset-key="departmentKey" />
             </div>
         </div>
     </SalesAnalysisShell>

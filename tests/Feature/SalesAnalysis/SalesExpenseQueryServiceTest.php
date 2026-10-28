@@ -294,4 +294,113 @@ class SalesExpenseQueryServiceTest extends TestCase
         $this->assertFalse($result['previous_has_data']);
         $this->assertNull($result['vendors'][0]['previous_amount']);
     }
+
+    public function test_department_sheet_reproduces_excel_order_subtotals_and_months()
+    {
+        $this->markCompanyAsSunbrain();
+
+        // 登録順: B社（小額）→A社（高額）。Excel登場順（登録順）で並び、金額順にはならない
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 2, 'vendor_name' => 'B社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1, 'subtotal_label' => '小計①'],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 2, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 3000, 'is_shared_split' => false, 'subtotal_group' => 1, 'subtotal_label' => '小計①'],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 2, 'vendor_name' => 'A社', 'calendar_year' => 2026, 'calendar_month' => 3, 'amount' => 500, 'is_shared_split' => false, 'subtotal_group' => 1, 'subtotal_label' => '小計①'],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 2, 'vendor_name' => 'C社', 'calendar_year' => 2025, 'calendar_month' => 5, 'amount' => 500, 'is_shared_split' => false, 'subtotal_group' => 2, 'subtotal_label' => null],
+            // 科目順: 主材料費（order=1）が先
+            ['department_key' => 'production', 'category' => '主材料費', 'category_order' => 1, 'vendor_name' => 'D社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 5000, 'is_shared_split' => true, 'subtotal_group' => 1, 'subtotal_label' => null],
+            // 別部署は混ざらない
+            ['department_key' => 'planning', 'category' => '主材料費', 'category_order' => 1, 'vendor_name' => 'X社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 99999, 'is_shared_split' => false, 'subtotal_group' => 1, 'subtotal_label' => null],
+        ]);
+
+        $sheet = $this->service()->departmentSheet(2025, 'production');
+
+        $this->assertTrue($sheet['has_data']);
+        $this->assertCount(12, $sheet['months']);
+        $this->assertSame([2025, 4], [$sheet['months'][0]['calendar_year'], $sheet['months'][0]['calendar_month']]);
+        $this->assertSame([2026, 3], [$sheet['months'][11]['calendar_year'], $sheet['months'][11]['calendar_month']]);
+
+        $this->assertSame(['主材料費', '外注加工費'], array_column($sheet['categories'], 'category'));
+        $this->assertTrue($sheet['categories'][0]['is_shared_split']);
+        $this->assertSame(10000.0, $sheet['total_amount']);
+        $this->assertSame(50.0, $sheet['categories'][0]['share_pct']);
+
+        $outsourcing = $sheet['categories'][1];
+        $this->assertSame(5000.0, $outsourcing['total_amount']);
+        $this->assertCount(2, $outsourcing['groups']);
+        $this->assertSame('小計①', $outsourcing['groups'][0]['subtotal_label']);
+        $this->assertSame(4500.0, $outsourcing['groups'][0]['subtotal_amount']);
+        $this->assertNull($outsourcing['groups'][1]['subtotal_label']);
+        $this->assertSame(['B社', 'A社'], array_column($outsourcing['groups'][0]['vendors'], 'vendor_name'));
+
+        $a = $outsourcing['groups'][0]['vendors'][1];
+        $this->assertSame(3000.0, $a['months'][0]);
+        $this->assertSame(500.0, $a['months'][11]);
+        $this->assertSame(3500.0, $a['total_amount']);
+
+        // 月別の部署合計: 4月=B1000+A3000+D5000、5月=C500、3月=A500
+        $this->assertSame(9000.0, $sheet['month_totals'][0]);
+        $this->assertSame(500.0, $sheet['month_totals'][1]);
+        $this->assertSame(500.0, $sheet['month_totals'][11]);
+    }
+
+    public function test_department_sheet_adds_previous_year_comparison_and_new_flags()
+    {
+        $this->markCompanyAsSunbrain();
+
+        $this->seedImport(2024, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 1500, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'C社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 500, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '消耗品費', 'category_order' => 2, 'vendor_name' => 'E社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 100, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $sheet = $this->service()->departmentSheet(2025, 'production');
+
+        $this->assertTrue($sheet['previous_has_data']);
+        $this->assertSame(1000.0, $sheet['previous_total_amount']);
+
+        $outsourcing = $sheet['categories'][0];
+        $this->assertSame(1000.0, $outsourcing['previous_total_amount']);
+        $this->assertSame(1000.0, $outsourcing['diff']);
+        $this->assertSame(100.0, $outsourcing['diff_pct']);
+        $this->assertFalse($outsourcing['is_new']);
+
+        $vendors = collect($outsourcing['groups'][0]['vendors'])->keyBy('vendor_name');
+        $this->assertSame(50.0, $vendors['A社']['diff_pct']);
+        // 前年度データはあるが前年に無かった支払先・科目は「新規」
+        $this->assertTrue($vendors['C社']['is_new']);
+        $this->assertNull($vendors['C社']['previous_total_amount']);
+        $this->assertTrue($sheet['categories'][1]['is_new']);
+    }
+
+    public function test_department_sheet_has_no_new_flags_when_previous_year_is_missing()
+    {
+        $this->markCompanyAsSunbrain();
+
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $sheet = $this->service()->departmentSheet(2025, 'production');
+
+        $this->assertFalse($sheet['previous_has_data']);
+        $this->assertNull($sheet['previous_total_amount']);
+        $vendor = $sheet['categories'][0]['groups'][0]['vendors'][0];
+        $this->assertFalse($vendor['is_new']);
+        $this->assertNull($vendor['diff_pct']);
+    }
+
+    public function test_department_sheet_returns_no_data_for_unregistered_year_or_department()
+    {
+        $this->markCompanyAsSunbrain();
+
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $this->assertFalse($this->service()->departmentSheet(2030, 'production')['has_data']);
+        $this->assertFalse($this->service()->departmentSheet(2025, 'ondemand')['has_data']);
+        $this->assertCount(12, $this->service()->departmentSheet(2030, 'production')['months']);
+    }
 }
