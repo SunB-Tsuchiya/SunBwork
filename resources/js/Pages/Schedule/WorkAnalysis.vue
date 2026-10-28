@@ -115,12 +115,15 @@ const visiblePoints = (person) => Number(person.base_points || 0)
     + (includeCreation.value ? Number(person.creation_points || 0) : 0)
     + (includeManagement.value ? Number(person.management_points || 0) : 0);
 const totalPoints = computed(() => people.value.reduce((sum, person) => sum + visiblePoints(person), 0));
+const pointRole = ref('all');
+const pointPeople = computed(() => people.value.filter((person) =>
+    pointRole.value === 'all' || (person.role?.code || 'other') === pointRole.value));
 const totalCreatedProjects = computed(() => people.value.reduce((sum, person) => sum + Number(person.created_projects || 0), 0));
 const totalUnrecordedOvertime = computed(() => people.value.reduce((sum, person) => sum + Number(person.unrecorded_overtime_minutes || 0), 0));
 const recordedPeople = computed(() => people.value.filter((person) => Number(person.records || 0) > 0).length);
 const maxPersonMinutes = computed(() => Math.max(1, ...people.value.map((person) => Number(person.minutes || 0))));
 const pointRows = computed(() => {
-    const rows = [...people.value].sort((a, b) => visiblePoints(b) - visiblePoints(a) || a.name.localeCompare(b.name, 'ja'));
+    const rows = [...pointPeople.value].sort((a, b) => visiblePoints(b) - visiblePoints(a) || a.name.localeCompare(b.name, 'ja'));
     const max = Math.max(1, ...rows.map((row) => visiblePoints(row)));
     return rows.map((row) => ({ ...row, width: `${(visiblePoints(row) / max) * 100}%` }));
 });
@@ -174,6 +177,9 @@ const categorySegments = (person) => Object.entries((person.activities || []).re
 }, {})).map(([category, minutes]) => ({ category, minutes, width: `${(minutes / maxPersonMinutes.value) * 100}%` }));
 watch(comparisonCategories, (options) => {
     if (comparisonCategory.value !== 'all' && !options.some(([code]) => code === comparisonCategory.value)) comparisonCategory.value = 'all';
+});
+watch(visibleRoles, (roles) => {
+    if (pointRole.value !== 'all' && !roles.some((role) => role.code === pointRole.value)) pointRole.value = 'all';
 });
 const rangeLabel = computed(() => range.value || date.value);
 const selectedWeekRange = computed(() => {
@@ -426,8 +432,15 @@ onBeforeUnmount(() => {
             <div v-if="!error" class="min-w-0 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
                 <div class="flex flex-wrap items-baseline justify-between gap-2">
                     <h4 class="font-semibold">暫定ポイント順位 <span class="ml-1 text-xs font-normal text-amber-800">試用・係数は調整可能</span></h4>
-                    <span class="text-sm text-gray-600">部署の記録合計 {{ pointLabel(totalPoints) }}点</span>
+                    <span class="text-sm text-gray-600">対象全員の記録合計 {{ pointLabel(totalPoints) }}点</span>
                 </div>
+                <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700">順位の対象
+                    <select v-model="pointRole" class="rounded border border-gray-300 bg-white px-2 py-1 text-sm">
+                        <option value="all">総合（全員）</option>
+                        <option v-for="role in visibleRoles" :key="role.code" :value="role.code">{{ role.label }}</option>
+                    </select>
+                </label>
+                <p class="mt-1 text-xs text-gray-600">総合を基本に、担当区分ごとの順位も確認できます。順位は記録された活動の目安で、人事評価を確定するものではありません。</p>
                 <p v-if="scoreVersion === 'trial_time_v3'" class="mt-1 text-xs text-gray-600">記録時間×10点/時×種類係数に、1日2時間までの認定残業の追加点を加えます。案件登録・案件管理の自動加点はありません。登録件数と管理案件数は参考情報です。</p>
                 <p v-else class="mt-1 text-xs text-gray-600">記録時間×10点/時×種類係数に、記録と重なる残業の追加点、案件登録1件{{ pointRule.creation_points }}点、直近14日にチーム作業が動いた管理案件の暫定点を加えます。通常作成・複製・一括取込は同点。過去の登録者は移行時のリーダーから推定しています。</p>
                 <div class="mt-2 flex flex-wrap gap-3 text-xs"><label><input v-model="includeOvertime" type="checkbox" class="mr-1 rounded" />残業追加点</label><label v-if="scoreVersion !== 'trial_time_v3'"><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label><label v-if="scoreVersion !== 'trial_time_v3'"><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label></div>
