@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import ExpenseSheetTable from '@/Components/SalesAnalysis/ExpenseSheetTable.vue';
 import ExpenseHighlights from '@/Components/SalesAnalysis/ExpenseHighlights.vue';
+import ExpenseVendors from '@/Components/SalesAnalysis/ExpenseVendors.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
@@ -44,8 +45,14 @@ const vendorFiscalYear = ref(null);
 let baseYearTouched = false;
 const urlParams = new URLSearchParams(window.location.search);
 
-// 表示切替: 科目別比較（compare）／部署シート（sheet。Excelの部署シートを1画面で再現。Phase23）
-const viewMode = ref(urlParams.get('view') === 'sheet' ? 'sheet' : 'compare');
+// 表示切替: 科目別比較（compare）／部署シート（sheet。Excelの部署シートを1画面で再現。Phase23）／支払先カルテ（vendors。Phase24-3）
+const viewMode = ref(['sheet', 'vendors'].includes(urlParams.get('view')) ? urlParams.get('view') : 'compare');
+// 支払先カルテで選んでいる支払先（正式名または別名）。部署シートの支払先名のクリックからも設定される
+const selectedVendor = ref(urlParams.get('vendor') || null);
+const openVendor = (name) => {
+    selectedVendor.value = name;
+    viewMode.value = 'vendors';
+};
 const sheetLoading = ref(false);
 const sheetData = ref(null);
 const sheetError = ref('');
@@ -94,6 +101,8 @@ const syncQueryString = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('department_key', departmentKey.value);
     url.searchParams.set('view', viewMode.value);
+    if (viewMode.value === 'vendors' && selectedVendor.value) url.searchParams.set('vendor', selectedVendor.value);
+    else url.searchParams.delete('vendor');
     if (selectedCategory.value) url.searchParams.set('category', selectedCategory.value);
     if (vendorFiscalYear.value) url.searchParams.set('fiscal_year', String(vendorFiscalYear.value));
     window.history.replaceState(null, '', url);
@@ -310,7 +319,7 @@ watch(vendorFiscalYear, () => {
     syncQueryString();
 });
 watch([compareYear, comparePeriod], fetchSheet);
-watch([departmentKey, selectedCategory, viewMode], syncQueryString);
+watch([departmentKey, selectedCategory, viewMode, selectedVendor], syncQueryString);
 // 部署切替時はfetchMeta内で年度が再設定されるまで古い表示を残さない
 watch(departmentKey, () => { sheetData.value = null; });
 watch([departmentKey, viewMode], fetchSheet);
@@ -354,9 +363,15 @@ onMounted(() => {
                         :class="viewMode === 'sheet' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
                         @click="viewMode = 'sheet'"
                     >部署シート</button>
+                    <button
+                        type="button"
+                        class="-mb-px border-b-2 px-3 py-1.5"
+                        :class="viewMode === 'vendors' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        @click="viewMode = 'vendors'"
+                    >支払先</button>
                 </div>
 
-                <div class="mb-3 flex flex-wrap gap-1 rounded border bg-gray-50 p-1 text-xs">
+                <div v-if="viewMode !== 'vendors'" class="mb-3 flex flex-wrap gap-1 rounded border bg-gray-50 p-1 text-xs">
                     <button
                         v-for="tab in departmentTabs"
                         :key="tab.key"
@@ -377,13 +392,13 @@ onMounted(() => {
                     <button type="button" :disabled="!canGoNextYear" class="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-1 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-40" @click="goLatestYear">最新年度</button>
                 </div>
 
-                <p v-if="metaLoading" class="text-xs text-gray-500">読み込み中...</p>
-                <p v-else-if="metaError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ metaError }}</p>
+                <p v-if="viewMode !== 'vendors' && metaLoading" class="text-xs text-gray-500">読み込み中...</p>
+                <p v-else-if="viewMode !== 'vendors' && metaError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ metaError }}</p>
                 <!--
                     データが無いときも行き止まりにしない。取込が1件も無い場合は取込画面へ、
                     その部署にだけ無い場合は他の部署タブ・取込済み年度の案内を出す
                 -->
-                <div v-else-if="!categories.length" class="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-gray-700">
+                <div v-else-if="viewMode !== 'vendors' && !categories.length" class="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-gray-700">
                     <template v-if="!fiscalYears.length">
                         <p class="font-semibold">この会社の経費データは、まだ1件も取り込まれていません。</p>
                         <p class="mt-1 text-gray-600">経費のExcelを取り込むと、年度の選択・科目ごとの複数年推移・支払先別の依存度が表示されます。</p>
@@ -553,9 +568,19 @@ onMounted(() => {
                 <!-- 読み込み中も表を残す（比較条件の変更のたびに、科目の開閉状態や表示モードが初期化されないように） -->
                 <div v-if="sheetData?.has_data" :class="sheetLoading ? 'opacity-60' : ''">
                     <ExpenseHighlights :sheet="sheetData" @focus="focusSheetRow" />
-                    <ExpenseSheetTable ref="sheetTableRef" :sheet="sheetData" :reset-key="departmentKey" />
+                    <ExpenseSheetTable ref="sheetTableRef" :sheet="sheetData" :reset-key="departmentKey" @vendor="openVendor" />
                 </div>
             </div>
+
+            <!-- 支払先カルテ: 全部署・全科目・全年度を支払先で横断して見る（Phase24-3） -->
+            <ExpenseVendors
+                v-if="viewMode === 'vendors' && vendorFiscalYear && !metaLoading && fiscalYears.length"
+                v-model="selectedVendor"
+                :route-prefix="routePrefix"
+                :department-labels="departmentLabels"
+                :enabled-department-keys="enabledDepartmentKeys"
+                :fiscal-year="vendorFiscalYear"
+            />
         </div>
     </SalesAnalysisShell>
 </template>

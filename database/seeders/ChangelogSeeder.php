@@ -2244,6 +2244,25 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'expense-vendors-1',
+                'title' => '経費に「支払先カルテ」を追加（支払先ごとの総額・傾向）',
+                'released_at' => '2026-10-29',
+                'summary' => '経費比較に新しいタブ「支払先」を追加しました。全部署・全科目・全年度を支払先ごとにまとめて、ランキングと、1社ごとのカルテ（年度推移・内訳・月別の動き）を見られます。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase24-3。DB 変更なし（sales_expense_aliases を kind=vendor・department_key=all で流用）。SalesExpenseVendorService（ranking/detail）、ExpenseVendorController、ExpenseVendors.vue。支払先の名寄せは SalesExpenseAliasService に支払先版を追加し、部署シート・支払先別の依存度・カルテに反映。統合した支払先が同一科目の別小計グループにまたがる場合は最初のグループにまとめる。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費：支払先カルテ（新しいタブ「支払先」）</h3><ul>
+<li>全部署・全科目の支払先を、金額の大きい順に表示します。部署での絞り込みと、支払先名での検索ができます。</li>
+<li>支払先をクリックすると、その支払先のカルテが開きます。年度ごとの支払総額（前年比）、基準年度の内訳（部署×科目）、月別の動き（直近5年度を重ねて表示）を見られます。</li>
+<li>部署シートの支払先名をクリックしても、その支払先のカルテへ移動できます。</li>
+</ul></section>
+<section class="cl-feature"><h3>経費：支払先の名寄せ（設定・取込 → 経費の名寄せ）</h3><ul>
+<li>「株式会社○○」と「○○(株)」のような表記の違いや社名変更を、同じ支払先としてまとめられます。候補を確認して承認でき、手動での統合・解除もできます。</li>
+<li>取り込んだデータは書き換えず、表示するときだけ読み替えます。部署シート、支払先別の依存度、支払先カルテに反映されます。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {
