@@ -68,6 +68,14 @@ async function loadEvents() {
 watch(loadRange, loadEvents, { immediate: true });
 watch(overlays, loadEvents, { deep: true });
 
+function onAttendeeResponded({ eventId, status }) {
+    const isInvitation = event => event.as_attendee && Number(event.id) === Number(eventId);
+    events.value = status === 'declined'
+        ? events.value.filter(event => !isInvitation(event))
+        : events.value.map(event => isInvitation(event) ? { ...event, my_attendee_status: status } : event);
+    showDetail.value = false;
+}
+
 // 月表示・週表示ではオーバーレイ（他人の予定）を出さない — 日表示のカラム機能のみで使う
 const nonOverlayEvents = computed(() => events.value.filter(e => !e.is_overlay));
 
@@ -399,7 +407,7 @@ watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, Strin
         @close="showDetail = false"
         @edit="openEdit"
         @open-room-reserve="openRoomReserveForEvent"
-        @responded="() => { showDetail = false; loadEvents(); }"
+        @responded="onAttendeeResponded"
         @materialized="() => { showDetail = false; loadEvents(); }" />
 
     <RoomReservationModal
