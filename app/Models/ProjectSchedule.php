@@ -14,6 +14,7 @@ class ProjectSchedule extends Model
         'project_job_item_id',
         'parent_id',
         'color',
+        'color_key',
         'name',
         'description',
         'start_date',

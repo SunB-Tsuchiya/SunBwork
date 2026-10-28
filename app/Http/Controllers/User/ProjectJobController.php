@@ -215,7 +215,7 @@ class ProjectJobController extends Controller
 
         $schedules = ProjectSchedule::where('project_job_id', $projectJob->id)
             ->orderBy('start_date')
-            ->get(['id', 'name', 'description', 'start_date', 'end_date']);
+            ->get(['id', 'name', 'description', 'start_date', 'end_date', 'color_key']);
 
         // 自分が発信者または受信者のジョブ履歴のみ
         $jobHistory = [];

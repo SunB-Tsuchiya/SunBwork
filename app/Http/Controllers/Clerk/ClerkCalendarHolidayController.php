@@ -36,15 +36,9 @@ class ClerkCalendarHolidayController extends Controller
     public function data(Request $request, ClerkCalendarHolidays $holidays)
     {
         $year = $this->year($request);
-        $companyId = $this->companyId();
-        // ストリップ前後の余白も含め、年跨ぎの祝日を返す。
-        foreach ([$year - 1, $year, $year + 1] as $adjacentYear) {
-            $holidays->initialize($companyId, $adjacentYear);
-        }
 
-        return response()->json(ClerkCalendarHoliday::where('company_id', $companyId)
-            ->whereBetween('date', [($year - 1).'-01-01', ($year + 1).'-12-31'])
-            ->orderBy('date')->get(['date', 'name']));
+        // ストリップ前後の余白も含め、年跨ぎの祝日を返す（Clerk は、年ごとの初期投入もする）。
+        return response()->json($holidays->forCompany($this->companyId(), $year, seed: true));
     }
 
     public function store(Request $request, ClerkCalendarHolidays $holidays)

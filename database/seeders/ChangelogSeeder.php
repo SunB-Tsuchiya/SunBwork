@@ -2168,6 +2168,26 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'calsync-1',
+                'title' => 'チームルームと案件のスケジュールを、Clerk のカレンダーと同じ使い心地に',
+                'released_at' => '2026-10-28',
+                'summary' => 'チームルームのスケジュールと、案件詳細のスケジュールタブが、Clerk のカレンダーと同じ「連続スクロールの月カレンダー」になり、祝日の表示と色設定が使えるようになりました。',
+                'design_files' => ['z_instructions/CALSYNC_PLAN1.md', 'z_instructions/CALSYNC_MANAGER1.md'],
+                'claude_notes' => 'Clerk のストリップ部品は引数化のみ（既定は Clerk の経路）。色設定はチームごと・案件ごとに独立（team_calendar_colors / project_calendar_colors）。案件の予定は状態色（完了・超過・間近）を優先し、通常のときだけ種類の色（project_schedules.color_key）。ProjectCalendar は stripStyle の opt-in。別画面 ProjectSchedules/Calendar は未変更。祝日は会社の休日カレンダーの読み取りのみ（DB は書き換えない）。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>チームルームのスケジュール</h3><ul>
+<li>月を連続でスクロールでき、年・月の選択、今月・前の週・次の週のボタンが使えます。祝日と土日が色で分かります。</li>
+<li>予定に色を付けられ、色ごとの名前（例：会議）をチームで決められます（メンバー全員が変更できます）。</li>
+<li>予定に「完了チェック」と「複製」が加わりました。完了にできるのは、予定を作った人と Super Admin です。複製は、メンバー全員ができます。</li>
+</ul></section>
+<section class="cl-feature"><h3>案件のスケジュール（案件詳細のスケジュールタブ）</h3><ul>
+<li>同じく、連続スクロールの月カレンダーと、祝日の表示になりました。</li>
+<li>予定に種類の色を付けられ、色ごとの名前は案件ごとに決められます（変更できるのは、案件を編集できる人です。案件に関わる人は、見るだけです）。</li>
+<li>期限が近い（黄）・期限超過（赤）・完了（緑）の色は、今までどおり優先されます。種類の色は、期限に余裕があるときの色になります。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

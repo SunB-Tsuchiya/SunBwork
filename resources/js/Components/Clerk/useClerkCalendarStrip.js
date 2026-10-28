@@ -3,7 +3,9 @@ import axios from 'axios';
 import { route } from 'ziggy-js';
 import { addDays, dayClass, jstToday, monthStart, stripRange, sunday } from './clerkCalendarDates';
 
-export function useClerkCalendarStrip(calendarRef) {
+// options.holidaysUrl: 祝日を取得する URL を返す関数（既定は Clerk のカレンダーの経路）。チームルーム・案件は、自分の経路を渡す。
+export function useClerkCalendarStrip(calendarRef, options = {}) {
+    const holidaysUrl = options.holidaysUrl ?? (() => route('clerk.calendar.holidays.data'));
     const today = jstToday();
     const selectedYear = ref(Number(today.slice(0, 4)));
     const selectedMonth = ref(Number(today.slice(5, 7)));
@@ -31,7 +33,7 @@ export function useClerkCalendarStrip(calendarRef) {
     async function fetchHolidays() {
         const request = ++holidayRequest;
         try {
-            const response = await axios.get(route('clerk.calendar.holidays.data'), { params: { year: renderedYear } });
+            const response = await axios.get(holidaysUrl(), { params: { year: renderedYear } });
             if (disposed || request !== holidayRequest) return;
             holidays.value = Object.fromEntries(response.data.map(item => [item.date, item.name]));
             holidayError.value = '';

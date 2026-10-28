@@ -4,22 +4,22 @@
  */
 export function scheduleStatusColor(endDateStr, isCompleted) {
     if (isCompleted) {
-        return { bg: '#dcfce7', border: '#15803d', text: '#14532d' }; // 緑: 完了
+        return { bg: '#dcfce7', border: '#15803d', text: '#14532d', kind: 'done' }; // 緑: 完了
     }
     if (!endDateStr) {
-        return { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' }; // 青: 通常
+        return { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a', kind: 'normal' }; // 青: 通常
     }
 
     const parts = String(endDateStr).split('T')[0].split('-').map(Number);
     if (parts.length < 3 || parts.some(isNaN)) {
-        return { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' };
+        return { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a', kind: 'normal' };
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const end = new Date(parts[0], parts[1] - 1, parts[2]);
 
     if (end < today) {
-        return { bg: '#fee2e2', border: '#b91c1c', text: '#7f1d1d' }; // 赤: 超過
+        return { bg: '#fee2e2', border: '#b91c1c', text: '#7f1d1d', kind: 'overdue' }; // 赤: 超過
     }
 
     // 残り営業日数（明日〜end_date、土日除く）
@@ -33,7 +33,7 @@ export function scheduleStatusColor(endDateStr, isCompleted) {
     }
 
     if (bizDays <= 3) {
-        return { bg: '#fef3c7', border: '#d97706', text: '#92400e' }; // 黄: 間近
+        return { bg: '#fef3c7', border: '#d97706', text: '#92400e', kind: 'soon' }; // 黄: 間近
     }
-    return { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' }; // 青: 通常
+    return { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a', kind: 'normal' }; // 青: 通常
 }

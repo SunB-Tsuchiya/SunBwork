@@ -188,6 +188,7 @@
                         :showMemoButton="false"
                         :uniformColors="true"
                         :stayInPlace="true"
+                        :stripStyle="true"
                     />
                 </section>
 
@@ -1046,6 +1047,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import ProjectJobItemsTab from '@/Components/ProjectJobItemsTab.vue';
 import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
+import { CLERK_EVENT_COLORS } from '@/Components/Clerk/clerkEventColors';
 import { Link, router, usePage, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -1080,10 +1082,12 @@ const scheduleEvents = computed(() =>
         }
         const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
         const uc = scheduleStatusColor(endDateOnly, isCompleted);
+        // 状態色（完了・超過・間近）を優先し、通常のときだけ、予定に選んだ種類の色にする
+        const cat = uc.kind === 'normal' && s.color_key ? CLERK_EVENT_COLORS[s.color_key] : null;
         return {
             id: s.id, title: s.name ?? '', start: startDateOnly, end: endForCalendar,
-            allDay: true, backgroundColor: uc.bg, borderColor: uc.border, textColor: uc.text,
-            extendedProps: { schedule_id: s.id, progress: s.progress ?? 0, completed_at: s.completed_at ?? null },
+            allDay: true, backgroundColor: cat ? cat.hex : uc.bg, borderColor: cat ? cat.hex : uc.border, textColor: cat ? cat.text : uc.text,
+            extendedProps: { schedule_id: s.id, progress: s.progress ?? 0, completed_at: s.completed_at ?? null, color_key: s.color_key ?? null },
         };
     })
 );

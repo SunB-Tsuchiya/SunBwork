@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
 use App\Models\Team;
 use App\Models\TeamEvent;
+use App\Support\CalendarColors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 
 class TeamEventController extends Controller
@@ -38,6 +40,10 @@ class TeamEventController extends Controller
             'description' => $e->description,
             'user_name'   => $e->user?->name,
             'editable'    => $e->user_id === Auth::id(),
+            'color_key'   => $e->color_key ?: CalendarColors::DEFAULT_KEY,
+            'completed'   => $e->completed_at !== null,
+            // 完了チェックを押せるのは、予定の作成者と SuperAdmin だけ（編集と同じ）
+            'can_complete' => $e->user_id === Auth::id() || Auth::user()->isSuperAdmin(),
         ]));
     }
 
@@ -51,7 +57,9 @@ class TeamEventController extends Controller
             'starts_at'   => 'required|date',
             'ends_at'     => 'nullable|date|after_or_equal:starts_at',
             'all_day'     => 'boolean',
+            'color_key'   => ['nullable', Rule::in(CalendarColors::KEYS)],
         ]);
+        $validated['color_key'] = $validated['color_key'] ?? CalendarColors::DEFAULT_KEY;
 
         $event = TeamEvent::create(array_merge($validated, [
             'team_id' => $team->id,
@@ -76,11 +84,30 @@ class TeamEventController extends Controller
             'starts_at'   => 'required|date',
             'ends_at'     => 'nullable|date',
             'all_day'     => 'boolean',
+            'color_key'   => ['nullable', Rule::in(CalendarColors::KEYS)],
         ]);
+        if (array_key_exists('color_key', $validated) && $validated['color_key'] === null) {
+            unset($validated['color_key']);   // 色が送られてこなければ、今の色のまま
+        }
 
         $event->update($validated);
 
         return response()->json($event);
+    }
+
+    /** 完了チェックの切り替え（予定の作成者と SuperAdmin だけ） */
+    public function complete(Team $team, TeamEvent $event)
+    {
+        $this->assertMember($team);
+        abort_unless($event->team_id === $team->id, 404);
+
+        if ($event->user_id !== Auth::id() && ! Auth::user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $event->update(['completed_at' => $event->completed_at ? null : now()]);
+
+        return response()->json(['completed' => $event->completed_at !== null]);
     }
 
     public function destroy(Team $team, TeamEvent $event)

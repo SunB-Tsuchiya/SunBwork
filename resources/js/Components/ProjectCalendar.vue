@@ -39,8 +39,25 @@
                         CSV取込
                     </button>
                 </template>
+                <button
+                    v-if="stripEnabled"
+                    type="button"
+                    @click="colorPanelOpen = !colorPanelOpen"
+                    :class="colorPanelOpen ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                    class="ml-auto rounded px-4 py-2 text-sm font-medium"
+                >色設定</button>
             </template>
         </div>
+
+        <!-- ── 色設定パネル（案件ごと。変更できるのは、案件を編集できる人だけ） ── -->
+        <ScheduleColorPanel
+            v-if="stripEnabled"
+            v-model:open="colorPanelOpen"
+            :colors-url="route('project_jobs.calendar.colors.index', { projectJob: props.project.id })"
+            :update-url="(colorKey) => route('project_jobs.calendar.colors.update', { projectJob: props.project.id, colorKey })"
+            :reorder-url="route('project_jobs.calendar.colors.reorder', { projectJob: props.project.id })"
+            @colors-updated="(v) => colorSettings = v"
+        />
 
         <!-- ── スケジュールパネル（トグル、カレンダー上部） ── -->
         <div v-if="schedulePanelOpen && props.project && !props.readonly" class="mb-4 rounded border border-gray-200 bg-gray-50 p-4">
@@ -156,7 +173,33 @@
             :weekPostsUrl="props.weekPostsUrl"
         />
 
-        <FullCalendar v-if="currentView === 'calendar'" ref="calendarRef" :options="calendarOptions" />
+        <FullCalendar v-if="!stripEnabled && currentView === 'calendar'" ref="calendarRef" :options="calendarOptions" />
+
+        <!-- 月のストリップ（Clerk のカレンダーと同じ。週を連続でスクロールし、祝日を表示する） -->
+        <div v-if="stripEnabled" v-show="currentView === 'calendar'" class="project-year-strip">
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <label for="project-calendar-year" class="sr-only">年</label>
+                <select id="project-calendar-year" v-model.number="selectedYear" class="rounded border-gray-300 text-sm" @change="selectMonth">
+                    <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
+                </select>
+                <label for="project-calendar-month" class="sr-only">月</label>
+                <select id="project-calendar-month" v-model.number="selectedMonth" class="rounded border-gray-300 text-sm" @change="selectMonth">
+                    <option v-for="month in 12" :key="month" :value="month">{{ month }}月</option>
+                </select>
+                <button type="button" class="rounded bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200" @click="thisMonth">今月</button>
+                <button type="button" class="rounded bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200" @click="moveWeek(-7)">前の週</button>
+                <button type="button" class="rounded bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200" @click="moveWeek(7)">次の週</button>
+                <span class="text-xs text-gray-500">{{ rangeLabel }}</span>
+            </div>
+            <p class="mb-2 text-xs text-gray-500">上下にスクロールして続きの週を表示できます。</p>
+            <p v-if="holidayError" role="alert" class="mb-2 text-sm text-red-600">{{ holidayError }} <button type="button" class="underline" @click="fetchHolidays">再読み込み</button></p>
+            <FullCalendar ref="calendarRef" :options="calendarOptions">
+                <template #dayCellContent="{ date }">
+                    <span class="project-date-number">{{ date.getMonth() + 1 }}/{{ date.getDate() }}</span>
+                    <span class="project-holiday-name" :title="holidays[localKey(date)] || ''">{{ holidays[localKey(date)] || '\u00a0' }}</span>
+                </template>
+            </FullCalendar>
+        </div>
 
         <!-- ホバーポップアップ -->
         <Teleport to="body">
@@ -272,6 +315,18 @@
                         </div>
                     </div>
                 </div>
+                <div v-if="stripEnabled" class="mb-2">
+                    <label class="mb-1 block text-sm font-medium">色 <span class="text-xs font-normal text-gray-500">（期限が近い・超過・完了のときは、その状態の色が優先されます）</span></label>
+                    <div class="flex flex-wrap items-end gap-x-2 gap-y-1">
+                        <button type="button" class="rounded border px-2 py-0.5 text-xs" :class="!simpleEventColorKey ? 'border-gray-700 bg-gray-100 font-semibold' : 'border-gray-200 text-gray-500'" @click="simpleEventColorKey = null">なし</button>
+                        <div v-for="key in CLERK_EVENT_COLOR_KEYS" :key="key" class="flex flex-col items-center gap-0.5">
+                            <button type="button" :title="colorLabel(key) || key"
+                                :class="[CLERK_EVENT_COLORS[key].swatch, 'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110', simpleEventColorKey === key ? 'border-gray-700 scale-110' : 'border-white']"
+                                @click="simpleEventColorKey = key" />
+                            <span v-if="colorLabel(key)" :title="colorLabel(key)" class="max-w-[2.6rem] overflow-hidden text-ellipsis whitespace-nowrap text-center text-[9px] leading-none text-gray-500">{{ colorLabel(key) }}</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="mb-2">
                     <label class="block text-sm font-medium">メモ</label>
                     <textarea v-model="simpleEventMemo" class="w-full rounded border p-2" rows="6"></textarea>
@@ -343,6 +398,27 @@
                     >
                         未完了に戻す
                     </button>
+                </div>
+
+                <!-- 種類の色（stripStyle のとき）。状態色（期限が近い・超過・完了）が優先される -->
+                <div v-if="stripEnabled" class="mb-2">
+                    <label class="mb-1 block text-sm font-medium">色</label>
+                    <div v-if="!isEditingSchedule" class="flex items-center gap-2 text-sm text-gray-600">
+                        <template v-if="scheduleShowData.color_key && CLERK_EVENT_COLORS[scheduleShowData.color_key]">
+                            <span :class="[CLERK_EVENT_COLORS[scheduleShowData.color_key].swatch, 'inline-block h-4 w-4 rounded-full']"></span>
+                            <span>{{ colorLabel(scheduleShowData.color_key) || scheduleShowData.color_key }}</span>
+                        </template>
+                        <span v-else>なし</span>
+                    </div>
+                    <div v-else class="flex flex-wrap items-end gap-x-2 gap-y-1">
+                        <button type="button" class="rounded border px-2 py-0.5 text-xs" :class="!scheduleEditColorKey ? 'border-gray-700 bg-gray-100 font-semibold' : 'border-gray-200 text-gray-500'" @click="scheduleEditColorKey = null">なし</button>
+                        <div v-for="key in CLERK_EVENT_COLOR_KEYS" :key="key" class="flex flex-col items-center gap-0.5">
+                            <button type="button" :title="colorLabel(key) || key"
+                                :class="[CLERK_EVENT_COLORS[key].swatch, 'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110', scheduleEditColorKey === key ? 'border-gray-700 scale-110' : 'border-white']"
+                                @click="scheduleEditColorKey = key" />
+                            <span v-if="colorLabel(key)" :title="colorLabel(key)" class="max-w-[2.6rem] overflow-hidden text-ellipsis whitespace-nowrap text-center text-[9px] leading-none text-gray-500">{{ colorLabel(key) }}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 連携設定リンク -->
@@ -451,6 +527,9 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import ProjectWeekPlanner from '@/Components/ProjectWeekPlanner.vue';
 import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
+import { useClerkCalendarStrip } from '@/Components/Clerk/useClerkCalendarStrip';
+import ScheduleColorPanel from '@/Components/Calendar/ScheduleColorPanel.vue';
+import { CLERK_EVENT_COLORS, CLERK_EVENT_COLOR_KEYS } from '@/Components/Clerk/clerkEventColors';
 
 const props = defineProps({
     schedules: { type: Array, default: () => [] },
@@ -467,6 +546,8 @@ const props = defineProps({
     initialView: { type: String, default: 'calendar' },
     stayInPlace: { type: Boolean, default: false },
     panelStorageKey: { type: String, default: '' },
+    // 真のとき、Clerk のカレンダーと同じ見た目（月のストリップ・祝日・色設定・予定の色の選択）にする（案件詳細のスケジュールタブ用）
+    stripStyle: { type: Boolean, default: false },
 });
 
 
@@ -478,6 +559,7 @@ const currentView = ref(props.initialView || 'calendar');
 function switchView(view) {
     if (!props.project || props.stayInPlace) {
         currentView.value = view;
+        if (stripEnabled && view === 'calendar') { refreshSize(); fetchHolidays(); }
         return;
     }
     router.get(route('coordinator.project_schedules.calendar'), {
@@ -655,7 +737,36 @@ const simpleEventIsRange = ref(false);
 const simpleEventStartDate = ref(getTodayString());
 const simpleEventEndDate = ref(getTodayString());
 const simpleEventMemo = ref('');
+const simpleEventColorKey = ref(null);   // 新しい予定の、種類の色（なし＝今までどおり）
+const scheduleEditColorKey = ref(null);  // 予定を編集するときの、種類の色
 const calendarRef = ref(null);
+
+// ── Clerk カレンダー相当の表示（stripStyle）: 月のストリップ・祝日・色設定 ──────────────────────────
+const stripEnabled = props.stripStyle && !!props.project?.id;
+const noStrip = { selectedYear: ref(0), selectedMonth: ref(0), years: [], rangeLabel: ref(''), holidays: ref({}), holidayError: ref(''),
+    selectMonth() {}, thisMonth() {}, moveWeek() {}, refreshSize() {}, fetchHolidays() {}, localKey: () => '', options: {} };
+const strip = stripEnabled
+    ? useClerkCalendarStrip(calendarRef, { holidaysUrl: () => route('project_jobs.calendar.holidays', { projectJob: props.project.id }) })
+    : noStrip;
+const { selectedYear, selectedMonth, years, rangeLabel, holidays, holidayError, selectMonth, thisMonth, moveWeek, refreshSize, fetchHolidays, localKey } = strip;
+
+const colorPanelOpen = ref(false);
+const colorSettings = ref([]);   // [{ color_key, label, sort_order }]
+const colorLabel = (colorKey) => colorSettings.value.find((c) => c.color_key === colorKey)?.label || '';
+onMounted(async () => {
+    if (!stripEnabled) return;
+    try {
+        const res = await axios.get(route('project_jobs.calendar.colors.index', { projectJob: props.project.id }));
+        colorSettings.value = res.data.colors;
+    } catch { /* ignore */ }
+});
+
+/** 予定の色: 状態色（完了＝緑・超過＝赤・間近＝黄）を優先し、通常のときだけ、選んだ種類の色（color_key）にする */
+function scheduleColorFor(endDate, isCompleted, colorKey) {
+    const uc = scheduleStatusColor(endDate, isCompleted);
+    const cat = stripEnabled && uc.kind === 'normal' && colorKey ? CLERK_EVENT_COLORS[colorKey] : null;
+    return cat ? { bg: cat.hex, border: cat.hex, text: cat.text } : { bg: uc.bg, border: uc.border, text: uc.text };
+}
 const didForceAddEvents = ref(false);
 // plain (non-proxied) events copy for FullCalendar to avoid Proxy/reactivity issues
 const plainCalendarEvents = ref([]);
@@ -679,6 +790,7 @@ onMounted(() => {
 
 // FullCalendar サイズ再計算（v-show で隠されていた後に呼ぶ）
 const updateCalendarSize = () => {
+    if (stripEnabled) { refreshSize(); return; }   // ストリップは、高さ・位置も合わせ直す
     nextTick(() => {
         calendarRef.value?.getApi?.()?.updateSize?.();
     });
@@ -807,6 +919,7 @@ async function savePanelEdits() {
 function openEventModal(startDate = null, endDate = null) {
     simpleEventTitle.value = '';
     simpleEventMemo.value = '';
+    simpleEventColorKey.value = null;
     const start = startDate || selectedDate.value || getTodayString();
     simpleEventStartDate.value = start;
     simpleEventEndDate.value = endDate || start;
@@ -933,7 +1046,7 @@ const calendarEvents = computed(() => {
                 endDateOnly = addOneDay(endDateOnly);
             }
             const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
-            const uc = scheduleStatusColor(s.end_date, isCompleted);
+            const uc = scheduleColorFor(s.end_date, isCompleted, s.color_key);
             const schedBg = uc.bg;
             const schedBorder = uc.border;
             list.push({
@@ -947,7 +1060,7 @@ const calendarEvents = computed(() => {
                 textColor: uc.text,
                 event_id: s.id,
                 description: s.description ?? '',
-                extendedProps: { project_schedule_id: s.id, completed_at: s.completed_at ?? null, progress: s.progress ?? 0, original_color: s.color ?? '#3b82f6' },
+                extendedProps: { project_schedule_id: s.id, completed_at: s.completed_at ?? null, progress: s.progress ?? 0, original_color: s.color ?? '#3b82f6', color_key: s.color_key ?? null },
             });
         });
     }
@@ -1030,7 +1143,7 @@ const calendarEvents = computed(() => {
         }
         if (e.deleted) return; // skip deleted markers
         const eCompleted = !!e.completed_at || (e.progress ?? 0) >= 100;
-        const eUc = scheduleStatusColor(e.end_date ?? e.end, eCompleted);
+        const eUc = scheduleColorFor(e.end_date ?? e.end, eCompleted, e.color_key);
         const eBg = eUc.bg;
         const eBorder = eUc.border;
         list.push({
@@ -1045,7 +1158,7 @@ const calendarEvents = computed(() => {
             borderColor: eBorder,
             event_id: e.id ?? e.event_id,
             description: e.description ?? e.body ?? '',
-            extendedProps: { project_schedule_id: e.id ?? e.event_id, completed_at: e.completed_at ?? null, progress: e.progress ?? 0 },
+            extendedProps: { project_schedule_id: e.id ?? e.event_id, completed_at: e.completed_at ?? null, progress: e.progress ?? 0, color_key: e.color_key ?? null },
         });
     });
 
@@ -1359,6 +1472,7 @@ const calendarOptions = computed(() => ({
         }
     },
     select: handleDateSelect,
+    ...(stripEnabled ? strip.options : {}),   // ストリップ（stripStyle のときだけ）
 }));
 
 // 日付選択ハンドラー関数を定義
@@ -1502,6 +1616,7 @@ function openScheduleShowModal(event) {
     }
     scheduleShowData.value.color = event.backgroundColor || event.color || null;
     scheduleShowData.value.completed_at = event.extendedProps?.completed_at ?? null;
+    scheduleShowData.value.color_key = event.extendedProps?.color_key ?? null;
     // prep edit fields
     scheduleEditTitle.value = scheduleShowData.value.title.replace(/^✓ /, '');
     scheduleEditStart.value = scheduleShowData.value.start;
@@ -1530,6 +1645,7 @@ function toggleEdit(enable) {
         scheduleEditStart.value = scheduleShowData.value.start;
         scheduleEditEnd.value = scheduleShowData.value.end;
         scheduleEditItemId.value = scheduleShowData.value.item_id ?? null;
+        scheduleEditColorKey.value = scheduleShowData.value.color_key ?? null;
     }
 }
 
@@ -1545,6 +1661,7 @@ async function submitScheduleUpdate() {
             end_date: scheduleEditEnd.value,
             description: scheduleShowData.value && scheduleShowData.value.description ? scheduleShowData.value.description : '',
             project_job_item_id: scheduleEditItemId.value || null,
+            ...(stripEnabled ? { color_key: scheduleEditColorKey.value } : {}),
         };
         // use coordinator project_schedules update endpoint if available
         // determine id robustly from several possible shapes (event, extendedProps, legacy names)
@@ -1968,6 +2085,7 @@ async function submitSimpleEvent() {
             description: simpleEventMemo.value || null,
             start_date: simpleEventStartDate.value,
             end_date: simpleEventEndDate.value || simpleEventStartDate.value,
+            ...(stripEnabled ? { color_key: simpleEventColorKey.value } : {}),
         };
         // Basic client-side validation for required project_job_id
         if (!payload.project_job_id) {
@@ -2165,4 +2283,27 @@ async function submitCsvImport() {
     white-space: nowrap;
     text-overflow: ellipsis;
 }
+</style>
+
+<style scoped>
+.project-year-strip :deep(.fc-scrollgrid-sync-table) { height: auto !important; }
+.project-year-strip :deep(.fc-daygrid-day-frame) { height: 118px; min-height: 118px !important; }
+.project-year-strip :deep(.fc-daygrid-day-top) { height: 38px; overflow: hidden; }
+.project-year-strip :deep(.fc-daygrid-day-number) { display: block; width: 100%; min-width: 0; padding: 2px 4px; }
+.project-date-number { display: block; text-align: right; font-size: 12px; line-height: 16px; }
+.project-holiday-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 16px; text-align: right; }
+.project-year-strip :deep(.fc-day-other .fc-daygrid-day-top) { opacity: 1; }
+.project-year-strip :deep(.clerk-saturday) { background-color: #eff6ff; }
+.project-year-strip :deep(.clerk-saturday .fc-daygrid-day-number),
+.project-year-strip :deep(.clerk-saturday .fc-col-header-cell-cushion) { color: #2563eb; }
+.project-year-strip :deep(.clerk-holiday) { background-color: #fef2f2; }
+.project-year-strip :deep(.clerk-holiday .fc-daygrid-day-number),
+.project-year-strip :deep(.clerk-holiday .fc-col-header-cell-cushion) { color: #dc2626; }
+.project-year-strip :deep(.fc-day-today) { background-color: inherit; }
+.project-year-strip :deep(.fc-day-today.clerk-holiday) { background-color: #fef2f2; }
+.project-year-strip :deep(.fc-day-today.clerk-saturday) { background-color: #eff6ff; }
+.project-year-strip :deep(.fc-day-today .fc-daygrid-day-frame) { box-shadow: inset 0 0 0 2px #9333ea; }
+.project-year-strip :deep(.fc-daygrid-event) { font-size: 11px; line-height: 16px; }
+.project-year-strip :deep(.fc-daygrid-event .fc-event-title) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-year-strip :deep(.fc-scroller) { overscroll-behavior-y: contain; }
 </style>

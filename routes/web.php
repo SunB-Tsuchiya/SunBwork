@@ -1472,6 +1472,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::post('/{team}/events/csv-import', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'csvImport'])->name('events.csv_import');
         Route::put('/{team}/events/{event}', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'update'])->name('events.update');
         Route::delete('/{team}/events/{event}', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'destroy'])->name('events.destroy');
+        Route::patch('/{team}/events/{event}/complete', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'complete'])->name('events.complete');
+
+        // カレンダーの色設定（チームごと。メンバー全員が変更できる）と、祝日（会社の休日カレンダーの読み取り）
+        Route::get('/{team}/calendar/colors', [\App\Http\Controllers\TeamRoom\TeamCalendarController::class, 'colors'])->name('calendar.colors.index');
+        Route::patch('/{team}/calendar/colors/{colorKey}', [\App\Http\Controllers\TeamRoom\TeamCalendarController::class, 'updateColor'])->name('calendar.colors.update');
+        Route::post('/{team}/calendar/colors/reorder', [\App\Http\Controllers\TeamRoom\TeamCalendarController::class, 'reorderColors'])->name('calendar.colors.reorder');
+        Route::get('/{team}/calendar/holidays', [\App\Http\Controllers\TeamRoom\TeamCalendarController::class, 'holidays'])->name('calendar.holidays');
 
         // ボード
         Route::post('/{team}/board', [\App\Http\Controllers\TeamRoom\TeamBoardController::class, 'store'])->name('board.store');
@@ -1511,6 +1518,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::post('/{team}/memo-posts', [\App\Http\Controllers\TeamRoom\TeamMemoPostController::class, 'store'])->name('memo-posts.store');
         Route::put('/{team}/memo-posts/{memoPost}', [\App\Http\Controllers\TeamRoom\TeamMemoPostController::class, 'update'])->name('memo-posts.update');
         Route::delete('/{team}/memo-posts/{memoPost}', [\App\Http\Controllers\TeamRoom\TeamMemoPostController::class, 'destroy'])->name('memo-posts.destroy');
+    });
+
+// ── 案件のカレンダー: 色設定（案件ごと）・祝日（会社の休日カレンダーの読み取り）。権限は、コントローラーで判定する ──
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->prefix('project-jobs/{projectJob}/calendar')
+    ->name('project_jobs.calendar.')
+    ->group(function () {
+        Route::get('/colors', [\App\Http\Controllers\ProjectCalendarController::class, 'colors'])->name('colors.index');
+        Route::patch('/colors/{colorKey}', [\App\Http\Controllers\ProjectCalendarController::class, 'updateColor'])->name('colors.update');
+        Route::post('/colors/reorder', [\App\Http\Controllers\ProjectCalendarController::class, 'reorderColors'])->name('colors.reorder');
+        Route::get('/holidays', [\App\Http\Controllers\ProjectCalendarController::class, 'holidays'])->name('holidays');
     });
 
 // セッション Keep-Alive 用 ping エンドポイント

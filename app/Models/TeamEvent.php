@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class TeamEvent extends Model
 {
     protected $fillable = [
-        'team_id', 'user_id', 'title', 'description', 'starts_at', 'ends_at', 'all_day',
+        'team_id', 'user_id', 'title', 'description', 'starts_at', 'ends_at', 'all_day', 'color_key', 'completed_at',
     ];
 
     protected function casts(): array
@@ -16,6 +16,7 @@ class TeamEvent extends Model
             'all_day'   => 'boolean',
             'starts_at' => 'datetime',
             'ends_at'   => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 

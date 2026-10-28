@@ -43,6 +43,7 @@ class ProjectSchedulesController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'color' => 'nullable|string|max:32',
+            'color_key' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\CalendarColors::KEYS)],   // 種類の色（通常の状態のときの色）
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
         
@@ -70,6 +71,7 @@ class ProjectSchedulesController extends Controller
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'color' => 'nullable|string|max:32',
+            'color_key' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\CalendarColors::KEYS)],
             'progress' => 'nullable|numeric|min:0|max:100',
         ]);
 
@@ -79,6 +81,8 @@ class ProjectSchedulesController extends Controller
             'name' => $data['name'] ?? $projectSchedule->name,
             'description' => array_key_exists('description', $data) ? $data['description'] : $projectSchedule->description,
             'color' => $data['color'] ?? $projectSchedule->color,
+            // 種類の色: 送られたとき（空にする場合も含む）だけ更新する。ドラッグ移動など、色を送らない更新では、今の色のまま
+            'color_key' => array_key_exists('color_key', $data) ? $data['color_key'] : $projectSchedule->color_key,
             'progress' => $data['progress'] ?? $projectSchedule->progress,
             'updated_by' => $request->user()->id,
         ]);
@@ -102,6 +106,7 @@ class ProjectSchedulesController extends Controller
             'start_date' => $projectSchedule->start_date ? $projectSchedule->start_date->toDateString() : null,
             'end_date' => $projectSchedule->end_date ? $projectSchedule->end_date->toDateString() : null,
             'color' => $projectSchedule->color,
+            'color_key' => $projectSchedule->color_key,
             'progress' => $projectSchedule->progress,
             'project_job_id' => $projectSchedule->project_job_id,
         ]]);

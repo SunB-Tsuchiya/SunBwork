@@ -296,3 +296,13 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 - 個人カレンダーの簡易予定タイトルは、案件と作業名が両方あれば「案件名／作業名」と表示する。片方だけならその名前を表示し、両方なければ大区分名に戻す。作業名の入力欄には本人の簡易予定と自己登録マイジョブの過去の作業名を最大15件取得し、フォーカス時に候補を表示する。同じ案件で使った作業名を上位に並べ、自由入力も許可する。
 
 - 2026-10-28の招待見直しでは、未回答の招待予定は灰色で本人カレンダーに示し、承認済みは会議種類の色と「自分の予定に登録済み」の説明に切り替える。承認は元イベントとの参照を保つため主催者の変更に追随し、独立コピーは自動作成しない。「自分用にコピーして編集」は任意で、評価上の実績確定ボタンではない。試用反映・画面確認は別管理。
+
+## チームルーム・案件のカレンダーを Clerk 相当に（2026-10-28）
+詳細は `CALSYNC_PLAN1.md` / `CALSYNC_MANAGER1.md`。Clerk のカレンダー（連続ストリップ・祝日・色設定）と同じ使い心地を、チームルームのスケジュールと、案件詳細のスケジュールタブに反映した。
+
+- **共通部品**: ストリップは `useClerkCalendarStrip(calendarRef, { holidaysUrl })`（祝日の取得先は引数。**既定は Clerk の経路**で、Clerk の動きは変わらない）。祝日は `ClerkCalendarHolidays::forCompany($companyId, $year, $seed)`（Clerk は `seed: true` で年ごとの初期投入、チーム・案件は読み取りのみで、未設定の年は元の祝日データで補う）。色設定の窓は `Components/Calendar/ScheduleColorPanel.vue`（URL と変更できるかを props で受け、サーバーが `can_edit` を返せばそれを優先。最後に変更した人・日時を表示）。色の定数は `App\Support\CalendarColors`（Clerk と同じ 11 色）と `clerkEventColors.js`。
+- **チームルーム**: `TeamScheduleCalendar.vue` は `ClerkScheduleCalendar.vue` と同じ作り（ストリップ・祝日・色設定・予定の色・完了チェック・複製）。色設定はチームごと（`team_calendar_colors`）で、**チームのメンバー全員**が変更できる（`TeamCalendarController`）。祝日はチームの会社の休日カレンダー。予定は `color_key`（初期 indigo）と `completed_at`。**完了チェックは作成者と SuperAdmin だけ**（`PATCH team-rooms/{team}/events/{event}/complete`）。ドラッグ・編集・削除も、作成者・SuperAdmin だけ（一覧の `can_complete`）。**複製はメンバー全員**。
+- **案件**: `ProjectCalendar.vue` は新しい prop `stripStyle`（opt-in）が真のときだけ、ストリップ・祝日・色設定・予定の色の選択を有効にする。適用は案件詳細のスケジュールタブ（`Coordinator/ProjectJobs/Show.vue`、閲覧用 `User/ProjectJobs/Show.vue`）。**別画面 `Coordinator/ProjectSchedules/Calendar.vue` は変更しない**。色設定は案件ごと（`project_calendar_colors`）。変更できるのは、案件を編集できる人（コーディネーター・Clerk・Leader・管理者。同じ会社。SuperAdmin は全社）。案件に関わる人（アサイン・チームメンバー）は見るだけ（`ProjectCalendarController`。経路は `project_jobs.calendar.*`）。
+- **案件の予定の色**: **状態色を優先**（完了＝緑・期限超過＝赤・期限が近い＝黄）。**通常のときだけ**、予定に選んだ種類の色（`project_schedules.color_key`）。`scheduleStatusColor()` は `kind`（done/overdue/soon/normal）も返す。`color_key` が空なら、今の青のまま。色を送らない更新（ドラッグ移動など）では、色は変わらない。
+- **DB**: `team_calendar_colors` / `project_calendar_colors`（外部キー名は短く明示）、`team_events.color_key` / `completed_at`、`project_schedules.color_key`。
+- **テスト**: `tests/Feature/TeamRoom/TeamCalendarTest.php`、`tests/Feature/ProjectCalendarTest.php`。
