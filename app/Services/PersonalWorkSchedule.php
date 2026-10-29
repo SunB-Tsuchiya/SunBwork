@@ -74,7 +74,11 @@ class PersonalWorkSchedule
             ->where(function ($query) use ($userIds, $attendees) {
                 $query->whereIn('user_id', $userIds)->orWhereIn('id', $attendees);
             })
-            ->whereBetween('starts_at', [$lower, $upper])
+            ->where('starts_at', '<=', $upper)
+            ->where(function ($query) use ($lower) {
+                $query->where('ends_at', '>=', $lower)
+                    ->orWhere(fn ($missingEnd) => $missingEnd->whereNull('ends_at')->where('starts_at', '>=', $lower));
+            })
             ->with(['user:id,company_id', 'projectJobAssignment.projectJob.coordinators:id', 'projectJobAssignment.projectJob:id,title,company_id,user_id,show_on_department_schedule', 'eventItemType:id,slug'])
             ->get()
             ->filter(function (Event $event) use ($start) {

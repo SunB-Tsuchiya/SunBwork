@@ -41,6 +41,7 @@ class WorkloadTrialRangeTest extends TestCase
 
         $schemas = [
             'users' => 'id integer primary key, name text, company_id integer, department_id integer, is_ghost integer default 0',
+            'departments' => 'id integer primary key, company_id integer, code text',
             'work_records' => 'id integer primary key, user_id integer, date text, start_time text, end_time text, scheduled_end text, overtime_minutes integer default 0',
             'user_monthly_schedules' => 'id integer primary key, user_id integer, year_month text, schedule text',
             'user_monthly_breaks' => 'id integer primary key, user_id integer, year_month text, schedule text',
@@ -247,6 +248,79 @@ class WorkloadTrialRangeTest extends TestCase
             'starts_at' => '2026-10-31 09:00:00', 'ends_at' => '2026-10-31 10:00:00']);
         $this->user->employment_type = 'regular';
         self::assertSame(60, $this->analyze('2026-10-31', '2026-10-31')['minutes']);
+    }
+
+    public function test_overtime_bonus_is_capped_for_each_day_before_monthly_aggregation(): void
+    {
+        foreach (['2026-10-28', '2026-10-29'] as $index => $date) {
+            $this->insert('events', ['id' => $index + 1, 'user_id' => 1, 'event_item_type_id' => 1,
+                'starts_at' => "$date 18:00:00", 'ends_at' => "$date 21:00:00"]);
+            $this->insert('work_records', ['id' => $index + 1, 'user_id' => 1, 'date' => $date,
+                'start_time' => '09:00', 'end_time' => '21:00', 'scheduled_end' => '18:00', 'overtime_minutes' => 180]);
+        }
+        $day = $this->analyze('2026-10-29', '2026-10-29');
+        $month = $this->analyze('2026-10-01', '2026-10-31');
+        self::assertSame(30.0, $day['base_points']);
+        self::assertSame(10.0, $day['overtime_points']);
+        self::assertSame(40.0, $day['points']);
+        self::assertSame(60.0, $month['base_points']);
+        self::assertSame(20.0, $month['overtime_points']);
+        self::assertSame(80.0, $month['points']);
+        self::assertSame(['2026-10' => 360], $day['monthly_overtime_minutes']);
+        self::assertSame($day['monthly_overtime_minutes'], $month['monthly_overtime_minutes']);
+    }
+
+    public function test_v3_project_creation_and_team_activity_do_not_add_automatic_points(): void
+    {
+        $this->insert('project_jobs', ['id' => 1, 'company_id' => 1, 'user_id' => 1,
+            'created_by_user_id' => 1, 'created_at' => '2026-10-29 08:00:00', 'show_on_department_schedule' => 1]);
+        $this->insert('project_job_assignments', ['id' => 1, 'project_job_id' => 1,
+            'user_id' => 1, 'sender_id' => 1, 'job_type' => 'work']);
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'project_job_assignment_id' => 1,
+            'starts_at' => '2026-10-29 09:00:00', 'ends_at' => '2026-10-29 10:00:00']);
+        $result = $this->analyze('2026-10-29', '2026-10-29');
+        self::assertSame(1, $result['created_projects']);
+        self::assertSame(1, $result['active_managed_projects']);
+        self::assertSame(0.0, $result['creation_points']);
+        self::assertSame(0.0, $result['management_points']);
+        self::assertSame(10.0, $result['points']);
+    }
+
+    public function test_daily_schedule_contains_the_same_spanning_event_as_analysis(): void
+    {
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 1,
+            'starts_at' => '2026-10-27 23:30:00', 'ends_at' => '2026-10-29 00:30:00']);
+        $schedule = (new PersonalWorkSchedule())->eventsForUsers([1], '2026-10-29');
+        self::assertCount(1, $schedule);
+        self::assertSame(1, $schedule->first()->id);
+        self::assertSame(30, $this->analyze('2026-10-29', '2026-10-29')['minutes']);
+    }
+
+    public function test_trial_access_requires_superadmin_and_matching_info_company_and_department(): void
+    {
+        $this->insert('departments', ['id' => 1, 'company_id' => 1, 'code' => 'INFO']);
+        $this->insert('departments', ['id' => 2, 'company_id' => 1, 'code' => 'OTHER']);
+        $schedule = new PersonalWorkSchedule();
+        $this->user->user_role = 'superadmin';
+        self::assertTrue($schedule->available($this->user));
+        $this->user->company_id = 2;
+        self::assertFalse($schedule->available($this->user));
+        $this->user->company_id = 1;
+        $this->user->department_id = 2;
+        self::assertFalse($schedule->available($this->user));
+        $this->user->department_id = 1;
+        foreach (['admin', 'coordinator', 'user'] as $role) {
+            $this->user->user_role = $role;
+            self::assertFalse($schedule->available($this->user));
+        }
+    }
+
+    public function test_daily_schedule_keeps_the_existing_one_hour_fallback_for_missing_end_time(): void
+    {
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 1,
+            'starts_at' => '2026-10-29 09:00:00']);
+        self::assertCount(1, (new PersonalWorkSchedule())->eventsForUsers([1], '2026-10-29'));
+        self::assertCount(0, (new PersonalWorkSchedule())->eventsForUsers([1], '2026-10-30'));
     }
 
     private function invitation(string $date): void
