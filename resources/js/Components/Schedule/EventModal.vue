@@ -39,6 +39,9 @@ const { showToast } = useToasts();
 const selectedTypeId      = ref(null);
 const selectedMeetingId   = ref(null);
 const titleManuallyEdited = ref(false);
+const retainedWorkType = computed(() => props.event?.event_item_type?.slug === 'work_schedule'
+    && !props.eventItemTypes.some((type) => type.id === props.event.event_item_type_id)
+    ? props.event.event_item_type : null);
 
 const selectedSlug      = computed(() => props.eventItemTypes.find(t => t.id === selectedTypeId.value)?.slug ?? null);
 const showMeetingSelect  = computed(() => selectedSlug.value === 'conference');
@@ -644,6 +647,7 @@ function fmtResTime(isoStr) {
                         <select v-model="selectedTypeId"
                             class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
                             <option :value="null">— 選択なし —</option>
+                            <option v-if="retainedWorkType" :value="event.event_item_type_id" disabled>{{ retainedWorkType.name || '作業（予定）' }}（既存記録）</option>
                             <option v-for="t in eventItemTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
                         </select>
                     </div>

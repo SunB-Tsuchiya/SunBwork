@@ -10,6 +10,7 @@ const commonActivities = [
 ];
 
 export const analysisActivityLabels = {
+    scheduled_other: 'そのほか（業務）',
     my_job: 'マイジョブ・依頼ジョブ', outing: '業務外出・訪問', unspecified: '作業種類未指定',
 };
 
