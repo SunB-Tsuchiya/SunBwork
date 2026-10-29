@@ -177,7 +177,7 @@ class ExpenseComparisonController extends Controller
         $compareFiscalYear = isset($data['compare_fiscal_year']) ? (int) $data['compare_fiscal_year'] : null;
         $comparePeriod = $data['compare_period'] ?? null;
 
-        $spreadsheet = $this->exportService->forCompany($companyId)->workbook($fiscalYear, $this->expenseDepartmentLabels($companyId), $compareFiscalYear, $comparePeriod);
+        $spreadsheet = $this->exportService->forCompany($companyId)->workbook($fiscalYear, $this->expenseDepartmentLabels($companyId), $compareFiscalYear, $comparePeriod, Auth::user());
         $filename = "経費_" . ($fiscalYear - 1970) . "期_{$fiscalYear}年度.xlsx";
 
         $writer = new Xlsx($spreadsheet);

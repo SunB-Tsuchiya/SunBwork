@@ -127,6 +127,13 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/expense-vendors', [App\Http\Controllers\SalesAnalysis\ExpenseVendorController::class, 'ranking'])->name('api.expense_vendors.ranking');
         Route::get('api/expense-vendors/detail', [App\Http\Controllers\SalesAnalysis\ExpenseVendorController::class, 'detail'])->name('api.expense_vendors.detail');
 
+        // 経費メモ（新規。Phase24-5。科目・支払先・月へのコメント。編集・削除は書いた本人とSuperAdminのみ）
+        Route::get('api/expense-notes', [App\Http\Controllers\SalesAnalysis\ExpenseNoteController::class, 'index'])->name('api.expense_notes.index');
+        Route::get('api/expense-notes/vendor', [App\Http\Controllers\SalesAnalysis\ExpenseNoteController::class, 'vendor'])->name('api.expense_notes.vendor');
+        Route::post('api/expense-notes', [App\Http\Controllers\SalesAnalysis\ExpenseNoteController::class, 'store'])->name('api.expense_notes.store');
+        Route::put('api/expense-notes/{note}', [App\Http\Controllers\SalesAnalysis\ExpenseNoteController::class, 'update'])->name('api.expense_notes.update')->whereNumber('note');
+        Route::delete('api/expense-notes/{note}', [App\Http\Controllers\SalesAnalysis\ExpenseNoteController::class, 'destroy'])->name('api.expense_notes.destroy')->whereNumber('note');
+
         // 同月比較（新規。2026-09-04 Codexレビュー2回目 10.4節・PLAN1.md「6D. 同月比較 詳細設計」）
         Route::get('same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'index'])->name('same_month_comparison');
         Route::get('api/same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'summary'])->name('api.same_month_comparison');

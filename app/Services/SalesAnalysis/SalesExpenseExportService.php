@@ -2,6 +2,7 @@
 
 namespace App\Services\SalesAnalysis;
 
+use App\Models\User;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -23,8 +24,11 @@ class SalesExpenseExportService
     {
     }
 
+    private ?int $companyId = null;
+
     public function forCompany(int $companyId): self
     {
+        $this->companyId = $companyId;
         $this->queryService->forCompany($companyId);
 
         return $this;
@@ -33,7 +37,7 @@ class SalesExpenseExportService
     /**
      * @param  array<string, string>  $departmentLabels 部署キー=>表示名（出力する部署を、この順で）
      */
-    public function workbook(int $fiscalYear, array $departmentLabels, ?int $compareFiscalYear = null, ?string $comparePeriod = null): Spreadsheet
+    public function workbook(int $fiscalYear, array $departmentLabels, ?int $compareFiscalYear = null, ?string $comparePeriod = null, ?User $viewer = null): Spreadsheet
     {
         $overview = $this->queryService->departmentsOverview($fiscalYear, array_keys($departmentLabels), $compareFiscalYear, $comparePeriod);
 
@@ -44,7 +48,11 @@ class SalesExpenseExportService
         foreach ($departmentLabels as $key => $label) {
             $sheet = $this->queryService->departmentSheet($fiscalYear, $key, $compareFiscalYear, $comparePeriod);
             if ($sheet['has_data']) {
-                $this->buildDepartmentSheet($spreadsheet, $label, $sheet);
+                // 経費メモ（Phase24-5）: その年度のメモを「メモ」列に出す（viewerが無ければ出さない）
+                $notes = $viewer !== null && $this->companyId !== null
+                    ? (new SalesExpenseNoteService())->forCompany($this->companyId)->forDepartment($key, $fiscalYear, $viewer)['notes']
+                    : [];
+                $this->buildDepartmentSheet($spreadsheet, $label, $sheet, $notes);
             }
         }
 
@@ -136,7 +144,8 @@ class SalesExpenseExportService
         }
     }
 
-    private function buildDepartmentSheet(Spreadsheet $spreadsheet, string $label, array $data): void
+    /** @param  array<int, array>  $notes その年度のメモ（名寄せ後の科目名・支払先名に読み替え済み） */
+    private function buildDepartmentSheet(Spreadsheet $spreadsheet, string $label, array $data, array $notes = []): void
     {
         // シート名は31文字まで・一部の記号は使えない
         $sheet = new Worksheet($spreadsheet, mb_substr(str_replace(['\\', '/', '?', '*', '[', ']', ':'], '', $label), 0, 31));
@@ -145,13 +154,17 @@ class SalesExpenseExportService
         $this->setText($sheet, 'A1', $this->periodLabel($data['fiscal_year']) . " {$label} 経費");
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $this->setText($sheet, 'A2', $this->conditionText($data));
+        $departmentNotes = $this->noteText($notes, null, null);
+        if ($departmentNotes !== '') {
+            $this->setText($sheet, 'A3', '部署メモ: ' . $departmentNotes);
+        }
 
         // ヘッダー（4行目）: 科目 / 支払先 / 4月〜3月 / 累計 / 構成比 / 比較年度累計 / 増減額 / 増減率
         $headers = ['科目', '支払先'];
         foreach ($data['months'] as $m) {
             $headers[] = $m['calendar_month'] . '月';
         }
-        array_push($headers, '累計', '構成比(%)', '比較年度累計', '増減額', '増減率(%)');
+        array_push($headers, '累計', '構成比(%)', '比較年度累計', '増減額', '増減率(%)', 'メモ');
         foreach ($headers as $i => $h) {
             $sheet->setCellValue($this->col($i) . '4', $h);
         }
@@ -163,6 +176,7 @@ class SalesExpenseExportService
             // 科目の行（月別合計・累計・構成比・比較）
             $this->setText($sheet, "A{$row}", $c['category'] . ($c['is_shared_split'] ? '（折半）' : ''));
             $this->writeAmounts($sheet, $row, $c['months'], $c['total_amount'], $c['share_pct'], $c['previous_total_amount'], $c['diff'], $c['diff_pct'], $c['is_new']);
+            $this->setText($sheet, "T{$row}", $this->noteText($notes, $c['category'], null));
             $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFont()->setBold(true);
             $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F3F4F6');
             $row++;
@@ -172,6 +186,7 @@ class SalesExpenseExportService
                     $this->setText($sheet, "B{$row}", $v['vendor_name']);
                     $share = $c['total_amount'] > 0 ? round($v['total_amount'] / $c['total_amount'] * 100, 1) : null;
                     $this->writeAmounts($sheet, $row, $v['months'], $v['total_amount'], $share, $v['previous_total_amount'], $v['diff'], $v['diff_pct'], $v['is_new']);
+                    $this->setText($sheet, "T{$row}", $this->noteText($notes, $c['category'], $v['vendor_name']));
                     $row++;
                 }
                 if ($g['subtotal_label']) {
@@ -203,6 +218,24 @@ class SalesExpenseExportService
         foreach (['O', 'P', 'Q', 'R', 'S'] as $c) {
             $sheet->getColumnDimension($c)->setWidth(13);
         }
+        $sheet->getColumnDimension('T')->setWidth(48);
+    }
+
+    /**
+     * 指定の付け先（部署全体=null,null／科目=科目,null／支払先=科目,支払先）のメモを、「4月: 本文 / 本文」の形に1つの文字列へまとめる。
+     *
+     * @param  array<int, array>  $notes
+     */
+    private function noteText(array $notes, ?string $category, ?string $vendor): string
+    {
+        $texts = [];
+        foreach ($notes as $n) {
+            if ($n['category'] === $category && $n['vendor_name'] === $vendor) {
+                $texts[] = ($n['calendar_month'] ? "{$n['calendar_month']}月: " : '') . $n['body'];
+            }
+        }
+
+        return implode(' / ', $texts);
     }
 
     /** 1行ぶんの金額（月別12列・累計・構成比・比較年度累計・増減額・増減率）を書く。0円の月は空欄にする */

@@ -6,10 +6,13 @@ import { useSalesChart } from '@/Composables/useSalesChart';
 // 1画面で再現する。科目は初期状態で閉じ、科目の合計行だけで部署全体を見渡せる。
 // 支払先の並びはExcel登場順（既定）と金額順を切り替えられる。
 
-const emit = defineEmits(['vendor']);
+const emit = defineEmits(['vendor', 'notes']);
 
 const props = defineProps({
     sheet: { type: Object, required: true },
+    // 経費メモ（Phase24-5）。名寄せ後の科目名・支払先名に読み替え済みで、行の科目・支払先と同じ名前で突き合わせる
+    notes: { type: Array, default: () => [] },
+    previousNotes: { type: Array, default: () => [] },
     // 部署・年度が変わったとき開閉状態を捨てるためのキー（部署切替で変える）
     resetKey: { type: String, default: '' },
 });
@@ -53,6 +56,30 @@ const focusRow = async (category, vendor = null) => {
 };
 defineExpose({ focusRow });
 const rowHighlight = (category, vendor = null) => (highlightKey.value === rowKey(category, vendor) ? '[&>td]:!bg-amber-100' : '');
+
+// 行ごとのメモ件数（今年度／前年度）
+const noteKey = (category, vendor = null) => JSON.stringify([category, vendor]);
+const noteCounts = computed(() => {
+    const m = {};
+    props.notes.forEach((n) => {
+        const k = noteKey(n.category, n.vendor_name);
+        m[k] = { cur: (m[k]?.cur ?? 0) + 1, prev: m[k]?.prev ?? 0 };
+    });
+    props.previousNotes.forEach((n) => {
+        const k = noteKey(n.category, n.vendor_name);
+        m[k] = { cur: m[k]?.cur ?? 0, prev: (m[k]?.prev ?? 0) + 1 };
+    });
+    return m;
+});
+const noteCount = (category, vendor = null) => noteCounts.value[noteKey(category, vendor)] ?? { cur: 0, prev: 0 };
+// メモがある行は濃く（件数つき）、前年度のメモだけの行は灰色、メモが無い行は薄く表示する。
+// 探しやすいよう、メモが無い行でも常に表示する（科目行は中くらい、支払先行は薄め。マウスを乗せると濃くなる）
+const noteIconClass = (cnt, vendorRow) => {
+    if (cnt.cur > 0) return 'rounded bg-indigo-100 px-1 text-indigo-700';
+    if (cnt.prev > 0) return 'rounded bg-gray-100 px-1 text-gray-600';
+    return vendorRow ? 'opacity-30 group-hover:opacity-80 hover:!opacity-100' : 'opacity-60 hover:opacity-100';
+};
+const noteTitle = (cnt) => (cnt.cur || cnt.prev ? `メモ ${cnt.cur}件${cnt.prev ? `（前年度 ${cnt.prev}件）` : ''}` : 'メモを追加');
 
 const toggle = (name) => {
     const next = new Set(expanded.value);
@@ -138,7 +165,7 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
                 <input v-model="heatmap" type="checkbox" class="rounded border-gray-300" :disabled="mode !== 'amount'" />
                 金額の濃淡
             </label>
-            <span class="text-gray-400">科目の行をクリックすると支払先が開きます</span>
+            <span class="text-gray-400">科目の行をクリックすると支払先が開きます。科目名・支払先名のすぐ右の📝から、メモを追加できます</span>
         </div>
 
         <div class="max-h-[70vh] overflow-auto rounded border">
@@ -158,10 +185,11 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
                 </thead>
                 <tbody>
                     <template v-for="c in sheet.categories" :key="c.category">
-                        <tr class="cursor-pointer font-semibold hover:bg-gray-50" :class="rowHighlight(c.category)" :data-row="rowKey(c.category)" @click="toggle(c.category)">
+                        <tr class="group cursor-pointer font-semibold hover:bg-gray-50" :class="rowHighlight(c.category)" :data-row="rowKey(c.category)" @click="toggle(c.category)">
                             <td class="sticky left-0 z-10 border-b bg-gray-50 px-2 py-1.5">
                                 <span class="mr-1 inline-block w-3 text-gray-400">{{ expanded.has(c.category) ? '▾' : '▸' }}</span>{{ c.category }}
                                 <span v-if="c.is_shared_split" class="ml-1 rounded bg-purple-100 px-1 text-[10px] font-semibold text-purple-700">サンエー印刷と折半</span>
+                                <button type="button" class="ml-1 align-middle text-[11px] font-normal" :class="noteIconClass(noteCount(c.category), false)" :title="noteTitle(noteCount(c.category))" @click.stop="emit('notes', { category: c.category, vendor: null })">📝<span v-if="noteCount(c.category).cur">{{ noteCount(c.category).cur }}</span></button>
                             </td>
                             <td v-for="(v, i) in c.months" :key="i" class="border-b bg-gray-50 px-2 py-1.5 text-right" :class="cellCls(v, c.previous_months[i])" :style="heatStyle(v, maxCategoryCell)">{{ cellText(v, c.previous_months[i]) }}</td>
                             <td class="border-b border-l bg-gray-50 px-2 py-1.5 text-right" :class="cellCls(c.total_amount, sum(c.previous_months))">{{ totalText(c.total_amount, sum(c.previous_months)) }}</td>
@@ -175,7 +203,7 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
 
                         <template v-if="expanded.has(c.category)">
                             <template v-for="(g, gi) in c.groups" :key="gi">
-                                <tr v-for="v in orderedVendors(g)" :key="v.vendor_name" class="hover:bg-indigo-50/40" :class="rowHighlight(c.category, v.vendor_name)" :data-row="rowKey(c.category, v.vendor_name)">
+                                <tr v-for="v in orderedVendors(g)" :key="v.vendor_name" class="group hover:bg-indigo-50/40" :class="rowHighlight(c.category, v.vendor_name)" :data-row="rowKey(c.category, v.vendor_name)">
                                     <td class="sticky left-0 z-10 border-b bg-white py-1 pl-7 pr-2">
                                         <!-- 支払先名をクリックすると、その支払先のカルテ（全部署・全年度の横断）へ移動する。内訳未記入は支払先ではないのでリンクにしない -->
                                         <button
@@ -186,6 +214,7 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
                                             @click.stop="emit('vendor', v.vendor_name)"
                                         >{{ v.vendor_name }}</button>
                                         <span v-else class="text-gray-500">{{ v.vendor_name }}</span>
+                                        <button type="button" class="ml-1 align-middle text-[11px]" :class="noteIconClass(noteCount(c.category, v.vendor_name), true)" :title="noteTitle(noteCount(c.category, v.vendor_name))" @click.stop="emit('notes', { category: c.category, vendor: v.vendor_name })">📝<span v-if="noteCount(c.category, v.vendor_name).cur">{{ noteCount(c.category, v.vendor_name).cur }}</span></button>
                                     </td>
                                     <td v-for="(amt, i) in v.months" :key="i" class="border-b px-2 py-1 text-right" :class="cellCls(amt, v.previous_months[i])" :style="heatStyle(amt, maxVendorCell)">{{ cellText(amt, v.previous_months[i]) }}</td>
                                     <td class="border-b border-l px-2 py-1 text-right" :class="cellCls(v.total_amount, sum(v.previous_months))">{{ totalText(v.total_amount, sum(v.previous_months)) }}</td>

@@ -9,14 +9,7 @@ class ChangelogSeeder extends Seeder
 {
     public function seedScheduleOtherSplit(): void
     {
-        Changelog::updateOrCreate(['version' => 'schedule-other-business-personal-20261029'], [
-            'title' => '予定の「そのほか」を業務と私用に分けて試算',
-            'released_at' => '2026-10-29',
-            'summary' => '既存の「そのほか」を業務として扱い、新しい試算では通常の時間点の0.9倍で集計します。私用は本人が種類を変更して集計から除外できます。',
-            'body' => '<p>予定の種類を「そのほか（業務）」「そのほか（私用）」に分けました。新しい試算では、業務は非公開でも時間と点数を数え、私用は対象外です。従来の「そのほか」は業務になりますので、私用の予定は種類を変更してください。「作業（予定）」の新規選択は終了しました。</p>',
-            'design_files' => ['z_instructions/EVALUATION_SCORE_PLAN1.md'],
-            'claude_notes' => 'Codex。既存otherのIDと旧式係数を維持して改名、personal_other追加。V3業務係数0.9、私用はイベント/紐付き記録とも除外。既存イベント行の一括書換えなし。情報出版SuperAdminの試用境界を維持。',
-        ]);
+        (new ScheduleOtherSplitChangelogSeeder())->run();
     }
     public function seedWorkloadTrialRebuild(): void
     {
@@ -2290,6 +2283,22 @@ HTML,
 <section class="cl-feature"><h3>経費：Excel出力</h3><ul>
 <li>部署シートと部署比較の画面に「Excel出力」ボタンを追加しました。部署比較のシートと、部署ごとのシート（科目→支払先→4月〜3月→累計、小計・合計、比較年度との増減）を出力します。</li>
 <li>部署を切り替えても、選んでいる年度は変わりません。</li>
+</ul></section>
+HTML,
+            ],
+            [
+                'version' => 'expense-notes-1',
+                'title' => '経費に「メモ」機能を追加（科目・支払先・月へのコメント）',
+                'released_at' => '2026-10-29',
+                'summary' => '経費の部署シートで、科目・支払先・月にコメントを残せます。翌年度に同じ行を開くと、前年度のメモも並べて見られます。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase24-5。売上DBに sales_expense_notes を追加（マイグレーションあり）。名寄せ後の正式名で保存・表示（取込の版とは切り離し、再取込でも消えない）。編集・削除は書いた本人と SuperAdmin のみ（サーバー側でも判定）。ルート api.expense_notes.*。Excel 出力にメモ列（先頭が数式文字のメモはアポストロフィ付き文字列）。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費：メモ</h3><ul>
+<li>部署シートの科目名・支払先名のすぐ右の📝から、メモ（例：「◯月は臨時案件のため増」）を追加できます。月を指定することもできます。部署全体へのメモは、表の上の「📝 部署メモ」から付けます。</li>
+<li>翌年度に同じ科目・支払先を開くと、前年度のメモも並べて見られます。表の上の「メモ一覧」で、その年度のメモを見渡せます。</li>
+<li>支払先カルテには、その支払先のメモが、全年度・全部署分まとめて表示されます。Excel出力にも「メモ」の列が付きます。</li>
+<li>編集・削除できるのは、書いた本人とSuper Adminだけです。取込Excelを取り込み直しても、メモは消えません。</li>
 </ul></section>
 HTML,
             ],
