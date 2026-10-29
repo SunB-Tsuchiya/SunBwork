@@ -392,7 +392,6 @@ watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, Strin
         :default-start-min="createDef.startMin"
         :default-end-min="createDef.endMin"
         :event-item-types="eventItemTypes"
-        :trial-evaluation-enabled="trialEvaluationEnabled"
         :meeting-definitions="meetingDefinitions"
         :rooms="rooms"
         :companies="companies"

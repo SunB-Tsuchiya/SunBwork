@@ -722,7 +722,6 @@ async function saveWeekBreaks() {
         :companies="companies"
         :departments="departments"
         :existing-events="personalEvents"
-        :trial-evaluation-enabled="departmentWorkEnabled"
         @close="onModalClose"
         @saved="onSaved"
         @deleted="onDeleted" />
