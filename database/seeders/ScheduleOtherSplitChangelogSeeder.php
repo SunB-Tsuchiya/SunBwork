@@ -9,7 +9,7 @@ class ScheduleOtherSplitChangelogSeeder extends Seeder
 {
     public function run(): void
     {
-        Changelog::updateOrCreate(['version' => 'schedule-other-business-personal-20261029'], [
+        Changelog::updateOrCreate(['version' => 'schedule-other-20261029'], [
             'title' => '予定の「そのほか」を業務と私用に分けて試算',
             'released_at' => '2026-10-29',
             'summary' => '既存の「そのほか」を業務として扱い、新しい試算では通常の時間点の0.9倍で集計します。私用は本人が種類を変更して集計から除外できます。',
