@@ -2302,6 +2302,23 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'expense-import-diff-1',
+                'title' => '経費の再取込で「前の版との差分」を表示（取込履歴つき）',
+                'released_at' => '2026-10-29',
+                'summary' => '経費Excelを同じ会計年度に取り込み直すと、前の版との違い（金額が変わった支払先・追加・削除）が表示されます。取込画面には、取込履歴も追加しました。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase24-6。DB 変更なし（旧版は履歴として残っているため、その都度計算）。SalesExpenseImportDiffService（history/diff。名寄せ後の名前で比較、1円未満は無視）、ExpenseImportController に history/diff と diff_summary、ExpenseImportDiff.vue。ルート expense_import.history / expense_import.diff。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費：再取込時の差分</h3><ul>
+<li>同じ会計年度の経費Excelを取り込み直すと、前の版との違いが表示されます。金額が変わった支払先、追加された支払先、消えた支払先、追加・削除された科目をまとめて確認でき、「差分の詳細を見る」で、部署→科目→支払先（変わった月つき）の順に開けます。</li>
+<li>科目名・支払先名は、名寄せの設定を反映して比べます。表記の違いだけでは、差分になりません。</li>
+</ul></section>
+<section class="cl-feature"><h3>経費：取込履歴</h3><ul>
+<li>取込画面の下に、経費の取込履歴を追加しました。版、ファイル名、取込者、日時、件数、合計を一覧でき、使用中の版と旧版が分かります。2版目以降は「前の版との差分」から、いつでも差分を見られます。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

@@ -107,6 +107,9 @@ $registerSalesAnalysisRoutes = function () {
         // 部署別経費データ取込（新規。Phase 21）
         Route::get('expense-import', [App\Http\Controllers\SalesAnalysis\ExpenseImportController::class, 'create'])->name('expense_import.create');
         Route::post('expense-import/store', [App\Http\Controllers\SalesAnalysis\ExpenseImportController::class, 'store'])->name('expense_import.store');
+        // 経費の取込履歴・再取込時の差分（新規。Phase24-6）
+        Route::get('expense-import/history', [App\Http\Controllers\SalesAnalysis\ExpenseImportController::class, 'history'])->name('expense_import.history');
+        Route::get('expense-import/diff', [App\Http\Controllers\SalesAnalysis\ExpenseImportController::class, 'diff'])->name('expense_import.diff');
 
         // 経費比較（新規。Phase 22。部署×科目を選んで複数年推移・支払先の依存度を比較する）
         Route::get('expense-comparison', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'index'])->name('expense_comparison');
