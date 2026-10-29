@@ -1,9 +1,10 @@
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import { useSalesChart } from '@/Composables/useSalesChart';
+import ExpenseImportDiff from '@/Components/SalesAnalysis/ExpenseImportDiff.vue';
 
 const { fiscalPeriodLabel } = useSalesChart();
 
@@ -13,6 +14,7 @@ const { fiscalPeriodLabel } = useSalesChart();
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
+    departmentLabels: { type: Object, default: () => ({}) },
     hasCompanySelected: { type: Boolean, default: true },
     supportsExpenses: { type: Boolean, default: false },
 });
@@ -33,6 +35,49 @@ const submitError = ref('');
 // 同一内容チェック／タイトル行の年度不一致チェックで拒否された直後だけ「再取込む」チェックボックスを目立たせる
 const isOverridableError = ref(false);
 const result = ref(null);
+
+// 再取込時の差分と取込履歴（Phase24-6）。差分は、取込直後の要約と、履歴の「差分を見る」から詳細を開く
+const history = ref([]);
+const historyError = ref('');
+const diff = ref(null);
+const diffLoading = ref(false);
+const diffError = ref('');
+const diffTarget = ref(null); // { fiscal_year, version }
+
+const loadHistory = async () => {
+    if (!props.supportsExpenses) return;
+    historyError.value = '';
+    try {
+        const response = await axios.get(route(rn('expense_import.history')));
+        history.value = response.data.imports;
+    } catch (e) {
+        historyError.value = '取込履歴の取得に失敗しました。';
+    }
+};
+
+const openDiff = async (fiscalYearValue, version) => {
+    diffTarget.value = { fiscal_year: fiscalYearValue, version };
+    diffLoading.value = true;
+    diffError.value = '';
+    diff.value = null;
+    try {
+        const response = await axios.get(route(rn('expense_import.diff')), { params: { fiscal_year: fiscalYearValue, version } });
+        diff.value = response.data;
+    } catch (e) {
+        diffError.value = e.response?.data?.message ?? '差分の取得に失敗しました。';
+    } finally {
+        diffLoading.value = false;
+    }
+};
+const closeDiff = () => {
+    diff.value = null;
+    diffTarget.value = null;
+    diffError.value = '';
+};
+const importedAt = (iso) => (iso ? new Date(iso).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' }) : '');
+const signedYen = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}¥${Math.abs(Math.round(v)).toLocaleString()}`;
+
+onMounted(loadHistory);
 
 const selectFile = () => fileInput.value?.click();
 
@@ -70,6 +115,8 @@ const submit = async () => {
             },
         });
         result.value = response.data;
+        closeDiff();
+        loadHistory();
         selectedFile.value = null;
         fileName.value = '';
         forceReimport.value = false;
@@ -171,9 +218,76 @@ const submit = async () => {
                         <li v-for="(w, i) in result.warnings" :key="i">{{ w }}</li>
                     </ul>
                 </div>
+                <div v-if="result.diff_summary" class="mt-3 rounded border border-green-200 bg-white p-3 text-xs">
+                    <p class="font-semibold text-gray-800">
+                        前の版（v{{ result.diff_summary.previous_version }}）との差分
+                        <span v-if="result.diff_summary.has_changes" class="font-normal text-gray-600">：合計 {{ signedYen(result.diff_summary.diff) }}</span>
+                    </p>
+                    <p v-if="!result.diff_summary.has_changes" class="mt-1 text-gray-600">金額・科目・支払先に違いはありません。</p>
+                    <p v-else class="mt-1 text-gray-600">
+                        金額が変わった支払先 {{ result.diff_summary.changed_vendors }}・追加 {{ result.diff_summary.added_vendors }}・消えた {{ result.diff_summary.removed_vendors }}<template v-if="result.diff_summary.added_categories || result.diff_summary.removed_categories">・科目の追加 {{ result.diff_summary.added_categories }}／消えた {{ result.diff_summary.removed_categories }}</template>
+                    </p>
+                    <button v-if="result.diff_summary.has_changes" type="button" class="mt-2 text-indigo-600 hover:underline" @click="openDiff(result.fiscal_year, result.version)">差分の詳細を見る</button>
+                </div>
                 <Link :href="route(rn('fiscal_year_analysis'))" class="mt-3 inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700">
                     期別分析で確認する
                 </Link>
+            </div>
+
+            <!-- 差分の詳細（取込直後・履歴のどちらからも、ここに出す） -->
+            <div v-if="diffTarget" class="mt-6">
+                <div class="mb-2 flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-gray-900">差分の詳細</h3>
+                    <button type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="closeDiff">× 閉じる</button>
+                </div>
+                <p v-if="diffLoading" class="text-xs text-gray-500">読み込み中...</p>
+                <p v-else-if="diffError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ diffError }}</p>
+                <p v-else-if="diff && !diff.has_previous" class="text-xs text-gray-500">この版には、比べられる前の版がありません。</p>
+                <ExpenseImportDiff v-else-if="diff" :diff="diff" :department-labels="departmentLabels" />
+            </div>
+
+            <!-- 取込履歴 -->
+            <div class="mt-8">
+                <h3 class="mb-2 text-sm font-semibold text-gray-900">経費の取込履歴</h3>
+                <p v-if="historyError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ historyError }}</p>
+                <p v-else-if="!history.length" class="text-xs text-gray-500">まだ取り込まれていません。</p>
+                <div v-else class="overflow-x-auto rounded border">
+                    <table class="min-w-full text-xs tabular-nums">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="px-2 py-1.5 text-left">会計年度</th>
+                                <th class="px-2 py-1.5 text-left">版</th>
+                                <th class="px-2 py-1.5 text-left">ファイル名</th>
+                                <th class="px-2 py-1.5 text-left">取込者</th>
+                                <th class="px-2 py-1.5 text-left">取込日時</th>
+                                <th class="px-2 py-1.5 text-right">科目数</th>
+                                <th class="px-2 py-1.5 text-right">明細件数</th>
+                                <th class="px-2 py-1.5 text-right">合計金額</th>
+                                <th class="px-2 py-1.5"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="h in history" :key="h.id" class="border-t" :class="h.is_current ? '' : 'text-gray-400'">
+                                <td class="px-2 py-1">{{ fiscalPeriodLabel(h.fiscal_year) }}</td>
+                                <td class="px-2 py-1">
+                                    v{{ h.version }}
+                                    <span v-if="h.is_current" class="ml-1 rounded bg-green-100 px-1 text-[10px] text-green-700">使用中</span>
+                                    <span v-else class="ml-1 rounded bg-gray-100 px-1 text-[10px] text-gray-500">旧版</span>
+                                </td>
+                                <td class="px-2 py-1">{{ h.original_filename }}</td>
+                                <td class="px-2 py-1">{{ h.imported_by_name }}</td>
+                                <td class="px-2 py-1">{{ importedAt(h.imported_at) }}</td>
+                                <td class="px-2 py-1 text-right">{{ h.category_count }}</td>
+                                <td class="px-2 py-1 text-right">{{ h.line_item_count }}</td>
+                                <td class="px-2 py-1 text-right">¥{{ Math.round(h.total_amount).toLocaleString() }}</td>
+                                <td class="px-2 py-1 text-right">
+                                    <button v-if="h.has_previous" type="button" class="text-indigo-600 hover:underline" @click="openDiff(h.fiscal_year, h.version)">前の版との差分</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mt-1 text-[11px] text-gray-400">画面の集計に使われるのは「使用中」の版（各会計年度の最新版）です。旧版は履歴として残り、差分の比較に使います。</p>
             </div>
         </div>
     </SalesAnalysisShell>
