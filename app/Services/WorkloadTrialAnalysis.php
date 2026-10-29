@@ -119,7 +119,12 @@ class WorkloadTrialAnalysis
                 'projectJobAssignment.projectJob.coordinators:id',
                 'projectJobAssignment.projectJob:id,title,company_id,user_id,show_on_department_schedule',
             ])->get();
-        $attendees = DB::table('schedule_attendees')->whereIn('event_id', $events->pluck('id'))
+        $attendeeEventIds = $events->pluck('id')
+            ->merge($events->pluck('source_schedule_event_id'))
+            ->merge($entries->pluck('source_event_id'))
+            ->merge($entries->map(fn ($entry) => $entry->sourceEvent?->source_schedule_event_id))
+            ->filter()->unique()->values();
+        $attendees = DB::table('schedule_attendees')->whereIn('event_id', $attendeeEventIds)
             ->whereIn('user_id', $userIds)->where('status', '!=', 'declined')
             ->get(['event_id', 'user_id', 'status'])->groupBy('event_id');
         $copies = $events->filter(fn ($event) => $event->is_materialized_copy && $event->source_schedule_event_id)
@@ -149,6 +154,9 @@ class WorkloadTrialAnalysis
             if (! $range || $range[1] <= $range[0]) continue;
             $assignment = $entry->sourceEvent?->projectJobAssignment;
             $fixedAppointment = $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent, $scoreVersion);
+            if ($fixedAppointment && ! $this->meetingEvidenceCounts(
+                $entry->sourceEvent, $user, $attendees, $attendanceDates, $from, $v3
+            )) continue;
             $intervals[$entry->user_id][$date][] = $this->item(
                 $key, $range, $entry->work_category, $activity,
                 $fixedAppointment,
@@ -195,16 +203,9 @@ class WorkloadTrialAnalysis
                     $attendees->get($event->id, collect()), $personId, (int) $event->user_id,
                     $v3, $to->toDateString() < $today
                 )) continue;
-                if ($v3 && $isMeeting && $from->toDateString() >= self::INVITED_MEETING_EVIDENCE_FROM
-                    && ($personId !== (int) $event->user_id || $event->is_materialized_copy)) {
-                    $sourceId = $event->is_materialized_copy ? $event->source_schedule_event_id : $event->id;
-                    if ($sourceId && ! $this->approvedAttendeeCounts(
-                        $attendees->get($sourceId, collect()), $personId, $this->isEmployee($user),
-                        $attendanceDates->has($personId.'|'.$from->toDateString())
-                    )) continue;
-                    if (! $sourceId && $this->isEmployee($user)
-                        && ! $attendanceDates->has($personId.'|'.$from->toDateString())) continue;
-                }
+                if ($isMeeting && ! $this->meetingEvidenceCounts(
+                    $event, $user, $attendees, $attendanceDates, $from, $v3
+                )) continue;
                 if ($personId !== (int) $event->user_id && $copies->has($personId.'|'.$event->id)) continue;
                 $result = $entryByEvent->get($personId.'|'.$event->id);
                 if ($result) continue; // The result entry already represents this interval.
@@ -555,6 +556,19 @@ class WorkloadTrialAnalysis
     {
         return $attendees->contains(fn ($row) => (int) $row->user_id === $personId
             && $row->status === 'accepted') && (! $attendanceRequired || $hasAttendance);
+    }
+
+    private function meetingEvidenceCounts(Event $event, User $user, Collection $attendees, Collection $attendanceDates, Carbon $from, bool $v3): bool
+    {
+        if (! $v3 || $from->toDateString() < self::INVITED_MEETING_EVIDENCE_FROM
+            || ((int) $event->user_id === (int) $user->id && ! $event->is_materialized_copy)) return true;
+        $hasAttendance = $attendanceDates->has($user->id.'|'.$from->toDateString());
+        $sourceId = $event->is_materialized_copy ? $event->source_schedule_event_id : $event->id;
+        if (! $sourceId) return ! $this->isEmployee($user) || $hasAttendance;
+
+        return $this->approvedAttendeeCounts(
+            $attendees->get($sourceId, collect()), (int) $user->id, $this->isEmployee($user), $hasAttendance
+        );
     }
 
     private function isEmployee(User $user): bool
