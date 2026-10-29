@@ -49,7 +49,7 @@ class WorkloadTrialRangeTest extends TestCase
             'personal_work_entries' => 'id integer primary key, user_id integer, company_id integer, department_id integer, work_date text, actual_minutes integer, work_category text, activity_type text, source_event_id integer, project_job_id integer, broad_project_id integer, plan_slot text, planned_start_time text, planned_end_time text, actual_quantity real, actual_unit text, title text, entry_visibility text',
             'events' => 'id integer primary key, user_id integer, starts_at text, ends_at text, project_job_assignment_id integer, event_item_type_id integer, is_materialized_copy integer default 0, source_schedule_event_id integer, is_company_event integer default 0, cancelled_at text, meeting_definition_id integer, visibility text',
             'schedule_attendees' => 'id integer primary key, event_id integer, user_id integer, status text',
-            'event_item_types' => 'id integer primary key, slug text',
+            'event_item_types' => 'id integer primary key, slug text, name text, coefficient real, description text, sort_order integer, created_at text, updated_at text',
             'project_job_assignments' => 'id integer primary key, project_job_id integer, user_id integer, sender_id integer, job_type text, stage_id integer, work_item_type_id integer, completed integer default 0',
             'project_jobs' => 'id integer primary key, company_id integer, created_by_user_id integer, created_at text, user_id integer, show_on_department_schedule integer, title text',
             'project_job_coordinators' => 'project_job_id integer, user_id integer',
@@ -181,7 +181,7 @@ class WorkloadTrialRangeTest extends TestCase
         self::assertSame(8.0, $result['meeting_points']);
     }
 
-    public function test_shared_other_is_excluded_while_private_explicit_work_is_counted(): void
+    public function test_existing_other_is_business_at_ninety_percent_and_private_work_also_counts(): void
     {
         $this->insert('event_item_types', ['id' => 2, 'slug' => 'other']);
         $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2, 'is_company_event' => 1,
@@ -189,9 +189,80 @@ class WorkloadTrialRangeTest extends TestCase
         $this->insert('events', ['id' => 2, 'user_id' => 1, 'event_item_type_id' => 1, 'visibility' => 'private',
             'starts_at' => '2026-10-29 10:00:00', 'ends_at' => '2026-10-29 11:00:00']);
         $result = $this->analyze('2026-10-29', '2026-10-29');
-        self::assertSame(60, $result['minutes']);
-        self::assertSame(1, $result['records']);
-        self::assertSame(10.0, $result['work_points']);
+        self::assertSame(120, $result['minutes']);
+        self::assertSame(2, $result['records']);
+        self::assertSame(19.0, $result['work_points']);
+        self::assertSame(0.0, $result['meeting_points']);
+    }
+
+    public function test_private_business_other_and_linked_record_use_the_same_ninety_percent_rate(): void
+    {
+        $this->insert('event_item_types', ['id' => 2, 'slug' => 'other']);
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2, 'visibility' => 'private',
+            'starts_at' => '2026-09-29 09:00:00', 'ends_at' => '2026-09-29 10:00:00']);
+        $existing = $this->analyze('2026-09-29', '2026-09-29');
+        self::assertSame(60, $existing['minutes']);
+        self::assertSame(9.0, $existing['points']);
+        self::assertSame(0.9, $existing['activities'][0]['coefficient']);
+        $this->insert('personal_work_entries', ['id' => 1, 'user_id' => 1, 'company_id' => 1,
+            'department_id' => 1, 'work_date' => '2026-09-29', 'actual_minutes' => 60,
+            'work_category' => 'shinko', 'source_event_id' => 1]);
+        $linked = $this->analyze('2026-09-29', '2026-09-29');
+        self::assertSame(9.0, $linked['points']);
+        self::assertSame(1, $linked['records']);
+        $this->database->getConnection()->table('events')->where('id', 1)->update(['cancelled_at' => '2026-09-29 11:00:00']);
+        self::assertSame(0.0, $this->analyze('2026-09-29', '2026-09-29')['points']);
+    }
+
+    public function test_personal_other_and_linked_record_do_not_create_time_days_or_overtime_points(): void
+    {
+        $this->insert('event_item_types', ['id' => 2, 'slug' => 'personal_other']);
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2, 'is_company_event' => 1,
+            'starts_at' => '2026-10-29 18:00:00', 'ends_at' => '2026-10-29 19:00:00']);
+        $this->insert('personal_work_entries', ['id' => 1, 'user_id' => 1, 'company_id' => 1,
+            'department_id' => 1, 'work_date' => '2026-10-29', 'actual_minutes' => 60,
+            'work_category' => 'shinko', 'source_event_id' => 1]);
+        $this->insert('work_records', ['id' => 1, 'user_id' => 1, 'date' => '2026-10-29',
+            'start_time' => '09:00', 'end_time' => '19:00', 'scheduled_end' => '18:00', 'overtime_minutes' => 60]);
+        foreach (['trial_time_v2', 'trial_time_v3'] as $version) {
+            $result = $this->analyze('2026-10-29', '2026-10-29', $version);
+            self::assertSame(0, $result['minutes']);
+            self::assertSame(0, $result['recorded_days']);
+            self::assertSame(0.0, $result['points']);
+            self::assertSame(0.0, $result['overtime_points']);
+        }
+    }
+
+    public function test_business_other_overlaps_a_job_without_adding_the_time_twice(): void
+    {
+        $this->insert('event_item_types', ['id' => 2, 'slug' => 'other']);
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2,
+            'starts_at' => '2026-10-29 09:00:00', 'ends_at' => '2026-10-29 11:00:00']);
+        $this->insert('project_job_assignments', ['id' => 1, 'user_id' => 1, 'sender_id' => 1, 'job_type' => 'work']);
+        $this->insert('events', ['id' => 2, 'user_id' => 1, 'project_job_assignment_id' => 1,
+            'starts_at' => '2026-10-29 10:00:00', 'ends_at' => '2026-10-29 11:00:00']);
+        $result = $this->analyze('2026-10-29', '2026-10-29');
+        self::assertSame(120, $result['minutes']);
+        self::assertSame(18.5, $result['points']);
+    }
+
+    public function test_other_split_migration_keeps_existing_event_ids_and_the_legacy_coefficient(): void
+    {
+        $this->insert('event_item_types', ['id' => 2, 'slug' => 'other', 'name' => 'そのほか', 'coefficient' => 1.2]);
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2,
+            'starts_at' => '2026-09-29 09:00:00', 'ends_at' => '2026-09-29 10:00:00']);
+        $migration = require __DIR__.'/../../database/migrations/2026_10_29_160001_split_other_schedule_business_and_personal.php';
+        $migration->up();
+        $migration->up();
+        $types = $this->database->getConnection()->table('event_item_types');
+        $other = (clone $types)->where('slug', 'other')->first();
+        self::assertSame(2, $other->id);
+        self::assertSame('そのほか（業務）', $other->name);
+        self::assertEquals(1.2, $other->coefficient);
+        self::assertSame(1, (clone $types)->where('slug', 'personal_other')->count());
+        self::assertEquals(0.0, (clone $types)->where('slug', 'personal_other')->value('coefficient'));
+        self::assertSame(2, $this->database->getConnection()->table('events')->where('id', 1)->value('event_item_type_id'));
+        self::assertSame(9.0, $this->analyze('2026-09-29', '2026-09-29')['points']);
     }
 
     public function test_november_invitation_needs_acceptance_and_complete_employee_attendance(): void
@@ -332,10 +403,10 @@ class WorkloadTrialRangeTest extends TestCase
         $this->insert('schedule_attendees', ['id' => 1, 'event_id' => 1, 'user_id' => 1, 'status' => 'accepted']);
     }
 
-    private function analyze(string $from, string $to): array
+    private function analyze(string $from, string $to, string $version = 'trial_time_v3'): array
     {
         return (new WorkloadTrialAnalysis(new PersonalWorkSchedule()))->analyze($this->user, collect([$this->user]),
-            Carbon::parse($from, 'Asia/Tokyo')->startOfDay(), Carbon::parse($to, 'Asia/Tokyo')->endOfDay(), true, 'trial_time_v3')[0];
+            Carbon::parse($from, 'Asia/Tokyo')->startOfDay(), Carbon::parse($to, 'Asia/Tokyo')->endOfDay(), true, $version)[0];
     }
 
     private function insert(string $table, array $row): void

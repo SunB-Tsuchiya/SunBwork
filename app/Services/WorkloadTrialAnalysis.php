@@ -153,6 +153,9 @@ class WorkloadTrialAnalysis
             }
             if (! $range || $range[1] <= $range[0]) continue;
             $assignment = $entry->sourceEvent?->projectJobAssignment;
+            if ($v3 && $entry->sourceEvent?->eventItemType?->slug === 'other' && ! $assignment) {
+                $activity = 'scheduled_other';
+            }
             $fixedAppointment = $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent, $scoreVersion);
             if ($fixedAppointment && ! $this->meetingEvidenceCounts(
                 $entry->sourceEvent, $user, $attendees, $attendanceDates, $from, $v3
@@ -214,7 +217,8 @@ class WorkloadTrialAnalysis
                     $personId === (int) $viewer->id && $attendees->get($event->id, collect())->contains('user_id', $viewer->id)
                 )['private']) continue;
                 $category = $isJob ? $this->jobCategory($user, $assignment->job_type) : $this->roleCategory($user);
-                $activity = $isJob ? 'my_job' : ($isScheduledWork ? 'unspecified'
+                $activity = $isJob ? 'my_job' : ($isScheduledWork
+                    ? ($event->eventItemType?->slug === 'other' ? 'scheduled_other' : 'unspecified')
                     : (in_array($event->eventItemType?->slug, ['customer_visit', 'client_visit', 'outing'], true)
                         ? 'outing' : 'meeting'));
                 $firstDay = $from->copy()->startOfDay();
@@ -507,6 +511,7 @@ class WorkloadTrialAnalysis
     private function isFixedAppointment(Event $event, string $scoreVersion = 'trial_time_v2'): bool
     {
         if ($scoreVersion === 'trial_time_v3') {
+            if (in_array($event->eventItemType?->slug, ['other', 'personal_other'], true)) return false;
             return ! $event->project_job_assignment_id && ($event->meeting_definition_id
                 || in_array($event->eventItemType?->slug, [
                     'meeting_internal', 'meeting_client', 'conference',
@@ -523,16 +528,19 @@ class WorkloadTrialAnalysis
 
     private function isScheduledWork(Event $event): bool
     {
-        return ! $event->project_job_assignment_id && $event->eventItemType?->slug === 'work_schedule';
+        return ! $event->project_job_assignment_id
+            && in_array($event->eventItemType?->slug, ['work_schedule', 'other'], true);
     }
 
     private function eventCounts(Event $event, bool $v3): bool
     {
+        if ($event->eventItemType?->slug === 'personal_other') return false;
         return ! $v3 || ! $event->cancelled_at;
     }
 
     private function entryCounts(PersonalWorkEntry $entry, User $viewer, bool $v3): bool
     {
+        if ($entry->source_event_id && $entry->sourceEvent?->eventItemType?->slug === 'personal_other') return false;
         if (! PersonalWorkActivities::allows($entry->work_category, $entry->activity_type)) return false;
         // An explicit work entry remains scoreable when its title and notes are hidden from the viewer.
         if ($v3) return ! $entry->source_event_id

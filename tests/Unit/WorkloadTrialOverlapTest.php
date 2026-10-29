@@ -170,6 +170,7 @@ class WorkloadTrialOverlapTest extends TestCase
     {
         $service = new WorkloadTrialAnalysis($this->createMock(PersonalWorkSchedule::class));
         $event = new Event();
+        $event->setRelation('eventItemType', null);
         $event->setDateFormat('Y-m-d H:i:s');
         $event->cancelled_at = '2026-10-21 12:00:00';
         $eventCounts = new ReflectionMethod($service, 'eventCounts');

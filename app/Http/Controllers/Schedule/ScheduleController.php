@@ -37,7 +37,7 @@ class ScheduleController extends Controller
             ->get(['id', 'name', 'color', 'available_from', 'available_to']);
 
         $eventItemTypes = EventItemType::query()
-            ->when(! app(PersonalWorkSchedule::class)->available($user), fn ($query) => $query->where('slug', '!=', 'work_schedule'))
+            ->where('slug', '!=', 'work_schedule')
             ->orderBy('id')->get(['id', 'name', 'slug']);
 
         $meetingDefinitions = MeetingDefinition::where('company_id', $user->company_id)

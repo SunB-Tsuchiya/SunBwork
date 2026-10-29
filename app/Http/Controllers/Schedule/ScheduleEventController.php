@@ -353,7 +353,7 @@ class ScheduleEventController extends Controller
         $this->checkSameDay($validated['starts_at'], $validated['ends_at']);
 
         $user = Auth::user();
-        $this->authorizeTrialWorkType($validated['event_item_type_id'] ?? null, $user);
+        $this->ensureWorkTypeAvailable($validated['event_item_type_id'] ?? null);
 
         $event = Event::create([
             'user_id'               => $user->id,
@@ -418,7 +418,7 @@ class ScheduleEventController extends Controller
             'visibility'            => 'nullable|in:private,company,group,public',
             'cancelled'             => 'sometimes|boolean',
         ]);
-        $this->authorizeTrialWorkType($validated['event_item_type_id'] ?? null, $user);
+        $this->ensureWorkTypeAvailable($validated['event_item_type_id'] ?? null, $event);
 
         $starts = $validated['starts_at'] ?? $event->starts_at;
         $ends   = $validated['ends_at']   ?? $event->ends_at;
@@ -493,11 +493,13 @@ class ScheduleEventController extends Controller
         }
     }
 
-    private function authorizeTrialWorkType(?int $typeId, $user): void
+    private function ensureWorkTypeAvailable(?int $typeId, ?Event $existing = null): void
     {
         if (! $typeId) return;
         if (\App\Models\EventItemType::whereKey($typeId)->value('slug') === 'work_schedule') {
-            abort_unless(app(\App\Services\PersonalWorkSchedule::class)->available($user), 403);
+            // Retain editable historical trial records, but do not create any new ones.
+            abort_unless($existing && (int) $existing->event_item_type_id === $typeId, 422,
+                'この種類は新規登録できません。仕事の記録には簡易予定またはマイジョブを使用してください。');
         }
     }
 

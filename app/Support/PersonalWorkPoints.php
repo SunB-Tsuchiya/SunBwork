@@ -12,6 +12,7 @@ class PersonalWorkPoints
     public const DEFAULT_COEFFICIENT = 1.0;
 
     public const COEFFICIENTS = [
+        'scheduled_other' => 0.9,
         'new_creation' => 1.2,
         'proof_revision_heavy' => 1.3,
         'proof_revision_light' => 0.9,
