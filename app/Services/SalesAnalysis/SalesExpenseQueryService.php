@@ -702,4 +702,91 @@ class SalesExpenseQueryService
             'is_new' => false,
         ];
     }
+
+    /**
+     * 部署比較（Phase24-4）: 部署ごとの年間合計・月別・前年比と、科目×部署のクロス表。
+     * 各部署の`departmentSheet()`を束ねる（比較年度・同期間比較の扱いは部署シートと同じ）。
+     * 共通費（shared）も1部署として並べる（折半の注記は部署シート側のバッジで見える）。
+     *
+     * @param  array<int, string>  $departmentKeys
+     * @return array<string, mixed>
+     */
+    public function departmentsOverview(int $fiscalYear, array $departmentKeys, ?int $compareFiscalYear = null, ?string $comparePeriod = null): array
+    {
+        $sheets = [];
+        foreach ($departmentKeys as $key) {
+            $sheets[$key] = $this->departmentSheet($fiscalYear, $key, $compareFiscalYear, $comparePeriod);
+        }
+        $first = $sheets !== [] ? reset($sheets) : $this->departmentSheet($fiscalYear, 'planning', $compareFiscalYear, $comparePeriod);
+
+        $monthTotals = array_fill(0, 12, 0.0);
+        $previousMonthTotals = array_fill(0, 12, 0.0);
+        $cross = [];
+        $departments = [];
+        $previousHasData = false;
+        foreach ($sheets as $key => $sheet) {
+            $previousHasData = $previousHasData || $sheet['previous_has_data'];
+            foreach ($sheet['month_totals'] as $i => $v) {
+                $monthTotals[$i] += $v;
+                $previousMonthTotals[$i] += $sheet['previous_month_totals'][$i];
+            }
+
+            $categories = [];
+            foreach ($sheet['categories'] as $c) {
+                $categories[] = [
+                    'category' => $c['category'],
+                    'total_amount' => $c['total_amount'],
+                    'previous_total_amount' => $c['previous_total_amount'],
+                    'diff_pct' => $c['diff_pct'],
+                    'is_new' => $c['is_new'],
+                ];
+                $cross[$c['category']]['by_department'][$key] = $c['total_amount'];
+                $cross[$c['category']]['total_amount'] = ($cross[$c['category']]['total_amount'] ?? 0.0) + $c['total_amount'];
+            }
+
+            $previousTotal = $sheet['previous_total_amount'];
+            $departments[] = [
+                'department_key' => $key,
+                'has_data' => $sheet['has_data'],
+                'total_amount' => $sheet['total_amount'],
+                'previous_total_amount' => $previousTotal,
+                'diff' => $previousTotal !== null ? $sheet['total_amount'] - $previousTotal : null,
+                'diff_pct' => ($previousTotal !== null && $previousTotal > 0) ? round(($sheet['total_amount'] - $previousTotal) / $previousTotal * 100, 1) : null,
+                'month_totals' => $sheet['month_totals'],
+                'previous_month_totals' => $sheet['previous_month_totals'],
+                'categories' => $categories,
+            ];
+        }
+
+        $total = array_sum($monthTotals);
+        $previousTotal = $previousHasData ? array_sum($previousMonthTotals) : null;
+        foreach ($departments as &$d) {
+            $d['share_pct'] = $total > 0 ? round($d['total_amount'] / $total * 100, 1) : null;
+        }
+        unset($d);
+
+        $crossRows = [];
+        foreach ($cross as $category => $row) {
+            $crossRows[] = ['category' => $category, 'by_department' => $row['by_department'], 'total_amount' => $row['total_amount']];
+        }
+        usort($crossRows, fn ($a, $b) => $b['total_amount'] <=> $a['total_amount']);
+
+        return [
+            'has_data' => (bool) array_filter($departments, fn ($d) => $d['has_data']),
+            'fiscal_year' => $fiscalYear,
+            'previous_fiscal_year' => $first['previous_fiscal_year'],
+            'previous_has_data' => $previousHasData,
+            'actual_months' => $first['actual_months'],
+            'is_partial' => $first['is_partial'],
+            'compare_period' => $first['compare_period'],
+            'months' => $first['months'],
+            'departments' => $departments,
+            'month_totals' => $monthTotals,
+            'previous_month_totals' => $previousMonthTotals,
+            'total_amount' => $total,
+            'previous_total_amount' => $previousTotal,
+            'diff_pct' => ($previousTotal !== null && $previousTotal > 0) ? round(($total - $previousTotal) / $previousTotal * 100, 1) : null,
+            'cross' => $crossRows,
+        ];
+    }
 }

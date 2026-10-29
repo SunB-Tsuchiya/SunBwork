@@ -149,6 +149,83 @@ class ExpenseComparisonTest extends TestCase
         ]))->assertStatus(422);
     }
 
+    public function test_departments_endpoint_returns_overview_and_validates()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2025);
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $response = $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.departments', ['fiscal_year' => 2025]));
+        $response->assertOk();
+        $response->assertJsonPath('has_data', true);
+        $response->assertJsonPath('departments.0.department_key', 'planning');
+        $response->assertJsonPath('departments.0.total_amount', 10000);
+        $response->assertJsonPath('cross.0.category', '外注加工費');
+        // 有効な部署に加えて共通費も末尾に含まれる
+        $this->assertSame('shared', collect($response->json('departments'))->last()['department_key']);
+
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.departments'))->assertStatus(422);
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_comparison.departments', ['fiscal_year' => 2025, 'compare_period' => 'bad']))->assertStatus(422);
+    }
+
+    public function test_export_returns_xlsx_with_overview_and_department_sheets_and_logs()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2025);
+        // 数式として解釈されうる支払先名（formula injection対策の確認用）
+        $import = SalesExpenseImport::first();
+        SalesExpenseLineItem::create([
+            'sales_expense_import_id' => $import->id, 'department_key' => 'planning', 'category' => '外注加工費',
+            'vendor_name' => '=SUM(1+1)', 'calendar_year' => 2025, 'calendar_month' => 5, 'amount' => 500, 'is_shared_split' => false,
+        ]);
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $response = $this->actingAs($superadmin)->get(route('superadmin.sales_analysis.expense_comparison.export', ['fiscal_year' => 2025]));
+        $response->assertOk();
+        $this->assertStringContainsString('spreadsheetml.sheet', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString(rawurlencode('経費_55期_2025年度.xlsx'), $response->headers->get('Content-Disposition'));
+
+        $tmp = tempnam(sys_get_temp_dir(), 'exp') . '.xlsx';
+        file_put_contents($tmp, $response->getContent());
+        $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp);
+        @unlink($tmp);
+
+        $names = $book->getSheetNames();
+        $this->assertSame('部署比較', $names[0]);
+        $this->assertCount(2, $names); // 部署比較＋データのある部署（企画）だけ
+
+        $overview = $book->getSheet(0);
+        $this->assertSame('部署', $overview->getCell('A4')->getValue());
+        $this->assertSame(10500.0, (float) $overview->getCell('B5')->getValue()); // 企画の合計
+
+        $dept = $book->getSheet(1);
+        $this->assertSame('科目', $dept->getCell('A4')->getValue());
+        $this->assertSame('4月', $dept->getCell('C4')->getValue());
+        $this->assertSame('外注加工費', $dept->getCell('A5')->getValue());
+        $this->assertSame(10500.0, (float) $dept->getCell('O5')->getValue()); // 科目行の累計
+        $this->assertSame('A社', $dept->getCell('B6')->getValue());
+        // 数式として解釈されず、文字列（アポストロフィ付き）になっている
+        $this->assertSame("'=SUM(1+1)", $dept->getCell('B7')->getValue());
+        $this->assertSame(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING, $dept->getCell('B7')->getDataType());
+
+        $this->assertSame(1, \App\Models\Sales\SalesAuditLog::where('action', 'export')->where('target_type', 'expense_comparison')->count());
+    }
+
+    public function test_export_validates_and_forbids()
+    {
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $this->actingAs($superadmin)->get(route('superadmin.sales_analysis.expense_comparison.export', ['fiscal_year' => 2025]))->assertForbidden();
+    }
+
+    public function test_export_requires_fiscal_year()
+    {
+        $this->markCompanyAsSunbrain();
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.expense_comparison.export'))->assertStatus(422);
+    }
+
     public function test_sheet_endpoint_validates_parameters()
     {
         $this->markCompanyAsSunbrain();

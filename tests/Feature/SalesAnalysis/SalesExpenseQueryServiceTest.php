@@ -536,4 +536,78 @@ class SalesExpenseQueryServiceTest extends TestCase
 
         $this->assertSame([], $this->service()->departmentSheet(2025, 'production')['vanished_vendors']);
     }
+
+    public function test_departments_overview_totals_shares_cross_table_and_previous_year()
+    {
+        $this->markCompanyAsSunbrain();
+
+        $this->seedImport(2024, 1, [
+            ['department_key' => 'planning', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'B社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 500, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'planning', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 3000, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'planning', 'category' => '消耗品費', 'category_order' => 2, 'vendor_name' => 'C社', 'calendar_year' => 2025, 'calendar_month' => 5, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'production', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'B社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 1000, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $o = $this->service()->departmentsOverview(2025, ['planning', 'production', 'ondemand']);
+
+        $this->assertTrue($o['has_data']);
+        $this->assertTrue($o['previous_has_data']);
+        $this->assertSame(5000.0, $o['total_amount']);
+        $this->assertSame(1500.0, $o['previous_total_amount']);
+        $this->assertSame(233.3, $o['diff_pct']);
+        $this->assertSame(5000.0, $o['month_totals'][0] + $o['month_totals'][1]); // 4月4000＋5月1000
+
+        $byKey = collect($o['departments'])->keyBy('department_key');
+        $this->assertSame(4000.0, $byKey['planning']['total_amount']);
+        $this->assertSame(80.0, $byKey['planning']['share_pct']);
+        $this->assertSame(1000.0, $byKey['planning']['previous_total_amount']);
+        $this->assertSame(300.0, $byKey['planning']['diff_pct']);
+        $this->assertSame(1000.0, $byKey['production']['total_amount']);
+        $this->assertFalse($byKey['ondemand']['has_data']); // データの無い部署も、行としては返す
+        $this->assertSame(0.0, $byKey['ondemand']['total_amount']);
+
+        // 科目×部署のクロス表（合計の大きい順）
+        $this->assertSame(['外注加工費', '消耗品費'], array_column($o['cross'], 'category'));
+        $this->assertSame(['planning' => 3000.0, 'production' => 1000.0], $o['cross'][0]['by_department']);
+        $this->assertSame(4000.0, $o['cross'][0]['total_amount']);
+    }
+
+    public function test_departments_overview_uses_same_period_comparison_when_partial()
+    {
+        $this->markCompanyAsSunbrain();
+
+        // 前年は4月100・12月9000。当年は4月だけ実績（期の途中）→ 既定は同期間（4月まで）で比較
+        $this->seedImport(2024, 1, [
+            ['department_key' => 'planning', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 4, 'amount' => 100, 'is_shared_split' => false, 'subtotal_group' => 1],
+            ['department_key' => 'planning', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2024, 'calendar_month' => 12, 'amount' => 9000, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+        $this->seedImport(2025, 1, [
+            ['department_key' => 'planning', 'category' => '外注加工費', 'category_order' => 1, 'vendor_name' => 'A社', 'calendar_year' => 2025, 'calendar_month' => 4, 'amount' => 150, 'is_shared_split' => false, 'subtotal_group' => 1],
+        ]);
+
+        $ytd = $this->service()->departmentsOverview(2025, ['planning']);
+        $this->assertTrue($ytd['is_partial']);
+        $this->assertSame('ytd', $ytd['compare_period']);
+        $this->assertSame(100.0, $ytd['previous_total_amount']);
+        $this->assertSame(50.0, $ytd['diff_pct']);
+
+        $full = $this->service()->departmentsOverview(2025, ['planning'], null, 'full');
+        $this->assertSame(9100.0, $full['previous_total_amount']);
+    }
+
+    public function test_departments_overview_without_data()
+    {
+        $this->markCompanyAsSunbrain();
+
+        $o = $this->service()->departmentsOverview(2025, ['planning', 'production']);
+        $this->assertFalse($o['has_data']);
+        $this->assertFalse($o['previous_has_data']);
+        $this->assertNull($o['previous_total_amount']);
+        $this->assertNull($o['diff_pct']);
+        $this->assertSame([], $o['cross']);
+        $this->assertCount(2, $o['departments']);
+    }
 }

@@ -2263,6 +2263,24 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'expense-departments-1',
+                'title' => '経費に「部署比較」とExcel出力を追加',
+                'released_at' => '2026-10-29',
+                'summary' => '経費比較に新しいタブ「部署比較」を追加しました。部署ごとの合計・構成比・月別の推移・科目×部署の一覧を見比べられます。部署シートと部署比較から、Excel出力もできます。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase24-4。DB 変更なし。departmentsOverview()（各部署の departmentSheet を束ねる）、SalesExpenseExportService（部署比較シート＋部署ごとの部署シート。formula injection 対策は売上 Excel 出力と同じ）、ルート api.expense_comparison.departments / expense_comparison.export（監査ログ export/expense_comparison）。部署タブ切替で基準年度をリセットしない挙動に変更。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費：部署比較（新しいタブ）</h3><ul>
+<li>企画・制作・オンデマンド・共通費の年間合計と構成比、前年（同期間）との増減を一覧できます。</li>
+<li>月別の推移（部署の積み上げ）と、科目×部署の一覧も見られます。部署の行や一覧のセルをクリックすると、その部署の部署シートが開きます。</li>
+</ul></section>
+<section class="cl-feature"><h3>経費：Excel出力</h3><ul>
+<li>部署シートと部署比較の画面に「Excel出力」ボタンを追加しました。部署比較のシートと、部署ごとのシート（科目→支払先→4月〜3月→累計、小計・合計、比較年度との増減）を出力します。</li>
+<li>部署を切り替えても、選んでいる年度は変わりません。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

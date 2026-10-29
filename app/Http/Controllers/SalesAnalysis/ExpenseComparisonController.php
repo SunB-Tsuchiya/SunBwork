@@ -5,12 +5,16 @@ namespace App\Http\Controllers\SalesAnalysis;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
+use App\Models\Sales\SalesAuditLog;
 use App\Services\SalesAnalysis\SalesDepartments;
+use App\Services\SalesAnalysis\SalesExpenseExportService;
 use App\Services\SalesAnalysis\SalesExpenseQueryService;
 use App\Services\SalesAnalysis\SalesExpenses;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
  * 経費比較画面（Phase22）。期別分析の経費セクション（Phase21）だけでは分からなかった
@@ -22,8 +26,10 @@ class ExpenseComparisonController extends Controller
 {
     use ResolvesSalesAnalysisRoutePrefix, ResolvesSalesAnalysisCompany;
 
-    public function __construct(private SalesExpenseQueryService $expenseQueryService)
-    {
+    public function __construct(
+        private SalesExpenseQueryService $expenseQueryService,
+        private SalesExpenseExportService $exportService,
+    ) {
     }
 
     public function index()
@@ -118,5 +124,77 @@ class ExpenseComparisonController extends Controller
                 $data['compare_period'] ?? null,
             )
         );
+    }
+
+    /** 比較の共通パラメータ（比較年度は省略時に前年度、比較期間は省略時に期の途中ならytd） */
+    private function compareRules(): array
+    {
+        return [
+            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'compare_fiscal_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'compare_period' => ['nullable', Rule::in(['ytd', 'full'])],
+        ];
+    }
+
+    /** 経費として扱う部署キー（有効な部署＋共通費）を、表示順のままラベルつきで返す */
+    private function expenseDepartmentLabels(int $companyId): array
+    {
+        $labels = [];
+        foreach (SalesDepartments::enabledKeysFor($companyId) as $key) {
+            $labels[$key] = SalesDepartments::labelsFor($companyId)[$key] ?? $key;
+        }
+        $labels[SalesExpenses::SHARED_DEPARTMENT_KEY] = '共通費';
+
+        return $labels;
+    }
+
+    /** 部署比較（Phase24-4）: 部署ごとの年間合計・月別・前年比と、科目×部署のクロス表 */
+    public function departments(Request $request)
+    {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        abort_unless(SalesExpenses::supportsExpensesFor($companyId), 403);
+
+        $data = $request->validate($this->compareRules());
+
+        return response()->json(
+            $this->expenseQueryService->forCompany($companyId)->departmentsOverview(
+                (int) $data['fiscal_year'],
+                array_keys($this->expenseDepartmentLabels($companyId)),
+                isset($data['compare_fiscal_year']) ? (int) $data['compare_fiscal_year'] : null,
+                $data['compare_period'] ?? null,
+            )
+        );
+    }
+
+    /** Excel出力（Phase24-4）: 部署比較シート＋部署ごとの部署シート。画面と同じ比較条件で出す */
+    public function export(Request $request)
+    {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        abort_unless(SalesExpenses::supportsExpensesFor($companyId), 403);
+
+        $data = $request->validate($this->compareRules());
+        $fiscalYear = (int) $data['fiscal_year'];
+        $compareFiscalYear = isset($data['compare_fiscal_year']) ? (int) $data['compare_fiscal_year'] : null;
+        $comparePeriod = $data['compare_period'] ?? null;
+
+        $spreadsheet = $this->exportService->forCompany($companyId)->workbook($fiscalYear, $this->expenseDepartmentLabels($companyId), $compareFiscalYear, $comparePeriod);
+        $filename = "経費_" . ($fiscalYear - 1970) . "期_{$fiscalYear}年度.xlsx";
+
+        $writer = new Xlsx($spreadsheet);
+        ob_start();
+        $writer->save('php://output');
+        $content = ob_get_clean();
+
+        SalesAuditLog::create([
+            'user_id' => Auth::id(),
+            'action' => 'export',
+            'target_type' => 'expense_comparison',
+            'context' => ['fiscal_year' => $fiscalYear, 'compare_fiscal_year' => $compareFiscalYear, 'compare_period' => $comparePeriod],
+        ]);
+
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . rawurlencode($filename) . '"',
+        ]);
     }
 }

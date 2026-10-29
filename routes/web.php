@@ -114,6 +114,8 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/expense-comparison/trend', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'trend'])->name('api.expense_comparison.trend');
         Route::get('api/expense-comparison/vendors', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'vendors'])->name('api.expense_comparison.vendors');
         Route::get('api/expense-comparison/sheet', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'sheet'])->name('api.expense_comparison.sheet');
+        Route::get('api/expense-comparison/departments', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'departments'])->name('api.expense_comparison.departments');
+        Route::get('expense-comparison/export', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'export'])->name('expense_comparison.export');
 
         // 経費の名寄せ設定（新規。Phase24。年度ごとに表記が変わる科目名を正式名へ読み替える）
         Route::get('expense-aliases', [App\Http\Controllers\SalesAnalysis\ExpenseAliasController::class, 'index'])->name('expense_aliases');
