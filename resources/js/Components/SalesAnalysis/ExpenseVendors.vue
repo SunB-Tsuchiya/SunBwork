@@ -40,6 +40,27 @@ const detail = ref(null);
 const detailLoading = ref(false);
 const detailError = ref('');
 
+// 経費メモ（Phase24-5）: この支払先に付いたメモを、全年度・全部署分、新しい年度順に表示する（読み取りのみ。追加・編集は部署シートの行から）
+const notes = ref([]);
+const notesByYear = computed(() => {
+    const groups = [];
+    notes.value.forEach((n) => {
+        const last = groups[groups.length - 1];
+        if (last && last.fiscal_year === n.fiscal_year) last.items.push(n);
+        else groups.push({ fiscal_year: n.fiscal_year, items: [n] });
+    });
+    return groups;
+});
+const noteDate = (iso) => (iso ? new Date(iso).toLocaleDateString('ja-JP') : '');
+const fetchVendorNotes = async (vendorName) => {
+    try {
+        const response = await axios.get(route(rn('api.expense_notes.vendor')), { params: { vendor: vendorName } });
+        notes.value = response.data.notes;
+    } catch (e) {
+        notes.value = []; // メモが読めなくても、カルテ自体は使えるようにする
+    }
+};
+
 const yen = (v) => (v === null || v === undefined ? '—' : `¥${Math.round(v).toLocaleString()}`);
 
 let rankingSeq = 0;
@@ -145,6 +166,7 @@ const fetchDetail = async () => {
         });
         if (seq !== detailSeq) return;
         detail.value = response.data;
+        fetchVendorNotes(response.data.vendor_name);
     } catch (e) {
         if (seq !== detailSeq) return;
         detail.value = null;
@@ -358,6 +380,22 @@ const diffText = (row) => {
                     <div class="rounded bg-white p-4 shadow">
                         <h4 class="mb-2 text-sm font-semibold text-gray-900">月別の動き（直近5年度を重ねて表示）</h4>
                         <canvas ref="monthChartRef" height="110"></canvas>
+                    </div>
+
+                    <div class="rounded bg-white p-4 shadow">
+                        <h4 class="mb-2 text-sm font-semibold text-gray-900">メモ（全年度・全部署）</h4>
+                        <p v-if="!notes.length" class="text-xs text-gray-400">この支払先のメモはまだありません。部署シートの支払先の行の📝から追加できます。</p>
+                        <div v-for="g in notesByYear" :key="g.fiscal_year" class="mb-3 last:mb-0">
+                            <p class="mb-1 text-xs font-semibold text-gray-700">{{ fiscalPeriodLabel(g.fiscal_year) }}</p>
+                            <ul class="divide-y rounded border text-xs">
+                                <li v-for="n in g.items" :key="n.id" class="px-2 py-1.5">
+                                    <span class="block text-[11px] text-gray-500">
+                                        {{ deptLabel(n.department_key) }} › {{ n.category }}<template v-if="n.calendar_month">・{{ n.calendar_month }}月</template>・{{ n.author_name }}・{{ noteDate(n.created_at) }}
+                                    </span>
+                                    <span class="block whitespace-pre-wrap break-words text-gray-800">{{ n.body }}</span>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </template>

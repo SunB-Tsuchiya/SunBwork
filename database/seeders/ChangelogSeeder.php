@@ -2281,6 +2281,22 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'expense-notes-1',
+                'title' => '経費に「メモ」機能を追加（科目・支払先・月へのコメント）',
+                'released_at' => '2026-10-29',
+                'summary' => '経費の部署シートで、科目・支払先・月にコメントを残せます。翌年度に同じ行を開くと、前年度のメモも並べて見られます。',
+                'design_files' => ['z_instructions/SALES_ANALYSIS_PLAN1.md', 'z_instructions/SALES_ANALYSIS_MANAGER1.md'],
+                'claude_notes' => 'Phase24-5。売上DBに sales_expense_notes を追加（マイグレーションあり）。名寄せ後の正式名で保存・表示（取込の版とは切り離し、再取込でも消えない）。編集・削除は書いた本人と SuperAdmin のみ（サーバー側でも判定）。ルート api.expense_notes.*。Excel 出力にメモ列（先頭が数式文字のメモはアポストロフィ付き文字列）。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>経費：メモ</h3><ul>
+<li>部署シートの科目名・支払先名のすぐ右の📝から、メモ（例：「◯月は臨時案件のため増」）を追加できます。月を指定することもできます。部署全体へのメモは、表の上の「📝 部署メモ」から付けます。</li>
+<li>翌年度に同じ科目・支払先を開くと、前年度のメモも並べて見られます。表の上の「メモ一覧」で、その年度のメモを見渡せます。</li>
+<li>支払先カルテには、その支払先のメモが、全年度・全部署分まとめて表示されます。Excel出力にも「メモ」の列が付きます。</li>
+<li>編集・削除できるのは、書いた本人とSuper Adminだけです。取込Excelを取り込み直しても、メモは消えません。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

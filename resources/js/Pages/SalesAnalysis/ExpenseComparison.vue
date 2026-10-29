@@ -5,6 +5,8 @@ import ExpenseSheetTable from '@/Components/SalesAnalysis/ExpenseSheetTable.vue'
 import ExpenseHighlights from '@/Components/SalesAnalysis/ExpenseHighlights.vue';
 import ExpenseVendors from '@/Components/SalesAnalysis/ExpenseVendors.vue';
 import ExpenseCompareControls from '@/Components/SalesAnalysis/ExpenseCompareControls.vue';
+import ExpenseNotesModal from '@/Components/SalesAnalysis/ExpenseNotesModal.vue';
+import ExpenseNotesList from '@/Components/SalesAnalysis/ExpenseNotesList.vue';
 import ExpenseDepartments from '@/Components/SalesAnalysis/ExpenseDepartments.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -60,6 +62,32 @@ const openVendor = (name) => {
 const sheetLoading = ref(false);
 const sheetData = ref(null);
 const sheetError = ref('');
+// 経費メモ（Phase24-5）: 部署シートの行に付けるコメント。年度・部署単位で読み込み、窓（ExpenseNotesModal）で追加・編集・削除する
+const notesData = ref({ notes: [], previous_notes: [] });
+const notesTarget = ref(null); // 窓を開いている付け先 { category, vendor }。nullなら閉じている
+let notesRequestSeq = 0;
+const fetchNotes = async () => {
+    if (!props.supportsExpenses || viewMode.value !== 'sheet' || !vendorFiscalYear.value) return;
+    const seq = ++notesRequestSeq;
+    try {
+        const response = await axios.get(route(rn('api.expense_notes.index')), { params: { department_key: departmentKey.value, fiscal_year: vendorFiscalYear.value } });
+        if (seq === notesRequestSeq) notesData.value = response.data;
+    } catch (e) {
+        // メモが読めなくても、部署シート自体は使えるようにする
+        if (seq === notesRequestSeq) notesData.value = { notes: [], previous_notes: [] };
+    }
+};
+const sameTarget = (n, t) => n.category === t.category && n.vendor_name === t.vendor;
+const targetNotes = computed(() => (notesTarget.value ? notesData.value.notes.filter((n) => sameTarget(n, notesTarget.value)) : []));
+const targetPreviousNotes = computed(() => (notesTarget.value ? notesData.value.previous_notes.filter((n) => sameTarget(n, notesTarget.value)) : []));
+const departmentNoteCount = computed(() => notesData.value.notes.filter((n) => n.category === null).length);
+const openNotes = (target) => { notesTarget.value = { category: target.category ?? null, vendor: target.vendor ?? null }; };
+// メモ一覧の行から: 表の該当行へ移動してから、窓を開く
+const openNoteFromList = (target) => {
+    if (target.category) focusSheetRow({ category: target.category, vendor: target.vendor });
+    openNotes(target);
+};
+
 // 部署比較（Phase24-4）: 全部署の合計・月別・科目×部署
 const departmentsLoading = ref(false);
 const departmentsData = ref(null);
@@ -362,9 +390,13 @@ watch([compareYear, comparePeriod], () => {
 });
 watch([departmentKey, selectedCategory, viewMode, selectedVendor], syncQueryString);
 // 部署切替時はfetchMeta内で年度が再設定されるまで古い表示を残さない
-watch(departmentKey, () => { sheetData.value = null; });
+watch(departmentKey, () => {
+    sheetData.value = null;
+    notesData.value = { notes: [], previous_notes: [] };
+});
 watch([departmentKey, viewMode], fetchSheet);
 watch(viewMode, fetchDepartments);
+watch([departmentKey, vendorFiscalYear, viewMode], fetchNotes);
 // 科目別比較へ戻ったとき、非表示中に更新できなかったグラフを描き直す
 watch(viewMode, async (mode) => {
     if (mode !== 'compare') return;
@@ -586,7 +618,10 @@ onMounted(() => {
                     :fiscal-year="vendorFiscalYear"
                     :fiscal-years="fiscalYears"
                 >
-                    <a :href="exportUrl" class="ml-auto rounded border border-gray-300 bg-white px-2 py-1 text-gray-700 hover:bg-gray-50">Excel出力</a>
+                    <button type="button" class="ml-auto rounded border border-gray-300 bg-white px-2 py-1 text-gray-700 hover:bg-gray-50" @click="openNotes({ category: null, vendor: null })">
+                        📝 部署メモ<span v-if="departmentNoteCount">（{{ departmentNoteCount }}）</span>
+                    </button>
+                    <a :href="exportUrl" class="rounded border border-gray-300 bg-white px-2 py-1 text-gray-700 hover:bg-gray-50">Excel出力</a>
                 </ExpenseCompareControls>
                 <p v-if="sheetLoading" class="mb-2 text-xs text-gray-500">読み込み中...</p>
                 <p v-if="sheetError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ sheetError }}</p>
@@ -596,9 +631,31 @@ onMounted(() => {
                 <!-- 読み込み中も表を残す（比較条件の変更のたびに、科目の開閉状態や表示モードが初期化されないように） -->
                 <div v-if="sheetData?.has_data" :class="sheetLoading ? 'opacity-60' : ''">
                     <ExpenseHighlights :sheet="sheetData" @focus="focusSheetRow" />
-                    <ExpenseSheetTable ref="sheetTableRef" :sheet="sheetData" :reset-key="departmentKey" @vendor="openVendor" />
+                    <ExpenseNotesList :notes="notesData.notes" :previous-notes="notesData.previous_notes" :fiscal-year="vendorFiscalYear" @open="openNoteFromList" />
+                    <ExpenseSheetTable
+                        ref="sheetTableRef"
+                        :sheet="sheetData"
+                        :notes="notesData.notes"
+                        :previous-notes="notesData.previous_notes"
+                        :reset-key="departmentKey"
+                        @vendor="openVendor"
+                        @notes="openNotes"
+                    />
                 </div>
             </div>
+
+            <ExpenseNotesModal
+                v-if="notesTarget"
+                :route-prefix="routePrefix"
+                :department-key="departmentKey"
+                :department-label="departmentTabs.find((t) => t.key === departmentKey)?.label ?? ''"
+                :fiscal-year="vendorFiscalYear"
+                :target="notesTarget"
+                :notes="targetNotes"
+                :previous-notes="targetPreviousNotes"
+                @close="notesTarget = null"
+                @changed="fetchNotes"
+            />
 
             <!-- 部署比較: 4部署の合計・構成比・月別・科目×部署を見比べる（Phase24-4） -->
             <div v-if="viewMode === 'departments' && !metaLoading && fiscalYears.length" class="rounded bg-white p-4 shadow">
