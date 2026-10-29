@@ -7,6 +7,7 @@ import { useSalesChart } from '@/Composables/useSalesChart';
 // 経費の名寄せ設定（Phase24）。経費Excelは年度ごとに科目名の表記が変わる
 // （例: 外注加工→外注加工費、消耗品→消耗品費）ため、完全一致の比較だと前年が「新規」扱いになる。
 // 別名を正式名へ読み替える対応表を、候補を承認しながら作る。取込済みのデータは書き換えない。
+// 科目名（部署ごと）と支払先名（部署をまたぐ。Phase24-3）の両方を扱う。
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -24,6 +25,12 @@ const departmentTabs = computed(() => [
     { key: 'shared', label: '共通費' },
 ]);
 const departmentKey = ref(props.enabledDepartmentKeys[0] ?? 'planning');
+// 名寄せの対象: 科目名（category）／支払先名（vendor）
+const kind = ref('category');
+const isVendor = computed(() => kind.value === 'vendor');
+const kindParams = () => (isVendor.value ? { kind: 'vendor' } : { kind: 'category', department_key: departmentKey.value });
+// 支払先は名前が多い（数百）ので、手動統合の一覧を絞り込む
+const unmappedFilter = ref('');
 
 const loading = ref(false);
 const saving = ref(false);
@@ -38,6 +45,12 @@ const manualSelected = ref([]);
 const manualCanonical = ref('');
 // 登録済みグループへ名前を追加するときの選択（正式名ごと）
 const addTarget = reactive({});
+
+const unitLabel = computed(() => (isVendor.value ? '支払先名' : '科目名'));
+const filteredUnmapped = computed(() => {
+    const f = unmappedFilter.value.trim();
+    return f ? overview.value.unmapped.filter((u) => u.name.includes(f)) : overview.value.unmapped;
+});
 
 const yearsLabel = (years) => (years?.length ? `${years.map((y) => fiscalPeriodNumber(y)).join('・')}期` : '');
 
@@ -54,7 +67,7 @@ const fetchOverview = async () => {
     loading.value = true;
     errorMessage.value = '';
     try {
-        const response = await axios.get(route(rn('api.expense_aliases.data')), { params: { department_key: departmentKey.value } });
+        const response = await axios.get(route(rn('api.expense_aliases.data')), { params: kindParams() });
         applyOverview(response.data);
     } catch (e) {
         errorMessage.value = 'データの取得に失敗しました。';
@@ -68,7 +81,7 @@ const post = async (routeName, payload, doneMessage) => {
     errorMessage.value = '';
     notice.value = '';
     try {
-        const response = await axios.post(route(rn(routeName)), { department_key: departmentKey.value, ...payload });
+        const response = await axios.post(route(rn(routeName)), { ...kindParams(), ...payload });
         applyOverview(response.data);
         notice.value = typeof doneMessage === 'function' ? doneMessage(response.data) : doneMessage;
     } catch (e) {
@@ -112,8 +125,9 @@ const mergeManual = () => post(
     `「${manualCanonical.value}」に統合しました。`,
 );
 
-watch(departmentKey, () => {
+watch([departmentKey, kind], () => {
     notice.value = '';
+    unmappedFilter.value = '';
     fetchOverview();
 });
 onMounted(fetchOverview);
@@ -132,10 +146,25 @@ onMounted(fetchOverview);
         <div v-else class="space-y-4">
             <div class="rounded bg-white p-4 shadow">
                 <p class="mb-2 text-xs text-gray-500">
-                    経費Excelは年度ごとに科目名の表記が変わります（例: 外注加工→外注加工費）。同じ科目をひとつにまとめると、
-                    部署シートや科目別比較で、年度をまたいで正しく比べられます。取り込んだデータは書き換えず、表示するときだけ読み替えます。
+                    経費Excelは年度ごとに科目名・支払先名の表記が変わります（例: 外注加工→外注加工費、西武プロセス→㈱西武プロセス）。
+                    同じものをひとつにまとめると、部署シートや科目別比較、支払先カルテで、年度をまたいで正しく比べられます。
+                    取り込んだデータは書き換えず、表示するときだけ読み替えます。
                 </p>
-                <div class="flex flex-wrap gap-1 rounded border bg-gray-50 p-1 text-xs">
+                <div class="mb-2 flex gap-1 border-b text-sm">
+                    <button
+                        type="button"
+                        class="-mb-px border-b-2 px-3 py-1.5"
+                        :class="kind === 'category' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        @click="kind = 'category'"
+                    >科目名</button>
+                    <button
+                        type="button"
+                        class="-mb-px border-b-2 px-3 py-1.5"
+                        :class="kind === 'vendor' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        @click="kind = 'vendor'"
+                    >支払先名</button>
+                </div>
+                <div v-if="!isVendor" class="flex flex-wrap gap-1 rounded border bg-gray-50 p-1 text-xs">
                     <button
                         v-for="tab in departmentTabs"
                         :key="tab.key"
@@ -164,7 +193,8 @@ onMounted(fetchOverview);
                         >候補をすべて統合する</button>
                     </div>
                     <p class="mb-3 text-[11px] text-gray-400">
-                        「費・料」の有無、「主」「主要」、「・」の並び順だけが違う科目を、機械的に候補にしています。意味が変わりそうなもの（例: 外注→外注加工費）は、下の「手動で統合」で選んでください。
+                        <template v-if="!isVendor">「費・料」の有無、「主」「主要」、「・」の並び順だけが違う科目を、機械的に候補にしています。意味が変わりそうなもの（例: 外注→外注加工費）は、下の「手動で統合」で選んでください。</template>
+                        <template v-else>全角半角・空白、法人格の表記（株式会社・㈱・有限会社・㈲ など）、括弧内の注記（例:「（突発分）」）だけが違う支払先を、機械的に候補にしています。「突発分」のように別の行として見たいものは承認せず、社名変更のように名前が違うものは、下の「手動で統合」で選んでください。</template>
                     </p>
                     <p v-if="!overview.suggestions.length" class="text-xs text-gray-500">統合の候補はありません。</p>
                     <div class="grid gap-3 md:grid-cols-2">
@@ -218,12 +248,14 @@ onMounted(fetchOverview);
 
                 <!-- 手動 -->
                 <div class="rounded bg-white p-4 shadow">
-                    <h3 class="mb-2 text-sm font-semibold text-gray-900">手動で統合（どれにも属していない科目名）</h3>
-                    <p v-if="!overview.unmapped.length" class="text-xs text-gray-500">統合されていない科目名はありません。</p>
+                    <h3 class="mb-2 text-sm font-semibold text-gray-900">手動で統合（どれにも属していない{{ unitLabel }}）</h3>
+                    <p v-if="!overview.unmapped.length" class="text-xs text-gray-500">統合されていない{{ unitLabel }}はありません。</p>
                     <template v-else>
-                        <p class="mb-2 text-[11px] text-gray-400">同じ科目を2つ以上チェックし、正式名にする名前を選んで統合します。</p>
-                        <div class="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                            <label v-for="u in overview.unmapped" :key="u.name" class="flex items-center gap-2">
+                        <p class="mb-2 text-[11px] text-gray-400">同じものを2つ以上チェックし、正式名にする名前を選んで統合します。チェックは絞り込みを変えても残ります。</p>
+                        <input v-model="unmappedFilter" type="search" :placeholder="`${unitLabel}で絞り込み`" class="mb-2 w-full max-w-sm rounded-md border-gray-300 text-xs shadow-sm" />
+                        <p v-if="!filteredUnmapped.length" class="text-xs text-gray-500">該当する名前はありません。</p>
+                        <div class="grid max-h-96 gap-x-4 gap-y-1 overflow-auto text-xs sm:grid-cols-2 lg:grid-cols-3">
+                            <label v-for="u in filteredUnmapped" :key="u.name" class="flex items-center gap-2">
                                 <input v-model="manualSelected" type="checkbox" :value="u.name" class="rounded border-gray-300" />
                                 <span class="text-gray-800">{{ u.name }}</span>
                                 <span class="text-gray-400">{{ yearsLabel(u.years) }}</span>

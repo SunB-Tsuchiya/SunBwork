@@ -39,7 +39,8 @@ class SalesExpenseAliasTest extends TestCase
             'total_amount' => array_sum(array_column($items, 4)),
         ]);
 
-        foreach ($items as $i => [$category, $vendor, $year, $month, $amount]) {
+        foreach ($items as $i => $item) {
+            [$category, $vendor, $year, $month, $amount] = $item;
             SalesExpenseLineItem::create([
                 'sales_expense_import_id' => $import->id,
                 'department_key' => $department,
@@ -50,7 +51,7 @@ class SalesExpenseAliasTest extends TestCase
                 'calendar_month' => $month,
                 'amount' => $amount,
                 'is_shared_split' => false,
-                'subtotal_group' => 1,
+                'subtotal_group' => $item[5] ?? 1, // 6番目の要素で小計グループを指定できる（省略時は1）
             ]);
         }
     }
@@ -253,5 +254,114 @@ class SalesExpenseAliasTest extends TestCase
             'canonical' => '',
             'aliases' => [],
         ])->assertStatus(422);
+    }
+
+    public function test_vendor_candidate_key_absorbs_corporate_markers_and_notes_only()
+    {
+        $key = fn ($n) => SalesExpenseAliasService::vendorCandidateKey($n);
+
+        $this->assertSame($key('西武プロセス'), $key('㈱西武プロセス'));
+        $this->assertSame($key('文化工房'), $key('株式会社文化工房'));
+        $this->assertSame($key('リコージャパン㈱'), $key('リコージャパン株式会社'));
+        $this->assertSame($key('リコージャパン㈱'), $key('リコージャパン㈱ (突発分）'));
+        $this->assertSame($key('㈱ＴＯＯ'), $key('㈱ＴＯＯ(ソフト、フォント）'));
+        $this->assertSame($key('トップライン'), $key('有限会社トップライン'));
+        // 名前そのものが違う（社名変更など）ものは候補にしない
+        $this->assertNotSame($key('㈲ホットネットシステム'), $key('有限会社トップラインシステム'));
+    }
+
+    public function test_vendor_overview_suggests_and_approve_registers_vendor_groups()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2024, [['外注加工', '西武プロセス', 2024, 4, 100], ['外注加工', 'A社', 2024, 4, 100]]);
+        $this->seedImport(2025, [['外注加工費', '㈱西武プロセス', 2025, 4, 200]]);
+
+        $overview = $this->aliasService()->vendorOverview();
+        $this->assertCount(1, $overview['suggestions']);
+        // 正式名の既定は最新年度の名前
+        $this->assertSame('㈱西武プロセス', $overview['suggestions'][0]['canonical']);
+        $this->assertSame(['西武プロセス'], array_column($overview['suggestions'][0]['aliases'], 'name'));
+        $this->assertSame(['A社'], array_column($overview['unmapped'], 'name'));
+
+        $this->assertSame(1, $this->aliasService()->approveVendorSuggestions());
+        $this->assertSame(['西武プロセス' => '㈱西武プロセス'], $this->aliasService()->vendorMap());
+        $this->assertSame('㈱西武プロセス', $this->aliasService()->canonicalVendor('西武プロセス'));
+        // 科目名の対応表とは別（kind=vendor / 部署=all）
+        $this->assertSame([], $this->aliasService()->categoryMap('production'));
+    }
+
+    public function test_vendor_alias_makes_renamed_vendor_comparable_in_the_sheet()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2024, [['外注加工費', '西武プロセス', 2024, 4, 1000]]);
+        $this->seedImport(2025, [['外注加工費', '㈱西武プロセス', 2025, 4, 1500]]);
+
+        $before = $this->queryService()->departmentSheet(2025, 'production');
+        $this->assertTrue($before['categories'][0]['groups'][0]['vendors'][0]['is_new']);
+        $this->assertCount(1, $before['vanished_vendors']);
+
+        $this->aliasService()->saveVendorGroup('㈱西武プロセス', ['西武プロセス']);
+
+        $after = $this->queryService()->departmentSheet(2025, 'production');
+        $vendor = $after['categories'][0]['groups'][0]['vendors'][0];
+        $this->assertFalse($vendor['is_new']);
+        $this->assertSame(50.0, $vendor['diff_pct']);
+        $this->assertSame([], $after['vanished_vendors']);
+
+        // 支払先別の依存度（前年比較）でも読み替えられる
+        $comparison = $this->queryService()->vendorComparison(2025, 'production', '外注加工費');
+        $this->assertSame(1000.0, $comparison['vendors'][0]['previous_amount']);
+    }
+
+    public function test_vendor_alias_merges_rows_and_moves_to_first_subtotal_group()
+    {
+        $this->markCompanyAsSunbrain();
+        // 統合する2つの名前が、同じ科目の別の小計グループに分かれている（グループ1に旧名、グループ2に新名）
+        $this->seedImport(2025, [
+            ['外注加工費', '旧名', 2025, 4, 100, 1],
+            ['外注加工費', '別会社', 2025, 4, 50, 1],
+            ['外注加工費', '新名', 2025, 4, 300, 2],
+        ]);
+        $this->aliasService()->saveVendorGroup('新名', ['旧名']);
+
+        $sheet = $this->queryService()->departmentSheet(2025, 'production');
+        $groups = $sheet['categories'][0]['groups'];
+        $this->assertCount(1, $groups); // 統合した支払先は最初のグループ（1）にまとまり、グループ2は空になる
+        $byName = collect($groups[0]['vendors'])->keyBy('vendor_name');
+        $this->assertSame(400.0, $byName['新名']['total_amount']);
+        $this->assertSame(450.0, $sheet['categories'][0]['total_amount']); // 科目の合計は変わらない
+
+        // 名寄せしていない支払先が別グループに重複して出る場合は、従来どおり別の行のまま
+        $this->aliasService()->saveVendorGroup('新名', []);
+        $plain = $this->queryService()->departmentSheet(2025, 'production');
+        $this->assertCount(2, $plain['categories'][0]['groups']);
+    }
+
+    public function test_alias_endpoints_support_vendor_kind()
+    {
+        $this->markCompanyAsSunbrain();
+        $this->seedImport(2024, [['外注加工', '西武プロセス', 2024, 4, 100]]);
+        $this->seedImport(2025, [['外注加工費', '㈱西武プロセス', 2025, 4, 200]]);
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        // 支払先は部署キー不要
+        $data = $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_aliases.data', ['kind' => 'vendor']));
+        $data->assertOk();
+        $data->assertJsonPath('suggestions.0.canonical', '㈱西武プロセス');
+
+        $approve = $this->actingAs($superadmin)->postJson(route('superadmin.sales_analysis.api.expense_aliases.approve'), ['kind' => 'vendor']);
+        $approve->assertOk();
+        $approve->assertJsonPath('approved_count', 1);
+
+        $this->assertSame(1, SalesExpenseAlias::where('kind', 'vendor')->where('department_key', 'all')->count());
+
+        $save = $this->actingAs($superadmin)->postJson(route('superadmin.sales_analysis.api.expense_aliases.save'), [
+            'kind' => 'vendor', 'canonical' => '㈱西武プロセス', 'aliases' => [],
+        ]);
+        $save->assertOk();
+        $this->assertSame(0, SalesExpenseAlias::count());
+
+        // 科目名は従来どおり部署キー必須
+        $this->actingAs($superadmin)->getJson(route('superadmin.sales_analysis.api.expense_aliases.data'))->assertStatus(422);
     }
 }

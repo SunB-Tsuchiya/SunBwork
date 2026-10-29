@@ -49,12 +49,20 @@ class ExpenseAliasController extends Controller
         return ['required', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), SalesExpenses::SHARED_DEPARTMENT_KEY])];
     }
 
+    /** 名寄せの対象。科目名（部署ごと）か、支払先名（部署をまたぐ）。省略時は科目名 */
+    private function kindRule(): array
+    {
+        return ['nullable', Rule::in(['category', 'vendor'])];
+    }
+
     public function data(Request $request)
     {
         $service = $this->aliasService();
-        $data = $request->validate(['department_key' => $this->departmentRule()]);
+        $data = $request->validate(['kind' => $this->kindRule(), 'department_key' => ['required_unless:kind,vendor', ...$this->departmentRuleOptional()]]);
 
-        return response()->json($service->overview($data['department_key']));
+        return response()->json(($data['kind'] ?? 'category') === 'vendor'
+            ? $service->vendorOverview()
+            : $service->overview($data['department_key']));
     }
 
     /** 正式名と別名を保存する。別名が空なら、その正式名のグループを解除する */
@@ -62,11 +70,18 @@ class ExpenseAliasController extends Controller
     {
         $service = $this->aliasService();
         $data = $request->validate([
-            'department_key' => $this->departmentRule(),
+            'kind' => $this->kindRule(),
+            'department_key' => ['required_unless:kind,vendor', ...$this->departmentRuleOptional()],
             'canonical' => ['required', 'string', 'max:255'],
             'aliases' => ['present', 'array'],
             'aliases.*' => ['string', 'max:255'],
         ]);
+
+        if (($data['kind'] ?? 'category') === 'vendor') {
+            $service->saveVendorGroup($data['canonical'], $data['aliases'], Auth::id());
+
+            return response()->json($service->vendorOverview());
+        }
 
         $service->saveGroup($data['department_key'], $data['canonical'], $data['aliases'], Auth::id());
 
@@ -76,10 +91,24 @@ class ExpenseAliasController extends Controller
     public function approveSuggestions(Request $request)
     {
         $service = $this->aliasService();
-        $data = $request->validate(['department_key' => $this->departmentRule()]);
+        $data = $request->validate(['kind' => $this->kindRule(), 'department_key' => ['required_unless:kind,vendor', ...$this->departmentRuleOptional()]]);
+
+        if (($data['kind'] ?? 'category') === 'vendor') {
+            $count = $service->approveVendorSuggestions(Auth::id());
+
+            return response()->json(array_merge($service->vendorOverview(), ['approved_count' => $count]));
+        }
 
         $count = $service->approveSuggestions($data['department_key'], Auth::id());
 
         return response()->json(array_merge($service->overview($data['department_key']), ['approved_count' => $count]));
+    }
+
+    /** 部署キーは科目名のときだけ必須。指定されたら有効な部署キーであること */
+    private function departmentRuleOptional(): array
+    {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+
+        return ['nullable', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), SalesExpenses::SHARED_DEPARTMENT_KEY])];
     }
 }

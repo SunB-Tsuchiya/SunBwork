@@ -23,6 +23,32 @@ class SalesExpenseQueryService
         return $this;
     }
 
+    private function canonicalVendorName(?string $name): ?string
+    {
+        return $name === null ? null : $this->aliases()->canonicalVendor($name);
+    }
+
+    /**
+     * 支払先別の行（vendor_name, subtotal_group, subtotal_label, amount, is_shared_split）を、
+     * 支払先名の名寄せ後の名前で合算し直す。小計グループは変えない（Excelの構造を保つ）。
+     *
+     * @param  \Illuminate\Support\Collection<int, object>  $rows
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function mergeVendorRows($rows)
+    {
+        return $rows
+            ->groupBy(fn ($r) => ($this->canonicalVendorName($r->vendor_name) ?? '') . "\0" . $r->subtotal_group)
+            ->map(fn ($group) => (object) [
+                'vendor_name' => $this->canonicalVendorName($group->first()->vendor_name),
+                'subtotal_group' => $group->first()->subtotal_group,
+                'subtotal_label' => $group->max('subtotal_label'),
+                'amount' => $group->sum(fn ($r) => (float) $r->amount),
+                'is_shared_split' => $group->max('is_shared_split'),
+            ])
+            ->values();
+    }
+
     /** 科目名の名寄せ（Phase24）。取込データは元の名前のまま持ち、集計時に正式名へ読み替える */
     private function aliases(): SalesExpenseAliasService
     {
@@ -192,6 +218,8 @@ class SalesExpenseQueryService
             return ['has_data' => false, 'groups' => [], 'total_amount' => 0.0, 'is_shared_split' => false];
         }
 
+        $rows = $this->mergeVendorRows($rows);
+
         $total = (float) $rows->sum('amount');
         $isSplit = $rows->contains(fn ($r) => (bool) $r->is_shared_split);
 
@@ -304,6 +332,15 @@ class SalesExpenseQueryService
         if ($rows->isEmpty()) {
             return ['has_data' => false, 'vendors' => [], 'total_amount' => 0.0];
         }
+
+        // 支払先名の名寄せ後の名前で合算し直す
+        $rows = $rows
+            ->groupBy(fn ($r) => $this->canonicalVendorName($r->vendor_name) ?? '')
+            ->map(fn ($group) => (object) [
+                'vendor_name' => $this->canonicalVendorName($group->first()->vendor_name),
+                'amount' => $group->sum(fn ($r) => (float) $r->amount),
+            ])
+            ->values();
 
         $total = (float) $rows->sum('amount');
         $vendors = $rows->map(fn ($r) => [
@@ -435,6 +472,25 @@ class SalesExpenseQueryService
         // 科目名を名寄せ後の正式名へ読み替える（以降のグルーピングは正式名で行い、別名の行は月ごとに合算される）
         foreach ($rows as $r) {
             $r->category = $this->aliases()->canonicalCategory($departmentKey, $r->category);
+            $r->vendor_name = $this->canonicalVendorName($r->vendor_name);
+        }
+
+        // 名寄せで統合した支払先が、同じ科目内の別の小計グループにまたがる場合は、最初に出てくるグループにまとめる
+        // （前年比較で、統合した支払先の前年金額が二重に使われないようにするため。名寄せしていない支払先は変えない）
+        $aliasTargets = array_flip(array_values($this->aliases()->vendorMap()));
+        if ($aliasTargets !== []) {
+            $firstGroup = [];
+            foreach ($rows as $r) {
+                if ($r->vendor_name !== null && isset($aliasTargets[$r->vendor_name])) {
+                    $k = $r->category . "\0" . $r->vendor_name;
+                    $firstGroup[$k] = min($firstGroup[$k] ?? PHP_INT_MAX, (int) $r->subtotal_group);
+                }
+            }
+            foreach ($rows as $r) {
+                if ($r->vendor_name !== null && isset($aliasTargets[$r->vendor_name])) {
+                    $r->subtotal_group = $firstGroup[$r->category . "\0" . $r->vendor_name];
+                }
+            }
         }
 
         $monthIndex = [];
@@ -606,7 +662,7 @@ class SalesExpenseQueryService
             if ($i === null || $i >= $limit) {
                 continue;
             }
-            $name = $r->vendor_name ?? '（内訳未記入）';
+            $name = $this->canonicalVendorName($r->vendor_name) ?? '（内訳未記入）';
             $category = $this->aliases()->canonicalCategory($departmentKey, $r->category);
             $categoryMonths[$category] ??= array_fill(0, 12, 0.0);
             $vendorMonths[$category][$name] ??= array_fill(0, 12, 0.0);
@@ -617,7 +673,7 @@ class SalesExpenseQueryService
         // 比較年度にデータ自体はあるが、YTDの範囲に金額が無い支払先・科目も「あった」として扱うため、
         // 範囲外の行も存在だけは登録しておく（新規判定が「前年に存在しない」ことを意味するように）
         foreach ($rows as $r) {
-            $name = $r->vendor_name ?? '（内訳未記入）';
+            $name = $this->canonicalVendorName($r->vendor_name) ?? '（内訳未記入）';
             $category = $this->aliases()->canonicalCategory($departmentKey, $r->category);
             $categoryMonths[$category] ??= array_fill(0, 12, 0.0);
             $vendorMonths[$category][$name] ??= array_fill(0, 12, 0.0);

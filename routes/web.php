@@ -121,6 +121,10 @@ $registerSalesAnalysisRoutes = function () {
         Route::post('api/expense-aliases', [App\Http\Controllers\SalesAnalysis\ExpenseAliasController::class, 'save'])->name('api.expense_aliases.save');
         Route::post('api/expense-aliases/approve-suggestions', [App\Http\Controllers\SalesAnalysis\ExpenseAliasController::class, 'approveSuggestions'])->name('api.expense_aliases.approve');
 
+        // 経費の支払先カルテ（新規。Phase24-3。全部署・全科目・全年度を支払先で横断して見る）
+        Route::get('api/expense-vendors', [App\Http\Controllers\SalesAnalysis\ExpenseVendorController::class, 'ranking'])->name('api.expense_vendors.ranking');
+        Route::get('api/expense-vendors/detail', [App\Http\Controllers\SalesAnalysis\ExpenseVendorController::class, 'detail'])->name('api.expense_vendors.detail');
+
         // 同月比較（新規。2026-09-04 Codexレビュー2回目 10.4節・PLAN1.md「6D. 同月比較 詳細設計」）
         Route::get('same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'index'])->name('same_month_comparison');
         Route::get('api/same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'summary'])->name('api.same_month_comparison');

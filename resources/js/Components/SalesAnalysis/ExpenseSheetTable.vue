@@ -6,6 +6,8 @@ import { useSalesChart } from '@/Composables/useSalesChart';
 // 1画面で再現する。科目は初期状態で閉じ、科目の合計行だけで部署全体を見渡せる。
 // 支払先の並びはExcel登場順（既定）と金額順を切り替えられる。
 
+const emit = defineEmits(['vendor']);
+
 const props = defineProps({
     sheet: { type: Object, required: true },
     // 部署・年度が変わったとき開閉状態を捨てるためのキー（部署切替で変える）
@@ -174,7 +176,17 @@ const prevLabel = computed(() => fiscalPeriodLabel(props.sheet.previous_fiscal_y
                         <template v-if="expanded.has(c.category)">
                             <template v-for="(g, gi) in c.groups" :key="gi">
                                 <tr v-for="v in orderedVendors(g)" :key="v.vendor_name" class="hover:bg-indigo-50/40" :class="rowHighlight(c.category, v.vendor_name)" :data-row="rowKey(c.category, v.vendor_name)">
-                                    <td class="sticky left-0 z-10 border-b bg-white py-1 pl-7 pr-2">{{ v.vendor_name }}</td>
+                                    <td class="sticky left-0 z-10 border-b bg-white py-1 pl-7 pr-2">
+                                        <!-- 支払先名をクリックすると、その支払先のカルテ（全部署・全年度の横断）へ移動する。内訳未記入は支払先ではないのでリンクにしない -->
+                                        <button
+                                            v-if="v.vendor_name !== '（内訳未記入）'"
+                                            type="button"
+                                            class="text-left hover:text-indigo-700 hover:underline"
+                                            title="この支払先のカルテを開く"
+                                            @click.stop="emit('vendor', v.vendor_name)"
+                                        >{{ v.vendor_name }}</button>
+                                        <span v-else class="text-gray-500">{{ v.vendor_name }}</span>
+                                    </td>
                                     <td v-for="(amt, i) in v.months" :key="i" class="border-b px-2 py-1 text-right" :class="cellCls(amt, v.previous_months[i])" :style="heatStyle(amt, maxVendorCell)">{{ cellText(amt, v.previous_months[i]) }}</td>
                                     <td class="border-b border-l px-2 py-1 text-right" :class="cellCls(v.total_amount, sum(v.previous_months))">{{ totalText(v.total_amount, sum(v.previous_months)) }}</td>
                                     <td class="border-b px-2 py-1 text-right text-gray-500">{{ c.total_amount > 0 ? `${Math.round(v.total_amount / c.total_amount * 1000) / 10}%` : '—' }}</td>

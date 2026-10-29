@@ -10,19 +10,26 @@ use Illuminate\Support\Facades\DB;
 /**
  * 経費の名寄せ（Phase24）。年度ごとに表記が変わる科目名を、正式名へ読み替える。
  * 取込済みデータは書き換えず、集計時（SalesExpenseQueryService）と設定画面でだけこの対応表を通す。
- * 現在は科目名（kind=category、部署ごと）を扱う。支払先名（kind=vendor）は24-3で同じ表を使う。
+ * 科目名（kind=category、部署ごと）と、支払先名（kind=vendor、部署をまたぐのでdepartment_key='all'）を扱う。
+ * 名寄せは利用者が承認したグループだけに適用する（機械的な候補は自動では適用しない）。
  */
 class SalesExpenseAliasService
 {
     private ?int $companyId = null;
 
+    public const VENDOR_DEPARTMENT_KEY = 'all';
+
     /** @var array<string, array<string, string>> 部署キー=>[別名=>正式名] */
     private array $categoryMaps = [];
+
+    /** @var array<string, string>|null 支払先の別名=>正式名 */
+    private ?array $vendorMap = null;
 
     public function forCompany(int $companyId): self
     {
         $this->companyId = $companyId;
         $this->categoryMaps = [];
+        $this->vendorMap = null;
 
         return $this;
     }
@@ -96,15 +103,27 @@ class SalesExpenseAliasService
     }
 
     /**
-     * 設定画面用: 登録済みグループ・統合候補・どれにも属さない科目名。
+     * 設定画面用（科目名）: 登録済みグループ・統合候補・どれにも属さない科目名。
      *
      * @return array{groups: array<int, array>, suggestions: array<int, array>, unmapped: array<int, array>}
      */
     public function overview(string $departmentKey): array
     {
-        $years = $this->categoryNamesWithYears($departmentKey);
-        $map = $this->categoryMap($departmentKey);
+        return $this->buildOverview($this->categoryNamesWithYears($departmentKey), $this->categoryMap($departmentKey), fn ($n) => self::candidateKey($n));
+    }
 
+    /** 設定画面用（支払先名）。 */
+    public function vendorOverview(): array
+    {
+        return $this->buildOverview($this->vendorNamesWithYears(), $this->vendorMap(), fn ($n) => self::vendorCandidateKey($n));
+    }
+
+    /**
+     * @param  array<string, array<int, int>>  $years 名前=>[会計年度...]
+     * @param  array<string, string>  $map 別名=>正式名
+     */
+    private function buildOverview(array $years, array $map, callable $keyFn): array
+    {
         $groups = [];
         foreach ($map as $alias => $canonical) {
             $groups[$canonical][] = $alias;
@@ -126,7 +145,7 @@ class SalesExpenseAliasService
 
         $suggestions = [];
         $suggested = [];
-        foreach ($this->clusterByKey(array_keys($free)) as $names) {
+        foreach ($this->clusterByKey(array_keys($free), $keyFn) as $names) {
             if (count($names) < 2) {
                 continue;
             }
@@ -143,20 +162,102 @@ class SalesExpenseAliasService
         return ['groups' => $groupList, 'suggestions' => $suggestions, 'unmapped' => $unmapped];
     }
 
+    // ---- 支払先名（kind=vendor） ----
+
+    /** @return array<string, string> 別名=>正式名 */
+    public function vendorMap(): array
+    {
+        return $this->vendorMap ??= SalesExpenseAlias::where('company_id', $this->requireCompanyId())
+            ->where('kind', SalesExpenseAlias::KIND_VENDOR)
+            ->where('department_key', self::VENDOR_DEPARTMENT_KEY)
+            ->pluck('canonical_name', 'alias_name')
+            ->all();
+    }
+
+    public function canonicalVendor(string $name): string
+    {
+        return $this->vendorMap()[$name] ?? $name;
+    }
+
     /**
-     * 正式名と別名の対応を保存する。同じ部署内で、正式名が別の正式名の別名になることはない（連鎖させない）。
+     * 正式名に読み替えられる元の支払先名すべて（正式名自身を含む）。
+     *
+     * @return array<int, string>
+     */
+    public function vendorNamesFor(string $canonical): array
+    {
+        $names = [$canonical];
+        foreach ($this->vendorMap() as $alias => $target) {
+            if ($target === $canonical) {
+                $names[] = $alias;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * 会社の各会計年度（現在有効な版）に出てくる支払先名（全部署）と、出現した会計年度。
+     *
+     * @return array<string, array<int, int>> 支払先名=>[会計年度...]（昇順）
+     */
+    public function vendorNamesWithYears(): array
+    {
+        $imports = SalesExpenseImport::where('company_id', $this->requireCompanyId())
+            ->orderBy('fiscal_year')->orderBy('version')
+            ->get(['id', 'fiscal_year'])
+            ->keyBy('fiscal_year');
+
+        $result = [];
+        foreach ($imports as $fiscalYear => $import) {
+            $names = SalesExpenseLineItem::where('sales_expense_import_id', $import->id)
+                ->whereNotNull('vendor_name')
+                ->distinct()
+                ->pluck('vendor_name');
+            foreach ($names as $name) {
+                $result[$name][] = (int) $fiscalYear;
+            }
+        }
+        ksort($result);
+
+        return $result;
+    }
+
+    public function saveVendorGroup(string $canonical, array $aliases, ?int $userId = null): void
+    {
+        $this->saveGroupOf(SalesExpenseAlias::KIND_VENDOR, self::VENDOR_DEPARTMENT_KEY, $canonical, $aliases, $userId);
+    }
+
+    public function approveVendorSuggestions(?int $userId = null): int
+    {
+        $suggestions = $this->vendorOverview()['suggestions'];
+        foreach ($suggestions as $s) {
+            $this->saveVendorGroup($s['canonical'], array_column($s['aliases'], 'name'), $userId);
+        }
+
+        return count($suggestions);
+    }
+
+    /**
+     * 正式名と別名の対応（科目名）を保存する。同じ部署内で、正式名が別の正式名の別名になることはない（連鎖させない）。
      * 別名リストが空なら、その正式名のグループを解除する。
      *
      * @param  array<int, string>  $aliases
      */
     public function saveGroup(string $departmentKey, string $canonical, array $aliases, ?int $userId = null): void
     {
+        $this->saveGroupOf(SalesExpenseAlias::KIND_CATEGORY, $departmentKey, $canonical, $aliases, $userId);
+    }
+
+    /** @param  array<int, string>  $aliases */
+    private function saveGroupOf(string $kind, string $departmentKey, string $canonical, array $aliases, ?int $userId): void
+    {
         $companyId = $this->requireCompanyId();
         $aliases = array_values(array_unique(array_filter($aliases, fn ($a) => $a !== '' && $a !== $canonical)));
 
-        DB::connection('sales')->transaction(function () use ($companyId, $departmentKey, $canonical, $aliases, $userId) {
+        DB::connection('sales')->transaction(function () use ($companyId, $kind, $departmentKey, $canonical, $aliases, $userId) {
             $base = SalesExpenseAlias::where('company_id', $companyId)
-                ->where('kind', SalesExpenseAlias::KIND_CATEGORY)
+                ->where('kind', $kind)
                 ->where('department_key', $departmentKey);
 
             // この正式名のグループを作り直す（解除も兼ねる）
@@ -170,7 +271,7 @@ class SalesExpenseAliasService
                 (clone $base)->where('alias_name', $alias)->delete();
                 SalesExpenseAlias::create([
                     'company_id' => $companyId,
-                    'kind' => SalesExpenseAlias::KIND_CATEGORY,
+                    'kind' => $kind,
                     'department_key' => $departmentKey,
                     'alias_name' => $alias,
                     'canonical_name' => $canonical,
@@ -180,6 +281,7 @@ class SalesExpenseAliasService
         });
 
         unset($this->categoryMaps[$departmentKey]);
+        $this->vendorMap = null;
     }
 
     /** 現在の統合候補をすべて登録する。登録したグループ数を返す。 */
@@ -211,14 +313,29 @@ class SalesExpenseAliasService
     }
 
     /**
+     * 支払先名の機械的な名寄せキー。全角半角・空白・大文字小文字、法人格の表記（株式会社・㈱・(株)・有限会社・㈲・有限）、
+     * 括弧内の注記（例:「（突発分）」）だけを無視する。社名変更のように名前そのものが違うものは候補にならず、画面で人が統合する。
+     */
+    public static function vendorCandidateKey(string $name): string
+    {
+        $t = mb_convert_kana($name, 'KVas');
+        $t = str_replace([' ', '　'], '', $t);
+        $t = preg_replace('/\([^)]*\)/u', '', $t);
+        $t = str_replace(['株式会社', '有限会社', '合同会社', '㈱', '㈲'], '', $t);
+        $t = preg_replace('/^有限|有限$/u', '', $t);
+
+        return mb_strtolower($t);
+    }
+
+    /**
      * @param  array<int, string>  $names
      * @return array<int, array<int, string>>
      */
-    private function clusterByKey(array $names): array
+    private function clusterByKey(array $names, callable $keyFn): array
     {
         $clusters = [];
         foreach ($names as $name) {
-            $clusters[self::candidateKey($name)][] = $name;
+            $clusters[$keyFn($name)][] = $name;
         }
 
         return array_values($clusters);
