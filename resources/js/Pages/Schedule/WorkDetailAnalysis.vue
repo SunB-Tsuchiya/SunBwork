@@ -4,7 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import useWorkloadAnalysisContext from '@/Composables/useWorkloadAnalysisContext';
 const { analysisRoute, activeClass } = useWorkloadAnalysisContext();
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
-import { workCategories, activityLabel } from '@/Constants/personalWorkActivities';
+import { workCategories, activityLabel, workCategoryColors, workSourceColors, workChipStyle } from '@/Constants/personalWorkActivities';
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
 const month = ref((props.initialDate || new Date().toLocaleDateString('sv-SE')).slice(0, 7));
@@ -218,13 +218,13 @@ onMounted(load);
                 <article v-for="person in ranked" :key="person.id" class="rounded border p-3 text-sm">
                     <div class="flex flex-wrap items-center justify-between gap-2"><h4 class="font-semibold">{{ person.name }}</h4><span class="text-xs text-gray-500">活動管理案件 {{ number(person.active_managed_projects) }}件・登録 {{ number(person.created_projects) }}件</span></div>
                     <div class="mt-2 flex flex-wrap gap-1 text-xs">
-                        <span v-for="[key, label] in sourceLabels" :key="key" class="rounded bg-slate-100 px-2 py-1">{{ label }} {{ number(person.source_counts?.[key]) }}件</span>
+                        <span v-for="[key, label] in sourceLabels" :key="key" class="rounded border px-2 py-1" :style="workChipStyle(workSourceColors[key] || workSourceColors.scheduled_work)">{{ label }} {{ number(person.source_counts?.[key]) }}件</span>
                     </div>
                     <p class="mt-2 text-xs text-gray-600">作業 {{ decimal(person.work_points) }}点・会議／訪問 {{ decimal(person.meeting_points) }}点・基本点合計 {{ decimal(person.base_points) }}点</p>
                     <p class="mt-1 text-xs text-gray-600">勤怠残業：<span v-for="(minutes, targetMonth) in person.monthly_overtime_minutes" :key="targetMonth" class="mr-2">{{ targetMonth }} {{ duration(minutes) }}<strong v-if="Number(minutes) > 45 * 60" class="ml-1 text-amber-800">45時間超</strong></span></p>
                     <p v-if="!person.activities?.length" class="mt-2 text-xs text-gray-500">公開範囲内の作業実績なし</p>
                     <div v-else class="mt-2 space-y-1 text-xs">
-                        <p v-for="activity in person.activities" :key="`${activity.work_category}-${activity.activity_type}`" class="rounded bg-gray-50 px-2 py-1">
+                        <p v-for="activity in person.activities" :key="`${activity.work_category}-${activity.activity_type}`" class="rounded border px-2 py-1" :style="workChipStyle(workCategoryColors[activity.work_category] || workCategoryColors.other)">
                             {{ categoryLabel(activity.work_category) }}／{{ activityLabel(activity.activity_type, activity.work_category) }}：入力{{ number(activity.records) }}件・{{ duration(activity.minutes) }}
                             <span v-for="(quantity, unit) in activity.quantities" :key="unit">・{{ number(quantity) }}{{ unit }}</span>
                         </p>

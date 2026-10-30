@@ -5,7 +5,7 @@ import useWorkloadAnalysisContext from '@/Composables/useWorkloadAnalysisContext
 const { analysisRoute, activeClass } = useWorkloadAnalysisContext();
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
-import { workCategories, workActivities, activityLabel } from '@/Constants/personalWorkActivities';
+import { workCategories, workActivities, activityLabel, workCategoryColors as activityColors, workChipStyle as chipStyle } from '@/Constants/personalWorkActivities';
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
 const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
@@ -46,14 +46,6 @@ let loadSequence = 0;
 let personSequence = 0;
 
 const categoryName = (value) => workCategories.find(([key]) => key === value)?.[1] || 'その他';
-const activityColors = {
-    shinko: { bg: '#fef3c7', text: '#78350f', border: '#fcd34d' },
-    eigyo: { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
-    dtp: { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' },
-    kousei: { bg: '#fce7f3', text: '#9d174d', border: '#f9a8d4' },
-    jimu: { bg: '#cffafe', text: '#155e75', border: '#67e8f9' },
-    other: { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
-};
 const roleColors = {
     shinko: { label: '進行管理', bar: '#f59e0b', chip: '#fef3c7' },
     operator: { label: 'オペレーター', bar: '#3b82f6', chip: '#dbeafe' },
@@ -66,7 +58,6 @@ const roleColors = {
 const roleColor = (code) => roleColors[code] || roleColors.other;
 const visibleRoles = computed(() => [...new Set(people.value.map((person) => person.role?.code || 'other'))]
     .map((code) => ({ code, ...roleColor(code) })));
-const chipStyle = (color) => ({ backgroundColor: color.bg, color: color.text, borderColor: color.border });
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ''}`;
 const itemName = (item) => ({ quick_work: '簡易予定', my_job: 'マイジョブ', assigned_job: '依頼ジョブ' })[item.kind] || '予定';
 const clockFromMinutes = (minutes) => minutes == null ? '—' : `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;

@@ -3,6 +3,24 @@ export const workCategories = [
     ['kousei', '校正'], ['jimu', '事務'], ['other', 'その他'],
 ];
 
+// Shared by the simple and detailed analysis cards.
+export const workCategoryColors = {
+    shinko: { bg: '#fef3c7', text: '#78350f', border: '#fcd34d' },
+    eigyo: { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
+    dtp: { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' },
+    kousei: { bg: '#fce7f3', text: '#9d174d', border: '#f9a8d4' },
+    jimu: { bg: '#cffafe', text: '#155e75', border: '#67e8f9' },
+    other: { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
+};
+export const workSourceColors = {
+    quick: { bg: '#fce7f3', text: '#9d174d', border: '#f9a8d4' },
+    my_job: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
+    assigned_job: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
+    meeting: { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
+    scheduled_work: { bg: '#f1f5f9', text: '#334155', border: '#cbd5e1' },
+};
+export const workChipStyle = (color) => ({ backgroundColor: color.bg, color: color.text, borderColor: color.border });
+
 const commonActivities = [
     ['intake_allocation', '受付・仕事の配分・担当調整'],
     ['preparation_specs', '準備・仕様整理'],
