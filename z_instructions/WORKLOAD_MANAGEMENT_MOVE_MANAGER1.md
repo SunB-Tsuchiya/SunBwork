@@ -10,11 +10,11 @@
 | ルート/JS | 成功 | 3role×6静的パスの実Laravel照合、Ziggy再生成。3role×2方式×6リンクとスコープ変更・色のロジックを直接実行。試用メニュー撤去、SuperAdmin会社コンテキスト変更時に旧scopeだけ解除し日付/期間/方式を保持 |
 | 構文/ビルド | 成功 | PHP対象9ファイル構文、対象ESLintエラー0。旧Show.vueの既存unused変数warning1件は変更せず記録。本番用/members Vite成功、manifest参照487ファイル欠落0。点数計算サービス/入力guardの差分なし |
 | GitHub保存 | 専用ブランチへ保存 | `feature/workload-management-move-20261030`。本番既存f5a327635起点の差分をレビュー可能にする。mainと共有作業ツリーには反映しない |
-| 変更履歴 | コード準備済み・登録未実行 | WorkloadManagementMoveChangelogSeeder、version workload-management-20261030（30文字以内）。共通Seederからも呼出。migrationなし |
-| さくら反映 | **未実施・別途許可が必要** | 最後に確認した既存版f5a327635。本件のSSH/デプロイ/seed/cache操作はしていない |
+| 変更履歴 | 独立Seederの登録成功 | WorkloadManagementMoveChangelogSeeder、version workload-management-20261030（30文字以内）。共通Seederからも呼出。migrationなし |
+| さくら反映 | **40ad992c3へ限定配備成功** | 別作業が既配備の4b51f8049を起点に専用版を作成。承認済み条件付きSSHでPHP7構文→早送り→独立変更履歴→config/cache/route/view成功。migrationなし |
 | 利用者画面確認 | **未実施** | 配備後に3roleのprefix/レイアウト/色/戻り先/権限/会社部署選択/簡易詳細ガイド/アーカイブ/試用項目撤去を確認する |
 
-**再開する1手:** 利用者がデプロイを依頼。読取で現在本番4b51f8049/main/変更なしを確認し、その版に今回だけ重ねた専用版を再検証・ビルド済み。deploy/workload-management-20261030を保存し、現在版/ブランチ/変更有無/取得コミット一致条件の正確な反映SSHを提示して承認を得る。まだ更新はしていない。
+**再開する1手:** さくら40ad992c3への限定配備完了。まずSuperAdminの新分析URL/prefix・黄の通常レイアウト・試用項目撤去・SuperAdmin dashboard戻りを利用者画面で確認する。次にAdmin/Leaderを確認。実画面は未確認、一般社員向け公開と月別コメントは今回の対象外。
 
 ## 設計上の境界
 
@@ -40,3 +40,5 @@ Laravelルート/ZiggyはAPP_ENV=testing、DB_CONNECTION=sqlite、DB_DATABASE=:m
 2026-10-30 保存完了: 管理移設の実装コミットf5b93c8a7をfeature/workload-management-move-20261030へpush成功。追跡対象の作業ツリー変更なし。配備済み既存f5a327635との差分は今回の管理移設ソース/テスト/資料/公開ビルドのみで、採点サービス・入力試用判定・係数の差分なし。新たなSSH/さくらseed/キャッシュ操作は実行していない。デプロイ許可待ち。
 
 2026-10-30 デプロイ準備の現在版照合: 利用者がデプロイを依頼し、別作業を巻き込まないよう指定。承認済み読取SSHでさくら4b51f8049/main/追跡対象変更なしを確認。前回f5a327635以降、別作業のリマインダー/リッチテキスト/manifest版管理等が既配備。元feature155413e46を直接早送りせず、4b51f8049を起点にdeploy/workload-management-20261030（/tmp/sunbwork-workload-management-deploy-20261030）を作り、今回のソース/資料だけ適用、Ziggyと/membersビルドを再生成。別作業の非重複28ソースは現在本番版と完全一致。共通ChangelogSeederは既存内容を保持し今回呼出1行だけ追加。移設以外の新しいmain作業は取得しない。合成69件286断言/対象ESLintエラー0/対象PHP7構文/ビルド成功、manifest参照490欠落0。migration差分なし、独立WorkloadManagementMoveChangelogSeederだけを配備時実行する。まだ更新SSHは実行していない。次は専用候補を保存して、現版4b/main/変更なしと取得版一致の条件付きSSHを正確に提示し承認を得る。
+
+2026-10-30 管理移設の限定配備成功: 利用者が専用40ad992c3の正確なSSHコマンドを承認。4b51f8049/main/追跡対象変更なし/取得40ad/migration差分なしの全条件を通過。取得したPHP7ファイルの実構文確認成功後、4b51f8049→40ad992c3を早送り。独立WorkloadManagementMoveChangelogSeederだけを--forceで実行成功、config/cache/route/viewクリア成功、最終HEAD40ad992c3。別作業の既配備28ソースは保持、mainの未配備作業は取り込まず、migration/共通Seeder全件は実行しない。次はSuperAdmin画面で①/superadmin/workload-analyzer配下の新分析、②黄の通常メニュー/レイアウト、③試用項目がない、④ダッシュボードへの戻り先もSuperAdmin、を確認。Admin/Leaderの実画面はまだ未確認。配備成功を画面成功に拡張しない。

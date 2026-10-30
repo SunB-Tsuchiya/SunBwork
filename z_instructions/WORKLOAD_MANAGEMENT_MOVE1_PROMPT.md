@@ -1,19 +1,17 @@
 # 作業量分析の管理画面移設 再開用 1
 
-2026-10-30 JST。AGENTS.md → JOB_EVALUATION_CONTROL1.md → JOB_EVALUATION_ROADMAP1.md → WORKLOAD_MANAGEMENT_MOVE_PLAN1.md → MANAGER1を読む。
+更新: 2026-10-30 JST。AGENTS.md → JOB_EVALUATION_CONTROL1.md → JOB_EVALUATION_ROADMAP1.md → WORKLOAD_MANAGEMENT_MOVE_PLAN1.md → MANAGER1を読む。
 
-利用者は計画を「hai」で承認。3ロール管理画面への移設はコード実装・非破壊検証・本番用ビルドまで完了。**利用者がデプロイを依頼。現在版4b51f8049に他作業が既配備のため、その版に今回だけ重ねて再検証した。更新SSHはまだ実行せず、正確なコマンド承認待ち。**
+**現在: さくら40ad992c3へ管理画面移設を限定配備成功。次はSuperAdminの実画面確認。その後Admin/Leaderへ。**
 
-専用ブランチ: feature/workload-management-move-20261030。作業ツリー: /tmp/sunbwork-evaluation-c7-20261030。最後に確認した既存さくら版f5a327635。共有メイン6af669c89は別作業でdirty、触らない。origin/mainは調査時e94584ee3。最新の保存コミットを確認して再開し、一時ツリーの存在を仮定しない。
+利用者は実装計画とデプロイを承認済み。読取で本番が4b51f8049/main/変更なしと判明。別作業のリッチテキスト等が既配備だったので、元feature155413e46を直接反映せず、4bを起点としたdeploy/workload-management-20261030を作成し今回だけ適用・再検証・再ビルド。別作業28ソースは完全保持、共通Seederは今回呼出1行のみ追加。69件286断言、PHP7構文/ESLintエラー0/ビルド成功、manifest490欠落0。
 
-WorkloadAnalysisAccessでAdmin自社/Leader所属ユニット/SuperAdmin会社コンテキストをGET専用に解決。DepartmentWorkControllerはGETのreadContextだけ分離し、管理用Controllerで差替え。入力側のavailableや点数計算は変更なし。各roleにresults/details/analysis/person_schedule/guide/archive。index/category入口は同prefixへ。AppLayout(fluid)、黄/赤/橙、dashboard戻り、許可された会社/部署候補、日付/方式リンク保持。旧schedule分析ページはSuperAdmin互換の管理用入口へ。一般社員は入れない。
+承認済み版固定SSHでPHP7構文→4b51f8049から40ad992c3への早送り→独立WorkloadManagementMoveChangelogSeeder --force→config/cache/route/view成功。migrationや共通Seeder全件は実行しない。一般社員公開/月別コメントは実装していない。
 
-試用タブとSuperAdminメニューの「作業記録の試用」は撤去したが、既存記録と保護されたAPIは残す。旧アーカイブは保持し月切替とrole prefixを修正、旧個人直リンクも認可する。SuperAdminの会社切替は分析画面だけ旧company_id/department_idを解除し日付/期間/方式を保持。
+配備用作業場所: /tmp/sunbwork-workload-management-deploy-20261030、deploy/workload-management-20261030。元実装/検証用: /tmp/sunbwork-evaluation-c7-20261030、feature/workload-management-move-20261030（実装f5b93c8a7、資料155413e46）。共有メイン6af669c89は別作業でdirty、変更/リセットしない。一時ツリーが消えていたら最新の保存ブランチ/資料を照合する。
 
-検証: SQLiteメモリ69件286断言成功。実Laravelルート照合、Ziggy再生成、role/方式/リンク/スコープ切替のJS直接実行、PHP対象構文・ESLintエラー0、本番用Viteとmanifest欠落0成功。旧Show.vueに既存unused警告1件。ブラウザ画面/本番/実アカウントの確認は未実施。詳細な実行環境と証拠はMANAGERを参照。
+管理閲覧はWorkloadAnalysisAccess、既存入力guardと採点サービス/係数は不変。Admin自社/Leader所属ユニット/SuperAdmin会社コンテキストの範囲。各roleのresults/details/analysis/person_schedule/guide/archiveを使用し、AppLayout黄/赤/橙・dashboard戻り。会社/部署切替もURLで制限。独立試用メニューのみ撤去し既存データと保護APIは保持。旧アーカイブと個人リンク認可も保持。
 
-変更履歴はWorkloadManagementMoveChangelogSeederのみ実行する専用手順を用意する。migrationなし。配備許可後も正確なSSHコマンド提示/承認を得て、現在版・変更・別作業を確認して限定反映する。一般社員公開・月別コメントは今回実装しない。
+次の利用者画面確認はSuperAdminで①新分析が/superadmin/workload-analyzer配下で開く、②黄の通常ロールメニュー/レイアウト、③作業記録の試用が分析/通常メニューにない、④戻るとSuperAdminのダッシュボード。すべて成功なら成功、部分なら項目と結果をもらう。Admin/Leaderの実画面はその後であり未確認。ビルド/配備/画面を混同しない。追加SSHが必要ならAGENTS.mdに従い正確なコマンド承認を得る。
 
-2026-10-30 保存完了: 管理移設の実装コミットf5b93c8a7をfeature/workload-management-move-20261030へpush成功。追跡対象の作業ツリー変更なし。配備済み既存f5a327635との差分は今回の管理移設ソース/テスト/資料/公開ビルドのみで、採点サービス・入力試用判定・係数の差分なし。新たなSSH/さくらseed/キャッシュ操作は実行していない。デプロイ許可待ち。
-
-2026-10-30 デプロイ準備の現在版照合: 利用者がデプロイを依頼し、別作業を巻き込まないよう指定。承認済み読取SSHでさくら4b51f8049/main/追跡対象変更なしを確認。前回f5a327635以降、別作業のリマインダー/リッチテキスト/manifest版管理等が既配備。元feature155413e46を直接早送りせず、4b51f8049を起点にdeploy/workload-management-20261030（/tmp/sunbwork-workload-management-deploy-20261030）を作り、今回のソース/資料だけ適用、Ziggyと/membersビルドを再生成。別作業の非重複28ソースは現在本番版と完全一致。共通ChangelogSeederは既存内容を保持し今回呼出1行だけ追加。移設以外の新しいmain作業は取得しない。合成69件286断言/対象ESLintエラー0/対象PHP7構文/ビルド成功、manifest参照490欠落0。migration差分なし、独立WorkloadManagementMoveChangelogSeederだけを配備時実行する。まだ更新SSHは実行していない。次は専用候補を保存して、現版4b/main/変更なしと取得版一致の条件付きSSHを正確に提示し承認を得る。
+2026-10-30 管理移設の限定配備成功: 利用者が専用40ad992c3の正確なSSHコマンドを承認。4b51f8049/main/追跡対象変更なし/取得40ad/migration差分なしの全条件を通過。取得したPHP7ファイルの実構文確認成功後、4b51f8049→40ad992c3を早送り。独立WorkloadManagementMoveChangelogSeederだけを--forceで実行成功、config/cache/route/viewクリア成功、最終HEAD40ad992c3。別作業の既配備28ソースは保持、mainの未配備作業は取り込まず、migration/共通Seeder全件は実行しない。次はSuperAdmin画面で①/superadmin/workload-analyzer配下の新分析、②黄の通常メニュー/レイアウト、③試用項目がない、④ダッシュボードへの戻り先もSuperAdmin、を確認。Admin/Leaderの実画面はまだ未確認。配備成功を画面成功に拡張しない。
