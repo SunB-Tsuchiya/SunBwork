@@ -15,3 +15,5 @@
 実装: DepartmentWorkRecords専用サービス/ControllerとVue部品、Schedule/Indexの部署2表示、GETルート/Ziggy、独立DepartmentRecordsPreviewChangelogSeeder。WorkloadTrialAnalysisは最後のseparateOvertime引数（既定true）をこのAPIだけfalseにして残業を元の4区分内に維持。採点自体は不変。休日の今日は表示し、過去4日は土日/会社祝日除外。本人の空きは完結勤怠と勤務枠/休憩がある日だけ、夜勤/不明null。既存予定ボード/共有予定/入力guardは維持。
 
 最終ビルド成功（20.24秒）。manifest参照490件欠落0。新規部品は独立manifestキーではなくSchedule/Indexチャンク内に同梱されていることを実成果物で確認。
+
+2026-10-30 配備前読取確認: 利用者が正確なSSHコマンドを承認。さくらce93d3171/main/追跡対象変更なしを確認。準備済み680b70634は同版の子孫で、アプリ差分は今回の専用API/集計引数/2表示/GETルート/Ziggy/独立変更履歴だけ。まだ更新していない。次は現在版/branch/変更なし/取得版/指定9ソース差分一致を条件とする限定配備コマンドを提示し承認を得る。PHP6ファイル構文確認、独立DepartmentRecordsPreviewChangelogSeederだけ--force、キャッシュクリアを予定。migration/一般公開/他作業取得なし。
