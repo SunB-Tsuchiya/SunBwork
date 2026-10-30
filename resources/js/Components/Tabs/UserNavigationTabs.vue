@@ -9,6 +9,9 @@ const props = defineProps({
 const isSunbrain = computed(() => usePage().props.auth?.companyType === 'sunbrain');
 // 一般会社（サンエー印刷等）はジョブ系タブを出さない。サン・ブレーンは従来どおり全タブ
 const isGeneral = computed(() => usePage().props.auth?.companyType === 'general');
+// Reuse the existing server-calculated INFO trial gate; do not open the board to other roles.
+const canAccessDepartmentWork = computed(() => usePage().props.auth?.user?.user_role === 'superadmin'
+    && Boolean(usePage().props.auth?.canAccessWorkRecordTrial) && !isGeneral.value);
 const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings', 'nencho', 'applications'];
 // 「年末調整」タブ: 自分が対象者になっている受付中の受付がある人にだけ表示（会社タイプ問わず。SunA/GeneralAffairs）
 const nenchoAvailable = computed(() => Boolean(usePage().props.auth?.nenchoAvailable));
@@ -25,13 +28,14 @@ const tab = (key) => [
         : 'border border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-800',
 ];
 
-function tryRoute(name) {
-    try { return route(name); } catch { return null; }
+function tryRoute(name, params = {}) {
+    try { return route(name, params); } catch { return null; }
 }
 
 const tabs = computed(() => [
     { key: 'dashboard', href: tryRoute('user.dashboard'), label: 'ダッシュボード' },
     { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
+    { key: 'department_work', href: tryRoute('schedule.index', { tab: 'work' }), label: '部署の作業', condition: canAccessDepartmentWork.value },
     { key: 'project_jobs', href: tryRoute('user.project_jobs.index'), label: '案件確認' },
     { key: 'myjob', href: tryRoute('user.myjobbox.index'), label: 'マイジョブBOX' },
     { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ' },
@@ -74,6 +78,9 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('calendar.index')" :class="tab('calendar')">
                 カレンダー
+            </Link>
+            <Link v-if="canAccessDepartmentWork" :href="route('schedule.index', { tab: 'work' })" :class="tab('department_work')">
+                部署の作業
             </Link>
             <Link v-if="showTab('project_jobs')" :href="route('user.project_jobs.index')" :class="tab('project_jobs')">
                 案件確認
