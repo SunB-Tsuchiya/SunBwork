@@ -4,7 +4,7 @@ export const workCategories = [
 ];
 
 const commonActivities = [
-    ['intake_allocation', '受付・差配'],
+    ['intake_allocation', '受付・仕事の配分・担当調整'],
     ['preparation_specs', '準備・仕様整理'],
     ['internal_improvement', '社内改善・システム開発'],
 ];
