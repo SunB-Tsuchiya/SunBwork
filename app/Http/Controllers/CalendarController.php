@@ -48,7 +48,7 @@ class CalendarController extends Controller
             // SuperAdminがUser画面を確認するときも、Clerkで登録した会社コンテキストを使う。
             $reminderCompanyId = $this->contextCompanyId() ?? $user->company_id;
             if ($reminderCompanyId) {
-                $calendarReminders = ClerkCalendarReminder::visibleForCompany((int) $reminderCompanyId);
+                $calendarReminders = ClerkCalendarReminder::visibleForCompany((int) $reminderCompanyId, null, $user);
             }
             // 勤務形態一覧
             try {

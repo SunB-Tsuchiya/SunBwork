@@ -20,4 +20,12 @@ return [
         // cache serializer path (ensure writable)
         'Cache.SerializerPath' => storage_path('framework/htmlpurifier'),
     ],
+
+    // お知らせ・リマインダー用（文字色・背景色などの基本装飾を許可）
+    'rich' => [
+        'HTML.Allowed' => 'p,br,strong,b,em,i,u,s,strike,span[style],ul,ol,li',
+        'CSS.AllowedProperties' => 'color,background-color',
+        'AutoFormat.RemoveEmpty' => true,
+        'Cache.SerializerPath' => storage_path('framework/htmlpurifier'),
+    ],
 ];
