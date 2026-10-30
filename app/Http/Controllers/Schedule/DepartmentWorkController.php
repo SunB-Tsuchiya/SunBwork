@@ -24,34 +24,51 @@ class DepartmentWorkController extends Controller
 {
     public function __construct(private PersonalWorkSchedule $schedule, private WorkloadTrialAnalysis $trial) {}
 
+    /** Read access is separate from the existing trial write permission. */
+    protected function readContext(Request $request): array
+    {
+        $viewer = $request->user();
+        abort_unless($this->schedule->available($viewer), 403);
+
+        return [$viewer, null, []];
+    }
+
     public function analysisPage(Request $request)
     {
-        abort_unless($this->schedule->available($request->user()), 403);
+        [, , $contextProps] = $this->readContext($request);
+        if ($request->routeIs('schedule.*')) {
+            return redirect()->route('superadmin.workload_analyzer.results', $request->query());
+        }
         $date = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString();
 
-        return Inertia::render('Schedule/WorkAnalysis', ['initialDate' => $date]);
+        return Inertia::render('Schedule/WorkAnalysis', ['initialDate' => $date, ...$contextProps]);
     }
 
     public function detailPage(Request $request)
     {
-        abort_unless($this->schedule->available($request->user()), 403);
+        [, , $contextProps] = $this->readContext($request);
+        if ($request->routeIs('schedule.*')) {
+            return redirect()->route('superadmin.workload_analyzer.details', $request->query());
+        }
         $date = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString();
 
-        return Inertia::render('Schedule/WorkDetailAnalysis', ['initialDate' => $date]);
+        return Inertia::render('Schedule/WorkDetailAnalysis', ['initialDate' => $date, ...$contextProps]);
     }
 
     public function guidePage(Request $request)
     {
-        abort_unless($this->schedule->available($request->user()), 403);
+        [, , $contextProps] = $this->readContext($request);
+        if ($request->routeIs('schedule.*')) {
+            return redirect()->route('superadmin.workload_analyzer.guide', $request->query());
+        }
         $date = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString();
 
-        return Inertia::render('Schedule/WorkloadGuide', ['initialDate' => $date]);
+        return Inertia::render('Schedule/WorkloadGuide', ['initialDate' => $date, ...$contextProps]);
     }
 
     public function index(Request $request)
     {
-        $viewer = $request->user();
-        abort_unless($this->schedule->available($viewer), 403);
+        [$viewer, $allowedUserIds] = $this->readContext($request);
         $params = $request->validate([
             'date' => ['nullable', 'date_format:Y-m-d'],
             'user_id' => ['nullable', 'integer', 'min:1'],
@@ -61,6 +78,7 @@ class DepartmentWorkController extends Controller
 
         $users = User::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
+            ->when($allowedUserIds !== null, fn ($q) => $q->whereIn('id', $allowedUserIds))
             ->when(isset($params['user_id']), fn ($query) => $query->whereKey($params['user_id']))
             ->with(['assignment:id,code', 'userSetting'])
             ->ordered()->get(['id', 'name', 'company_id', 'department_id', 'assignment_id', 'sort_order']);
@@ -298,8 +316,7 @@ class DepartmentWorkController extends Controller
 
     public function analysis(Request $request)
     {
-        $viewer = $request->user();
-        abort_unless($this->schedule->available($viewer), 403);
+        [$viewer, $allowedUserIds] = $this->readContext($request);
         $params = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
             'period' => ['required', Rule::in(['day', 'week', 'month', 'quarter'])],
@@ -321,8 +338,9 @@ class DepartmentWorkController extends Controller
         };
         $allUsers = User::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
+            ->when($allowedUserIds !== null, fn ($q) => $q->whereIn('id', $allowedUserIds))
             ->with(['assignment:id,code,name', 'userSetting', 'employmentSetting'])->ordered()
-            ->get(['id', 'name', 'user_role', 'assignment_id', 'sort_order', 'employment_type']);
+            ->get(['id', 'name', 'company_id', 'department_id', 'user_role', 'assignment_id', 'sort_order', 'employment_type']);
         $users = $allUsers->filter(function (User $user) {
             $default = in_array($user->employment_type ?? 'regular', ['regular', 'contract'], true);
             return ($user->employmentSetting?->ranking_included ?? $default)

@@ -1,7 +1,8 @@
 <script setup>
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
-import { route } from 'ziggy-js';
+import useWorkloadAnalysisContext from '@/Composables/useWorkloadAnalysisContext';
+const { analysisRoute, activeClass } = useWorkloadAnalysisContext();
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import { workCategories, activityLabel } from '@/Constants/personalWorkActivities';
 
@@ -84,7 +85,7 @@ async function load() {
         return;
     }
     try {
-        const { data } = await axios.get(route('schedule.department_work.analysis'), {
+        const { data } = await axios.get(analysisRoute('analysis'), {
             params: { date: `${month.value}-01`, period: period.value, score_version: scoreVersion.value },
         });
         if (current !== sequence) return;
@@ -99,7 +100,7 @@ async function load() {
 }
 
 watch([month, period, scoreVersion], () => {
-    const url = route('schedule.department_work.details', { date: `${month.value}-01`, period: period.value, score_version: scoreVersion.value });
+    const url = analysisRoute('details', { date: `${month.value}-01`, period: period.value, score_version: scoreVersion.value });
     window.history.replaceState(window.history.state, '', url);
     load();
 });
@@ -108,7 +109,7 @@ onMounted(load);
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業量分析" active="details" :date="`${month}-01`" period="month" :score-version="scoreVersion">
+    <WorkloadAnalysisShell title="作業量分析" active="details" :date="`${month}-01`" :period="period" :score-version="scoreVersion">
 
         <section class="rounded-lg bg-white p-4 shadow">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -137,7 +138,7 @@ onMounted(load);
             </div>
             <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <span class="font-medium text-gray-700">採点方式</span>
-                <button v-for="[value, label] in [['trial_time_v3', '標準の試算（V3）'], ['trial_time_v2', '従来の試用点（比較用）']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? 'border-blue-600 bg-blue-50 text-blue-800' : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
+                <button v-for="[value, label] in [['trial_time_v3', '標準の試算（V3）'], ['trial_time_v2', '従来の試用点（比較用）']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? activeClass : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
                 <span class="text-gray-600">新しい試算は比較用で、過去の記録を変更しません。</span>
             </div>
             <p v-if="period === 'quarter'" class="mt-2 text-xs text-gray-600">3か月は選んだ月を含む直近3か月です。</p>
@@ -177,7 +178,7 @@ onMounted(load);
                 <div class="font-semibold">並び方と暫定点の比較</div>
                 <p class="mt-1 text-xs text-gray-700">工程候補は同じ案件・作業種類・日付などをまとめた参考数、入力件数は記録の数です。どちらも完了数ではありません。暫定点は主に記録時間で決まります。作業点は会議・訪問以外、会議・訪問点には打合せ・業務外出・訪問商談を含みます。</p>
                 <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                    <label v-for="[key, label] in [['units', '工程候補が多い順'], ['records', '入力件数が多い順'], ['points', '暫定点が高い順']]" :key="key" class="rounded border px-2 py-1" :class="sortBy === key ? 'border-blue-500 bg-blue-50 text-blue-800' : 'bg-white'">
+                    <label v-for="[key, label] in [['units', '工程候補が多い順'], ['records', '入力件数が多い順'], ['points', '暫定点が高い順']]" :key="key" class="rounded border px-2 py-1" :class="sortBy === key ? activeClass : 'bg-white'">
                         <input v-model="sortBy" type="radio" name="work-detail-sort" :value="key" class="sr-only" />{{ label }}
                     </label>
                 </div>

@@ -157,6 +157,7 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        (new WorkloadManagementMoveChangelogSeeder())->run();
         (new EvaluationV3DefaultChangelogSeeder())->run();
         $this->seedScheduleOtherSplit();
         $this->seedWorkloadTrialRebuild();

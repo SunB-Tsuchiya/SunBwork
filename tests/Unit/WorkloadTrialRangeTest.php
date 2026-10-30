@@ -403,6 +403,41 @@ class WorkloadTrialRangeTest extends TestCase
         $this->insert('schedule_attendees', ['id' => 1, 'event_id' => 1, 'user_id' => 1, 'status' => 'accepted']);
     }
 
+    public function test_management_api_matches_existing_v3_calculation_for_the_same_cohort(): void
+    {
+        $db=$this->database->getConnection();
+        foreach (["user_role text", "assignment_id integer", "sort_order integer default 0", "employment_type text"] as $column) $db->statement("alter table users add column $column");
+        foreach (["name text", "sort_order integer default 0"] as $column) $db->statement("alter table departments add column $column");
+        foreach ([
+            'companies'=>'id integer primary key, name text, sort_order integer',
+            'assignments'=>'id integer primary key, code text, name text',
+            'user_settings'=>'id integer primary key, user_id integer, worktype_id integer',
+            'user_employment_settings'=>'id integer primary key, user_id integer, ranking_included integer, workload_tracked integer',
+        ] as $table=>$columns) $db->statement("create table $table ($columns)");
+        $this->insert('companies',['id'=>1,'name'=>'Synthetic company','sort_order'=>1]);
+        $this->insert('departments',['id'=>1,'company_id'=>1,'code'=>'INFO','name'=>'Synthetic department']);
+        $this->insert('assignments',['id'=>1,'code'=>'operator','name'=>'Operator']);
+        $this->insert('user_settings',['id'=>1,'user_id'=>1,'worktype_id'=>1]);
+        $db->table('users')->where('id',1)->update(['user_role'=>'superadmin','assignment_id'=>1,'employment_type'=>'regular']);
+        $this->user->user_role='superadmin';
+        $this->user->setRelation('adminPermission',null)->setRelation('leaderPermission',null);
+        $this->insert('events',['id'=>1,'user_id'=>1,'event_item_type_id'=>1,'starts_at'=>'2026-09-01 09:00:00','ends_at'=>'2026-09-01 10:00:00']);
+        $this->insert('events',['id'=>2,'user_id'=>1,'event_item_type_id'=>1,'starts_at'=>'2026-09-01 09:30:00','ends_at'=>'2026-09-01 10:30:00']);
+        $expected=$this->analyze('2026-09-01','2026-09-30');
+        $request=ManagementRangeRequest::create('/superadmin/workload-analyzer/analysis','GET',['date'=>'2026-09-01','period'=>'month','user_id'=>1]);
+        $request->setUserResolver(fn ()=>$this->user);
+        $request->setRouteResolver(fn ()=>(new \Illuminate\Routing\Route('GET','test',fn ()=>null))->name('superadmin.workload_analyzer.analysis'));
+        $factory=$this->createMock(\Illuminate\Contracts\Routing\ResponseFactory::class);
+        $factory->method('json')->willReturnCallback(fn ($data)=>new \Illuminate\Http\JsonResponse($data));
+        Container::getInstance()->instance(\Illuminate\Contracts\Routing\ResponseFactory::class,$factory);
+        $schedule=new PersonalWorkSchedule();
+        $controller=new \App\Http\Controllers\Management\WorkloadAnalysisController($schedule,new WorkloadTrialAnalysis($schedule));
+        $actual=$controller->analysis($request)->getData(true);
+        self::assertSame('trial_time_v3',$actual['score_version']);
+        self::assertSame(90,$actual['people'][0]['minutes']);
+        self::assertEquals($expected,$actual['people'][0]);
+    }
+
     private function analyze(string $from, string $to, string $version = 'trial_time_v3'): array
     {
         return (new WorkloadTrialAnalysis(new PersonalWorkSchedule()))->analyze($this->user, collect([$this->user]),
@@ -412,5 +447,15 @@ class WorkloadTrialRangeTest extends TestCase
     private function insert(string $table, array $row): void
     {
         $this->database->getConnection()->table($table)->insert($row);
+    }
+}
+
+
+class ManagementRangeRequest extends \Illuminate\Http\Request
+{
+    public function validate(array $rules, ...$params): array
+    {
+        $factory=new \Illuminate\Validation\Factory(new \Illuminate\Translation\Translator(new \Illuminate\Translation\ArrayLoader(),'en'));
+        return $factory->make($this->all(),$rules)->validate();
     }
 }

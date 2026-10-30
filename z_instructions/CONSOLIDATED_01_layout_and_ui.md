@@ -78,9 +78,9 @@ CLAUDE.md の UI/レイアウトセクションが最上位の権威。本ファ
 2026-10-14: 同画面の取引先候補は文字を入力したときだけ開き、閉じるボタン・外側クリック・Esc で閉じられるようにする。空欄をフォーカスしただけで候補を表示すると下の登録ボタンを覆うため、避ける。
 2026-10-14: 一覧の「編集」は上部の登録フォームを切り替えず、既存値を入れたモーダルを開く。登録と編集は同じ入力部品を使う。候補一覧が開いている間の Esc は候補を先に閉じる。
 
-`Schedule/WorkAnalysis.vue` と `Schedule/WorkDetailAnalysis.vue` は、予定表や Super Admin の通常メニューから別タブで開く独立画面。両画面は `Components/Schedule/WorkloadAnalysisShell.vue` を使い、`AppLayout` の役割別ヘッダー・タブを表示しない。独立画面内では簡易順位と詳細分析を同じタブで切り替え、予定表へ戻れる。旧方式アーカイブは別タブで既存画面を参照する。集計 API と表示権限は従来どおり。
+2026-10-30 管理画面への移設: `Schedule/WorkAnalysis.vue` / `WorkDetailAnalysis.vue` / `WorkloadGuide.vue` は共通 `WorkloadAnalysisShell` 内で `AppLayout(fluid)` を使う。SuperAdmin/Admin/Leaderそれぞれの `*.workload_analyzer.*` に入り、通常のロール別メニュー・黄/赤/橙・ダッシュボードへの戻り先を使う。分析内の簡易・詳細・ガイド・旧アーカイブのリンクとAPIも同じprefixを維持する。従来の独立画面・固定の「予定表へ」リンクはこの移設で置換する。
 
-作業記録の独立試用も同じシェルを使う。Super Admin メニューの「作業記録の試用」は情報出版の Super Admin にだけ表示し、別タブで開く。モバイルの選択メニューも同じ条件を使う。ページとAPIの権限は `PersonalWorkSchedule::available()` でサーバ側でも確認する。
+会社/部署の候補は管理用閲覧スコープから提供し、初期値と選択をURLに保持する。「作業記録の試用」は分析タブとSuperAdminの通常/モバイルメニューから外すが、既存データと厳しい入力側の試用権限は保持。一般社員向け表示は別工程。実装/配備/画面確認は `WORKLOAD_MANAGEMENT_MOVE_MANAGER1.md` を参照する。
 
 ### NG パターン（やってはいけない）
 

@@ -1,6 +1,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
+import useWorkloadAnalysisContext from '@/Composables/useWorkloadAnalysisContext';
+const { analysisRoute, buttonClass } = useWorkloadAnalysisContext();
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
@@ -37,8 +38,8 @@ const scoreVersion = queryScoreVersion === 'trial_time_v2' ? 'trial_time_v2' : '
                     </div>
                 </div>
                 <div class="mt-5 flex flex-wrap items-center gap-3">
-                    <Link :href="route('schedule.department_work.details', { date, score_version: scoreVersion })" class="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">詳しい作業量分析を見る</Link>
-                    <Link :href="route('schedule.department_work.results', { date, period, score_version: scoreVersion })" class="text-sm font-medium text-blue-700 underline">簡易順位を見る</Link>
+                    <Link :href="analysisRoute('details', { date, score_version: scoreVersion })" class="rounded px-4 py-2 text-sm font-semibold" :class="buttonClass">詳しい作業量分析を見る</Link>
+                    <Link :href="analysisRoute('results', { date, period, score_version: scoreVersion })" class="text-sm font-medium text-blue-700 underline">簡易順位を見る</Link>
                 </div>
             </section>
 
@@ -86,7 +87,7 @@ const scoreVersion = queryScoreVersion === 'trial_time_v2' ? 'trial_time_v2' : '
                         <div class="mt-3 space-y-3 text-sm leading-6 text-gray-700">
                             <p>まず入力がそろっている期間か確かめ、次に担当と作業種類ごとの実績を複数月で見ます。そのうえで、管理者が作業結果の具体性、難しさ、納期や進行管理の負担を確認します。</p>
                             <p>現在の暫定点は記録時間の影響が大きく、入力件数は分割方法で増えます。工程候補は自動完了を含むジョブの本当の完了数を保証しません。長い単一記録への自動減点や、新しい査定点はまだ決めていません。</p>
-                            <p>旧方式は<Link :href="route('superadmin.workload_analyzer.archive')" class="text-blue-700 underline">旧方式アーカイブ</Link>で参照できます。旧方式も現DBによる再計算表示で、過去時点の固定結果ではありません。</p>
+                            <p>旧方式は<Link :href="analysisRoute('archive', { ym: date.slice(0, 7) })" class="text-blue-700 underline">旧方式アーカイブ</Link>で参照できます。旧方式も現DBによる再計算表示で、過去時点の固定結果ではありません。</p>
                         </div>
                     </details>
                 </div>
