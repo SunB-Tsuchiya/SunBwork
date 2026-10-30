@@ -322,6 +322,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     Route::post('/presence/{user}', [App\Http\Controllers\UserPresenceController::class, 'update'])->name('presence.update');
 
+    // 仕事・案件ハブ: 情報出版SuperAdmin限定の一覧・追加試用。
+    Route::get('/user/work/broad-projects/clients', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'clients'])->name('user.work.broad_projects.clients');
+    Route::get('/user/work/broad-projects', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'index'])->name('user.work.broad_projects.index');
+    Route::post('/user/work/broad-projects', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'store'])->name('user.work.broad_projects.store');
+
     // 案件確認（ユーザー向け案件一覧・詳細）
     Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');
     Route::get('/user/project-jobs/{projectJob}/progress-sheets-json', [App\Http\Controllers\User\ProjectJobController::class, 'progressSheetsJson'])->name('user.project_jobs.progress_sheets_json');

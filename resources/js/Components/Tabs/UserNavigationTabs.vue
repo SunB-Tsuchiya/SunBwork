@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
+import UserWorkHubTabs from './UserWorkHubTabs.vue';
 
 const props = defineProps({
     active: { type: String, default: '' },
@@ -9,6 +10,19 @@ const props = defineProps({
 const isSunbrain = computed(() => usePage().props.auth?.companyType === 'sunbrain');
 // 一般会社（サンエー印刷等）はジョブ系タブを出さない。サン・ブレーンは従来どおり全タブ
 const isGeneral = computed(() => usePage().props.auth?.companyType === 'general');
+const hubEnabled = computed(() => Boolean(usePage().props.userWorkHub?.enabled) && !isGeneral.value);
+const hubTab = computed(() => {
+    if (hubEnabled.value) {
+        try {
+            const current = route().current();
+            if (current === 'user.project_jobs.jobbox.show') return 'jobbox';
+            if (['events.create_job', 'user.project_jobs.assignments.create', 'user.project_jobs.assignments.edit'].includes(current)) return 'myjob';
+        } catch { /* Fall back to the page's explicit tab. */ }
+    }
+    return props.active;
+});
+const hubActive = computed(() => ['myjob', 'jobbox', 'broad_projects', 'project_jobs', 'proof_status'].includes(hubTab.value));
+const activeKey = computed(() => hubEnabled.value && hubActive.value ? 'work_hub' : props.active);
 // Reuse the existing server-calculated INFO trial gate; do not open the board to other roles.
 const canAccessDepartmentWork = computed(() => usePage().props.auth?.user?.user_role === 'superadmin'
     && Boolean(usePage().props.auth?.canAccessWorkRecordTrial) && !isGeneral.value);
@@ -23,7 +37,7 @@ const showApply = computed(() => (usePage().props.auth?.applicationAccess ?? [])
 // User カラー: blue
 const tab = (key) => [
     'rounded-md px-3 py-2 text-sm font-medium',
-    props.active === key
+    activeKey.value === key
         ? 'bg-blue-100 text-blue-700'
         : 'border border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-800',
 ];
@@ -36,12 +50,13 @@ const tabs = computed(() => [
     { key: 'dashboard', href: tryRoute('user.dashboard'), label: 'ダッシュボード' },
     { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
     { key: 'department_work', href: tryRoute('schedule.index', { tab: 'work' }), label: '部署の作業', condition: canAccessDepartmentWork.value },
-    { key: 'project_jobs', href: tryRoute('user.project_jobs.index'), label: '案件確認' },
-    { key: 'myjob', href: tryRoute('user.myjobbox.index'), label: 'マイジョブBOX' },
-    { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ' },
+    { key: 'work_hub', href: tryRoute('user.myjobbox.index'), label: '仕事・案件', condition: hubEnabled.value },
+    { key: 'project_jobs', href: tryRoute('user.project_jobs.index'), label: '案件確認', condition: !hubEnabled.value },
+    { key: 'myjob', href: tryRoute('user.myjobbox.index'), label: 'マイジョブBOX', condition: !hubEnabled.value },
+    { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ', condition: !hubEnabled.value },
     { key: 'diaries', href: tryRoute('diaries.index'), label: '日報一覧' },
     { key: 'team_rooms', href: tryRoute('team-rooms.index'), label: 'チームルーム' },
-    { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value },
+    { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value && !hubEnabled.value },
     { key: 'nencho', href: tryRoute('user.general_affairs.nencho.index'), label: '年末調整', condition: nenchoAvailable.value },
     { key: 'applications', href: tryRoute('user.applications.index'), label: '申請', condition: showApply.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
@@ -66,49 +81,15 @@ function onMobileSelect(e) {
                     v-for="t in tabs"
                     :key="t.key"
                     :value="t.href"
-                    :selected="active === t.key"
+                    :selected="activeKey === t.key"
                 >{{ t.label }}</option>
             </select>
         </div>
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
-            <Link :href="route('user.dashboard')" :class="tab('dashboard')">
-                ダッシュボード
-            </Link>
-            <Link :href="route('calendar.index')" :class="tab('calendar')">
-                カレンダー
-            </Link>
-            <Link v-if="canAccessDepartmentWork" :href="route('schedule.index', { tab: 'work' })" :class="tab('department_work')">
-                部署の作業
-            </Link>
-            <Link v-if="showTab('project_jobs')" :href="route('user.project_jobs.index')" :class="tab('project_jobs')">
-                案件確認
-            </Link>
-            <Link v-if="showTab('myjob')" :href="route('user.myjobbox.index')" :class="tab('myjob')">
-                マイジョブBOX
-            </Link>
-            <Link v-if="showTab('jobbox')" :href="route('user.jobbox.index')" :class="tab('jobbox')">
-                依頼されたジョブ
-            </Link>
-            <Link :href="route('diaries.index')" :class="tab('diaries')">
-                日報一覧
-            </Link>
-            <Link :href="route('team-rooms.index')" :class="tab('team_rooms')">
-                チームルーム
-            </Link>
-            <Link v-if="isSunbrain" :href="route('user.proof.status')" :class="tab('proof_status')">
-                校正状況
-            </Link>
-            <Link v-if="nenchoAvailable" :href="route('user.general_affairs.nencho.index')" :class="tab('nencho')">
-                年末調整
-            </Link>
-            <Link v-if="showApply && showTab('applications')" :href="route('user.applications.index')" :class="tab('applications')">
-                申請
-            </Link>
-            <Link :href="route('user.settings.index')" :class="tab('settings')">
-                設定
-            </Link>
+            <Link v-for="t in tabs" :key="t.key" :href="t.href" :class="tab(t.key)" :aria-current="activeKey === t.key ? 'page' : undefined">{{ t.label }}</Link>
         </nav>
+        <UserWorkHubTabs v-if="hubEnabled && hubActive" :active="hubTab" class="mt-3" />
     </div>
 </template>

@@ -3,7 +3,11 @@ import axios from 'axios';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
-const props = defineProps({ project: { type: Object, default: null } });
+const props = defineProps({
+    project: { type: Object, default: null },
+    routePrefix: { type: String, default: 'superadmin.broad_projects' },
+    allowStatus: { type: Boolean, default: true },
+});
 const emit = defineEmits(['saved', 'cancel']);
 const isEditing = computed(() => Boolean(props.project?.id));
 const clientSearch = ref(props.project?.client?.name || '');
@@ -61,7 +65,7 @@ async function searchClients() {
     clientPickerOpen.value = true;
     clientLoading.value = true;
     try {
-        const { data } = await axios.get(route('superadmin.broad_projects.clients'), { params: { q: term } });
+        const { data } = await axios.get(route(`${props.routePrefix}.clients`), { params: { q: term } });
         if (request === clientRequest && clientPickerOpen.value) clientOptions.value = data;
     } catch {
         if (request === clientRequest) clientOptions.value = [];
@@ -95,11 +99,12 @@ function save() {
                 form.reset();
                 form.clearErrors();
                 clearClient();
+                emit('saved');
             }
         },
     };
-    if (isEditing.value) form.put(route('superadmin.broad_projects.update', { broadProject: props.project.id }), options);
-    else form.post(route('superadmin.broad_projects.store'), options);
+    if (isEditing.value) form.put(route(`${props.routePrefix}.update`, { broadProject: props.project.id }), options);
+    else form.post(route(`${props.routePrefix}.store`), options);
 }
 </script>
 
@@ -133,10 +138,10 @@ function save() {
                 </div>
             </div>
         </div>
-        <label class="flex items-center gap-2 text-sm"><input v-model="form.is_active" type="checkbox" />簡易予定で選択できる</label>
+        <label v-if="allowStatus" class="flex items-center gap-2 text-sm"><input v-model="form.is_active" type="checkbox" />簡易予定で選択できる</label>
         <div class="flex justify-end gap-3">
             <button v-if="isEditing" type="button" class="text-sm text-gray-600 underline" @click="emit('cancel')">キャンセル</button>
-            <button type="submit" :disabled="form.processing" class="rounded bg-yellow-500 px-4 py-2 text-sm font-medium text-gray-900 disabled:opacity-50">{{ isEditing ? '変更を保存' : '登録する' }}</button>
+            <button type="submit" :disabled="form.processing" class="rounded px-4 py-2 text-sm font-medium disabled:opacity-50" :class="routePrefix.startsWith('user.') ? 'bg-blue-600 text-white' : 'bg-yellow-500 text-gray-900'">{{ isEditing ? '変更を保存' : '登録する' }}</button>
         </div>
     </form>
 </template>

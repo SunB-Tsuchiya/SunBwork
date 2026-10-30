@@ -4,7 +4,7 @@
 
 ## この台帳の使い方
 
-このファイルを横断プロジェクトの決定・証拠の入口にする。**2026-10-30の利用者判断により、現在は入力統合とユーザー導線の設計を先に進める。現行草案は `USER_WORK_HUB_PLAN1.md` / `USER_WORK_HUB_MANAGER1.md` / `USER_WORK_HUB1_PROMPT.md`。** `JOB_EVALUATION_ROADMAP1.md` の評価優先順はこの直近作業順について置換されたが、評価側の未完了判断は保留として維持する。評価側の管理は `EVALUATION_SCORE_PLAN1.md` / MANAGER / PROMPT、入力と導線の履歴は `JOB_INPUT_REVIEW_PLAN1.md` / MANAGER / PROMPT、試用分析とガイドの履歴は `WORKLOAD_REBUILD_PLAN1/2.md` と `WORKLOAD_REVIEW_PLAN3.md` を参照する。過去の経緯は `JOB_REDESIGN_FLOW_AUDIT1.md` と `JOB_SYSTEM_RETHINK_NOTES1.md`。`PERSONAL_WORK*` と `JOB_REDESIGN*` は先行試用の資料であり、現方針に反する箇所はそのまま実装しない。手元にない資料は、手元の `origin/main` に存在する場合、`git show origin/main:z_instructions/<ファイル名>` で参照する。
+このファイルを横断プロジェクトの決定・証拠の入口にする。**2026-10-30の利用者判断により、現在は入力統合とユーザー導線の設計を先に進める。現行管理は `USER_WORK_HUB_PLAN1.md` / `USER_WORK_HUB_MANAGER1.md` / `USER_WORK_HUB1_PROMPT.md`。** `JOB_EVALUATION_ROADMAP1.md` の評価優先順はこの直近作業順について置換されたが、評価側の未完了判断は保留として維持する。評価側の管理は `EVALUATION_SCORE_PLAN1.md` / MANAGER / PROMPT、入力と導線の履歴は `JOB_INPUT_REVIEW_PLAN1.md` / MANAGER / PROMPT、試用分析とガイドの履歴は `WORKLOAD_REBUILD_PLAN1/2.md` と `WORKLOAD_REVIEW_PLAN3.md` を参照する。過去の経緯は `JOB_REDESIGN_FLOW_AUDIT1.md` と `JOB_SYSTEM_RETHINK_NOTES1.md`。`PERSONAL_WORK*` と `JOB_REDESIGN*` は先行試用の資料であり、現方針に反する箇所はそのまま実装しない。手元にない資料は、手元の `origin/main` に存在する場合、`git show origin/main:z_instructions/<ファイル名>` で参照する。
 
 引継ぎ時は、まず `AGENTS.md` と本台帳を読み、次に作業対象の PLAN / MANAGER / PROMPT と実装、最新の利用者発言を照合する。作業ツリーが分岐していたら、ファイルの存在だけで最新と決めず `git status`、`git log`、`git show origin/main:<path>` で比較する。`origin/main` 自体も取得時点の参照なので、本番やリモートの最新状態と同一とは断定しない。`/tmp` の隔離作業ツリーが残るとは仮定しない。
 
@@ -521,3 +521,7 @@
 2026-10-30 大まかな案件の追加・整理権限（利用者確認済み）: 直前に提示した「追加は同部署の一般ユーザーにも許可し、既存候補の修正・休止・統合は進行管理・部署リーダー・SuperAdminに限定」の方針に利用者は「yes」と回答。先行の整理担当未決を置換する。一般ユーザーが追加した候補は同部署へ即表示する既確認方針を維持。最初の試用は情報出版SuperAdmin限定で、一般User権限の実装・公開はまだ未承認。重複・統合の具体手順、初期タブ、依頼未処理件数は次の設計事項。実装・配備の承認として扱わない。
 
 2026-10-30 仕事・案件ハブの初期表示と依頼件数（利用者確認済み）: 直前に列挙した①上段を開いたらマイジョブを初期表示、②依頼されたジョブのタブへ未登録依頼の件数を表示、の2点に利用者は「yes」と回答。前行の2点未決を置換する。件数は本人宛ての未登録割当を重複なく数え、登録済み履歴を含めない設計。現行JobBoxの登録済み判定はDB値と `supersedes_assignment_id` の動的照合を含むため、既定一覧と数字を揃える。完了済み未登録の扱いは実装前調査。次は上段タブと大まかな案件のSuperAdmin限定試用実装を先行する範囲を利用者と確認する。マイジョブBOXへの簡易記録統合、配備、一般公開の承認には拡張しない。
+
+2026-10-30 仕事・案件ハブの先行実装承認（利用者確認済み）: 直前の「5タブ導線・件数表示・大まかな案件一覧/追加を情報出版SuperAdmin限定で試用実装し、BOXへの簡易作業統合は次工程とするか」に利用者は「yes」と回答。前行の試用実装範囲未決を置換し、当該範囲だけを実装承認済みへ変更。配備・一般User公開・BOX統合は別工程。
+
+2026-10-30 仕事・案件ハブの先行実装・コード検証（配備/画面未確認）: 隔離branch feature/user-work-hub-design-20261030で専用サービスとUser一覧/追加/候補API、共通上段と5タブ、未登録依頼件数、部署内の大まかな案件検索/追加を実装。3APIはいずれも既存INFO SuperAdmin試用条件を再確認し一般Userを拒否。登録先は本人の会社部署、取引先は同社有効候補、候補重複は休止中も検出。現行一覧が完了非表示のため数字も登録済み/転換済み/最新受信または割当完了を除き、全期間・割当単位で計上。合成SQLiteメモリ6テスト45断言、変更PHP構文、実ルート、対象ESLint、Vue SSR権限別メニュー/5タブ/選択/件数/URL、/membersビルドに成功。DB移行・本番データ取得/変更なし。独立変更履歴Seederは準備のみ。次は配備する場合の本番版/別作業との差分を承認付きSSHで確認。新画面実機確認、一般公開、簡易入力のBOX統合は未完了。

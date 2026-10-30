@@ -109,6 +109,7 @@ class HandleInertiaRequests extends Middleware
             // セッション移行（login() / regenerate()）後も soft navigation で
             // meta[name="csrf-token"] が更新されるよう AppLayout が参照している。
             'csrf_token' => csrf_token(),
+            'userWorkHub' => fn () => app(\App\Services\UserWorkHub::class)->navigation($request->user()),
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
             'departmentFieldConfigs' => $departmentFieldConfigs,
             'jobFieldOptions'        => $jobFieldOptions,
