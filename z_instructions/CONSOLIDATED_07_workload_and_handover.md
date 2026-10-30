@@ -62,3 +62,5 @@ AI 引き継ぎ（Handover）
 2026-10-30 評価試用の既定: 方式未指定はV3、明示したV2は比較用として維持。簡易・詳細・ガイド・作業記録試用のリンクで選択を保持し、分析APIの未指定もV3を使用する。点数式と情報出版SuperAdmin限定は維持。旧方式アーカイブは別画面のまま保持。
 
 2026-10-30 管理用作業量分析の移設（配備状態はWORKLOAD_MANAGEMENT_MOVE_MANAGER1.md）: 各roleのworkload_analyzerで新分析を利用。Admin自社/Leader所属ユニット/SuperAdmin会社コンテキストの閲覧権限をWorkloadAnalysisAccessで解決し、PersonalWorkSchedule.availableの入力試用制限は緩めない。一般社員には今回開放しない。旧schedule配下の分析ページはSuperAdmin互換入口からrole管理画面へ案内。作業記録の試用メニューは外すがデータ/厳しいAPI権限は保持。採点式の変更/DB migrationなし。
+
+2026-10-30 Leader画面4点成功・管理移設完了: 利用者「成功」で実際のLeaderアカウントのleader/workload-analyzer配下/橙の通常レイアウト、表示対象者が所属ユニット範囲内、簡易/ガイド遷移でもleader prefix保持・独立試用項目なし、Leader dashboard戻りを全確認。これでSuperAdmin/Admin/Leaderに依頼した各4点は全成功。実装/69件286断言/本番ビルド/別作業保持での40ad992c3限定配備/今回の画面確認まで完了。未依頼の本番権限OFF・URL改変・全レスポンシブ・全アーカイブ操作を実機確認済みへ拡張しない。一般社員向け限定公開と月別コメントは未実装の別工程であり、評価全体や正式査定/全員公開の完了宣言ではない。完了したWORKLOAD_MANAGEMENT_MOVEのPLAN/MANAGER/PROMPT本体をarchivedへ移し、旧root名には履歴リンク/変更履歴design_filesの参照維持の案内だけ残す。
