@@ -67,8 +67,8 @@ onBeforeUnmount(() => { ++sequence; controller?.abort(); });
 </script>
 
 <template>
-    <section class="space-y-4" :aria-busy="loading">
-        <div class="rounded-lg border bg-white p-4">
+    <section class="grid grid-cols-1 gap-4 lg:grid-cols-2" :aria-busy="loading">
+        <div class="min-w-0 rounded-lg border bg-white p-4" :class="{ 'lg:col-span-2': loading || error || !mine }">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <h3 class="font-semibold">みんなの作業記録</h3>
                 <label class="flex items-center gap-2 text-sm">対象日
@@ -80,15 +80,15 @@ onBeforeUnmount(() => { ++sequence; controller?.abort(); });
             <p class="mt-2 text-xs text-gray-600">今日と直近4営業日を確認できます。過去日は土日・登録祝日を除きます。休日の今日も表示します。</p>
             <p class="mt-1 text-xs text-gray-600">終了した予定などの記録時間です。休憩と重複を除きます。時間の長さは成果や評価を示すものではありません。</p>
         </div>
-        <div v-if="loading" role="status" class="flex items-center gap-2 rounded-lg border bg-white p-6 text-blue-700">
+        <div v-if="loading" role="status" class="flex items-center gap-2 rounded-lg border bg-white p-6 text-blue-700 lg:col-span-2">
             <span class="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" aria-hidden="true" />作業記録を読み込んでいます…
         </div>
-        <div v-else-if="error" role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div v-else-if="error" role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 lg:col-span-2">
             {{ error }} <button type="button" class="ml-2 underline" @click="load(date)">再試行</button>
             <button type="button" class="ml-2 underline" @click="load(null)">今日を表示</button>
         </div>
         <template v-else>
-            <div v-if="mine" class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div v-if="mine" class="min-w-0 rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <h4 class="font-semibold">自分の記録を確認</h4>
                 <div class="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                     <span>記録時間：{{ duration(mine.minutes) }}</span>
@@ -99,7 +99,7 @@ onBeforeUnmount(() => { ++sequence; controller?.abort(); });
                 <p class="mt-1 text-xs text-gray-600">会議・仕事の配分・他の人の応援も、記録すると管理側の作業量確認に反映されます。作業種類が未指定でも記録時間は集計されます。</p>
                 <a :href="calendarLink" class="mt-3 inline-block rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">この日の記録を確認・入力</a>
             </div>
-            <div class="rounded-lg border bg-white p-4">
+            <div class="min-w-0 rounded-lg border bg-white p-4 lg:col-span-2">
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div class="flex flex-wrap gap-3 text-xs">
                         <span v-for="group in groups" :key="group.key" class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded" :style="{ backgroundColor: group.color }" />{{ group.label }}</span>
