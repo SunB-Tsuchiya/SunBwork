@@ -23,22 +23,32 @@ function onReady(editor) {
     quill = editor;
 
     // 貼り付けでは文字色・背景色を取り込まない（他サイトや AI の出力に付く白背景などを防ぐ）。
-    // 色はツールバーで選んだときだけ付く。初期表示（保存済み HTML の読み込み）には影響させない。
-    let pasting = false;
-    editor.root.addEventListener('paste', () => {
-        pasting = true;
-        setTimeout(() => { pasting = false; }, 0);
-    }, true);
-    editor.clipboard.addMatcher(Node.ELEMENT_NODE, (node, delta) => {
-        if (!pasting) return delta;
-        delta.ops.forEach((op) => {
-            if (op.attributes) {
-                delete op.attributes.color;
-                delete op.attributes.background;
-            }
+    // Quill に渡す前の HTML から色の指定を取り除く。色はツールバーで選んだときだけ付く。
+    // 保存済み HTML の読み込みは別経路なので影響しない。
+    editor.root.addEventListener('paste', (e) => {
+        const html = e.clipboardData?.getData('text/html');
+        if (!html) return; // プレーンテキストは Quill の標準処理
+        e.preventDefault();
+        e.stopPropagation();
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        doc.querySelectorAll('[style]').forEach((el) => {
+            el.style.removeProperty('color');
+            el.style.removeProperty('background');
+            el.style.removeProperty('background-color');
+            if (!el.getAttribute('style')?.trim()) el.removeAttribute('style');
         });
-        return delta;
-    });
+        doc.querySelectorAll('[color], [bgcolor]').forEach((el) => {
+            el.removeAttribute('color');
+            el.removeAttribute('bgcolor');
+        });
+
+        const range = editor.getSelection(true);
+        if (range.length) editor.deleteText(range.index, range.length, 'user');
+        const before = editor.getLength();
+        editor.clipboard.dangerouslyPasteHTML(range.index, doc.body.innerHTML, 'user');
+        editor.setSelection(range.index + (editor.getLength() - before), 0, 'silent');
+    }, true);
 }
 
 function onInput(html) {
