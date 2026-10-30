@@ -88,6 +88,8 @@ class ScheduleController extends Controller
             Log::error('ScheduleController dailyWorktypes: ' . $e->getMessage());
         }
 
+        $departmentWorkEnabled = app(PersonalWorkSchedule::class)->available($user);
+
         return Inertia::render('Schedule/Index', [
             'initialDate'        => $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString(),
             'overlays'           => $overlays,
@@ -99,7 +101,8 @@ class ScheduleController extends Controller
             'worktypes'          => $worktypes,
             'dailyWorktypes'     => $dailyWorktypes,
             'defaultWorktype'    => $defaultWorktype,
-            'departmentWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
+            'departmentWorkEnabled' => $departmentWorkEnabled,
+            'showDepartmentWork' => $departmentWorkEnabled && $request->query('tab') === 'work',
         ]);
     }
 

@@ -211,7 +211,7 @@ const getTopTabActive = () => {
         if (r.includes('teams')) return 'teams';
         if (r.includes('clients')) return 'clients';
         if (r.includes('workload_setting')) return 'workload_setting';
-        if (r === 'schedule.index' && page.props.departmentWorkEnabled && page.props.auth?.companyType !== 'general') return 'department_work';
+        if (r === 'schedule.index' && page.props.showDepartmentWork && page.props.departmentWorkEnabled && page.props.auth?.companyType !== 'general') return 'department_work';
         if (r === 'schedule.department_work.details') return 'workload';
         if (r.includes('workload_analyzer')) return 'workload';
         if (r.includes('project_jobs')) return 'project_jobs';
