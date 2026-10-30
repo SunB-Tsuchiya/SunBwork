@@ -438,6 +438,62 @@ class WorkloadTrialRangeTest extends TestCase
         self::assertEquals($expected,$actual['people'][0]);
     }
 
+    public function test_employee_projection_keeps_overtime_in_its_source_without_changing_points(): void
+    {
+        $this->insert('event_item_types', ['id' => 2, 'slug' => 'other']);
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2,
+            'starts_at' => '2026-10-29 17:00:00', 'ends_at' => '2026-10-29 19:00:00']);
+        $this->insert('work_records', ['id' => 1, 'user_id' => 1, 'date' => '2026-10-29',
+            'start_time' => '09:00', 'end_time' => '19:00', 'scheduled_end' => '18:00', 'overtime_minutes' => 60]);
+        $analysis = new WorkloadTrialAnalysis(new PersonalWorkSchedule());
+        $start = Carbon::parse('2026-10-29', 'Asia/Tokyo')->startOfDay();
+        $end = $start->copy()->endOfDay();
+        $normal = $analysis->analyze($this->user, collect([$this->user]), $start, $end, false, 'trial_time_v3')[0];
+        $employee = $analysis->analyze($this->user, collect([$this->user]), $start, $end, false, 'trial_time_v3', false)[0];
+        self::assertSame($normal['points'], $employee['points']);
+        self::assertSame($normal['minutes'], $employee['minutes']);
+        self::assertSame(60, $normal['time_breakdown_minutes']['overtime']);
+        self::assertSame(0, $employee['time_breakdown_minutes']['overtime']);
+        self::assertSame(120, $employee['time_breakdown_minutes']['other']);
+        self::assertSame(120, array_sum($employee['time_breakdown_minutes']));
+    }
+
+    public function test_department_preview_returns_same_department_only_and_no_management_or_private_fields(): void
+    {
+        $db = $this->database->getConnection();
+        $db->statement('alter table users add column sort_order integer default 0');
+        $db->statement('alter table users add column assignment_id integer');
+        $db->statement('create table assignments (id integer primary key, code text, name text)');
+        $db->statement('create table user_settings (id integer primary key, user_id integer, worktype_id integer)');
+        $db->statement('create table user_employment_settings (id integer primary key, user_id integer)');
+        $this->insert('departments', ['id' => 1, 'company_id' => 1, 'code' => 'INFO']);
+        $this->insert('users', ['id' => 2, 'name' => 'Other department', 'company_id' => 1, 'department_id' => 2]);
+        $this->insert('users', ['id' => 3, 'name' => 'Other company', 'company_id' => 2, 'department_id' => 1]);
+        $this->user->user_role = 'superadmin';
+        $this->insert('event_item_types', ['id' => 2, 'slug' => 'other']);
+        $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2,
+            'starts_at' => '2026-10-29 09:00:00', 'ends_at' => '2026-10-29 10:00:00', 'visibility' => 'private']);
+        $holidays = $this->createMock(\App\Services\ClerkCalendarHolidays::class);
+        $holidays->method('forCompany')->willReturn([]);
+        $schedule = new PersonalWorkSchedule();
+        $service = new \App\Services\DepartmentWorkRecords($schedule, new WorkloadTrialAnalysis($schedule), $holidays);
+        $result = $service->records($this->user, '2026-10-29');
+        self::assertCount(1, $result['people']);
+        self::assertSame(['id', 'name', 'minutes', 'breakdown'], array_keys($result['people'][0]));
+        self::assertSame(60, $result['people'][0]['minutes']);
+        self::assertSame(60, array_sum($result['people'][0]['breakdown']));
+        self::assertSame(['minutes', 'unclassified_minutes', 'gap_minutes'], array_keys($result['mine']));
+        self::assertNull($result['mine']['gap_minutes']);
+        self::assertStringNotContainsString('points', json_encode($result));
+        self::assertStringNotContainsString('visibility', json_encode($result));
+        self::assertStringNotContainsString('title', json_encode($result));
+        $this->insert('work_records', ['id' => 1, 'user_id' => 1, 'date' => '2026-10-29', 'start_time' => '09:00', 'end_time' => '11:00']);
+        $withAttendance = $service->records($this->user, '2026-10-29');
+        self::assertSame(60, $withAttendance['mine']['gap_minutes']);
+        self::assertSame(0, $withAttendance['mine']['unclassified_minutes']);
+
+    }
+
     private function analyze(string $from, string $to, string $version = 'trial_time_v3'): array
     {
         return (new WorkloadTrialAnalysis(new PersonalWorkSchedule()))->analyze($this->user, collect([$this->user]),

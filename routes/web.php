@@ -1647,6 +1647,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
             ->name('index');
 
         Route::get('/department-work', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'index'])->name('department_work.index');
+        Route::get('/department-work/records', \App\Http\Controllers\Schedule\DepartmentWorkRecordsController::class)->name('department_work.records');
         Route::get('/department-work/options', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'options'])->name('department_work.options');
         Route::get('/department-work/mine', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'mine'])->name('department_work.mine');
         Route::get('/department-work/analysis', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysis'])->name('department_work.analysis');

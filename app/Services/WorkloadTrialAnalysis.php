@@ -34,7 +34,7 @@ class WorkloadTrialAnalysis
 
     public function __construct(private PersonalWorkSchedule $schedule) {}
 
-    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false, string $scoreVersion = 'trial_time_v2'): array
+    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false, string $scoreVersion = 'trial_time_v2', bool $separateOvertime = true): array
     {
         $v3 = $scoreVersion === 'trial_time_v3';
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
@@ -371,7 +371,7 @@ class WorkloadTrialAnalysis
                         if ($minute >= $overtimeRange[0] && $minute < $overtimeRange[1]) $covered++;
                     }
                     $recognized = min((int) $work->overtime_minutes, $covered);
-                    if ($covered > 0 && $recognized > 0) {
+                    if ($separateOvertime && $covered > 0 && $recognized > 0) {
                         $ratio = $recognized / $covered;
                         foreach ($ledger['overtime_breakdown_minutes'] as $group => $groupMinutes) {
                             $timeBreakdown[$group] -= $groupMinutes * $ratio;

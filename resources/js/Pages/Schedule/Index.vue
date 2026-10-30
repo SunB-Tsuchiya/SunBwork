@@ -2,8 +2,9 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import ScheduleCalendar from '@/Components/Schedule/ScheduleCalendar.vue';
 import DepartmentWorkBoard from '@/Components/Schedule/DepartmentWorkBoard.vue';
+import DepartmentWorkRecords from '@/Components/Schedule/DepartmentWorkRecords.vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     initialDate:        { type: String, default: '' },
@@ -25,6 +26,14 @@ const isGeneral = computed(() => usePage().props.auth?.companyType === 'general'
 const workEnabled = computed(() => props.departmentWorkEnabled && !isGeneral.value);
 
 const boardVisible = computed(() => workEnabled.value && props.showDepartmentWork);
+const departmentTab = ref(new URLSearchParams(window.location.search).get('view') === 'records' ? 'records' : 'plans');
+function selectDepartmentTab(value, today = false) {
+    departmentTab.value = value;
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', value);
+    if (today) url.searchParams.delete('record_date');
+    window.history.replaceState(window.history.state, '', url);
+}
 const pageTitle = computed(() => boardVisible.value ? '部署の作業' : '予定表');
 </script>
 
@@ -39,7 +48,19 @@ const pageTitle = computed(() => boardVisible.value ? '部署の作業' : '予�
             </div>
         </template>
 
-        <DepartmentWorkBoard v-if="boardVisible" :initial-date="initialDate" />
+        <div v-if="boardVisible">
+            <div role="group" aria-label="部署の作業の表示" class="mb-3 flex flex-wrap gap-2 border-b border-gray-200">
+                <button v-for="item in [['plans', '部署の作業予定'], ['records', 'みんなの作業記録']]" :key="item[0]" type="button" :aria-pressed="departmentTab === item[0]" class="rounded-t px-4 py-2 text-sm font-semibold" :class="departmentTab === item[0] ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="selectDepartmentTab(item[0])">{{ item[1] }}</button>
+            </div>
+            <template v-if="departmentTab === 'plans'">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2 text-sm">
+                    <span>会議・仕事の配分・応援も、記録すると仕事の内容が伝わります。</span>
+                    <button type="button" class="font-semibold text-blue-700 underline" @click="selectDepartmentTab('records', true)">今日の記録を確認</button>
+                </div>
+                <DepartmentWorkBoard :initial-date="initialDate" />
+            </template>
+            <DepartmentWorkRecords v-else />
+        </div>
         <template v-else>
         <!-- 会議室予約テスト中バナー -->
         <div class="mb-2 flex items-center gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
