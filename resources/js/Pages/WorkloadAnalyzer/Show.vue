@@ -8,6 +8,10 @@ import { computed, onMounted, ref } from 'vue';
 
 const page = usePage();
 const routePrefix = computed(() => {
+    try {
+        const prefix = String(route().current() || '').split('.')[0];
+        if (['superadmin', 'admin', 'leader'].includes(prefix)) return prefix;
+    } catch { /* Keep the authenticated role fallback. */ }
     const role = page.props.auth?.user?.user_role ?? 'leader';
     if (role === 'superadmin') return 'superadmin';
     if (role === 'admin') return 'admin';

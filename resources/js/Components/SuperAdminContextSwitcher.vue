@@ -26,7 +26,15 @@ async function switchContext(companyId) {
 
   try {
     await axios.post(route('superadmin.switch_context'), { company_id: companyId })
-    window.location.reload()
+    if (page.props.analysisContext) {
+      // The selected company's departments are resolved again by the analysis server.
+      const nextUrl = new URL(window.location.href)
+      nextUrl.searchParams.delete('company_id')
+      nextUrl.searchParams.delete('department_id')
+      window.location.assign(nextUrl.toString())
+    } else {
+      window.location.reload()
+    }
   } catch (_) {
     switching.value = false
   }

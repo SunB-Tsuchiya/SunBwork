@@ -72,13 +72,6 @@ const tabs = computed(() => [
         condition: typeof route === 'function' && route().has('superadmin.workload_analyzer.index'),
     },
     {
-        key: 'work_record_trial',
-        href: tryRoute('schedule.work_record_trial.page'),
-        label: '作業記録の試用',
-        newTab: true,
-        condition: canAccessWorkRecordTrial.value && typeof route === 'function' && route().has('schedule.work_record_trial.page'),
-    },
-    {
         key: 'broad_projects',
         href: tryRoute('superadmin.broad_projects.index'),
         label: '大まかな案件',
@@ -215,15 +208,6 @@ function onMobileSelect(e) {
                 :class="tab('workload')"
             >
                 作業量分析
-            </a>
-            <a
-                v-if="canAccessWorkRecordTrial && typeof route === 'function' && route().has('schedule.work_record_trial.page')"
-                :href="route('schedule.work_record_trial.page')"
-                target="_blank"
-                rel="noopener noreferrer"
-                :class="tab('work_record_trial')"
-            >
-                作業記録の試用
             </a>
             <Link
                 v-if="canAccessWorkRecordTrial && typeof route === 'function' && route().has('superadmin.broad_projects.index')"

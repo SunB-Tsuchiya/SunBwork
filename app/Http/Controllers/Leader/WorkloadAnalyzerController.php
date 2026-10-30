@@ -31,19 +31,22 @@ class WorkloadAnalyzerController extends Controller
 
     public function index(Request $request)
     {
-        if ($request->routeIs('superadmin.workload_analyzer.index')
-            && app(\App\Services\PersonalWorkSchedule::class)->available($request->user())) {
-            return redirect()->route('schedule.department_work.details');
+        $prefix = explode('.', (string) $request->route()->getName())[0];
+        app(\App\Services\WorkloadAnalysisAccess::class)->authorize($request->user(), $prefix);
+        $params = $request->query();
+        if (! isset($params['date']) && is_string($params['ym'] ?? null) && preg_match('/^\d{4}-\d{2}$/', $params['ym'])) {
+            $params['date'] = $params['ym'].'-01';
         }
+        unset($params['ym']);
+        $page = $request->routeIs('*.workload_analyzer.category_rank') ? 'results' : 'details';
 
-        return $this->legacyIndex($request,
-            $request->routeIs('superadmin.workload_analyzer.category_rank')
-                && app(\App\Services\PersonalWorkSchedule::class)->available($request->user()));
+        return redirect()->route($prefix.'.workload_analyzer.'.$page, $params);
     }
 
     public function archive(Request $request)
     {
-        abort_unless(app(\App\Services\PersonalWorkSchedule::class)->available($request->user()), 403);
+        $prefix = explode('.', (string) $request->route()->getName())[0];
+        app(\App\Services\WorkloadAnalysisAccess::class)->authorize($request->user(), $prefix);
 
         return $this->legacyIndex($request, true);
     }
@@ -707,6 +710,7 @@ class WorkloadAnalyzerController extends Controller
 
     public function show(Request $request, $userId)
     {
+        app(\App\Services\WorkloadAnalysisAccess::class)->assertUserVisible($request, (int) $userId);
         $this->requireAdminPermission('workload_analysis');
         $this->requireLeaderPermission('workload_analysis');
         $ym = $request->query('ym') ?: now()->format('Y-m');

@@ -60,3 +60,5 @@ AI 引き継ぎ（Handover）
 2026-10-30 評価試用: 全作業区分の共通項目 `intake_allocation` の表示名を「受付・仕事の配分・担当調整」へ変更（旧「受付・差配」）。配分/担当調整を記録した時間は既存の通常係数1.0で算入。管理人数による自動加点は追加しない。コード値と既存記録は保持する。
 
 2026-10-30 評価試用の既定: 方式未指定はV3、明示したV2は比較用として維持。簡易・詳細・ガイド・作業記録試用のリンクで選択を保持し、分析APIの未指定もV3を使用する。点数式と情報出版SuperAdmin限定は維持。旧方式アーカイブは別画面のまま保持。
+
+2026-10-30 管理用作業量分析の移設（配備状態はWORKLOAD_MANAGEMENT_MOVE_MANAGER1.md）: 各roleのworkload_analyzerで新分析を利用。Admin自社/Leader所属ユニット/SuperAdmin会社コンテキストの閲覧権限をWorkloadAnalysisAccessで解決し、PersonalWorkSchedule.availableの入力試用制限は緩めない。一般社員には今回開放しない。旧schedule配下の分析ページはSuperAdmin互換入口からrole管理画面へ案内。作業記録の試用メニューは外すがデータ/厳しいAPI権限は保持。採点式の変更/DB migrationなし。

@@ -2,14 +2,14 @@
 
 2026-10-30 JST。AGENTS.md → JOB_EVALUATION_CONTROL1.md → JOB_EVALUATION_ROADMAP1.md → WORKLOAD_MANAGEMENT_MOVE_PLAN1.md → MANAGER1を読む。
 
-利用者依頼: SuperAdminの現行V3反映版をAdmin/Leaderの「作業量分析」へ置換。3ロールのprefix・色・レイアウト・戻り先を合わせる。「作業記録の試用」は不要。一般社員向け公開は別工程。**デプロイは別途許可があるまで実行しない。**
+利用者は計画を「hai」で承認。3ロール管理画面への移設はコード実装・非破壊検証・本番用ビルドまで完了。**デプロイは利用者の別途許可前なので未実施。次は成果物の報告と許可待ち。**
 
-現在は調査/計画作成まででコード未変更。AGENTS.mdの大規模作業確認待ち。Adminは既存の自社範囲、Leaderは既存ユニットメンバー範囲を維持し、権限OFF/別会社/対象外ユーザーをAPIでも拒否する。既存PersonalWorkSchedule.availableを緩めると入力権限まで広がるので禁止。V3既定/V2比較/点数式/記録/非公開保護は維持。
+専用ブランチ: feature/workload-management-move-20261030。作業ツリー: /tmp/sunbwork-evaluation-c7-20261030。最後に確認した既存さくら版f5a327635。共有メイン6af669c89は別作業でdirty、触らない。origin/mainは調査時e94584ee3。最新の保存コミットを確認して再開し、一時ツリーの存在を仮定しない。
 
-AppLayout(fluid)を使い、戻り先をrole dashboardへ。role別workload_analyzerの新読取ルート、動的な画面/APIリンク、必要な会社/部署選択を用意。旧予定表入口はSuperAdmin互換として扱い、一般公開しない。独立試用メニューを外すが既存データ/履歴は削除しない。旧方式アーカイブは比較用として保存。
+WorkloadAnalysisAccessでAdmin自社/Leader所属ユニット/SuperAdmin会社コンテキストをGET専用に解決。DepartmentWorkControllerはGETのreadContextだけ分離し、管理用Controllerで差替え。入力側のavailableや点数計算は変更なし。各roleにresults/details/analysis/person_schedule/guide/archive。index/category入口は同prefixへ。AppLayout(fluid)、黄/赤/橙、dashboard戻り、許可された会社/部署候補、日付/方式リンク保持。旧schedule分析ページはSuperAdmin互換の管理用入口へ。一般社員は入れない。
 
-最後の作業場所: /tmp/sunbwork-evaluation-c7-20261030、review/evaluation-c7-20261030。前回配備f5a327635。最新管理資料とブランチを照合してから進める。一時ツリーが消える場合がある。共有メイン6af669c89は別作業でdirty、変更/リセットしない。
+試用タブとSuperAdminメニューの「作業記録の試用」は撤去したが、既存記録と保護されたAPIは残す。旧アーカイブは保持し月切替とrole prefixを修正、旧個人直リンクも認可する。SuperAdminの会社切替は分析画面だけ旧company_id/department_idを解除し日付/期間/方式を保持。
 
-PHP CLIなし/DockerのWSL統合停止が直近の実行環境。認可の合成検証とPHP構文を本番DBなしで実行できる環境を確認する。ESLint・ルート変更後のZiggy・/members本番ビルド・manifest確認を完了し、未検証は明記する。tests/実装/配備/画面確認を混同しない。月別コメントは構想のみ後工程。
+検証: SQLiteメモリ69件286断言成功。実Laravelルート照合、Ziggy再生成、role/方式/リンク/スコープ切替のJS直接実行、PHP対象構文・ESLintエラー0、本番用Viteとmanifest欠落0成功。旧Show.vueに既存unused警告1件。ブラウザ画面/本番/実アカウントの確認は未実施。詳細な実行環境と証拠はMANAGERを参照。
 
-次の1手: 計画の確認回答を得て、閲覧スコープ/APIから実装。デプロイの承認を先に求める段階ではない。
+変更履歴はWorkloadManagementMoveChangelogSeederのみ実行する専用手順を用意する。migrationなし。配備許可後も正確なSSHコマンド提示/承認を得て、現在版・変更・別作業を確認して限定反映する。一般社員公開・月別コメントは今回実装しない。

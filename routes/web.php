@@ -606,9 +606,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // Admin: Workload Analyzer (company-wide)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
+        Route::get('workload-analyzer/archive', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'archive'])->name('workload_analyzer.archive');
+        // Read-only V3 management analysis. Static routes precede the legacy {user} route.
+        Route::get('workload-analyzer/results', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'analysisPage'])->name('workload_analyzer.results');
+        Route::get('workload-analyzer/details', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'detailPage'])->name('workload_analyzer.details');
+        Route::get('workload-analyzer/analysis', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'analysis'])->name('workload_analyzer.analysis');
+        Route::get('workload-analyzer/person-schedule', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'index'])->name('workload_analyzer.person_schedule');
         // Register static routes before the parameterized {user} route
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
-        Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
+        Route::get('workload-analyzer/guide', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'guidePage'])->name('workload_analyzer.guide');
         Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
         Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
@@ -744,9 +750,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
         // SuperAdmin: Workload Analyzer (global)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
+        // Read-only V3 management analysis. Static routes precede the legacy {user} route.
+        Route::get('workload-analyzer/results', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'analysisPage'])->name('workload_analyzer.results');
+        Route::get('workload-analyzer/details', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'detailPage'])->name('workload_analyzer.details');
+        Route::get('workload-analyzer/analysis', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'analysis'])->name('workload_analyzer.analysis');
+        Route::get('workload-analyzer/person-schedule', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'index'])->name('workload_analyzer.person_schedule');
         Route::get('workload-analyzer/archive', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'archive'])->name('workload_analyzer.archive');
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
-        Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
+        Route::get('workload-analyzer/guide', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'guidePage'])->name('workload_analyzer.guide');
 
         // SuperAdmin: スクリプト管理
         Route::get('scripts', [App\Http\Controllers\SuperAdmin\ScriptManagementController::class, 'index'])->name('scripts.index');
@@ -787,9 +798,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('diaryinteractions/mark-read-all', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markReadAll'])->name('diaryinteractions.mark_read_all');
         // Leader: Workload Analyzer (show company/department/team members and analysis placeholders)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
+        Route::get('workload-analyzer/archive', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'archive'])->name('workload_analyzer.archive');
+        // Read-only V3 management analysis. Static routes precede the legacy {user} route.
+        Route::get('workload-analyzer/results', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'analysisPage'])->name('workload_analyzer.results');
+        Route::get('workload-analyzer/details', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'detailPage'])->name('workload_analyzer.details');
+        Route::get('workload-analyzer/analysis', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'analysis'])->name('workload_analyzer.analysis');
+        Route::get('workload-analyzer/person-schedule', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'index'])->name('workload_analyzer.person_schedule');
         // ensure static routes are registered before the parameterized {user} route
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
-        Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
+        Route::get('workload-analyzer/guide', [App\Http\Controllers\Management\WorkloadAnalysisController::class, 'guidePage'])->name('workload_analyzer.guide');
         Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
         Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');

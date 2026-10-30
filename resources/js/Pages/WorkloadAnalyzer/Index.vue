@@ -144,23 +144,16 @@ function getDeptRows(dept) {
     return sorted;
 }
 
-// determine role-based prefix for routes (fallback to leader)
-// be defensive: page.props or page.props.value may be undefined during hydration
-const authUser = page?.props?.value?.auth?.user || page?.props?.value?.user || {};
-const userRole = authUser?.user_role || authUser?.role || (authUser?.roles && authUser.roles[0]) || '';
-const rolePrefix = (() => {
-    const r = String(userRole || '').toLowerCase();
-    if (r.includes('super')) return '/superadmin';
-    if (r.includes('admin')) return '/admin';
-    // leader, coordinator, default -> leader
-    return '/leader';
-})();
+// Retain the actual role area, including SuperAdmin visiting an Admin route.
 const routeNamePrefix = (() => {
-    const r = String(userRole || '').toLowerCase();
-    if (r.includes('super')) return 'superadmin';
-    if (r.includes('admin')) return 'admin';
-    return 'leader';
+    try {
+        const prefix = String(route().current() || '').split('.')[0];
+        if (['superadmin', 'admin', 'leader'].includes(prefix)) return prefix;
+    } catch { /* Use authenticated role only when no route context is available. */ }
+    const role = page.props.auth?.user?.user_role || page.props.user?.user_role;
+    return ['superadmin', 'admin'].includes(role) ? role : 'leader';
 })();
+const rolePrefix = `/${routeNamePrefix}`;
 
 // build a small list of months around current month (last 12 months)
 const months = [];
@@ -196,7 +189,7 @@ function goToCategoryRank() {
 function changeYm() {
     const ym = selectedYm.value || currentMonth;
     try {
-        const routeName = `${routeNamePrefix}.workload_analyzer.index`;
+        const routeName = `${routeNamePrefix}.workload_analyzer.${props.legacyArchive ? 'archive' : 'index'}`;
         Inertia.get(route(routeName, { ym }));
         return;
     } catch (e) {
@@ -376,7 +369,7 @@ function formatOvertimeMinutes(min) {
 
         <div v-if="legacyArchive" class="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
             <strong>旧方式の参照用画面です。</strong> ページ数を複数項目へ反映した旧算式で、現在のDBから再計算します。過去時点の固定記録ではありません。
-            <Link :href="route('schedule.department_work.details')" class="ml-2 font-semibold text-blue-700 underline">新しい作業量分析へ</Link>
+            <Link :href="route(`${routeNamePrefix}.workload_analyzer.details`, { date: `${selectedYm}-01` })" class="ml-2 font-semibold text-blue-700 underline">新しい作業量分析へ</Link>
         </div>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">

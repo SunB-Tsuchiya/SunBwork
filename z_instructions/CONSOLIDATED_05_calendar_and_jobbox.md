@@ -306,3 +306,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 - **案件の予定の色**: **状態色を優先**（完了＝緑・期限超過＝赤・期限が近い＝黄）。**通常のときだけ**、予定に選んだ種類の色（`project_schedules.color_key`）。`scheduleStatusColor()` は `kind`（done/overdue/soon/normal）も返す。`color_key` が空なら、今の青のまま。色を送らない更新（ドラッグ移動など）では、色は変わらない。
 - **DB**: `team_calendar_colors` / `project_calendar_colors`（外部キー名は短く明示）、`team_events.color_key` / `completed_at`、`project_schedules.color_key`。
 - **テスト**: `tests/Feature/TeamRoom/TeamCalendarTest.php`、`tests/Feature/ProjectCalendarTest.php`。
+
+2026-10-30 管理用作業量分析の移設（配備状態はWORKLOAD_MANAGEMENT_MOVE_MANAGER1.md）: 各roleのworkload_analyzerで新分析を利用。Admin自社/Leader所属ユニット/SuperAdmin会社コンテキストの閲覧権限をWorkloadAnalysisAccessで解決し、PersonalWorkSchedule.availableの入力試用制限は緩めない。一般社員には今回開放しない。旧schedule配下の分析ページはSuperAdmin互換入口からrole管理画面へ案内。作業記録の試用メニューは外すがデータ/厳しいAPI権限は保持。採点式の変更/DB migrationなし。

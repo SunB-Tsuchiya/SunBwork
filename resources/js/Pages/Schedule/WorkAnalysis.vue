@@ -1,7 +1,8 @@
 <script setup>
 import axios from 'axios';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { route } from 'ziggy-js';
+import useWorkloadAnalysisContext from '@/Composables/useWorkloadAnalysisContext';
+const { analysisRoute, activeClass } = useWorkloadAnalysisContext();
 import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
 import { workCategories, workActivities, activityLabel } from '@/Constants/personalWorkActivities';
@@ -246,7 +247,7 @@ async function load() {
         return;
     }
     try {
-        const { data } = await axios.get(route('schedule.department_work.analysis'), {
+        const { data } = await axios.get(analysisRoute('analysis'), {
             params: { date: date.value, period: period.value, score_version: scoreVersion.value },
         });
         if (sequence !== loadSequence) return;
@@ -289,10 +290,10 @@ async function loadPerson(person, selectedPeriod, selectedDate) {
     personError.value = '';
     personLoading.value = true;
     try {
-        const requests = [axios.get(route('schedule.department_work.analysis'), {
+        const requests = [axios.get(analysisRoute('analysis'), {
             params: { date: selectedDate, period: selectedPeriod, user_id: person.id, score_version: scoreVersion.value },
         })];
-        if (selectedPeriod === 'day') requests.push(axios.get(route('schedule.department_work.index'), { params: { date: selectedDate, user_id: person.id } }));
+        if (selectedPeriod === 'day') requests.push(axios.get(analysisRoute('person_schedule'), { params: { date: selectedDate, user_id: person.id } }));
         const [analysisResponse, scheduleResponse] = await Promise.all(requests);
         if (sequence !== personSequence) return;
         selectedPerson.value = analysisResponse.data.people?.[0] || null;
@@ -351,7 +352,7 @@ function backToPersonPeriod() {
 }
 
 watch([date, period, scoreVersion], () => {
-    const url = route('schedule.department_work.results', { date: date.value, period: period.value, score_version: scoreVersion.value });
+    const url = analysisRoute('results', { date: date.value, period: period.value, score_version: scoreVersion.value });
     window.history.replaceState(window.history.state, '', url);
     closePerson();
     load();
@@ -406,7 +407,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <span class="font-medium text-gray-700">採点方式</span>
-                <button v-for="[value, label] in [['trial_time_v3', '標準の試算（V3）'], ['trial_time_v2', '従来の試用点（比較用）']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? 'border-blue-600 bg-blue-50 text-blue-800' : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
+                <button v-for="[value, label] in [['trial_time_v3', '標準の試算（V3）'], ['trial_time_v2', '従来の試用点（比較用）']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? activeClass : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
                 <span class="text-gray-600">新しい試算は比較用で、過去の記録を変更しません。</span>
             </div>
             <p v-if="period === 'week' && selectedWeekRange" class="mt-2 text-xs font-medium text-blue-800">対象週：{{ selectedWeekRange }}</p>
