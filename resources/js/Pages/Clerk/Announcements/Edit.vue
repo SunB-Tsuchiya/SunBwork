@@ -1,13 +1,16 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
+import RecipientPicker from '@/Components/Clerk/RecipientPicker.vue';
+import SimpleRichText from '@/Components/Common/SimpleRichText.vue';
 import * as pdfjsLib from 'pdfjs-dist';
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
 
 const props = defineProps({
     announcement: Object,
     users:        { type: Array,  default: null },
+    showBlocks:   { type: Boolean, default: false },
     companies:    { type: Array,  default: null },
 });
 
@@ -19,9 +22,8 @@ const canCrossCompany = computed(() => page.props.auth?.featureFlags?.crossCompa
 
 const selectedCompanyIds = ref([]);
 const targetType = ref(props.announcement.target_type ?? 'all');
+const targetBlock = ref(props.announcement.target_block ?? 'all');
 const selectedUserIds = ref([...(props.announcement.recipient_ids ?? [])]);
-const showModal = ref(false);
-const employmentFilter = ref('all');
 
 const scopedUsers = computed(() => {
     if (!canCrossCompany.value || selectedCompanyIds.value.length === 0) return props.users ?? [];
@@ -33,36 +35,6 @@ function toggleCompany(id) {
     if (idx === -1) selectedCompanyIds.value.push(id); else selectedCompanyIds.value.splice(idx, 1);
     selectedUserIds.value = [];
 }
-
-const modalSortKey = ref('name');
-const modalSortAsc = ref(true);
-function toggleSort(key) {
-    if (modalSortKey.value === key) modalSortAsc.value = !modalSortAsc.value;
-    else { modalSortKey.value = key; modalSortAsc.value = true; }
-}
-function companyName(id) { return props.companies?.find(c => c.id === id)?.name ?? ''; }
-
-const employmentLabel = (type) => ({ regular: '正社員', contract: '契約社員', dispatch: '派遣', outsource: '業務委託' }[type] ?? type);
-
-const filteredModalUsers = computed(() => {
-    let base = scopedUsers.value;
-    if (employmentFilter.value === 'employees') base = base.filter(u => ['regular', 'contract'].includes(u.employment_type));
-    else if (employmentFilter.value === 'dispatch') base = base.filter(u => ['dispatch', 'outsource'].includes(u.employment_type));
-    return [...base].sort((a, b) => {
-        const va = modalSortKey.value === 'company' ? companyName(a.company_id) : a.name;
-        const vb = modalSortKey.value === 'company' ? companyName(b.company_id) : b.name;
-        return modalSortAsc.value ? va.localeCompare(vb, 'ja') : vb.localeCompare(va, 'ja');
-    });
-});
-
-watch(targetType, (v) => { if (v !== 'individual') selectedUserIds.value = []; });
-
-function toggleUser(id) {
-    const idx = selectedUserIds.value.indexOf(id);
-    if (idx === -1) selectedUserIds.value.push(id); else selectedUserIds.value.splice(idx, 1);
-}
-const selectAll = () => { selectedUserIds.value = filteredModalUsers.value.map(u => u.id); };
-const clearAll  = () => { selectedUserIds.value = []; };
 
 // ── フォーム ────────────────────────────────────────────────
 const form = ref({
@@ -125,6 +97,7 @@ function buildFormData() {
     form.value.attachments.forEach(f => data.append('attachments[]', f));
     if (isDraft.value) {
         data.append('target_type', targetType.value);
+        data.append('target_block', targetBlock.value);
         if (canCrossCompany.value && selectedCompanyIds.value.length === 1) {
             data.append('target_company_id', selectedCompanyIds.value[0]);
         }
@@ -182,27 +155,16 @@ function submit() {
                         </div>
                     </div>
                     <!-- 宛先種別 -->
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">宛先</label>
-                        <div class="flex gap-4">
-                            <label class="flex cursor-pointer items-center gap-1.5">
-                                <input type="radio" v-model="targetType" value="all" class="text-purple-600" /><span class="text-sm">全員</span>
-                            </label>
-                            <label class="flex cursor-pointer items-center gap-1.5">
-                                <input type="radio" v-model="targetType" value="employees_only" class="text-purple-600" /><span class="text-sm">社員のみ</span>
-                            </label>
-                            <label class="flex cursor-pointer items-center gap-1.5">
-                                <input type="radio" v-model="targetType" value="individual" class="text-purple-600" /><span class="text-sm">個別選択</span>
-                            </label>
-                        </div>
-                        <div v-if="targetType === 'individual'" class="mt-3">
-                            <button type="button" @click="showModal = true"
-                                class="rounded border border-purple-400 px-3 py-1.5 text-sm text-purple-700 hover:bg-purple-50">
-                                ユーザーを選択する
-                            </button>
-                            <span v-if="selectedUserIds.length > 0" class="ml-2 text-sm text-gray-600">{{ selectedUserIds.length }}人選択中</span>
-                        </div>
-                    </div>
+                    <RecipientPicker
+                        v-model:target-type="targetType"
+                        v-model:block="targetBlock"
+                        :show-blocks="showBlocks"
+                        v-model:user-ids="selectedUserIds"
+                        :users="scopedUsers"
+                        :companies="companies"
+                        :show-company="canCrossCompany"
+                        accent="purple"
+                    />
                 </template>
 
                 <!-- タイトル -->
@@ -217,8 +179,7 @@ function submit() {
                 <!-- 内容 -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>
-                    <textarea v-model="form.content" rows="8"
-                        class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"></textarea>
+                    <SimpleRichText v-model="form.content" />
                     <p v-if="errors.content" class="mt-1 text-xs text-red-500">{{ errors.content }}</p>
                 </div>
 
@@ -287,63 +248,6 @@ function submit() {
                 </div>
             </form>
         </div>
-
-        <!-- ユーザー選択モーダル（下書きのみ） -->
-        <Teleport to="body">
-            <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div class="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
-                    <div class="flex items-center justify-between border-b px-6 py-4">
-                        <h3 class="text-lg font-semibold text-gray-800">送信先ユーザーを選択</h3>
-                        <button @click="showModal = false" class="text-gray-400 hover:text-gray-600">✕</button>
-                    </div>
-                    <div class="flex items-center gap-3 border-b bg-gray-50 px-6 py-3">
-                        <span class="text-sm text-gray-600">絞り込み:</span>
-                        <label class="flex cursor-pointer items-center gap-1 text-sm"><input type="radio" v-model="employmentFilter" value="all" class="text-purple-600" /> 全員</label>
-                        <label class="flex cursor-pointer items-center gap-1 text-sm"><input type="radio" v-model="employmentFilter" value="employees" class="text-purple-600" /> 正社員・契約社員</label>
-                        <label class="flex cursor-pointer items-center gap-1 text-sm"><input type="radio" v-model="employmentFilter" value="dispatch" class="text-purple-600" /> 派遣・業務委託</label>
-                        <div class="ml-auto flex gap-2">
-                            <button @click="selectAll" class="text-xs text-purple-600 hover:underline">全選択</button>
-                            <button @click="clearAll" class="text-xs text-gray-500 hover:underline">解除</button>
-                        </div>
-                    </div>
-                    <div class="flex-1 overflow-y-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="sticky top-0 bg-gray-50">
-                                <tr>
-                                    <th class="w-10 px-4 py-2"></th>
-                                    <th class="cursor-pointer select-none px-4 py-2 text-left text-xs font-medium text-gray-500 hover:text-gray-700" @click="toggleSort('name')">
-                                        名前 <span v-if="modalSortKey==='name'">{{ modalSortAsc ? '▲' : '▼' }}</span>
-                                    </th>
-                                    <th v-if="canCrossCompany" class="cursor-pointer select-none px-4 py-2 text-left text-xs font-medium text-gray-500 hover:text-gray-700" @click="toggleSort('company')">
-                                        会社 <span v-if="modalSortKey==='company'">{{ modalSortAsc ? '▲' : '▼' }}</span>
-                                    </th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">担当</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">雇用形態</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                <tr v-for="u in filteredModalUsers" :key="u.id"
-                                    class="cursor-pointer hover:bg-purple-50"
-                                    :class="selectedUserIds.includes(u.id) ? 'bg-purple-50' : ''"
-                                    @click="toggleUser(u.id)">
-                                    <td class="px-4 py-2 text-center">
-                                        <input type="checkbox" :checked="selectedUserIds.includes(u.id)" @click.stop="toggleUser(u.id)" class="rounded text-purple-600" />
-                                    </td>
-                                    <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ u.name }}</td>
-                                    <td v-if="canCrossCompany" class="px-4 py-2 text-xs text-gray-500">{{ companyName(u.company_id) }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-600">{{ u.assignment_name }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-600">{{ employmentLabel(u.employment_type) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="flex items-center justify-between border-t px-6 py-4">
-                        <span class="text-sm text-gray-600">{{ selectedUserIds.length }}人選択中</span>
-                        <button @click="showModal = false" class="rounded bg-purple-600 px-5 py-2 text-sm font-medium text-white hover:bg-purple-700">確定</button>
-                    </div>
-                </div>
-            </div>
-        </Teleport>
 
         <!-- ライトボックス -->
         <Teleport to="body">

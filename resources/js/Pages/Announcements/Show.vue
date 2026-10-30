@@ -1,4 +1,5 @@
 <script setup>
+import RichTextView from '@/Components/Common/RichTextView.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
@@ -66,9 +67,7 @@ onMounted(async () => {
                 <h3 class="mb-4 text-xl font-bold text-gray-900">{{ recipient.title }}</h3>
 
                 <!-- 内容 -->
-                <div class="whitespace-pre-wrap rounded border border-gray-200 bg-white p-4 text-sm text-gray-800 leading-relaxed">
-                    {{ recipient.content }}
-                </div>
+                <RichTextView :content="recipient.content" class="rounded border border-gray-200 bg-white p-4 text-sm text-gray-800 leading-relaxed" />
 
                 <!-- 添付ファイル（インライン描画） -->
                 <div v-if="recipient.attachments && recipient.attachments.length > 0" class="mt-6 space-y-4">

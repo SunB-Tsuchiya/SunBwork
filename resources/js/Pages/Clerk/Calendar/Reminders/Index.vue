@@ -1,5 +1,6 @@
 <script setup>
 import { CLERK_EVENT_COLORS } from '@/Components/Clerk/clerkEventColors';
+import RichTextView from '@/Components/Common/RichTextView.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
@@ -17,6 +18,13 @@ function status(reminder) {
     if (props.today < reminder.starts_on) return { label: '表示予定', classes: 'bg-blue-100 text-blue-700' };
     if (props.today > reminder.ends_on) return { label: '終了', classes: 'bg-gray-100 text-gray-600' };
     return { label: '表示中', classes: 'bg-amber-100 text-amber-800' };
+}
+
+function targetLabel(reminder) {
+    const block = { honsha: '本社', odai: '小台' }[reminder.target_block];
+    const type = reminder.target_type === 'employees_only' ? '社員のみ'
+        : reminder.target_type === 'individual' ? `個別（${reminder.users_count}人）` : '全員';
+    return block ? `${block}・${type}` : type;
 }
 
 function toggle(reminder) {
@@ -64,6 +72,7 @@ function remove(reminder) {
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-3 py-3 text-left">リマインド内容</th>
+                            <th class="px-3 py-3 text-left">宛先</th>
                             <th class="px-3 py-3 text-left">表示期間</th>
                             <th class="px-3 py-3 text-left">状態</th>
                             <th class="px-3 py-3 text-right">操作</th>
@@ -71,10 +80,13 @@ function remove(reminder) {
                     </thead>
                     <tbody class="divide-y divide-gray-200">
                         <tr v-for="reminder in reminders" :key="reminder.id" class="hover:bg-gray-50">
-                            <td class="min-w-72 px-3 py-3 whitespace-pre-wrap break-words">
-                                <span class="mr-2 inline-block h-3 w-3 rounded-full" :style="{ backgroundColor: CLERK_EVENT_COLORS[reminder.color_key]?.hex }"></span>
-                                {{ reminder.content }}
+                            <td class="min-w-72 px-3 py-3">
+                                <div class="flex items-start gap-2">
+                                    <span class="mt-1 inline-block h-3 w-3 shrink-0 rounded-full" :style="{ backgroundColor: CLERK_EVENT_COLORS[reminder.color_key]?.hex }"></span>
+                                    <RichTextView :content="reminder.content" />
+                                </div>
                             </td>
+                            <td class="whitespace-nowrap px-3 py-3">{{ targetLabel(reminder) }}</td>
                             <td class="whitespace-nowrap px-3 py-3">{{ reminder.starts_on }} ～ {{ reminder.ends_on }}</td>
                             <td class="whitespace-nowrap px-3 py-3">
                                 <span class="rounded-full px-2 py-1 text-xs font-medium" :class="status(reminder).classes">{{ status(reminder).label }}</span>
@@ -88,7 +100,7 @@ function remove(reminder) {
                             </td>
                         </tr>
                         <tr v-if="!reminders.length">
-                            <td colspan="4" class="px-3 py-8 text-center text-gray-500">リマインダーはまだありません。</td>
+                            <td colspan="5" class="px-3 py-8 text-center text-gray-500">リマインダーはまだありません。</td>
                         </tr>
                     </tbody>
                 </table>

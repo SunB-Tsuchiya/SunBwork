@@ -1,5 +1,7 @@
 <script setup>
 import { CLERK_EVENT_COLORS, CLERK_EVENT_COLOR_KEYS } from '@/Components/Clerk/clerkEventColors';
+import RecipientPicker from '@/Components/Clerk/RecipientPicker.vue';
+import SimpleRichText from '@/Components/Common/SimpleRichText.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -7,6 +9,8 @@ import { route } from 'ziggy-js';
 
 const props = defineProps({
     reminder: { type: Object, default: null },
+    users: { type: Array, default: () => [] },
+    showBlocks: { type: Boolean, default: false },
     today: { type: String, required: true },
 });
 
@@ -14,10 +18,16 @@ const editing = computed(() => Boolean(props.reminder?.id));
 const form = useForm({
     content: props.reminder?.content ?? '',
     color_key: props.reminder?.color_key ?? 'orange',
+    target_type: props.reminder?.target_type ?? 'all',
+    target_block: props.reminder?.target_block ?? 'all',
+    user_ids: props.reminder?.user_ids ?? [],
     starts_on: props.reminder?.starts_on ?? props.today,
     ends_on: props.reminder?.ends_on ?? props.today,
     is_active: props.reminder?.is_active ?? true,
 });
+
+// 装飾タグを除いた文字数（上限 1000 文字）
+const plainLength = computed(() => (form.content || '').replace(/<[^>]*>/g, '').length);
 
 function submit() {
     if (editing.value) {
@@ -42,20 +52,24 @@ function submit() {
         <div class="rounded bg-white p-6 shadow">
             <form class="space-y-6" @submit.prevent="submit">
                 <div>
-                    <label for="reminder-content" class="mb-1 block text-sm font-medium text-gray-700">リマインド内容 <span class="text-red-600">*</span></label>
-                    <textarea
-                        id="reminder-content"
-                        v-model="form.content"
-                        rows="5"
-                        maxlength="1000"
-                        class="w-full rounded border-gray-300 text-sm focus:border-purple-500 focus:ring-purple-500"
-                        placeholder="例：交通費精算の締め切りは9月25日です。"
-                    ></textarea>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">リマインド内容 <span class="text-red-600">*</span></label>
+                    <SimpleRichText v-model="form.content" min-height="120px" placeholder="例：交通費精算の締め切りは9月25日です。" />
                     <div class="mt-1 flex justify-between gap-3">
                         <p class="text-xs text-red-600">{{ form.errors.content }}</p>
-                        <p class="text-xs text-gray-500">{{ form.content.length }} / 1000</p>
+                        <p class="text-xs text-gray-500">{{ plainLength }} / 1000</p>
                     </div>
                 </div>
+
+                <RecipientPicker
+                    v-model:target-type="form.target_type"
+                    v-model:block="form.target_block"
+                    :show-blocks="showBlocks"
+                    v-model:user-ids="form.user_ids"
+                    :users="users"
+                    accent="purple"
+                    :error="form.errors.target_type"
+                    :user-error="form.errors.user_ids"
+                />
 
                 <fieldset>
                     <legend class="mb-2 text-sm font-medium text-gray-700">色 <span class="text-red-600">*</span></legend>
@@ -90,7 +104,7 @@ function submit() {
                     <input v-model="form.is_active" type="checkbox" class="rounded text-purple-600 focus:ring-purple-500" />
                     このリマインダーを有効にする
                 </label>
-                <p class="text-xs text-gray-500">開始日と終了日を含む期間中、対象会社のユーザーのカレンダーに表示します。</p>
+                <p class="text-xs text-gray-500">開始日と終了日を含む期間中、宛先に含まれるユーザーのカレンダーに表示します。</p>
 
                 <div v-if="Object.keys(form.errors).length" role="alert" class="rounded border border-red-200 bg-red-50 p-3">
                     <p v-for="(error, key) in form.errors" :key="key" class="text-sm text-red-700">{{ error }}</p>

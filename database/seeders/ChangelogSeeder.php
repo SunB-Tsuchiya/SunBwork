@@ -2320,6 +2320,40 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'reminder-target-richtext-1',
+                'title' => 'リマインダーに宛先選択、お知らせ・リマインダーに文字色などの装飾を追加',
+                'released_at' => '2026-10-30',
+                'summary' => 'リマインダーを「全員／社員のみ／個別選択」で出す相手を絞れるようになり、お知らせとリマインダーの本文に太字・文字色などを付けられるようになりました。',
+                'design_files' => ['z_instructions/REMINDER_PLAN1.md', 'z_instructions/REMINDER_MANAGER1.md'],
+                'claude_notes' => 'clerk_calendar_reminders.target_type（既存行は all）と clerk_calendar_reminder_users を追加。ユーザー選択は Components/Clerk/RecipientPicker.vue に切り出し。本文は Quill（SimpleRichText）で入力し、保存時に HtmlSanitizer::purifyRich（文字色・背景色のみ許可）、表示は RichTextView（DOMPurify）。メッセージ用 purify() は不変。旧データ・自動生成のプレーンテキストは改行を保って表示。本番反映は migrate（--force）が2本必要。複数件表示の要望は要望者の整理待ちで保留（REMINDER_MANAGER1 D-1）。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>リマインダー</h3><ul>
+<li>宛先を「全員」「社員のみ」「個別選択」から選べます。個別選択では、お知らせと同じ画面でメンバーを選べます。</li>
+<li>宛先に含まれる人のカレンダーにだけ表示されます。既存のリマインダーは今までどおり全員に表示されます。</li>
+<li>一覧に宛先の列を追加しました。</li>
+</ul></section>
+<section class="cl-feature"><h3>お知らせ・リマインダーの文字装飾</h3><ul>
+<li>太字・斜体・下線・取り消し線・文字色・背景色・箇条書きを使えます（事務・リーダーのお知らせ作成／編集、リマインダー登録）。</li>
+<li>これまでのお知らせは、そのままの見た目で表示されます。</li>
+</ul></section>
+HTML,
+            ],
+            [
+                'version' => 'announcement-blocks-1',
+                'title' => 'お知らせに「全社／本社／小台」の対象範囲を追加（サン・ブレーン）',
+                'released_at' => '2026-10-30',
+                'summary' => 'サン・ブレーンのお知らせで、宛先区分の上に対象範囲（全社・本社・小台）を選べるようになりました。本社は情報出版、小台は製版とオンデマンドが対象です。管理者はどの範囲にも含まれます。',
+                'design_files' => ['app/Services/AnnouncementBlocks.php'],
+                'claude_notes' => 'announcements.target_block（既存は all）。部署名で判定（情報出版=本社 / 製版・オンデマンド=小台）、admin ロールは全ブロック対象。送信者の所属がサン・ブレーンのときだけ画面に出し、サーバー側も同条件で無視する。受信者は送信時に確定（既存のお知らせは不変）。本番反映は migrate（--force）1本。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>お知らせの対象範囲</h3><ul>
+<li>事務・リーダーのお知らせ作成／編集に「対象範囲」（全社・本社・小台）を追加しました。サン・ブレーン所属のときだけ表示されます。</li>
+<li>本社は情報出版、小台は製版とオンデマンドの所属が対象です。管理者はどの範囲にも含まれます。</li>
+<li>範囲を選ぶと、その中で「全員」「社員のみ」「個別選択」を指定できます。個別選択の一覧もその範囲の人だけになります。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

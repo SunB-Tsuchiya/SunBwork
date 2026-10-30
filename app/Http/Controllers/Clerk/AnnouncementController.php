@@ -7,6 +7,7 @@ use App\Models\Announcement;
 use App\Models\AnnouncementRecipient;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\AnnouncementBlocks;
 use App\Services\AttachmentService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -132,13 +133,14 @@ class AnnouncementController extends Controller
             'company_id'      => $u->company_id,
             'assignment_name' => $u->assignment?->name ?? '',
             'employment_type' => $u->employment_type ?? 'regular',
+            'blocks'          => AnnouncementBlocks::blocksOf($u),
         ]);
 
         $companies = $isCrossCompany
             ? Company::where('code', '!=', 'SUPERADMIN')->active()->ordered()->get(['id', 'name'])
             : null;
 
-        return Inertia::render('Clerk/Announcements/Create', compact('users', 'companies'));
+        return Inertia::render('Clerk/Announcements/Create', ['users' => $users, 'companies' => $companies, 'showBlocks' => AnnouncementBlocks::appliesTo($user)]);
     }
 
     /** Clerk: お知らせ送信 or 下書き保存 */
@@ -146,9 +148,10 @@ class AnnouncementController extends Controller
     {
         $request->validate([
             'target_type'       => 'required|in:all,employees_only,individual',
+            'target_block'      => 'nullable|in:all,honsha,odai',
             'target_company_id' => 'nullable|exists:companies,id',
             'title'             => 'required|string|max:255',
-            'content'           => 'required|string',
+            'content'           => ['required', 'string', $this->contentRule()],
             'user_ids'          => 'required_if:target_type,individual|array',
             'user_ids.*'        => 'integer|exists:users,id',
             'attachments'       => 'nullable|array|max:10',
@@ -174,20 +177,19 @@ class AnnouncementController extends Controller
         $announcement = Announcement::create([
             'sender_id'         => $sender->id,
             'target_type'       => $request->target_type,
+            'target_block'      => AnnouncementBlocks::fromRequest($request, $sender),
             'title'             => $request->title,
-            'content'           => $request->content,
+            'content'           => $this->cleanContent($request->content),
             'target_company_id' => $targetCompanyId,
             'status'            => $isDraft ? 'draft' : 'sent',
         ]);
 
+        $block = AnnouncementBlocks::fromRequest($request, $request->user());
+        $byScope = fn () => User::query()->when($scopeCompanyId, fn ($q) => $q->where('company_id', $scopeCompanyId));
         $recipientIds = match ($request->target_type) {
-            'all' => $scopeCompanyId
-                ? User::where('company_id', $scopeCompanyId)->pluck('id')->toArray()
-                : User::pluck('id')->toArray(),
-            'employees_only' => $scopeCompanyId
-                ? User::where('company_id', $scopeCompanyId)->whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray()
-                : User::whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray(),
-            'individual' => $request->user_ids ?? [],
+            'all' => AnnouncementBlocks::constrain($byScope(), $block)->pluck('id')->toArray(),
+            'employees_only' => AnnouncementBlocks::constrain($byScope()->whereIn('employment_type', ['regular', 'contract']), $block)->pluck('id')->toArray(),
+            'individual' => AnnouncementBlocks::constrain(User::whereIn('id', $request->user_ids ?? []), $block)->pluck('id')->toArray(),
         };
 
         if (! empty($recipientIds)) {
@@ -228,6 +230,7 @@ class AnnouncementController extends Controller
                 'content' => $announcement->content,
                 'status'  => $announcement->status,
                 'target_type' => $announcement->target_type,
+                'target_block' => $announcement->target_block ?? 'all',
                 'attachments' => $announcement->attachments->map(fn ($a) => [
                     'id'            => $a->id,
                     'url'           => asset('storage/' . $a->path),
@@ -253,12 +256,14 @@ class AnnouncementController extends Controller
                 'company_id'      => $u->company_id,
                 'assignment_name' => $u->assignment?->name ?? '',
                 'employment_type' => $u->employment_type ?? 'regular',
+            'blocks'          => AnnouncementBlocks::blocksOf($u),
             ]);
 
             $data['companies'] = $isCrossCompany
                 ? Company::where('code', '!=', 'SUPERADMIN')->active()->ordered()->get(['id', 'name'])
                 : null;
 
+            $data['showBlocks'] = AnnouncementBlocks::appliesTo($user);
             $data['announcement']['recipient_ids'] = $announcement->recipients()->pluck('user_id')->toArray();
         }
 
@@ -272,7 +277,7 @@ class AnnouncementController extends Controller
 
         $rules = [
             'title'                   => 'required|string|max:255',
-            'content'                 => 'required|string',
+            'content'                 => ['required', 'string', $this->contentRule()],
             'attachments'             => 'nullable|array|max:10',
             'attachments.*'           => 'file|max:20480',
             'remove_attachment_ids'   => 'nullable|array',
@@ -282,6 +287,7 @@ class AnnouncementController extends Controller
         // 下書きは宛先変更も可能
         if ($announcement->status === 'draft') {
             $rules['target_type']       = 'required|in:all,employees_only,individual';
+            $rules['target_block']      = 'nullable|in:all,honsha,odai';
             $rules['target_company_id'] = 'nullable|exists:companies,id';
             $rules['user_ids']          = 'required_if:target_type,individual|array';
             $rules['user_ids.*']        = 'integer|exists:users,id';
@@ -291,7 +297,7 @@ class AnnouncementController extends Controller
 
         $announcement->update([
             'title'   => $request->title,
-            'content' => $request->content,
+            'content' => $this->cleanContent($request->content),
         ]);
 
         // 下書き: 宛先更新 + 送信判定
@@ -313,17 +319,16 @@ class AnnouncementController extends Controller
 
             $announcement->update([
                 'target_type'       => $request->target_type,
+                'target_block'      => AnnouncementBlocks::fromRequest($request, $sender),
                 'target_company_id' => $targetCompanyId,
             ]);
 
+            $block = AnnouncementBlocks::fromRequest($request, $request->user());
+            $byScope = fn () => User::query()->when($scopeCompanyId, fn ($q) => $q->where('company_id', $scopeCompanyId));
             $recipientIds = match ($request->target_type) {
-                'all' => $scopeCompanyId
-                    ? User::where('company_id', $scopeCompanyId)->pluck('id')->toArray()
-                    : User::pluck('id')->toArray(),
-                'employees_only' => $scopeCompanyId
-                    ? User::where('company_id', $scopeCompanyId)->whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray()
-                    : User::whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray(),
-                'individual' => $request->user_ids ?? [],
+                'all' => AnnouncementBlocks::constrain($byScope(), $block)->pluck('id')->toArray(),
+                'employees_only' => AnnouncementBlocks::constrain($byScope()->whereIn('employment_type', ['regular', 'contract']), $block)->pluck('id')->toArray(),
+                'individual' => AnnouncementBlocks::constrain(User::whereIn('id', $request->user_ids ?? []), $block)->pluck('id')->toArray(),
             };
 
             $announcement->recipients()->delete();
@@ -387,6 +392,22 @@ class AnnouncementController extends Controller
     }
 
     /** 送信権限のある会社の通知かどうかを確認する */
+    /** 本文が装飾タグだけで空になっていないか確認する */
+    private function contentRule(): \Closure
+    {
+        return function ($attribute, $value, $fail) {
+            if (app(\App\Services\HtmlSanitizer::class)->purifyRich($value) === null && trim(strip_tags((string) $value)) === '') {
+                $fail('内容を入力してください。');
+            }
+        };
+    }
+
+    /** 文字色などの基本装飾のみ許可して保存する */
+    private function cleanContent(string $content): string
+    {
+        return app(\App\Services\HtmlSanitizer::class)->purifyRich($content) ?? '';
+    }
+
     private function authorizeForCompany(Announcement $announcement, \App\Models\User $user): void
     {
         $companyId = $user->isSuperAdmin()

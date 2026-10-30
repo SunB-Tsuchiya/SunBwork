@@ -1,4 +1,5 @@
 <script setup>
+import RichTextView from '@/Components/Common/RichTextView.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
@@ -144,7 +145,7 @@ function destroy() {
                         <span v-if="announcement.sender_name" class="text-xs text-gray-500">送信者: {{ announcement.sender_name }}</span>
                     </div>
                     <h3 class="mb-3 text-lg font-bold text-gray-900">{{ announcement.title }}</h3>
-                    <p class="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">{{ announcement.content }}</p>
+                    <RichTextView :content="announcement.content" class="text-sm text-gray-700 leading-relaxed" />
                 </div>
 
                 <!-- 添付ファイル -->
