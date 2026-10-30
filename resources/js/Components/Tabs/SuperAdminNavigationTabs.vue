@@ -9,6 +9,8 @@ const props = defineProps({
 const page = usePage();
 const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
 const canAccessWorkRecordTrial = computed(() => page.props.auth?.canAccessWorkRecordTrial ?? false);
+const canAccessWorkHubPreview = computed(() => page.props.auth?.user?.user_role === 'superadmin'
+    && Boolean(page.props.userWorkHub?.enabled) && page.props.auth?.companyType !== 'general');
 
 // SuperAdmin カラー: yellow
 const tab = (key) => [
@@ -70,6 +72,12 @@ const tabs = computed(() => [
         label: '作業量分析',
         newTab: true,
         condition: typeof route === 'function' && route().has('superadmin.workload_analyzer.index'),
+    },
+    {
+        key: 'work_hub_preview',
+        href: tryRoute('user.myjobbox.index'),
+        label: '仕事・案件（試用）',
+        condition: canAccessWorkHubPreview.value,
     },
     {
         key: 'broad_projects',
@@ -209,6 +217,13 @@ function onMobileSelect(e) {
             >
                 作業量分析
             </a>
+            <Link
+                v-if="canAccessWorkHubPreview"
+                :href="route('user.myjobbox.index')"
+                :class="tab('work_hub_preview')"
+            >
+                仕事・案件（試用）
+            </Link>
             <Link
                 v-if="canAccessWorkRecordTrial && typeof route === 'function' && route().has('superadmin.broad_projects.index')"
                 :href="route('superadmin.broad_projects.index')"

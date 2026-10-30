@@ -99,3 +99,5 @@
 今回新設した操作は一覧・追加・取引先候補のみ。編集・休止は既存SuperAdmin管理画面へのリンクを置く。進行管理/Leader/一般Userの権限開放、候補統合、入力中のその場追加、BOXへの簡易記録統合は後工程。migration・過去レコード更新なし。同名・同取引先・同年度の検査は休止済みも含むが、DB一意制約ではないため完全な同時登録の排除は保証しない。統合の具体手順と併せて必要性を再検討する。
 
 合成SQLiteメモリテスト、PHP構文、実ルート、対象ESLint、Vue SSRによる権限別メニュー/5タブ/選択/件数/URL、`/members`ビルドとmanifestを確認。詳細の件数と状態はMANAGERに記録。独立 `UserWorkHubPreviewChangelogSeeder` と共通Seederの呼出を用意したがDBへのseedは未実行。配備前には現在の本番と別作業の差分を照合してから専用版を準備する。
+
+2026-10-31 利用者依頼による仮入口: SuperAdminNavigationTabsに「仕事・案件（試用）」をデスクトップ/モバイル双方へ追加。実ロールSuperAdmin、サーバの `userWorkHub.enabled`、一般会社以外を条件に、既存 `user.myjobbox.index` から試用版を確認する。入口追加で試用の会社/部署/ロールを広げない。一般公開後の仮入口撤去は公開工程で扱う。
