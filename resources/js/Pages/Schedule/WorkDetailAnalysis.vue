@@ -23,7 +23,7 @@ const error = ref('');
 const includeOvertime = ref(true);
 const includeCreation = ref(true);
 const includeManagement = ref(true);
-const sortBy = ref('units');
+const sortBy = ref('points');
 let sequence = 0;
 
 const roleLabels = {
@@ -178,7 +178,7 @@ onMounted(load);
                 <div class="font-semibold">並び方と暫定点の比較</div>
                 <p class="mt-1 text-xs text-gray-700">工程候補は同じ案件・作業種類・日付などをまとめた参考数、入力件数は記録の数です。どちらも完了数ではありません。暫定点は主に記録時間で決まります。作業点は会議・訪問以外、会議・訪問点には打合せ・業務外出・訪問商談を含みます。</p>
                 <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                    <label v-for="[key, label] in [['units', '工程候補が多い順'], ['records', '入力件数が多い順'], ['points', '暫定点が高い順']]" :key="key" class="rounded border px-2 py-1" :class="sortBy === key ? activeClass : 'bg-white'">
+                    <label v-for="[key, label] in [['points', '暫定点が高い順'], ['units', '工程候補が多い順'], ['records', '入力件数が多い順']]" :key="key" class="rounded border px-2 py-1" :class="sortBy === key ? activeClass : 'bg-white'">
                         <input v-model="sortBy" type="radio" name="work-detail-sort" :value="key" class="sr-only" />{{ label }}
                     </label>
                 </div>
