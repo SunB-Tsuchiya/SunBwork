@@ -21,6 +21,24 @@ let quill = null;
 
 function onReady(editor) {
     quill = editor;
+
+    // 貼り付けでは文字色・背景色を取り込まない（他サイトや AI の出力に付く白背景などを防ぐ）。
+    // 色はツールバーで選んだときだけ付く。初期表示（保存済み HTML の読み込み）には影響させない。
+    let pasting = false;
+    editor.root.addEventListener('paste', () => {
+        pasting = true;
+        setTimeout(() => { pasting = false; }, 0);
+    }, true);
+    editor.clipboard.addMatcher(Node.ELEMENT_NODE, (node, delta) => {
+        if (!pasting) return delta;
+        delta.ops.forEach((op) => {
+            if (op.attributes) {
+                delete op.attributes.color;
+                delete op.attributes.background;
+            }
+        });
+        return delta;
+    });
 }
 
 function onInput(html) {
