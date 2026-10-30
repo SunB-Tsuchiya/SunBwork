@@ -26,7 +26,7 @@ const ordered = computed(() => {
     });
 });
 const maximum = computed(() => Math.max(1, ...people.value.map((person) => person.minutes)));
-const calendarLink = computed(() => route('calendar.index', { date: date.value }));
+const calendarLink = computed(() => route('calendar.index', { date: date.value, view: 'day' }));
 let controller;
 let sequence = 0;
 
