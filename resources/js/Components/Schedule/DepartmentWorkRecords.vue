@@ -8,7 +8,7 @@ const people = ref([]);
 const mine = ref(null);
 const loading = ref(true);
 const error = ref('');
-const sort = ref('name');
+const sort = ref('configured');
 const groups = [
     { key: 'job', label: 'ジョブ', color: '#6366f1' },
     { key: 'quick', label: '簡易作業', color: '#ec4899' },
@@ -16,10 +16,15 @@ const groups = [
     { key: 'other', label: 'その他業務', color: '#64748b' },
 ];
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60}分`;
-const ordered = computed(() => [...people.value].sort((a, b) => {
-    const value = (person) => sort.value === 'total' ? person.minutes : (person.breakdown[sort.value] || 0);
-    return (sort.value === 'name' ? 0 : value(b) - value(a)) || a.name.localeCompare(b.name, 'ja') || a.id - b.id;
-}));
+const ordered = computed(() => {
+    const positions = new Map(people.value.map((person, index) => [person.id, index]));
+    return [...people.value].sort((a, b) => {
+        const value = (person) => sort.value === 'total' ? person.minutes : (person.breakdown[sort.value] || 0);
+        const compared = sort.value === 'configured' ? 0
+            : sort.value === 'name' ? a.name.localeCompare(b.name, 'ja') : value(b) - value(a);
+        return compared || positions.get(a.id) - positions.get(b.id);
+    });
+});
 const maximum = computed(() => Math.max(1, ...people.value.map((person) => person.minutes)));
 const calendarLink = computed(() => route('calendar.index', { date: date.value }));
 let controller;
@@ -101,7 +106,7 @@ onBeforeUnmount(() => { ++sequence; controller?.abort(); });
                     </div>
                     <label class="flex items-center gap-2 text-sm">並び替え
                         <select v-model="sort" class="rounded border-gray-300 text-sm">
-                            <option value="name">名前順</option><option value="total">総時間が多い順</option>
+                            <option value="configured">ユーザー一覧の設定順</option><option value="name">名前順</option><option value="total">総時間が多い順</option>
                             <option v-for="group in groups" :key="group.key" :value="group.key">{{ group.label }}が多い順</option>
                         </select>
                     </label>
