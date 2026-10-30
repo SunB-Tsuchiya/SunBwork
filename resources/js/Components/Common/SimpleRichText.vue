@@ -19,8 +19,30 @@ const toolbar = [
 
 let quill = null;
 
+// ツールバーのボタンに付けるマウスオーバー表示（Quill は標準では付けない）
+const TOOLBAR_TITLES = {
+    '.ql-bold': '太字',
+    '.ql-italic': '斜体',
+    '.ql-underline': '下線',
+    '.ql-strike': '取り消し線',
+    '.ql-color': '文字色',
+    '.ql-background': '背景色（マーカー）',
+    '.ql-list[value="ordered"]': '番号付きリスト',
+    '.ql-list[value="bullet"]': '箇条書き',
+    '.ql-clean': '書式クリア（選択した文字の装飾を消す）',
+};
+
+function setToolbarTitles(editor) {
+    const container = editor.getModule('toolbar')?.container;
+    if (!container) return;
+    Object.entries(TOOLBAR_TITLES).forEach(([selector, title]) => {
+        container.querySelectorAll(selector).forEach((el) => el.setAttribute('title', title));
+    });
+}
+
 function onReady(editor) {
     quill = editor;
+    setToolbarTitles(editor);
 
     // 貼り付けでは文字色・背景色を取り込まない（他サイトや AI の出力に付く白背景などを防ぐ）。
     // Quill に渡す前の HTML から色の指定を取り除く。色はツールバーで選んだときだけ付く。
