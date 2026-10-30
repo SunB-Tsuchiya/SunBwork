@@ -12,6 +12,8 @@ const currentTime = () => {
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 };
 const date = ref(props.initialDate);
+const queryScoreVersion = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('score_version');
+const scoreVersion = queryScoreVersion === 'trial_time_v2' ? 'trial_time_v2' : 'trial_time_v3';
 const records = ref([]);
 const recent = ref([]);
 const dayReview = ref({ reviewed: false, missing_minutes_count: 0, entered_minutes_total: 0 });
@@ -244,7 +246,7 @@ onMounted(async () => { await Promise.all([loadDay(), loadProjects()]); });
 </script>
 
 <template>
-    <WorkloadAnalysisShell title="作業記録の試用" active="record" :date="date">
+    <WorkloadAnalysisShell title="作業記録の試用" active="record" :date="date" :score-version="scoreVersion">
         <div class="mx-auto max-w-5xl space-y-5">
             <section class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
                 <h2 class="font-semibold">Super Admin 限定の試用</h2>

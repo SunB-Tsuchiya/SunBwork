@@ -338,19 +338,19 @@ class DepartmentWorkController extends Controller
             'period' => $params['period'],
             'start' => $start->toDateString(), 'end' => $end->toDateString(),
             'excluded_count' => $allUsers->count() - $users->count(),
-            'score_version' => $params['score_version'] ?? 'trial_time_v2',
+            'score_version' => $params['score_version'] ?? 'trial_time_v3',
             'point_rule' => [
                 'points_per_hour' => PersonalWorkPoints::POINTS_PER_HOUR,
                 'default_coefficient' => PersonalWorkPoints::DEFAULT_COEFFICIENT,
                 'coefficients' => PersonalWorkPoints::COEFFICIENTS,
-                'creation_points' => ($params['score_version'] ?? 'trial_time_v2') === 'trial_time_v3' ? 0 : WorkloadTrialAnalysis::CREATION_POINTS,
+                'creation_points' => ($params['score_version'] ?? 'trial_time_v3') === 'trial_time_v3' ? 0 : WorkloadTrialAnalysis::CREATION_POINTS,
                 'overtime_first_three_hours' => WorkloadTrialAnalysis::OVERTIME_BONUS_FIRST_THREE_HOURS,
                 'overtime_after_three_hours' => WorkloadTrialAnalysis::OVERTIME_BONUS_AFTER_THREE_HOURS,
                 'v3_overtime_bonus_minutes_per_day' => WorkloadTrialAnalysis::V3_OVERTIME_BONUS_MINUTES_PER_DAY,
-                'management_points_per_active_day' => ($params['score_version'] ?? 'trial_time_v2') === 'trial_time_v3' ? 0 : WorkloadTrialAnalysis::MANAGEMENT_POINTS_PER_ACTIVE_DAY,
+                'management_points_per_active_day' => ($params['score_version'] ?? 'trial_time_v3') === 'trial_time_v3' ? 0 : WorkloadTrialAnalysis::MANAGEMENT_POINTS_PER_ACTIVE_DAY,
                 'deputy_factor' => WorkloadTrialAnalysis::DEPUTY_FACTOR,
             ],
-            'people' => $this->trial->analyze($viewer, $users, $start, $end, $individual, $params['score_version'] ?? 'trial_time_v2'),
+            'people' => $this->trial->analyze($viewer, $users, $start, $end, $individual, $params['score_version'] ?? 'trial_time_v3'),
         ]);
     }
 

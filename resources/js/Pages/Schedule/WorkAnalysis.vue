@@ -11,7 +11,7 @@ const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
 const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
 const period = ref(['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'day');
 const queryScoreVersion = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('score_version');
-const scoreVersion = ref(queryScoreVersion === 'trial_time_v3' ? 'trial_time_v3' : 'trial_time_v2');
+const scoreVersion = ref(queryScoreVersion === 'trial_time_v2' ? 'trial_time_v2' : 'trial_time_v3');
 const weekPickerOpen = ref(false);
 const weekPicker = ref(null);
 const weekPickerMonth = ref(date.value.slice(0, 7));
@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <span class="font-medium text-gray-700">採点方式</span>
-                <button v-for="[value, label] in [['trial_time_v2', '従来の試用点'], ['trial_time_v3', '新しい試算']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? 'border-blue-600 bg-blue-50 text-blue-800' : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
+                <button v-for="[value, label] in [['trial_time_v3', '標準の試算（V3）'], ['trial_time_v2', '従来の試用点（比較用）']]" :key="value" type="button" class="rounded border px-2 py-1" :class="scoreVersion === value ? 'border-blue-600 bg-blue-50 text-blue-800' : 'bg-white'" @click="scoreVersion = value">{{ label }}</button>
                 <span class="text-gray-600">新しい試算は比較用で、過去の記録を変更しません。</span>
             </div>
             <p v-if="period === 'week' && selectedWeekRange" class="mt-2 text-xs font-medium text-blue-800">対象週：{{ selectedWeekRange }}</p>

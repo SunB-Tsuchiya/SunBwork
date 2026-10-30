@@ -8,14 +8,14 @@ const date = props.initialDate || new Date().toLocaleDateString('sv-SE');
 const queryPeriod = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('period');
 const period = ['day', 'week', 'month'].includes(queryPeriod) ? queryPeriod : 'day';
 const queryScoreVersion = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('score_version');
-const scoreVersion = queryScoreVersion === 'trial_time_v3' ? 'trial_time_v3' : 'trial_time_v2';
+const scoreVersion = queryScoreVersion === 'trial_time_v2' ? 'trial_time_v2' : 'trial_time_v3';
 </script>
 
 <template>
     <WorkloadAnalysisShell title="作業量分析ガイド" active="guide" :date="date" :period="period" :score-version="scoreVersion">
         <div class="mx-auto max-w-5xl space-y-5">
             <section class="rounded-lg bg-white p-5 shadow sm:p-6">
-                <p class="text-xs font-semibold text-blue-700">まずは概要</p>
+                <p class="text-xs font-semibold text-blue-700">標準はV3・従来の試用点は比較用</p>
                 <h2 class="mt-1 text-xl font-bold text-gray-900">この画面は、記録された仕事を確認するための試用分析です</h2>
                 <p class="mt-3 text-sm leading-6 text-gray-700">
                     表の順番や点数だけで、仕事の成果・能力・査定を決めるものではありません。
@@ -32,7 +32,8 @@ const scoreVersion = queryScoreVersion === 'trial_time_v3' ? 'trial_time_v3' : '
                     </div>
                     <div class="rounded-lg border border-blue-100 bg-blue-50 p-4">
                         <div class="text-sm font-semibold text-blue-900">3. 担当した負担</div>
-                        <p class="mt-1 text-sm text-gray-700">記録時間と残業・案件登録・管理を分けて見ます。補助点は切り替えて比較できます。</p>
+                        <p v-if="scoreVersion === 'trial_time_v3'" class="mt-1 text-sm text-gray-700">記録した作業・打合せ・担当調整などの時間と、認定された残業を確認します。案件登録・管理の自動加点はありません。</p>
+                        <p v-else class="mt-1 text-sm text-gray-700">記録時間と残業・案件登録・管理を分けて見ます。補助点は切り替えて比較できます。</p>
                     </div>
                 </div>
                 <div class="mt-5 flex flex-wrap items-center gap-3">
