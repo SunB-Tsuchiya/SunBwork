@@ -12,9 +12,9 @@
 | GitHub保存 | 専用ブランチへ保存 | `feature/workload-management-move-20261030`。本番既存f5a327635起点の差分をレビュー可能にする。mainと共有作業ツリーには反映しない |
 | 変更履歴 | 独立Seederの登録成功 | WorkloadManagementMoveChangelogSeeder、version workload-management-20261030（30文字以内）。共通Seederからも呼出。migrationなし |
 | さくら反映 | **40ad992c3へ限定配備成功** | 別作業が既配備の4b51f8049を起点に専用版を作成。承認済み条件付きSSHでPHP7構文→早送り→独立変更履歴→config/cache/route/view成功。migrationなし |
-| 利用者画面確認 | **SuperAdminの依頼4点成功。Admin/Leaderは未確認** | superadmin prefix/黄の通常レイアウト/試用項目撤去/dashboard戻りを利用者確認。Admin/Leaderの実権限・各画面遷移等は次の確認 |
+| 利用者画面確認 | **SuperAdminとAdminの依頼各4点成功。Leaderは未確認** | SuperAdminはprefix/黄の通常レイアウト/試用項目撤去/dashboard戻り。Adminはprefix/赤/自社内の会社部署候補/簡易ガイド遷移/試用項目なし/dashboard戻りを利用者確認。Leaderは次の確認 |
 
-**再開する1手:** SuperAdminの依頼4点は利用者確認済み。次は実際のAdminアカウントで新分析のadmin prefix/赤の通常レイアウト/自社内の候補/簡易・ガイドのリンク保持/試用項目なし/dashboard戻りを画面確認する。SuperAdminによるadmin URL閲覧をAdminの自社制限確認と混同しない。Leaderはその後。
+**再開する1手:** SuperAdmin/Adminの依頼各4点は利用者確認済み。次は実際のLeaderでleader prefix/橙の通常レイアウト/所属ユニット内の対象者/簡易・ガイドのリンク保持/試用項目なし/dashboard戻りを確認する。実アカウントで確認できない場合は未確認を保持。
 
 ## 設計上の境界
 
@@ -44,3 +44,5 @@ Laravelルート/ZiggyはAPP_ENV=testing、DB_CONNECTION=sqlite、DB_DATABASE=:m
 2026-10-30 管理移設の限定配備成功: 利用者が専用40ad992c3の正確なSSHコマンドを承認。4b51f8049/main/追跡対象変更なし/取得40ad/migration差分なしの全条件を通過。取得したPHP7ファイルの実構文確認成功後、4b51f8049→40ad992c3を早送り。独立WorkloadManagementMoveChangelogSeederだけを--forceで実行成功、config/cache/route/viewクリア成功、最終HEAD40ad992c3。別作業の既配備28ソースは保持、mainの未配備作業は取り込まず、migration/共通Seeder全件は実行しない。次はSuperAdmin画面で①/superadmin/workload-analyzer配下の新分析、②黄の通常メニュー/レイアウト、③試用項目がない、④ダッシュボードへの戻り先もSuperAdmin、を確認。Admin/Leaderの実画面はまだ未確認。配備成功を画面成功に拡張しない。
 
 2026-10-30 SuperAdmin画面4点成功: 利用者「成功」で、新分析がsuperadmin/workload-analyzer配下で開く、黄の通常メニュー/レイアウト、分析タブと現在表示中の通常メニューに独立作業記録試用がない、戻るとSuperAdmin dashboard、を全確認。モバイル等未依頼の画面やAdmin/Leaderの権限確認へ拡張しない。次は実際のAdminアカウントで/admin prefix・赤の通常レイアウト・自社内の会社部署候補・簡易/ガイド間prefix保持・試用項目なし・dashboard戻りを段階確認する。SuperAdminがAdmin URLを開く場合はSuperAdmin権限のままなので、Adminの自社制限の画面確認として代用しない。Adminが確認できない場合は未確認として保持し、アカウントの資格情報を求めない。
+
+2026-10-30 Admin画面4点成功: 利用者「成功」で、実際のAdminアカウントで①admin/workload-analyzer配下と赤の通常レイアウト、②会社候補は自社だけ/部署候補も自社内、③簡易/ガイドへ移ってもadmin prefix保持かつ独立試用項目なし、④Admin dashboard戻りを全確認。実際の権限OFFやURL改変の本番試験、全レスポンシブ表示まで成功へ拡張しない。次は実際のLeaderでleader prefix/橙の通常レイアウト/対象者が所属ユニット範囲内/簡易ガイドprefix保持と試用項目なし/dashboard戻りを確認。表示対象が空の場合やユニット外が混ざる場合は成功とせず観測結果を確認する。
