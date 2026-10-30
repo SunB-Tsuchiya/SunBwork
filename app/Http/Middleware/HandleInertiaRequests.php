@@ -30,7 +30,11 @@ class HandleInertiaRequests extends Middleware
      */
     public function version(Request $request): ?string
     {
-        return parent::version($request);
+        // ASSET_URL を設定している環境（さくら本番）では親実装が固定値になり、デプロイ後も開きっぱなしのタブが
+        // 古い JS のまま動いてしまう。ビルドごとに変わる manifest のハッシュを使い、次の画面遷移で自動リロードさせる。
+        $manifest = public_path('build/manifest.json');
+
+        return file_exists($manifest) ? hash_file('xxh128', $manifest) : parent::version($request);
     }
 
     /**
