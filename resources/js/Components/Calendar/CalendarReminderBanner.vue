@@ -25,11 +25,11 @@ const reminderClasses = (colorKey) => colorClasses[colorKey] ?? colorClasses.ora
         <div
             v-for="reminder in reminders"
             :key="reminder.id"
-            class="flex min-h-10 items-center justify-center rounded border-2 px-4 py-1.5 text-center text-sm font-bold shadow-sm"
+            class="flex min-h-10 items-center justify-center rounded border-2 px-4 py-1.5 text-center text-sm shadow-sm"
             :class="reminderClasses(reminder.color_key)"
         >
             <div class="flex flex-wrap items-baseline justify-center gap-x-1">
-                <span>事務からのお知らせ：</span>
+                <span class="font-bold">事務からのお知らせ：</span>
                 <RichTextView :content="reminder.content" />
             </div>
         </div>
