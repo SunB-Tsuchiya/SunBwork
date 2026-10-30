@@ -13,3 +13,5 @@ WorkloadAnalysisAccessでAdmin自社/Leader所属ユニット/SuperAdmin会社�
 検証: SQLiteメモリ69件286断言成功。実Laravelルート照合、Ziggy再生成、role/方式/リンク/スコープ切替のJS直接実行、PHP対象構文・ESLintエラー0、本番用Viteとmanifest欠落0成功。旧Show.vueに既存unused警告1件。ブラウザ画面/本番/実アカウントの確認は未実施。詳細な実行環境と証拠はMANAGERを参照。
 
 変更履歴はWorkloadManagementMoveChangelogSeederのみ実行する専用手順を用意する。migrationなし。配備許可後も正確なSSHコマンド提示/承認を得て、現在版・変更・別作業を確認して限定反映する。一般社員公開・月別コメントは今回実装しない。
+
+2026-10-30 保存完了: 管理移設の実装コミットf5b93c8a7をfeature/workload-management-move-20261030へpush成功。追跡対象の作業ツリー変更なし。配備済み既存f5a327635との差分は今回の管理移設ソース/テスト/資料/公開ビルドのみで、採点サービス・入力試用判定・係数の差分なし。新たなSSH/さくらseed/キャッシュ操作は実行していない。デプロイ許可待ち。

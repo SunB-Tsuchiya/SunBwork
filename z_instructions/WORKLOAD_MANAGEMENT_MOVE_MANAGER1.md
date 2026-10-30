@@ -36,3 +36,5 @@ PHP CLIなし/Docker停止を受け、公式Ubuntuパッケージを/tmpへ展�
 Laravelルート/ZiggyはAPP_ENV=testing、DB_CONNECTION=sqlite、DB_DATABASE=:memory:、CACHE_STORE=array、SESSION_DRIVER=arrayで実行。共有.envは変更していない。本番ビルドは隔離ツリーでVITE_APP_BASE_PATH=/membersをコマンドに限定指定。PHPの一時実行環境や作業ツリーが消えたら存在を仮定せず再構築する。
 
 2026-10-30 最終整形確認: 新規PHP4ファイルのPint検査成功。整形後も対象69件286断言が成功。既存の大きな旧コントローラ等は無関係な全体整形をしない。
+
+2026-10-30 保存完了: 管理移設の実装コミットf5b93c8a7をfeature/workload-management-move-20261030へpush成功。追跡対象の作業ツリー変更なし。配備済み既存f5a327635との差分は今回の管理移設ソース/テスト/資料/公開ビルドのみで、採点サービス・入力試用判定・係数の差分なし。新たなSSH/さくらseed/キャッシュ操作は実行していない。デプロイ許可待ち。

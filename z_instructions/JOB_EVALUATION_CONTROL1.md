@@ -423,3 +423,5 @@
 2026-10-30 管理移設の計画承認/実装進行: 利用者「hai」で計画を確認。閲覧専用WorkloadAnalysisAccessと管理用Controllerを追加。既存DepartmentWorkControllerのGETのみreadContextを差し替えて再利用、入力guardは維持。role別ルート/会社部署候補/単位メンバー制限/AppLayout/黄赤橙/ダッシュボード戻り/同prefixリンクを実装し、試用メニュー撤去。個人APIと旧個人リンクの範囲外も拒否。/tmpにPHP CLI8.3を展開して、実DBなしのSQLiteメモリ検証が可能になった。認可とAPIテスト11件52断言、既存V3サービスとの実計算一致も追加成功。まだデプロイ/実画面は未実施、最終検証と専用版保存を続ける。
 
 2026-10-30 管理画面移設の実装/検証完了・未デプロイ: 計画承認後、3ロールの閲覧スコープ/GET API/ロールprefix/AppLayout/黄赤橙/dashboard戻りを実装。独立試用メニューを撤去しデータ/入力権限は保持。旧アーカイブのprefix/月切替と個人リンク認可、SuperAdmin会社切替後のscope解除も確認。SQLiteメモリ69件286断言、実ルート照合、JSの3role×2方式×6リンクとスコープ/テーマ/会社コンテキスト保持、PHP対象構文、ESLintエラー0、/membersビルド成功、manifest参照487欠落0。旧Show.vue既存unused警告1件は非変更。専用feature/workload-management-move-20261030へ保存し、main/本番へは反映しない。変更履歴seedはコードのみ準備、migrationなし。次は差分/検証を報告し別途デプロイ許可待ち。3roleの実画面確認は未実施、一般社員公開/月別コメントは対象外。
+
+2026-10-30 保存完了: 管理移設の実装コミットf5b93c8a7をfeature/workload-management-move-20261030へpush成功。追跡対象の作業ツリー変更なし。配備済み既存f5a327635との差分は今回の管理移設ソース/テスト/資料/公開ビルドのみで、採点サービス・入力試用判定・係数の差分なし。新たなSSH/さくらseed/キャッシュ操作は実行していない。デプロイ許可待ち。
