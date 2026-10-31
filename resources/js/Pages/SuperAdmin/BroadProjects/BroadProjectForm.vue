@@ -1,10 +1,13 @@
 <script setup>
 import axios from 'axios';
+import { parentOptions, broadProjectColor } from '@/utils/broadProjectTree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     project: { type: Object, default: null },
+    projects: { type: Array, default: () => [] },
+    initialParentId: { type: Number, default: null },
     routePrefix: { type: String, default: 'superadmin.broad_projects' },
     allowStatus: { type: Boolean, default: true },
 });
@@ -19,6 +22,7 @@ const clientInputId = isEditing.value ? 'broad-project-edit-client' : 'broad-pro
 const clientOptionsId = `${clientInputId}-options`;
 const form = useForm({
     name: props.project?.name || '',
+    parent_id: props.project?.parent_id ?? props.initialParentId,
     client_id: props.project?.client_id ?? null,
     fiscal_year: props.project?.fiscal_year ?? null,
     is_active: props.project?.is_active ?? true,
@@ -110,6 +114,14 @@ function save() {
 
 <template>
     <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="save">
+        <label class="text-sm sm:col-span-2">親グループ（任意）
+            <select v-model="form.parent_id" class="mt-1 w-full rounded border p-2">
+                <option :value="null">なし（大グループ）</option>
+                <option v-for="parent in parentOptions(projects, project?.id)" :key="parent.id" :value="parent.id">{{ parent.path }}{{ !parent.selectable ? '［休止中］' : '' }}</option>
+            </select>
+            <span v-if="form.errors.parent_id" class="block text-red-700">{{ form.errors.parent_id }}</span>
+            <span class="mt-1 block text-xs text-gray-500">分類は3段まで。親を休止すると、その中の分類も新規入力の候補から外れます。</span>
+        </label>
         <label class="text-sm">名前（必須）
             <input v-model="form.name" type="text" maxlength="255" required class="mt-1 w-full rounded border p-2" />
             <span v-if="form.errors.name" class="block text-red-700">{{ form.errors.name }}</span>
@@ -141,7 +153,7 @@ function save() {
         <label v-if="allowStatus" class="flex items-center gap-2 text-sm"><input v-model="form.is_active" type="checkbox" />簡易予定で選択できる</label>
         <div class="flex justify-end gap-3">
             <button v-if="isEditing" type="button" class="text-sm text-gray-600 underline" @click="emit('cancel')">キャンセル</button>
-            <button type="submit" :disabled="form.processing" class="rounded px-4 py-2 text-sm font-medium disabled:opacity-50" :class="routePrefix.startsWith('user.') ? 'bg-blue-600 text-white' : 'bg-yellow-500 text-gray-900'">{{ isEditing ? '変更を保存' : '登録する' }}</button>
+            <button type="submit" :disabled="form.processing" class="rounded px-4 py-2 text-sm font-medium disabled:opacity-50" :class="broadProjectColor(routePrefix)">{{ isEditing ? '変更を保存' : '登録する' }}</button>
         </div>
     </form>
 </template>

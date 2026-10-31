@@ -43,7 +43,7 @@ const titleSuggestions = computed(() => recentTitles.value
     .slice(0, 8));
 const time = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 const projectLabel = (project) => [project.title, project.jobcode, project.client_name].filter(Boolean).join(' / ');
-const broadProjectLabel = (project) => [project.name, project.client_name, project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' / ');
+const broadProjectLabel = (project) => [project.path || project.name, project.client_name, !project.path && project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' / ');
 const matchingBroadProjects = computed(() => broadProjects.value.filter(project => {
     const words = projectSearch.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     return words.every(word => broadProjectLabel(project).toLocaleLowerCase().includes(word));

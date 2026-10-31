@@ -85,6 +85,7 @@ function getGhostUsersLink() {
 }
 
 const tabs = computed(() => [
+    { key: 'broad_projects', href: page.props.auth?.canManageBroadProjects ? tryRoute('coordinator.broad_projects.index') : null, label: '大まかな案件' },
     { key: 'dashboard', href: route('coordinator.dashboard'), label: 'ダッシュボード' },
     { key: 'clients', href: route('coordinator.clients.index'), label: 'クライアント管理' },
     { key: 'subcontractors', href: route('coordinator.subcontractors.index'), label: '外注先管理' },
@@ -137,6 +138,7 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link v-if="page.props.auth?.canManageBroadProjects" :href="route('coordinator.broad_projects.index')" :class="tab('broad_projects')">大まかな案件</Link>
             <Link :href="route('coordinator.dashboard')" :class="tab('dashboard')"> ダッシュボード </Link>
             <Link :href="route('coordinator.clients.index')" :class="tab('clients')"> クライアント管理 </Link>
             <Link :href="route('coordinator.subcontractors.index')" :class="tab('subcontractors')"> 外注先管理 </Link>

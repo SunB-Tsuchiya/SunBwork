@@ -5,85 +5,64 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\BroadProject;
 use App\Models\Client;
+use App\Services\BroadProjectTree;
 use App\Services\PersonalWorkSchedule;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class BroadProjectController extends Controller
 {
-    public function __construct(private PersonalWorkSchedule $schedule) {}
+    protected string $defaultPrefix = 'superadmin.broad_projects';
+
+    public function __construct(protected BroadProjectTree $tree, protected PersonalWorkSchedule $schedule) {}
+
+    protected function prefix(Request $request): string
+    {
+        $name = $request->route()?->getName() ?? '';
+        foreach (['coordinator.broad_projects', 'leader.broad_projects'] as $prefix) {
+            if (str_starts_with($name, $prefix.'.')) return $prefix;
+        }
+        return $this->defaultPrefix;
+    }
+
+    protected function authorizeContext(Request $request): void
+    {
+        $this->tree->authorize($request->user());
+        if (str_starts_with($this->prefix($request), 'user.')) {
+            abort_unless($this->schedule->available($request->user()), 403);
+        }
+    }
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->schedule->available($user), 403);
-
-        return Inertia::render('SuperAdmin/BroadProjects/Index', [
-            'projects' => BroadProject::where('company_id', $user->company_id)
-                ->where('department_id', $user->department_id)
-                ->with('client:id,name')
-                ->orderByDesc('is_active')->orderBy('name')->orderBy('id')->get(),
+        $this->authorizeContext($request);
+        return Inertia::render(str_starts_with($this->prefix($request), 'user.') ? 'User/WorkHub/BroadProjects' : 'SuperAdmin/BroadProjects/Index', [
+            'projects' => $this->tree->rows($request->user()),
+            'routePrefix' => $this->prefix($request),
         ]);
     }
 
     public function clients(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->schedule->available($user), 403);
+        $this->authorizeContext($request);
         $params = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $term = trim($params['q'] ?? '');
-
-        return response()->json(Client::forCompany($user->company_id)
-            ->active()
-            ->when($term !== '', fn ($query) => $query->where('name', 'like', '%'.addcslashes($term, '%_\\').'%'))
+        return response()->json(Client::forCompany($request->user()->company_id)->active()
+            ->when($term !== '', fn ($q) => $q->where('name', 'like', '%'.addcslashes($term, '%_\\').'%'))
             ->orderBy('name')->limit(30)->get(['id', 'name']));
     }
 
     public function store(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->schedule->available($user), 403);
-        $data = $this->validated($request);
-        $this->checkClient($data['client_id'] ?? null, $user->company_id);
-        BroadProject::create($data + ['company_id' => $user->company_id, 'department_id' => $user->department_id]);
-
-        return to_route('superadmin.broad_projects.index');
+        $this->authorizeContext($request);
+        $this->tree->save($request->user(), $request->all());
+        return to_route($this->prefix($request).'.index')->with('success', '大まかな案件を追加しました。');
     }
 
     public function update(Request $request, BroadProject $broadProject)
     {
-        $user = $request->user();
-        abort_unless($this->schedule->available($user), 403);
-        abort_unless((int) $broadProject->company_id === (int) $user->company_id
-            && (int) $broadProject->department_id === (int) $user->department_id, 404);
-        $data = $this->validated($request);
-        $this->checkClient($data['client_id'] ?? null, $user->company_id);
-        $broadProject->update($data);
-
-        return to_route('superadmin.broad_projects.index');
-    }
-
-    private function validated(Request $request): array
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'client_id' => ['nullable', 'integer', Rule::exists('clients', 'id')],
-            'fiscal_year' => ['nullable', 'integer', 'between:1900,2100'],
-            'is_active' => ['required', 'boolean'],
-        ]);
-        $data['name'] = trim($data['name']);
-        if ($data['name'] === '') {
-            throw ValidationException::withMessages(['name' => '名前を入力してください。']);
-        }
-        return $data;
-    }
-
-    private function checkClient(?int $clientId, int $companyId): void
-    {
-        if ($clientId && ! Client::forCompany($companyId)->whereKey($clientId)->exists()) {
-            throw ValidationException::withMessages(['client_id' => 'この取引先は選択できません。']);
-        }
+        $this->authorizeContext($request);
+        $this->tree->save($request->user(), $request->all(), $broadProject);
+        return to_route($this->prefix($request).'.index')->with('success', '大まかな案件を更新しました。');
     }
 }

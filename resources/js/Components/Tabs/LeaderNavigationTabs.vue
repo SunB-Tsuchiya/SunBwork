@@ -25,6 +25,7 @@ function tryRoute(name) {
 }
 
 const tabs = computed(() => [
+    { key: 'broad_projects', href: page.props.auth?.canManageBroadProjects ? tryRoute('leader.broad_projects.index') : null, label: '大まかな案件' },
     { key: 'dashboard', href: tryRoute('leader.dashboard'), label: 'ダッシュボード' },
     { key: 'user_management', href: tryRoute('leader.user_management.index'), label: 'ユーザー管理', condition: isDepartmentLeader.value },
     {
@@ -73,6 +74,7 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link v-if="page.props.auth?.canManageBroadProjects" :href="route('leader.broad_projects.index')" :class="tab('broad_projects')">大まかな案件</Link>
             <Link :href="route('leader.dashboard')" :class="tab('dashboard')">
                 ダッシュボード
             </Link>

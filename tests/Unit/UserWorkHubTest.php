@@ -108,7 +108,7 @@ class UserWorkHubTest extends TestCase
 
     public function test_all_new_controller_actions_reject_direct_access_by_ordinary_user(): void
     {
-        $controller = new \App\Http\Controllers\User\WorkHubBroadProjectController($this->hub);
+        $controller = new \App\Http\Controllers\User\WorkHubBroadProjectController(new \App\Services\BroadProjectTree, new PersonalWorkSchedule);
         foreach (['index', 'clients', 'store'] as $action) {
             $request = \Illuminate\Http\Request::create('/user/work/broad-projects', 'POST', ['name' => 'Denied']);
             $request->setUserResolver(fn () => $this->user(['user_role' => 'user']));

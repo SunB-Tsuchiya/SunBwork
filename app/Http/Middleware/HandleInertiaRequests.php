@@ -234,6 +234,7 @@ class HandleInertiaRequests extends Middleware
 
                     return false;
                 })(),
+                'canManageBroadProjects' => app(\App\Services\BroadProjectTree::class)->canManage($request->user()),
                 'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()
                     && app(PersonalWorkSchedule::class)->available($request->user()),
                 // 校正チームメンバーフラグ

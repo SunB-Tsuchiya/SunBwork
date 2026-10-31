@@ -214,27 +214,28 @@ class DepartmentWorkController extends Controller
             })->values();
 
         $selectedBroadId = (int) ($params['selected_broad_id'] ?? 0);
+        // Keep the full department tree until after ancestor filtering; a paused
+        // branch must not consume the search limit or become a new selection.
         $broadProjects = BroadProject::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
-            ->where(function ($query) use ($selectedBroadId, $term) {
-                $query->where(function ($active) use ($term) {
-                    $active->where('is_active', true)
-                        ->when($term !== '', fn ($q) => $q->where(function ($match) use ($term) {
-                            $like = '%'.addcslashes($term, '%_\\').'%';
-                            $match->where('name', 'like', $like)
-                                ->orWhereHas('client', fn ($client) => $client->where('name', 'like', $like));
-                        }));
-                })->when($selectedBroadId, fn ($q) => $q->orWhere('broad_projects.id', $selectedBroadId));
-            })
-            ->with('client:id,name')
+            ->with(['client:id,name', 'parent.parent'])
             ->when($selectedBroadId, fn ($query) => $query->orderByRaw('id = ? DESC', [$selectedBroadId]))
-            ->orderBy('name')->limit(30)->get()
-            ->map(fn ($project) => [
-                'id' => $project->id, 'name' => $project->name,
+            ->orderBy('name')->get()
+            ->filter(function ($project) use ($selectedBroadId, $term) {
+                if ((int) $project->id === $selectedBroadId) return true;
+                if (! $project->activePath()) return false;
+                $label = $project->pathLabel().' '.($project->client?->name ?? '');
+                $words = preg_split('/\s+/u', mb_strtolower(trim($term)), -1, PREG_SPLIT_NO_EMPTY);
+                foreach ($words as $word) {
+                    if (! str_contains(mb_strtolower($label), $word)) return false;
+                }
+                return true;
+            })->take(30)->map(fn ($project) => [
+                'id' => $project->id, 'name' => $project->name, 'path' => $project->pathLabel(),
                 'client_name' => $project->client?->name,
                 'fiscal_year' => $project->fiscal_year,
-                'is_active' => $project->is_active,
-            ]);
+                'is_active' => $project->activePath(),
+            ])->values();
 
         $recentTitles = PersonalWorkEntry::where('user_id', $viewer->id)
             ->whereNull('source_event_id')->whereNotNull('title')
@@ -464,8 +465,8 @@ class DepartmentWorkController extends Controller
                 ->where('department_id', $user->department_id)
                 ->first();
             if (! $broad) abort(403);
-            if (! $broad->is_active && (int) ($existing?->broad_project_id) !== (int) $broad->id) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['broad_project_id' => '休止中の大まかな案件は選べません。']);
+            if (! $broad->activePath() && (int) ($existing?->broad_project_id) !== (int) $broad->id) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['broad_project_id' => '親グループを含め、休止中の大まかな案件は選べません。']);
             }
             if (! empty($data['project_job_id'])) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['broad_project_id' => '案件は一つだけ選んでください。']);

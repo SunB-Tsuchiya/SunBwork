@@ -327,6 +327,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/user/work/broad-projects', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'index'])->name('user.work.broad_projects.index');
     Route::post('/user/work/broad-projects', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'store'])->name('user.work.broad_projects.store');
 
+    Route::put('/user/work/broad-projects/{broadProject}', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'update'])->name('user.work.broad_projects.update');
+
+    foreach (['coordinator', 'leader'] as $role) {
+        Route::middleware($role)->prefix($role.'/broad-projects')->name($role.'.broad_projects.')->group(function () {
+            $controller = App\Http\Controllers\SuperAdmin\BroadProjectController::class;
+            Route::get('clients', [$controller, 'clients'])->name('clients');
+            Route::get('/', [$controller, 'index'])->name('index');
+            Route::post('/', [$controller, 'store'])->name('store');
+            Route::put('{broadProject}', [$controller, 'update'])->name('update');
+        });
+    }
+
     // 案件確認（ユーザー向け案件一覧・詳細）
     Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');
     Route::get('/user/project-jobs/{projectJob}/progress-sheets-json', [App\Http\Controllers\User\ProjectJobController::class, 'progressSheetsJson'])->name('user.project_jobs.progress_sheets_json');
