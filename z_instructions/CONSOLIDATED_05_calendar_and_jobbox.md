@@ -317,3 +317,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-10-30 管理用作業量分析の移設（配備状態はWORKLOAD_MANAGEMENT_MOVE_MANAGER1.md）: 各roleのworkload_analyzerで新分析を利用。Admin自社/Leader所属ユニット/SuperAdmin会社コンテキストの閲覧権限をWorkloadAnalysisAccessで解決し、PersonalWorkSchedule.availableの入力試用制限は緩めない。一般社員には今回開放しない。旧schedule配下の分析ページはSuperAdmin互換入口からrole管理画面へ案内。作業記録の試用メニューは外すがデータ/厳しいAPI権限は保持。採点式の変更/DB migrationなし。
 
 2026-10-31 大まかな案件の階層管理（ローカル検証・未配備）: BroadProjectTreeが本人の会社/INFO部署とSuperAdmin/Coordinator/Leaderを再認可する。最大3段の親子を一つの一覧で開閉し、名前・祖先名・取引先・年度の検索では一致行と祖先を表示。登録/編集は共通BroadProjectFormモーダル、親選択、ロール別ルート/操作色、通常AppLayoutを維持。親の休止も簡易入力の新規候補から除き、既存選択は再編集できる。簡易入力の候補だけに経路ラベルを返し、既存カレンダータイトル/レコードは一括変更しない。分類管理の進行管理/Leader開放と一般Userの仕事ハブ/新入力公開は別権限。承認済み62分類は専用CLIで明示会社部署にdry-run後登録し、import_keyでWeb編集を保護。詳しくはUSER_WORK_HUB_PLAN1/MANAGER1。
+
+2026-10-31追記: 上記階層管理はe6280319fへ本番限定配備済み。承認62分類を追加し旧年度付き1件を保持、合計63件。INFO同部署Coordinator/Leader/SuperAdminの分類管理のみ開放。一般Userの新ハブ/入力の公開と既存ProjectJob紐付けは含まない。新階層の利用者画面確認は未完了（USER_WORK_HUB_MANAGER1）。
