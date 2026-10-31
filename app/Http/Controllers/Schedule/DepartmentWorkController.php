@@ -220,7 +220,8 @@ class DepartmentWorkController extends Controller
             ->where('department_id', $viewer->department_id)
             ->with(['client:id,name', 'parent.parent'])
             ->when($selectedBroadId, fn ($query) => $query->orderByRaw('id = ? DESC', [$selectedBroadId]))
-            ->orderBy('name')->get()
+            ->inDisplayOrder()->get()
+            ->sortBy(fn ($project) => [(int) $project->id === $selectedBroadId ? 0 : 1, ...$project->displayOrderKey()])
             ->filter(function ($project) use ($selectedBroadId, $term) {
                 if ((int) $project->id === $selectedBroadId) return true;
                 if (! $project->activePath()) return false;

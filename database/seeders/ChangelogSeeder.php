@@ -161,6 +161,7 @@ class ChangelogSeeder extends Seeder
         (new DepartmentRecordsPreviewChangelogSeeder())->run();
         (new UserWorkHubPreviewChangelogSeeder())->run();
         (new BroadProjectTreeChangelogSeeder())->run();
+        (new BroadProjectOrganizationChangelogSeeder())->run();
         (new EvaluationV3DefaultChangelogSeeder())->run();
         $this->seedScheduleOtherSplit();
         $this->seedWorkloadTrialRebuild();

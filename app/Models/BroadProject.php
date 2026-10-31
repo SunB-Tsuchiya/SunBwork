@@ -13,7 +13,20 @@ class BroadProject extends Model
     protected $casts = [
         'fiscal_year' => 'integer',
         'is_active' => 'boolean',
+        'sort_order' => 'integer',
     ];
+
+    public function scopeInDisplayOrder($query)
+    {
+        return $query->orderByRaw('sort_order IS NULL')->orderBy('sort_order')->orderBy('name')->orderBy('id');
+    }
+
+    public function displayOrderKey(): array
+    {
+        $root = $this->parent_id ? $this->parent : $this;
+        return [$root?->sort_order ?? PHP_INT_MAX, $root?->name ?? '', $root?->id ?? 0,
+            $this->parent_id ? 1 : 0, $this->sort_order ?? PHP_INT_MAX, $this->name, $this->id];
+    }
 
     public function client()
     {
@@ -33,7 +46,7 @@ class BroadProject extends Model
     public function pathLabel(): string
     {
         $labels = []; $seen = []; $node = $this;
-        while ($node && ! isset($seen[$node->id]) && count($seen) < 3) {
+        while ($node && ! isset($seen[$node->id]) && count($seen) < 2) {
             if ((int) $node->company_id !== (int) $this->company_id
                 || (int) $node->department_id !== (int) $this->department_id) break;
             $seen[$node->id] = true;
@@ -47,7 +60,7 @@ class BroadProject extends Model
     {
         $seen = []; $node = $this;
         while ($node) {
-            if (isset($seen[$node->id]) || count($seen) >= 3 || ! $node->is_active
+            if (isset($seen[$node->id]) || count($seen) >= 2 || ! $node->is_active
                 || (int) $node->company_id !== (int) $this->company_id
                 || (int) $node->department_id !== (int) $this->department_id) return false;
             $seen[$node->id] = true;

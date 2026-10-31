@@ -32,18 +32,20 @@ export function treeRows(projects, query = '', showInactive = false, expanded = 
     return rows;
 }
 
-export function parentOptions(projects, projectId) {
-    return projects.filter(p => {
-        let node = p;
-        let depth = 0;
-        const seen = new Set();
-        while (node) {
-            if (node.id === projectId || seen.has(node.id)) return false;
-            seen.add(node.id); depth++;
-            node = projects.find(n => n.id === node.parent_id);
-        }
-        return depth < 3;
-    });
+export function largeGroups(projects) {
+    return projects.filter(p => p.parent_id == null);
+}
+
+export function siblings(projects, parentId = null) {
+    return projects.filter(p => (p.parent_id ?? null) === parentId);
+}
+
+export function shiftOrder(ids, index, direction) {
+    const target = index + direction;
+    if (target < 0 || target >= ids.length) return [...ids];
+    const next = [...ids];
+    [next[index], next[target]] = [next[target], next[index]];
+    return next;
 }
 
 export function broadProjectColor(prefix) {

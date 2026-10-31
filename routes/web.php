@@ -328,6 +328,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::post('/user/work/broad-projects', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'store'])->name('user.work.broad_projects.store');
 
     Route::put('/user/work/broad-projects/{broadProject}', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'update'])->name('user.work.broad_projects.update');
+    Route::post('/user/work/broad-projects/{broadProject}/move', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'move'])->name('user.work.broad_projects.move');
+    Route::post('/user/work/broad-projects/reorder', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'reorder'])->name('user.work.broad_projects.reorder');
 
     foreach (['coordinator', 'leader'] as $role) {
         Route::middleware($role)->prefix($role.'/broad-projects')->name($role.'.broad_projects.')->group(function () {
@@ -336,6 +338,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             Route::get('/', [$controller, 'index'])->name('index');
             Route::post('/', [$controller, 'store'])->name('store');
             Route::put('{broadProject}', [$controller, 'update'])->name('update');
+            Route::post('{broadProject}/move', [$controller, 'move'])->name('move');
+            Route::post('reorder', [$controller, 'reorder'])->name('reorder');
         });
     }
 
@@ -707,6 +711,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('broad-projects', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'index'])->name('broad_projects.index');
         Route::post('broad-projects', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'store'])->name('broad_projects.store');
         Route::put('broad-projects/{broadProject}', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'update'])->name('broad_projects.update');
+        Route::post('broad-projects/{broadProject}/move', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'move'])->name('broad_projects.move');
+        Route::post('broad-projects/reorder', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'reorder'])->name('broad_projects.reorder');
 
         // デモページ管理
         Route::prefix('demo-pages')->name('demo_pages.')->group(function () {

@@ -319,3 +319,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-10-31 大まかな案件の階層管理（ローカル検証・未配備）: BroadProjectTreeが本人の会社/INFO部署とSuperAdmin/Coordinator/Leaderを再認可する。最大3段の親子を一つの一覧で開閉し、名前・祖先名・取引先・年度の検索では一致行と祖先を表示。登録/編集は共通BroadProjectFormモーダル、親選択、ロール別ルート/操作色、通常AppLayoutを維持。親の休止も簡易入力の新規候補から除き、既存選択は再編集できる。簡易入力の候補だけに経路ラベルを返し、既存カレンダータイトル/レコードは一括変更しない。分類管理の進行管理/Leader開放と一般Userの仕事ハブ/新入力公開は別権限。承認済み62分類は専用CLIで明示会社部署にdry-run後登録し、import_keyでWeb編集を保護。詳しくはUSER_WORK_HUB_PLAN1/MANAGER1。
 
 2026-10-31追記: 上記階層管理はe6280319fへ本番限定配備済み。承認62分類を追加し旧年度付き1件を保持、合計63件。INFO同部署Coordinator/Leader/SuperAdminの分類管理のみ開放。一般Userの新ハブ/入力の公開と既存ProjectJob紐付けは含まない。新階層の利用者画面確認は未完了（USER_WORK_HUB_MANAGER1）。
+
+2026-10-31 利用者承認による操作整理（ローカル実装/未配備）: 分類を大/中2段とし、通常編集は名前/取引先/年度/休止だけ。大追加と各大内の中追加を分け、中だけ専用「グループ移動」で大の間を移す。大を子へ移す/中の下へ追加しない。共通順は承認Excel順を初期値とし、INFO同部署Coordinator/Leader/SuperAdminのみ、専用モーダルで大同士/同じ大内の中同士を並べ替えて保存する。休止込みの全兄弟を対象に現在順をサーバ照合し、同時変更時は再表示を求める。一般Userの並べ替えは不可。AppLayout/role色/ルート/共通フォームは維持。新sort_order/初期化CLIは設定済み順を保護し、既存ID/所属/名称を初期化で変えない。一般公開/お気に入り/ProjectJob紐付けは後続。進捗はUSER_WORK_HUB_MANAGER1。

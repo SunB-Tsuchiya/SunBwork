@@ -31,29 +31,73 @@ class BroadProjectTree
         return BroadProject::where('company_id', $user->company_id)->where('department_id', $user->department_id);
     }
 
+    private function own(User $user, BroadProject $node): void
+    {
+        $this->authorize($user);
+        if ((int) $node->company_id !== (int) $user->company_id
+            || (int) $node->department_id !== (int) $user->department_id) throw new AuthorizationException;
+    }
+
     public function rows(User $user): array
     {
-        $nodes = $this->scoped($user)->with(['client:id,name', 'parent.parent'])->orderBy('name')->orderBy('id')->get();
+        $nodes = $this->scoped($user)->with(['client:id,name', 'parent'])->inDisplayOrder()->get();
         return $nodes->map(fn ($node) => [
             'id' => $node->id, 'parent_id' => $node->parent_id, 'name' => $node->name,
             'client_id' => $node->client_id, 'client' => $node->client,
             'fiscal_year' => $node->fiscal_year, 'is_active' => $node->is_active,
+            'sort_order' => $node->sort_order,
             'path' => $node->pathLabel(), 'selectable' => $node->activePath(),
         ])->all();
+    }
+
+    private function lockDepartment(User $user): void
+    {
+        DB::table('departments')->where('id', $user->department_id)->lockForUpdate()->first();
+    }
+
+    private function root(User $user, int $id): BroadProject
+    {
+        $parent = $this->scoped($user)->find($id);
+        if (! $parent || $parent->parent_id !== null) {
+            throw ValidationException::withMessages(['parent_id' => '同じ部署の大グループを選んでください。']);
+        }
+        return $parent;
+    }
+
+    private function checkDuplicate(User $user, array $data, ?int $except = null): void
+    {
+        if ($this->scoped($user)->where('parent_id', $data['parent_id'])->where('name', $data['name'])
+            ->where('client_id', $data['client_id'])->where('fiscal_year', $data['fiscal_year'])
+            ->when($except, fn ($q) => $q->whereKeyNot($except))->exists()) {
+            throw ValidationException::withMessages(['name' => '同じグループ内に同名・同取引先・同年度の分類があります。休止中も確認してください。']);
+        }
+    }
+
+    private function nextOrder(User $user, ?int $parent): int
+    {
+        return ((int) $this->scoped($user)->where('parent_id', $parent)->max('sort_order')) + 10;
     }
 
     public function save(User $user, array $input, ?BroadProject $existing = null): BroadProject
     {
         $this->authorize($user);
-        if ($existing && ((int) $existing->company_id !== (int) $user->company_id
-            || (int) $existing->department_id !== (int) $user->department_id)) throw new AuthorizationException;
-        $data = Validator::make($input, [
-            'name' => ['required', 'string', 'max:255'], 'parent_id' => ['nullable', 'integer', 'min:1'],
+        if ($existing) $this->own($user, $existing);
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
             'client_id' => ['nullable', 'integer', 'min:1'], 'fiscal_year' => ['nullable', 'integer', 'between:1900,2100'],
             'is_active' => ['required', 'boolean'],
-        ])->validate();
+        ];
+        if ($existing) {
+            // Editing metadata can never silently move a group, even with a crafted request.
+            if (array_key_exists('parent_id', $input) || array_key_exists('group_type', $input)) {
+                throw ValidationException::withMessages(['parent_id' => '所属の変更は「グループ移動」から行ってください。']);
+            }
+        } else {
+            $rules['group_type'] = ['required', 'in:large,middle'];
+            $rules['parent_id'] = ['nullable', 'integer', 'min:1', 'required_if:group_type,middle', 'prohibited_if:group_type,large'];
+        }
+        $data = Validator::make($input, $rules)->validate();
         $data['name'] = trim(preg_replace('/[\s\x{3000}]+/u', ' ', $data['name']));
-        $data['parent_id'] = $data['parent_id'] ?? null;
         $data['client_id'] = $data['client_id'] ?? null;
         $data['fiscal_year'] = $data['fiscal_year'] ?? null;
         if ($data['name'] === '') throw ValidationException::withMessages(['name' => '名前を入力してください。']);
@@ -63,33 +107,68 @@ class BroadProjectTree
         }
 
         return DB::transaction(function () use ($user, $data, $existing) {
-            // Serialize tree edits and the approved import within the department.
-            DB::table('departments')->where('id', $user->department_id)->lockForUpdate()->first();
-            $nodes = $this->scoped($user)->get()->keyBy('id');
-            $id = $existing?->id ?? 0;
-            $parents = $nodes->mapWithKeys(fn ($n) => [$n->id => $n->parent_id])->all();
-            $parents[$id] = $data['parent_id'];
-            foreach (array_keys($parents) as $start) {
-                $seen = []; $cursor = $start;
-                while ($cursor !== null) {
-                    if (isset($seen[$cursor]) || ! array_key_exists($cursor, $parents)) {
-                        throw ValidationException::withMessages(['parent_id' => '同じ部署のグループを選び、循環しないようにしてください。']);
-                    }
-                    $seen[$cursor] = true;
-                    if (count($seen) > 3) throw ValidationException::withMessages(['parent_id' => 'グループは3段までにしてください。']);
-                    $cursor = $parents[$cursor];
-                }
-            }
-            $duplicate = $this->scoped($user)->where('parent_id', $data['parent_id'])->where('name', $data['name'])
-                ->where('client_id', $data['client_id'])->where('fiscal_year', $data['fiscal_year'])
-                ->when($existing, fn ($q) => $q->whereKeyNot($existing->id))->exists();
-            if ($duplicate) throw ValidationException::withMessages(['name' => '同じ親・名前・取引先・年度の案件が登録されています。休止中も確認してください。']);
+            $this->lockDepartment($user);
             $node = $existing ? $this->scoped($user)->findOrFail($existing->id) : new BroadProject;
-            $node->fill($data);
-            $node->company_id = $user->company_id;
-            $node->department_id = $user->department_id;
+            $parentId = $existing ? $node->parent_id : ($data['parent_id'] ?? null);
+            if ($parentId !== null) $this->root($user, (int) $parentId);
+            $attributes = array_intersect_key($data, array_flip(['name', 'client_id', 'fiscal_year', 'is_active']));
+            $this->checkDuplicate($user, $attributes + ['parent_id' => $parentId], $node->id);
+            $node->fill($attributes);
+            if (! $existing) {
+                $node->company_id = $user->company_id;
+                $node->department_id = $user->department_id;
+                $node->parent_id = $parentId;
+                $node->sort_order = $this->nextOrder($user, $parentId);
+            }
             $node->save();
             return $node;
+        });
+    }
+
+    public function move(User $user, BroadProject $existing, array $input): void
+    {
+        $this->own($user, $existing);
+        $data = Validator::make($input, ['parent_id' => ['required', 'integer', 'min:1']])->validate();
+        DB::transaction(function () use ($user, $existing, $data) {
+            $this->lockDepartment($user);
+            $node = $this->scoped($user)->findOrFail($existing->id);
+            if ($node->parent_id === null || $node->children()->exists()) {
+                throw ValidationException::withMessages(['parent_id' => '移動できるのは中グループだけです。']);
+            }
+            $parent = $this->root($user, (int) $data['parent_id']);
+            if ((int) $node->parent_id === (int) $parent->id) return;
+            $this->checkDuplicate($user, [
+                'name' => $node->name, 'parent_id' => $parent->id,
+                'client_id' => $node->client_id, 'fiscal_year' => $node->fiscal_year,
+            ], $node->id);
+            $node->parent_id = $parent->id;
+            $node->sort_order = $this->nextOrder($user, $parent->id);
+            $node->save();
+        });
+    }
+
+    public function reorder(User $user, array $input): void
+    {
+        $this->authorize($user);
+        $data = Validator::make($input, [
+            'parent_id' => ['present', 'nullable', 'integer', 'min:1'],
+            'current_ids' => ['required', 'array', 'list', 'min:1'], 'current_ids.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'ordered_ids' => ['required', 'array', 'list', 'min:1'], 'ordered_ids.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ])->validate();
+        DB::transaction(function () use ($user, $data) {
+            $this->lockDepartment($user);
+            $parentId = $data['parent_id'] ?? null;
+            if ($parentId !== null) $this->root($user, (int) $parentId);
+            $current = $this->scoped($user)->where('parent_id', $parentId)->inDisplayOrder()->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $submitted = array_map('intval', $data['current_ids']);
+            $ordered = array_map('intval', $data['ordered_ids']);
+            $currentSet = $current; $orderedSet = $ordered; sort($currentSet); sort($orderedSet);
+            if ($current !== $submitted || $currentSet !== $orderedSet) {
+                throw ValidationException::withMessages(['ordered_ids' => '分類や並びが変更されています。一覧を再読み込みしてから並べ替えてください。']);
+            }
+            foreach ($ordered as $index => $id) {
+                $this->scoped($user)->whereKey($id)->update(['sort_order' => ($index + 1) * 10]);
+            }
         });
     }
 }

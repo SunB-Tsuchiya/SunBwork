@@ -29,6 +29,9 @@ class ApprovedBroadProjectImport
                     $ids[$item['key']] = $node->id; $reused++;
                     continue; // Preserve every web edit, including the parent and active state.
                 }
+                if ($parentId && ! $scope()->where('id', $parentId)->whereNull('parent_id')->exists()) {
+                    throw new RuntimeException('中グループは大グループの中にだけ登録できます。');
+                }
                 $matches = $scope()->whereNull('import_key')->where('parent_id', $parentId)->where('name', $item['name'])
                     ->whereNull('client_id')->whereNull('fiscal_year')->get();
                 if ($matches->count() > 1) throw new RuntimeException('同名の既存候補が複数あります。登録を中止しました。');

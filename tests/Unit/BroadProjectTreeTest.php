@@ -45,6 +45,7 @@ class BroadProjectTreeTest extends TestCase
         });
         $container->bind('db.schema', fn () => $this->db->getConnection()->getSchemaBuilder());
         (require dirname(__DIR__, 2).'/database/migrations/2026_10_31_200001_add_tree_to_broad_projects.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_10_31_210001_add_sort_order_to_broad_projects.php')->up();
         $schema->create('project_jobs', fn (Blueprint $t) => $t->id());
         $schema->create('project_job_assignments', function (Blueprint $t) {
             $t->id(); $t->integer('project_job_id')->default(1); $t->integer('user_id'); $t->integer('sender_id')->nullable();
@@ -80,7 +81,7 @@ class BroadProjectTreeTest extends TestCase
 
     private function save(string $name, ?int $parent = null, ?\App\Models\BroadProject $existing = null): \App\Models\BroadProject
     {
-        return $this->tree->save($this->user(), ['name' => $name, 'parent_id' => $parent, 'is_active' => true], $existing);
+        return $this->tree->save($this->user(), ['name' => $name, 'is_active' => true] + ($existing ? [] : ['group_type' => $parent ? 'middle' : 'large', 'parent_id' => $parent]), $existing);
     }
 
     private function rejects(callable $action, string $exception = ValidationException::class): void
@@ -103,25 +104,72 @@ class BroadProjectTreeTest extends TestCase
         $this->rejects(fn () => $this->save('Injected', $foreign->id));
         $this->rejects(fn () => $this->save('Injected', null, $foreign), AuthorizationException::class);
         self::assertCount(0, $this->tree->rows($this->user()));
-        $node = $this->tree->save($this->user(), ['name' => 'Scoped', 'is_active' => true, 'company_id' => 2, 'department_id' => 3]);
+        $node = $this->tree->save($this->user(), ['name' => 'Scoped', 'group_type' => 'large', 'is_active' => true, 'company_id' => 2, 'department_id' => 3]);
         self::assertEquals(1, $node->company_id); self::assertEquals(1, $node->department_id);
     }
 
-    public function test_cycles_depth_subtree_moves_and_duplicates(): void
+    public function test_two_levels_and_metadata_edits_cannot_change_membership(): void
     {
-        $root = $this->save('Root'); $middle = $this->save('Middle', $root->id); $leaf = $this->save('Leaf', $middle->id);
-        self::assertSame('Root ／ Middle ／ Leaf', $leaf->fresh()->pathLabel());
-        $this->rejects(fn () => $this->save('Fourth', $leaf->id));
-        $this->rejects(fn () => $this->save('Root', $leaf->id, $root));
-        $this->rejects(fn () => $this->save('Root', $root->id, $root));
-        $other = $this->save('Other');
-        $this->rejects(fn () => $this->save('Root', $other->id, $root)); // subtree would be four levels
+        $root = $this->save('Root'); $middle = $this->save('Middle', $root->id);
+        self::assertSame('Root ／ Middle', $middle->fresh()->pathLabel());
+        self::assertLessThan($middle->fresh()->displayOrderKey(), $root->fresh()->displayOrderKey());
+        $this->rejects(fn () => $this->save('Third', $middle->id));
+        $this->rejects(fn () => $this->tree->save($this->user(), ['name' => 'Wrong', 'is_active' => true, 'group_type' => 'large', 'parent_id' => $root->id]));
+        $this->rejects(fn () => $this->tree->save($this->user(), ['name' => 'Wrong', 'is_active' => true, 'group_type' => 'middle']));
+        $this->rejects(fn () => $this->tree->save($this->user(), ['name' => 'Root', 'is_active' => true, 'parent_id' => $middle->id], $root));
+        $this->rejects(fn () => $this->tree->save($this->user(), ['name' => 'Middle', 'is_active' => true, 'parent_id' => null], $middle));
         $this->rejects(fn () => $this->save(' Middle ', $root->id));
+        $other = $this->save('Other');
         self::assertNotNull($this->save('Middle', $other->id));
+        $edited = $this->tree->save($this->user(), ['name' => 'Renamed', 'is_active' => true, 'sort_order' => 999], $middle);
+        self::assertEquals($root->id, $edited->parent_id); self::assertEquals(10, $edited->sort_order);
         $root->update(['is_active' => false]);
-        self::assertFalse($leaf->fresh()->activePath());
-        $this->rejects(fn () => $this->save('Root')); // paused duplicates still rejected
+        self::assertFalse($middle->fresh()->activePath());
+        $this->rejects(fn () => $this->save('Root'));
         self::assertNull($root->fresh()->parent_id);
+    }
+
+    public function test_only_middle_groups_move_to_own_large_groups_and_keep_identity(): void
+    {
+        $root = $this->save('Root'); $other = $this->save('Other');
+        $middle = $this->save('Middle', $root->id); $existing = $this->save('Existing', $other->id);
+        $this->rejects(fn () => $this->tree->move($this->user(), $root, ['parent_id' => $other->id]));
+        $this->rejects(fn () => $this->tree->move($this->user(), $middle, ['parent_id' => $middle->id]));
+        $this->rejects(fn () => $this->tree->move($this->user(), $middle, ['parent_id' => null]));
+        $this->tree->move($this->user(), $middle, ['parent_id' => $other->id]);
+        self::assertEquals($other->id, $middle->fresh()->parent_id);
+        self::assertSame('Middle', $middle->fresh()->name); self::assertEquals(20, $middle->fresh()->sort_order);
+        self::assertEquals($middle->id, $middle->fresh()->id);
+        self::assertEquals(10, $existing->fresh()->sort_order);
+        $duplicate = $this->save('Middle', $root->id);
+        $this->rejects(fn () => $this->tree->move($this->user(), $duplicate, ['parent_id' => $other->id]));
+        $foreign = \App\Models\BroadProject::create(['name' => 'Foreign', 'company_id' => 2, 'department_id' => 3, 'is_active' => true]);
+        $this->rejects(fn () => $this->tree->move($this->user(), $middle, ['parent_id' => $foreign->id]));
+        $this->rejects(fn () => $this->tree->move($this->user(), $foreign, ['parent_id' => $root->id]), AuthorizationException::class);
+        $this->rejects(fn () => $this->tree->move($this->user(['user_role' => 'user']), $middle, ['parent_id' => $root->id]), AuthorizationException::class);
+    }
+
+    public function test_reorder_requires_full_current_sibling_order_and_manager_role(): void
+    {
+        $root = $this->save('Root'); $other = $this->save('Other'); $child = $this->save('Child', $root->id);
+        $input = ['parent_id' => null, 'current_ids' => [$root->id, $other->id], 'ordered_ids' => [$other->id, $root->id]];
+        foreach (['user', 'admin', 'clerk'] as $role) {
+            $this->rejects(fn () => $this->tree->reorder($this->user(['user_role' => $role]), $input), AuthorizationException::class);
+        }
+        $this->rejects(fn () => $this->tree->reorder($this->user(), array_replace($input, ['ordered_ids' => [$root->id]])));
+        $this->rejects(fn () => $this->tree->reorder($this->user(), array_replace($input, ['ordered_ids' => [$root->id, $child->id]])));
+        $this->rejects(fn () => $this->tree->reorder($this->user(), array_replace($input, ['ordered_ids' => [$root->id, $root->id]])));
+        $this->rejects(fn () => $this->tree->reorder($this->user(), array_replace($input, ['ordered_ids' => ['first' => $other->id, 'second' => $root->id]])));
+        $this->tree->reorder($this->user(['user_role' => 'coordinator']), $input);
+        self::assertSame([$other->id, $root->id], \App\Models\BroadProject::whereNull('parent_id')->inDisplayOrder()->pluck('id')->all());
+        self::assertEquals(10, $child->fresh()->sort_order);
+        $this->rejects(fn () => $this->tree->reorder($this->user(), $input)); // stale original order
+        $paused = $this->save('Paused', $root->id); $paused->update(['is_active' => false]);
+        $children = ['parent_id' => $root->id, 'current_ids' => [$child->id, $paused->id], 'ordered_ids' => [$paused->id, $child->id]];
+        $this->tree->reorder($this->user(['user_role' => 'leader']), $children);
+        self::assertSame([$paused->id, $child->id], \App\Models\BroadProject::where('parent_id', $root->id)->inDisplayOrder()->pluck('id')->all());
+        $this->save('New', $root->id);
+        $this->rejects(fn () => $this->tree->reorder($this->user(), $children));
     }
 
     public function test_client_scope_and_existing_dormant_client(): void
@@ -129,12 +177,13 @@ class BroadProjectTreeTest extends TestCase
         $db = $this->db->getConnection();
         $db->table('clients')->insert([['id' => 1, 'name' => 'Own', 'is_dormant' => false], ['id' => 2, 'name' => 'Foreign', 'is_dormant' => false]]);
         $db->table('company_clients')->insert([['company_id' => 1, 'client_id' => 1], ['company_id' => 2, 'client_id' => 2]]);
-        $input = ['name' => 'Root', 'is_active' => true, 'client_id' => 2];
+        $input = ['name' => 'Root', 'group_type' => 'large', 'is_active' => true, 'client_id' => 2];
         $this->rejects(fn () => $this->tree->save($this->user(), $input));
         $input['client_id'] = 1;
         $node = $this->tree->save($this->user(), $input);
         $db->table('clients')->where('id', 1)->update(['is_dormant' => true]);
-        self::assertEquals(1, $this->tree->save($this->user(), $input, $node)->client_id);
+        $editing = $input; unset($editing['group_type']);
+        self::assertEquals(1, $this->tree->save($this->user(), $editing, $node)->client_id);
         $input['name'] = 'New';
         $this->rejects(fn () => $this->tree->save($this->user(), $input));
     }
@@ -169,4 +218,42 @@ class BroadProjectTreeTest extends TestCase
         self::assertSame('20261031:r01', $existing->fresh()->import_key);
         self::assertSame(62, \App\Models\BroadProject::count());
     }
+
+    public function test_initial_order_matches_approved_excel_and_preserves_manual_order_on_repeat(): void
+    {
+        $old = \App\Models\BroadProject::create(['name' => '中学入試問題集', 'fiscal_year' => 2027, 'company_id' => 1, 'department_id' => 1, 'is_active' => true]);
+        $path = dirname(__DIR__, 2).'/database/data/broad-project-classifications-20261031.json';
+        (new \App\Services\ApprovedBroadProjectImport($path))->run(1, 1, false, 'default');
+        $order = new \App\Services\ApprovedBroadProjectOrder($path);
+        self::assertSame(63, $order->run(1, 1, true, 'default')['initialized_nodes']);
+        self::assertSame(63, \App\Models\BroadProject::whereNull('sort_order')->count());
+        self::assertSame(63, $order->run(1, 1, false, 'default')['initialized_nodes']);
+        $catalog = json_decode(file_get_contents($path), true);
+        $expected = array_column(array_filter($catalog, fn ($n) => $n['parent_key'] === null), 'key');
+        $roots = \App\Models\BroadProject::whereNull('parent_id')->inDisplayOrder()->get();
+        self::assertSame($expected, $roots->whereNotNull('import_key')->pluck('import_key')->all());
+        self::assertEquals($old->id, $roots->last()->id); self::assertSame(2027, $old->fresh()->fiscal_year);
+        foreach (\App\Models\BroadProject::whereNull('parent_id')->get() as $root) {
+            if (! $root->import_key) continue;
+            $expectedChildren = array_column(array_filter($catalog, fn ($n) => $n['parent_key'] === $root->import_key), 'key');
+            self::assertSame($expectedChildren, \App\Models\BroadProject::where('parent_id', $root->id)->inDisplayOrder()->pluck('import_key')->all());
+        }
+        $current = $roots->pluck('id')->all(); $reverse = array_reverse($current);
+        $this->tree->reorder($this->user(), ['parent_id' => null, 'current_ids' => $current, 'ordered_ids' => $reverse]);
+        self::assertSame(0, $order->run(1, 1, false, 'default')['initialized_nodes']);
+        self::assertSame($reverse, \App\Models\BroadProject::whereNull('parent_id')->inDisplayOrder()->pluck('id')->all());
+        $this->rejects(fn () => $order->run(2, 1, false, 'default'), \RuntimeException::class);
+        $this->rejects(fn () => $order->run(2, 3, false, 'default'), \RuntimeException::class);
+    }
+
+    public function test_initial_order_stops_on_existing_third_level_without_reparenting(): void
+    {
+        $root = $this->save('Root'); $middle = $this->save('Middle', $root->id);
+        $third = \App\Models\BroadProject::create(['name' => 'Legacy third', 'parent_id' => $middle->id, 'company_id' => 1, 'department_id' => 1, 'is_active' => true]);
+        $order = new \App\Services\ApprovedBroadProjectOrder(dirname(__DIR__, 2).'/database/data/broad-project-classifications-20261031.json');
+        $this->rejects(fn () => $order->run(1, 1, false, 'default'), \RuntimeException::class);
+        self::assertEquals($middle->id, $third->fresh()->parent_id); self::assertNull($third->fresh()->sort_order);
+        self::assertFalse($third->fresh()->activePath());
+    }
+
 }

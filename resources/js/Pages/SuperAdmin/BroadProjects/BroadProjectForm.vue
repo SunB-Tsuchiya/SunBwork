@@ -1,6 +1,6 @@
 <script setup>
 import axios from 'axios';
-import { parentOptions, broadProjectColor } from '@/utils/broadProjectTree';
+import { broadProjectColor } from '@/utils/broadProjectTree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
@@ -22,7 +22,7 @@ const clientInputId = isEditing.value ? 'broad-project-edit-client' : 'broad-pro
 const clientOptionsId = `${clientInputId}-options`;
 const form = useForm({
     name: props.project?.name || '',
-    parent_id: props.project?.parent_id ?? props.initialParentId,
+    ...(!props.project?.id ? {group_type: props.initialParentId ? 'middle' : 'large', parent_id: props.initialParentId} : {}),
     client_id: props.project?.client_id ?? null,
     fiscal_year: props.project?.fiscal_year ?? null,
     is_active: props.project?.is_active ?? true,
@@ -114,14 +114,12 @@ function save() {
 
 <template>
     <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="save">
-        <label class="text-sm sm:col-span-2">親グループ（任意）
-            <select v-model="form.parent_id" class="mt-1 w-full rounded border p-2">
-                <option :value="null">なし（大グループ）</option>
-                <option v-for="parent in parentOptions(projects, project?.id)" :key="parent.id" :value="parent.id">{{ parent.path }}{{ !parent.selectable ? '［休止中］' : '' }}</option>
-            </select>
-            <span v-if="form.errors.parent_id" class="block text-red-700">{{ form.errors.parent_id }}</span>
-            <span class="mt-1 block text-xs text-gray-500">分類は3段まで。親を休止すると、その中の分類も新規入力の候補から外れます。</span>
-        </label>
+        <p class="text-sm text-gray-600 sm:col-span-2">
+            {{ (project?.parent_id || initialParentId) ? '中グループ' : '大グループ' }}
+            <span v-if="project?.parent_id || initialParentId"> ／ {{ projects.find(p => p.id === (project?.parent_id || initialParentId))?.name }}</span>
+        </p>
+        <p v-if="isEditing" class="text-xs text-gray-500 sm:col-span-2">ここでは名前などを編集します。中グループの所属は一覧の「グループ移動」から変更できます。</p>
+        <p v-if="form.errors.parent_id || form.errors.group_type" class="text-sm text-red-700 sm:col-span-2">{{ form.errors.parent_id || form.errors.group_type }}</p>
         <label class="text-sm">名前（必須）
             <input v-model="form.name" type="text" maxlength="255" required class="mt-1 w-full rounded border p-2" />
             <span v-if="form.errors.name" class="block text-red-700">{{ form.errors.name }}</span>

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 const source = await readFile(new URL('../../resources/js/utils/broadProjectTree.js', import.meta.url), 'utf8');
-const { treeRows, parentOptions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const { treeRows, largeGroups, siblings, shiftOrder } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const nodes = [
     {id:1,name:'模試',path:'模試',selectable:true},
     {id:2,parent_id:1,name:'公開',path:'模試 ／ 公開',selectable:true},
@@ -19,8 +19,11 @@ test('collapsed, expanded and ancestor-aware search keep the tree together', () 
     assert.deepEqual(treeRows(nodes,'子').map(n=>n.id),[]);
     assert.deepEqual(treeRows(nodes,'子',true).map(n=>n.id),[4,5]);
 });
-test('parent choices exclude self, descendants and third-level parents', () => {
-    assert.deepEqual(parentOptions(nodes,1).map(n=>n.id),[4,5]);
-    assert.deepEqual(parentOptions(nodes,2).map(n=>n.id),[1,4,5]);
-    assert.ok(!parentOptions(nodes,null).some(n=>n.id===3));
+test('large group choices and sibling ordering never mix classification levels', () => {
+    assert.deepEqual(largeGroups(nodes).map(n=>n.id), [1,4]);
+    assert.deepEqual(siblings(nodes,1).map(n=>n.id), [2]);
+    assert.deepEqual(siblings(nodes).map(n=>n.id), [1,4]);
+    assert.deepEqual(shiftOrder([1,4],0,1),[4,1]);
+    assert.deepEqual(shiftOrder([1,4],0,-1),[1,4]);
+    assert.deepEqual(shiftOrder([1,4],1,1),[1,4]);
 });

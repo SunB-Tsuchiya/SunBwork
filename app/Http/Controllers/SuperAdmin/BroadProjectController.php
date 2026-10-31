@@ -39,6 +39,7 @@ class BroadProjectController extends Controller
         return Inertia::render(str_starts_with($this->prefix($request), 'user.') ? 'User/WorkHub/BroadProjects' : 'SuperAdmin/BroadProjects/Index', [
             'projects' => $this->tree->rows($request->user()),
             'routePrefix' => $this->prefix($request),
+            'canManage' => $this->tree->canManage($request->user()),
         ]);
     }
 
@@ -65,4 +66,19 @@ class BroadProjectController extends Controller
         $this->tree->save($request->user(), $request->all(), $broadProject);
         return to_route($this->prefix($request).'.index')->with('success', '大まかな案件を更新しました。');
     }
+
+    public function move(Request $request, BroadProject $broadProject)
+    {
+        $this->authorizeContext($request);
+        $this->tree->move($request->user(), $broadProject, $request->all());
+        return to_route($this->prefix($request).'.index')->with('success', '中グループを移動しました。');
+    }
+
+    public function reorder(Request $request)
+    {
+        $this->authorizeContext($request);
+        $this->tree->reorder($request->user(), $request->all());
+        return to_route($this->prefix($request).'.index')->with('success', '部署共通の並び順を保存しました。');
+    }
+
 }
