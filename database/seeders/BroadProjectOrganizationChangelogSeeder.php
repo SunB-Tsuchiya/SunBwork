@@ -9,7 +9,7 @@ class BroadProjectOrganizationChangelogSeeder extends Seeder
 {
     public function run(): void
     {
-        Changelog::updateOrCreate(['version' => 'broad-project-organization-20261031'], [
+        Changelog::updateOrCreate(['version' => 'broad-groups-20261031'], [
             'title' => '大まかな案件の編集・移動・並べ替えを整理',
             'released_at' => '2026-10-31',
             'summary' => '分類を大グループと中グループに揃え、部署共通の並びを管理できます。',

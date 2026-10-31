@@ -126,3 +126,7 @@ Ziggyはネットワークなし・SQLiteメモリ設定の一時コンテナか
 合成メモリ検証は既存hub含む15テスト161断言成功（新sort migration適用、2段/通常編集注入拒否/中移動/大移動禁止/同名拒否/会社部署/管理権限/全兄弟順/古い順/休止/Excelの全根中区分順/再初期化保持/旧年度付きID/3段停止）。PHP変更11ファイル構文成功。実Laravel生成Ziggyで新8POSTルートとauth/sanctum/verifiedを確認、initialize-order helpでコマンド検出。JSツリー/同階層抽出/上下端操作成功。実Vue SSRで編集フォームに親入力も送信項目もないこと、大/中追加の意図、管理者ボタン制限を確認。前回の試用ナビ/role別入口もSSR退行なし。対象ESLint成功。members最終ビルド・manifestは保存時追記。本番migration/順序初期化/今回修正配備/新しい操作の利用者確認は未実施。次は元版e6280319fを固定した限定スクリプト提示・承認。
 
 2026-10-31 操作整理の最終検証: 不正な連想配列の並べ替えも拒否するテストを追加し、最終15テスト162断言成功。最新membersビルド成功、manifest490参照/欠落0/旧資産削除0/base確認。直前の161断言から更新。本番はまだe6280319fで、今回の2段/操作分離/共通順は未配備。共有ツリーや.envを変更していない。
+
+2026-10-31 操作整理配備の途中結果: 利用者は正確なorganization-deployスクリプト実行にyes。同じスクリプトで本番e6280319f/main/追跡変更なし/今回16ソース/依存変更なし/削除なしを確認し、PHP11ファイル構文成功。mysql名silverlamb759_sunbwork、63分類/2段/20兄弟集合を確認、私有スナップショット保存。sort migrationだけ--database=mysql --path/--realpath --force成功、1baed275310e902b234a21dca91cb5bc85e3bda3へ早送り。DB名を各初期化直前に確認、dry-run/本処理とも63件20集合成功。登録済み63件のsort_order以外の全列をスナップショットと厳密一致確認し、全兄弟のExcel順も成功。
+
+その後、独立BroadProjectOrganizationChangelogSeederがversion長33文字に対し既存changelogs.version VARCHAR(30)のため失敗して停止。キャッシュ4種削除と最後のGit状態確認は未実行。アプリ/DBの反映と履歴/キャッシュ完了を区別する。Codexの既存スキーマ長確認漏れを修正し、versionをbroad-groups-20261031（20文字）へ短縮。ソースはSeeder1ファイルだけを追加反映し、分類登録/migration/並び初期化は再実行せず、独立履歴登録とキャッシュ削除だけを完了する正確なSSHコマンドを提示する。一般公開未承認、新操作の画面確認もまだ。
