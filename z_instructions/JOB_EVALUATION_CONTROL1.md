@@ -560,4 +560,4 @@
 
 2026-10-31 操作整理配備の途中結果: 利用者は正確なorganization-deployスクリプト実行にyes。同じスクリプトで本番e6280319f/main/追跡変更なし/今回16ソース/依存変更なし/削除なしを確認し、PHP11ファイル構文成功。mysql名silverlamb759_sunbwork、63分類/2段/20兄弟集合を確認、私有スナップショット保存。sort migrationだけ--database=mysql --path/--realpath --force成功、1baed275310e902b234a21dca91cb5bc85e3bda3へ早送り。DB名を各初期化直前に確認、dry-run/本処理とも63件20集合成功。登録済み63件のsort_order以外の全列をスナップショットと厳密一致確認し、全兄弟のExcel順も成功。
 
-その後、独立BroadProjectOrganizationChangelogSeederがversion長33文字に対し既存changelogs.version VARCHAR(30)のため失敗して停止。キャッシュ4種削除と最後のGit状態確認は未実行。アプリ/DBの反映と履歴/キャッシュ完了を区別する。Codexの既存スキーマ長確認漏れを修正し、versionをbroad-groups-20261031（20文字）へ短縮。ソースはSeeder1ファイルだけを追加反映し、分類登録/migration/並び初期化は再実行せず、独立履歴登録とキャッシュ削除だけを完了する正確なSSHコマンドを提示する。一般公開未承認、新操作の画面確認もまだ。
+その後、独立BroadProjectOrganizationChangelogSeederがversion長33文字に対し既存changelogs.version VARCHAR(30)のため失敗して停止。キャッシュ4種削除と最後のGit状態確認は未実行。アプリ/DBの反映と履歴/キャッシュ完了を区別する。Codexの既存スキーマ長確認漏れを修正し、versionをbroad-groups-20261031（21文字）へ短縮。ソースはSeeder1ファイルだけを追加反映し、分類登録/migration/並び初期化は再実行せず、独立履歴登録とキャッシュ削除だけを完了する正確なSSHコマンドを提示する。一般公開未承認、新操作の画面確認もまだ。
