@@ -8,7 +8,7 @@
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">案件編集</h2>
             </div>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <form @submit.prevent="submit">
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">伝票番号</label>
@@ -19,6 +19,7 @@
                     <label class="mb-1 block font-semibold">案件タイトル</label>
                     <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
                 </div>
+                <BroadProjectPicker v-if="broadProjectLink.enabled" v-model="form.broad_project_id" :options="broadProjectLink.options" :suggestions="broadProjectLink.suggestions" :error="form.errors.broad_project_id" />
                 <label class="mb-4 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm">
                     <input v-model="form.show_on_department_schedule" type="checkbox" class="mt-1 rounded" />
                     <span><strong>部署の作業予定表に案件名を表示する</strong><br />極秘案件はチェックを外してください。既存の案件画面や日報の閲覧権限は変わりません。</span>
@@ -303,6 +304,7 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import BroadProjectPicker from '@/Components/ProjectJobs/BroadProjectPicker.vue';
 import DuplicateJobModal from '@/Components/DuplicateJobModal.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { useJobDuplicateCheck } from '@/Composables/useJobDuplicateCheck';
@@ -472,6 +474,7 @@ function validatePageCount() {
     }
 }
 const props = defineProps({
+    broadProjectLink: { type: Object, default: () => ({enabled: false}) },
     job: Object,
     coordinatorCandidates: { type: Array, default: () => [] },
     sizes: { type: Array, default: () => [] },
@@ -659,6 +662,7 @@ const decodedDetail = decodeField(props.job.detail, '');
 const decodedTeammember = decodeField(props.job.teammember, null);
 const decodedSchedule = decodeField(props.job.schedule, null);
 const form = useForm({
+    ...(props.broadProjectLink.enabled ? {broad_project_id: props.job.broad_project_id ?? null} : {}),
     jobcode: props.job.jobcode || '',
     title: props.job.title || props.job.name || '',
     show_on_department_schedule: props.job.show_on_department_schedule !== false,

@@ -19,6 +19,7 @@ class ProjectJob extends Model
         'creation_method',
         'client_id',
         'company_id',
+        'broad_project_id',
         'detail',
         'size_id',
         'page_count',
@@ -37,6 +38,7 @@ class ProjectJob extends Model
     protected $appends = ['image_url'];
 
     protected $casts = [
+        'broad_project_id' => 'integer',
         'schedule' => 'array',
         'completed' => 'boolean',
         'page_count' => 'integer',
@@ -48,6 +50,11 @@ class ProjectJob extends Model
     public function getImageUrlAttribute(): ?string
     {
         return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;
+    }
+
+    public function broadProject()
+    {
+        return $this->belongsTo(BroadProject::class);
     }
 
     public function company()

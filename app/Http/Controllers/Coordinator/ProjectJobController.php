@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\Client;
 use App\Models\PrepresSalesRep;
 use App\Services\OcrSpaceService;
+use App\Services\ProjectBroadProjectLink;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -457,6 +458,7 @@ class ProjectJobController extends Controller
         $salesReps = PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
         return Inertia::render('Coordinator/ProjectJobs/Create', [
+            'broadProjectLink' => app(ProjectBroadProjectLink::class)->editor($user, $companyId),
             'coordinatorCandidates' => $this->coordinatorCandidates($companyId ?: null),
             'sizes' => $sizes,
             'departments' => $departments,
@@ -489,6 +491,8 @@ class ProjectJobController extends Controller
                 'tmp_ocr_image_path'     => ['nullable', 'string', 'max:500'],
                 'show_on_department_schedule' => 'boolean',
             ]);
+
+            $data += app(ProjectBroadProjectLink::class)->attributes($request->user(), $request->all(), $this->resolveActorCompanyId($request->user()));
 
             // 受注番号の重複は禁止ではなく警告。フロントの確認モーダルで承認された場合のみ通す
             // （同じ受注番号で組版・可変・発送など別作業を登録する運用があるため）
@@ -1071,6 +1075,7 @@ class ProjectJobController extends Controller
             ->values();
 
         return Inertia::render('Coordinator/ProjectJobs/Show', [
+            'broadProjectLabel' => app(ProjectBroadProjectLink::class)->label($request->user(), $this->resolveActorCompanyId($request->user()), $projectJob),
             'job' => $projectJob,
             'subCoordinators' => $subCoordinators,
             'members' => $members,
@@ -1277,6 +1282,7 @@ class ProjectJobController extends Controller
 
         $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
         return Inertia::render('Coordinator/ProjectJobs/Edit', [
+            'broadProjectLink' => app(ProjectBroadProjectLink::class)->editor($user, $companyId, $projectJob),
             'job'                  => $jobArray,
             'coordinatorCandidates' => $this->coordinatorCandidates($companyId ?: null),
             'sizes' => $sizes,
@@ -1310,6 +1316,8 @@ class ProjectJobController extends Controller
                 'sub_coordinator_ids.*' => 'exists:users,id',
                 'show_on_department_schedule' => 'boolean',
             ]);
+
+            $data += app(ProjectBroadProjectLink::class)->attributes($request->user(), $request->all(), $this->resolveActorCompanyId($request->user()), $projectJob);
 
             // store と同様、確認モーダルで承認された場合は重複を許可する
             if (!empty($data['jobcode']) && !$request->boolean('allow_duplicate_jobcode')) {

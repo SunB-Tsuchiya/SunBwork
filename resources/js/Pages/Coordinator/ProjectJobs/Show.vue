@@ -31,6 +31,7 @@
                     <h1 class="mt-0.5 text-2xl font-bold text-gray-900">
                         {{ job.title || job.name || '（案件名なし）' }}
                     </h1>
+                    <p v-if="broadProjectLabel" class="mt-1 text-sm text-gray-600">大まかな案件：{{ broadProjectLabel }}</p>
                     <p class="mt-1 text-xs text-gray-500">
                         <span v-if="job.jobcode">伝票番号: {{ job.jobcode }}　</span>
                         <span v-if="job.user?.name">リーダー: {{ job.user.name }}</span>
@@ -1053,6 +1054,7 @@ import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 const page = usePage();
+const broadProjectLabel = computed(() => page.props.broadProjectLabel || null);
 const job  = page.props.job || {};
 const schedules = computed(() => Array.isArray(page.props.schedules) ? page.props.schedules : []);
 

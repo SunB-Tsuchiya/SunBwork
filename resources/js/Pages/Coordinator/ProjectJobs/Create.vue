@@ -16,7 +16,7 @@
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">案件作成</h2>
             </div>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <form @submit.prevent="submit">
                 <!-- クライアント選択（一番最初） -->
                 <div class="mb-4">
@@ -106,6 +106,7 @@
                     <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
                     <div v-if="form.errors.title" class="mt-1 text-sm text-red-600">{{ form.errors.title }}</div>
                 </div>
+                <BroadProjectPicker v-if="broadProjectLink.enabled" v-model="form.broad_project_id" :options="broadProjectLink.options" :suggestions="broadProjectLink.suggestions" :error="form.errors.broad_project_id" />
                 <label class="mb-4 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm">
                     <input v-model="form.show_on_department_schedule" type="checkbox" class="mt-1 rounded" />
                     <span><strong>部署の作業予定表に案件名を表示する</strong><br />極秘案件はチェックを外してください。既存の案件画面や日報の閲覧権限は変わりません。</span>
@@ -543,11 +544,13 @@ import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { useJobDuplicateCheck } from '@/Composables/useJobDuplicateCheck';
 import DateInput from '@/Components/Prepress/DateInput.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import BroadProjectPicker from '@/Components/ProjectJobs/BroadProjectPicker.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
+    broadProjectLink: { type: Object, default: () => ({enabled: false}) },
     coordinatorCandidates: { type: Array, default: () => [] },
     sizes: { type: Array, default: () => [] },
     departments: { type: Array, default: () => [] },
@@ -558,6 +561,7 @@ const props = defineProps({
 
 const page = usePage();
 const form = useForm({
+    ...(props.broadProjectLink.enabled ? {broad_project_id: null} : {}),
     jobcode: '',
     title: '',
     show_on_department_schedule: true,
