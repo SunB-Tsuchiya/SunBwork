@@ -325,3 +325,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-10-31追記: 上記大中2段/操作分離/管理者共通順は本番968f164baへ限定配備完了。sort列だけ追加、63件20兄弟集合を承認Excel順へ初期化し、sort以外の全列/ID保持を確認。独立更新履歴/キャッシュ4種/公開manifestと対象JS確認完了。新操作の利用者確認は別管理（USER_WORK_HUB_MANAGER1）。
 
 2026-11-02 ProjectJob分類参照（ローカル検証/未配備）: Coordinatorの通常新規/編集のタイトル付近でBroadProjectPickerを使い、大/中分類を任意選択。検索、共通順、元の休止選択保持、未確定候補の手動選択に対応。権限がない場合は欄と送信項目を出さず、保存時も実所属/案件管理権限を再検証。project_jobs.broad_project_idだけを明示登録し、未送信は既存値保持、NULLで解除。既存案件名/依頼/マイジョブ/添付は一括変更しない。分類経路は許可者のCoordinator詳細で独立表示し、一般Userの新ハブ/簡易入力公開とは分離。詳細はUSER_WORK_HUB_PLAN1/MANAGER1。
+
+2026-11-02追記: 上記ProjectJob分類参照は本番94d42b779へ限定配備完了。新nullable FKのみ追加し、既存の紐付け0/件数保持/分類マスター不変更を検証。公開資産も確認済み。利用者画面での新操作/保存は未確認、USER_WORK_HUB_MANAGER1で別管理。

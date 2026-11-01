@@ -1,6 +1,6 @@
 # ユーザーの仕事・案件ハブ：Codex再開用プロンプト
 
-更新: 2026-11-02 JST。**現在はProjectJobと大まかな案件の任意紐付けを実装・コード検証済み、限定配備の準備段階。** 利用者は新規/編集で任意選択、既存は候補を進行管理が確認してから登録する案を承認。新feature/project-broad-link-20261102、/tmp/sunbwork-project-broad-link-20261102（旧/tmpは消失）で作業。大中2段/操作分離/Excel順の本番最終確認は968f164ba、当該画面3点は成功確認済み。本番の現在版は未再確認。今回19テスト216断言/SSR/構文/ESLint/membersビルド成功、FK追加と新画面はまだ未配備。一般User公開未承認、既存案件を自動一括分類しない。次は固定差分の正確なSSHコマンドを提示して承認を得る。
+更新: 2026-11-02 JST。**ProjectJobと大まかな案件の任意紐付けを本番94d42b7795ff96e145953a8f21fdfd6782fad1b0へ限定配備完了。** 新nullable FK追加、既存案件の紐付け0/件数保持/分類マスター不変更、独立履歴/キャッシュ4種/公開manifestと対象4JS確認済み。利用者画面確認・実際の紐付け保存は次。新feature/project-broad-link-20261102、/tmp/sunbwork-project-broad-link-20261102で管理。19テスト216断言/SSR/構文/ESLint/members build成功。次は既存案件1件の任意欄/選択/保存後保持とタイトル維持を3点明示して確認。旧分類画面3点は成功済みで繰り返さない。一般User公開未承認、自動一括分類なし。
 
 先行アプリ実装の保存コミットは `9cb1a1330`、資料保存は `1bcd2b1ef`。2026-10-31に仮入口を追加したため、最新のソースと資料のブランチ先端は `git log` で確認する。
 
@@ -115,3 +115,7 @@ Create/Editへ共有BroadProjectPickerを追加し、検索・未選択・直接
 検証: ネットワークなしPHP8.3コンテナ、合成SQLiteメモリで新migration自体を既存行へupし、旧分類/hub含む19テスト216断言成功。nullable移行/未変更タイトル/大中保存/整数ID/解除/未送信保持/会社/部署/所有共同管理/一般会社/旧NULL会社/親休止/他部署の元リンク保持/候補未自動保存/名称親変更後の経路とID保持を検証。変更PHPと新テスト7ファイル構文成功。実Laravelルート一覧で既存create/store/edit/updateのauth:sanctum/verified/Coordinator/DenyGeneralを確認。Vue SSRは共有pickerの任意/未選択/候補未選択/既存休止表示、実Create/Editの権限別欄有無/送信項目有無/既存選択IDを確認。ESLintエラー0、Showの警告17件は保存版にも同一内容で存在（比較済み）。新履歴version project-broad-link-20261102は27文字で既存30文字制限内。
 
 members用ビルド成功、manifest490参照/欠落0/base確認、旧資産削除は復元し差分削除0。既存のnode_modules/vendorを読取参照し、共有ソース/CLAUDE.md/.env/実DBを変更していない。本番の新FK/紐付け実データ/限定配備/今回の利用者画面確認は未実施。次は本番最終確認968f164baを元版に固定し、今回10アプリソースだけと追加migrationだけを指定する配備スクリプトを提示、正確なSSHコマンド承認を得る。
+
+2026-11-02 ProjectJob紐付け限定配備完了: 利用者は提示した正確な `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/project-broad-link-deploy-20261102.sh` にyes。同じスクリプトで本番968f164ba/main/追跡変更なし/取得94d42b7795ff96e145953a8f21fdfd6782fad1b0/今回10ソース一致/依存・routes・Ziggy変更なし/削除なしを通過。PHP6ファイル実構文成功。mysql名silverlamb759_sunbwork/INFO会社2部署1/新列未存在を確認し、project件数と分類hashだけを私有検証ファイルへ保存。新nullable FK migrationだけ--database=mysql --path/--realpath --force成功後、固定SHAへ早送り。既存project件数保持・紐付け0件・会社2部署1分類マスター全列hash一致を確認し、自動一括分類なし。独立ProjectBroadProjectLinkChangelogSeeder成功、config/cache/route/view clear全成功。最後は追跡変更なし、既存未追跡5件保持。sales接続未使用。
+
+公開manifestは検証済み版と一致。app-BNL57I79.js / Create-CmOBtlHQ.js / Edit-BzSpCNbe.js / Show-DWmwbF59.jsはHTTP200。これは配備と公開資産の確認で、実ユーザーの分類保存・新画面確認はまだ未確認。次は紐付け先が明確な同部署の既存案件1件で、①編集に大まかな案件（任意）あり、②検索して意図した大/中を選べる、③更新後に編集を開き直して選択が残り案件タイトルが変わっていない、の3点を依頼。全て問題なければ成功、相違は番号と結果。既確認の分類一覧/階層/並び替え表示の試験を繰り返さない。新規作成での未選択/選択保存、分類詳細経路、別管理者の実画面は別の未確認状態。一般User新ハブ/入力公開未承認、個人お気に入りは後続。
