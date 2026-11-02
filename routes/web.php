@@ -329,6 +329,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     Route::put('/user/work/broad-projects/{broadProject}', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'update'])->name('user.work.broad_projects.update');
     Route::post('/user/work/broad-projects/{broadProject}/move', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'move'])->name('user.work.broad_projects.move');
+    Route::put('/user/work/broad-projects/{broadProject}/favorite', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'favorite'])->name('user.work.broad_projects.favorite');
     Route::post('/user/work/broad-projects/reorder', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'reorder'])->name('user.work.broad_projects.reorder');
 
     foreach (['coordinator', 'leader'] as $role) {
@@ -339,6 +340,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             Route::post('/', [$controller, 'store'])->name('store');
             Route::put('{broadProject}', [$controller, 'update'])->name('update');
             Route::post('{broadProject}/move', [$controller, 'move'])->name('move');
+            Route::put('{broadProject}/favorite', [$controller, 'favorite'])->name('favorite');
             Route::post('reorder', [$controller, 'reorder'])->name('reorder');
         });
     }
@@ -712,6 +714,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('broad-projects', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'store'])->name('broad_projects.store');
         Route::put('broad-projects/{broadProject}', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'update'])->name('broad_projects.update');
         Route::post('broad-projects/{broadProject}/move', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'move'])->name('broad_projects.move');
+        Route::put('broad-projects/{broadProject}/favorite', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'favorite'])->name('broad_projects.favorite');
         Route::post('broad-projects/reorder', [App\Http\Controllers\SuperAdmin\BroadProjectController::class, 'reorder'])->name('broad_projects.reorder');
 
         // デモページ管理

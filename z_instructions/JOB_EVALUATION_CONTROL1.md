@@ -609,3 +609,5 @@ DB/API設計案: broad_project_favorites(user_id,broad_project_id,timestamps)と
 対象案: 新migration/model/認可サービス/冪等更新route、BroadProjectController/分類一覧、DepartmentWorkController/QuickWorkEntryModal、ProjectBroadProjectLink/BroadProjectPicker、Ziggy、合成テスト/独立更新履歴/統合資料。合成メモリで本人隔離/他会社部署拒否/権限範囲/二重登録/解除冪等/休止/部署変更/共通順不変/選択候補上限と検索を検証し、Vue SSR/ESLint/実ルート/PHP構文/membersビルドを行う。配備と画面確認は別段階で、承認後も本番書込みは固定差分と正確なSSHコマンドを提示する。
 
 BOX統合の保留事項は維持: 旧マイジョブの未予定分/複数日をどう表示するか、簡易入力work_category=otherをBOXへ入れるか、依頼転換との重複表示をどう扱うかは未確定。会議/外出/その他業務の通常予定をBOXへ入れない確認は保持し、新お気に入りの検討で統合や一般公開が完了したことにしない。
+
+2026-11-02 個人お気に入り案の実装承認（確定）: 利用者は直前の「大/中を個別に星登録解除、本人だけの呼出、簡易入力と進行管理の分類選択でも使用、Excel順維持、BOX統合の前に実装」へ「はい、そうしましょう」。97b068d01末尾の提案をこの範囲で実装承認済みに置換。新テーブルと本人固定の冪等更新、現在のINFO SuperAdmin試用/同部署Coordinator/Leader分類管理の権限内で進める。一般User公開/BOX統合/共通順変更は含まない。次は合成検証とmembersビルドを完了し、専用migrationだけを指定する限定配備コマンドを提示する。

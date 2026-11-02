@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import axios from 'axios';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
@@ -17,7 +18,28 @@ const props = defineProps({
 const query = ref('');
 const showInactive = ref(false);
 const expanded = ref(new Set());
-const rows = computed(() => treeRows(props.projects, query.value, showInactive.value, expanded.value));
+const favoritesOnly = ref(false);
+const favoriteIds = ref(new Set(props.projects.filter(p => p.is_favorite).map(p => p.id)));
+const favoritePending = ref(new Set());
+const favoriteError = ref('');
+watch(() => props.projects, projects => {favoriteIds.value = new Set(projects.filter(p => p.is_favorite).map(p => p.id));});
+const rows = computed(() => treeRows(props.projects.map(p => ({...p, is_favorite: favoriteIds.value.has(p.id)})), query.value, showInactive.value, expanded.value, favoritesOnly.value));
+async function setFavorite(project) {
+    if (favoritePending.value.has(project.id)) return;
+    favoritePending.value = new Set([...favoritePending.value, project.id]); favoriteError.value = '';
+    try {
+        const {data} = await axios.put(route(`${props.routePrefix}.favorite`, {broadProject: project.id}), {
+            is_favorite: !favoriteIds.value.has(project.id),
+        }, {headers: {'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''}});
+        const next = new Set(favoriteIds.value);
+        if (data.is_favorite) next.add(project.id); else next.delete(project.id);
+        favoriteIds.value = next;
+    } catch (error) {
+        favoriteError.value = error.response?.data?.errors?.is_favorite?.[0] || 'お気に入りを保存できませんでした。再読み込みしてお試しください。';
+    } finally {
+        const next = new Set(favoritePending.value); next.delete(project.id); favoritePending.value = next;
+    }
+}
 const modal = ref(null);
 const editingProject = ref(null);
 const initialParentId = ref(null);
@@ -70,6 +92,7 @@ function toggle(id) {
                 <div class="flex flex-wrap items-center gap-3">
                     <input v-model="query" type="search" maxlength="100" placeholder="名前・親グループ・取引先・年度" aria-label="大まかな案件を検索" class="w-full rounded border px-3 py-2 text-sm sm:w-80" />
                     <label class="flex items-center gap-2 text-sm"><input v-model="showInactive" type="checkbox" />休止中も表示</label>
+                    <label class="flex items-center gap-2 text-sm"><input v-model="favoritesOnly" type="checkbox" />お気に入りだけ（{{ favoriteIds.size }}）</label>
                 </div>
                 <button v-if="canManage" type="button" class="rounded px-4 py-2 text-sm font-medium" :class="broadProjectColor(routePrefix)" @click="openCreate()">大グループを追加</button>
             </div>
@@ -79,12 +102,15 @@ function toggle(id) {
                 <button type="button" class="text-blue-700 underline" @click="expanded = new Set()">すべて閉じる</button>
             </div>
             <button v-if="canManage && largeGroups(projects).length > 1" type="button" class="mt-3 text-sm text-blue-700 underline" @click="openOrder()">大グループの並べ替え</button>
+            <p class="mt-2 text-xs text-gray-500">星は自分だけのお気に入りです。部署共通の並び順は変わりません。休止中のお気に入りは「休止中も表示」で確認・解除できます。</p>
+            <p v-if="favoriteError" role="alert" class="mt-2 text-sm text-red-700">{{ favoriteError }}</p>
             <p v-if="query.trim()" class="mt-2 text-xs text-gray-500">検索中は一致した分類と親グループを開いて表示します。</p>
             <p v-if="!rows.length" class="py-8 text-center text-sm text-gray-500">該当する大まかな案件はありません。</p>
             <ul v-else class="mt-3 divide-y divide-gray-200">
                 <li v-for="project in rows" :key="project.id" class="flex flex-wrap items-center justify-between gap-3 py-3 hover:bg-gray-50">
                     <div class="min-w-0 flex-1" :style="{ paddingLeft: `${project.depth * 20}px` }">
                         <div class="flex items-start gap-2">
+                            <button v-if="canManage" type="button" :disabled="favoritePending.has(project.id) || (!project.selectable && !favoriteIds.has(project.id))" :aria-pressed="favoriteIds.has(project.id)" :aria-label="`${project.name}をお気に入り${favoriteIds.has(project.id) ? 'から解除' : 'に登録'}`" class="shrink-0 text-lg leading-6 disabled:opacity-30" :class="favoriteIds.has(project.id) ? 'text-yellow-600' : 'text-gray-400'" @click="setFavorite(project)">{{ favoriteIds.has(project.id) ? '★' : '☆' }}</button>
                             <button v-if="project.childCount" type="button" class="w-6 shrink-0 rounded border text-gray-600" :aria-expanded="project.open" :aria-label="`${project.name}を${project.open ? '閉じる' : '開く'}`" @click="toggle(project.id)">{{ project.open ? '−' : '＋' }}</button>
                             <span v-else class="w-6 shrink-0" aria-hidden="true"></span>
                             <div class="min-w-0 break-words">

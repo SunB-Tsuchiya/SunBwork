@@ -214,29 +214,7 @@ class DepartmentWorkController extends Controller
             })->values();
 
         $selectedBroadId = (int) ($params['selected_broad_id'] ?? 0);
-        // Keep the full department tree until after ancestor filtering; a paused
-        // branch must not consume the search limit or become a new selection.
-        $broadProjects = BroadProject::where('company_id', $viewer->company_id)
-            ->where('department_id', $viewer->department_id)
-            ->with(['client:id,name', 'parent.parent'])
-            ->when($selectedBroadId, fn ($query) => $query->orderByRaw('id = ? DESC', [$selectedBroadId]))
-            ->inDisplayOrder()->get()
-            ->sortBy(fn ($project) => [(int) $project->id === $selectedBroadId ? 0 : 1, ...$project->displayOrderKey()])
-            ->filter(function ($project) use ($selectedBroadId, $term) {
-                if ((int) $project->id === $selectedBroadId) return true;
-                if (! $project->activePath()) return false;
-                $label = $project->pathLabel().' '.($project->client?->name ?? '');
-                $words = preg_split('/\s+/u', mb_strtolower(trim($term)), -1, PREG_SPLIT_NO_EMPTY);
-                foreach ($words as $word) {
-                    if (! str_contains(mb_strtolower($label), $word)) return false;
-                }
-                return true;
-            })->take(30)->map(fn ($project) => [
-                'id' => $project->id, 'name' => $project->name, 'path' => $project->pathLabel(),
-                'client_name' => $project->client?->name,
-                'fiscal_year' => $project->fiscal_year,
-                'is_active' => $project->activePath(),
-            ])->values();
+        $broadProjects = app(\App\Services\BroadProjectFavorites::class)->candidates($viewer, $term, $selectedBroadId);
 
         $recentTitles = PersonalWorkEntry::where('user_id', $viewer->id)
             ->whereNull('source_event_id')->whereNotNull('title')

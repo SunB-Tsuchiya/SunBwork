@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BroadProject;
 use App\Models\Client;
 use App\Services\BroadProjectTree;
+use App\Services\BroadProjectFavorites;
 use App\Services\PersonalWorkSchedule;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -37,7 +38,7 @@ class BroadProjectController extends Controller
     {
         $this->authorizeContext($request);
         return Inertia::render(str_starts_with($this->prefix($request), 'user.') ? 'User/WorkHub/BroadProjects' : 'SuperAdmin/BroadProjects/Index', [
-            'projects' => $this->tree->rows($request->user()),
+            'projects' => app(BroadProjectFavorites::class)->decorate($request->user(), $this->tree->rows($request->user())),
             'routePrefix' => $this->prefix($request),
             'canManage' => $this->tree->canManage($request->user()),
         ]);
@@ -79,6 +80,14 @@ class BroadProjectController extends Controller
         $this->authorizeContext($request);
         $this->tree->reorder($request->user(), $request->all());
         return to_route($this->prefix($request).'.index')->with('success', '部署共通の並び順を保存しました。');
+    }
+
+    public function favorite(Request $request, BroadProject $broadProject)
+    {
+        $this->authorizeContext($request);
+        $data = $request->validate(['is_favorite' => ['required', 'boolean']]);
+        $enabled = app(BroadProjectFavorites::class)->set($request->user(), $broadProject, (bool) $data['is_favorite']);
+        return response()->json(['is_favorite' => $enabled]);
     }
 
 }

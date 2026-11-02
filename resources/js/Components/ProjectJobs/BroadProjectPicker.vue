@@ -23,7 +23,12 @@ const selected = computed(() => props.options.find(option => option.id === props
         <input v-model="query" type="search" maxlength="100" placeholder="グループ名・年度で絞り込み" aria-label="大まかな案件の候補を検索" class="mb-2 w-full rounded border px-3 py-2 text-sm" />
         <select id="project-broad-classification" :value="modelValue" class="w-full rounded border px-3 py-2" @change="emit('update:modelValue', $event.target.value ? Number($event.target.value) : null)">
             <option value="">紐付けない</option>
-            <option v-for="option in filtered" :key="option.id" :value="option.id">{{ option.parent_id ? '中：' : '大：' }}{{ option.label }}{{ option.active ? '' : '［休止中・既存の選択］' }}</option>
+            <optgroup v-if="filtered.some(option => option.is_favorite)" label="お気に入り">
+                <option v-for="option in filtered.filter(option => option.is_favorite)" :key="option.id" :value="option.id">{{ option.parent_id ? '中：' : '大：' }}{{ option.label }}{{ option.active ? '' : '［休止中・既存の選択］' }}</option>
+            </optgroup>
+            <optgroup :label="filtered.some(option => option.is_favorite) ? 'その他の分類' : 'すべての分類'">
+                <option v-for="option in filtered.filter(option => !option.is_favorite)" :key="option.id" :value="option.id">{{ option.parent_id ? '中：' : '大：' }}{{ option.label }}{{ option.active ? '' : '［休止中・既存の選択］' }}</option>
+            </optgroup>
         </select>
         <p v-if="query.trim() && !filtered.length" class="mt-1 text-xs text-gray-500">一致する分類がありません。検索語を変えてください。</p>
         <p v-if="selected" class="mt-2 text-sm text-gray-600">選択中：{{ selected.label }}</p>

@@ -65,6 +65,7 @@ class ProjectBroadProjectLinkTest extends TestCase
         // An existing row before migration must retain its title and start unlinked.
         $this->db->getConnection()->table('project_jobs')->insert(['id' => 1, 'company_id' => 1, 'user_id' => 1, 'title' => 'Existing synthetic project']);
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_02_100001_add_broad_project_to_project_jobs.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_02_110001_create_broad_project_favorites_table.php')->up();
         $this->links = new ProjectBroadProjectLink(new BroadProjectTree);
     }
 

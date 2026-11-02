@@ -27,3 +27,13 @@ test('large group choices and sibling ordering never mix classification levels',
     assert.deepEqual(shiftOrder([1,4],0,-1),[1,4]);
     assert.deepEqual(shiftOrder([1,4],1,1),[1,4]);
 });
+
+test('favorite filtering includes ancestors without implicitly selecting descendants', () => {
+    const favorites = nodes.map(n => ({...n,is_favorite:n.id===2}));
+    assert.deepEqual(treeRows(favorites,'',false,new Set(),true).map(n=>n.id),[1,2]);
+    const rootOnly = nodes.map(n=>({...n,is_favorite:n.id===1}));
+    assert.deepEqual(treeRows(rootOnly,'',false,new Set(),true).map(n=>n.id),[1]);
+    const inactive = nodes.map(n=>({...n,is_favorite:n.id===5}));
+    assert.deepEqual(treeRows(inactive,'',false,new Set(),true).map(n=>n.id),[]);
+    assert.deepEqual(treeRows(inactive,'',true,new Set(),true).map(n=>n.id),[4,5]);
+});

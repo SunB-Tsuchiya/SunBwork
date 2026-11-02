@@ -11,7 +11,12 @@ use Illuminate\Validation\ValidationException;
 
 class ProjectBroadProjectLink
 {
-    public function __construct(private BroadProjectTree $tree) {}
+    private BroadProjectFavorites $favorites;
+
+    public function __construct(private BroadProjectTree $tree)
+    {
+        $this->favorites = new BroadProjectFavorites($tree);
+    }
 
     public function available(User $actor, ?int $companyId, ?ProjectJob $job = null): bool
     {
@@ -50,9 +55,10 @@ class ProjectBroadProjectLink
         $nodes = $this->tree->scoped($actor)->with('parent')->inDisplayOrder()->get()
             ->sortBy(fn ($node) => $node->displayOrderKey())
             ->filter(fn ($node) => $node->activePath() || (int) $node->id === (int) $job?->broad_project_id);
+        $favoriteIds = array_fill_keys($this->favorites->ids($actor), true);
         $options = $nodes->map(fn ($node) => [
             'id' => $node->id, 'parent_id' => $node->parent_id, 'label' => $node->pathLabel(),
-            'active' => $node->activePath(),
+            'active' => $node->activePath(), 'is_favorite' => isset($favoriteIds[$node->id]),
         ])->values()->all();
         return ['enabled' => true, 'options' => $options, 'suggestions' => $job && ! $job->broad_project_id
             ? $this->suggestions($job->title ?? '', $nodes->all()) : []];

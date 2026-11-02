@@ -163,6 +163,7 @@ class ChangelogSeeder extends Seeder
         (new BroadProjectTreeChangelogSeeder())->run();
         (new BroadProjectOrganizationChangelogSeeder())->run();
         (new ProjectBroadProjectLinkChangelogSeeder())->run();
+        (new BroadProjectFavoritesChangelogSeeder())->run();
         (new EvaluationV3DefaultChangelogSeeder())->run();
         $this->seedScheduleOtherSplit();
         $this->seedWorkloadTrialRebuild();

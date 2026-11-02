@@ -48,6 +48,10 @@ const matchingBroadProjects = computed(() => broadProjects.value.filter(project 
     const words = projectSearch.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     return words.every(word => broadProjectLabel(project).toLocaleLowerCase().includes(word));
 }));
+const broadProjectGroups = computed(() => [
+    {key: 'favorites', label: 'お気に入りの大まかな案件', items: matchingBroadProjects.value.filter(p => p.is_favorite)},
+    {key: 'other', label: '大まかな案件', items: matchingBroadProjects.value.filter(p => !p.is_favorite)},
+].filter(group => group.items.length));
 const projectGroups = computed(() => [
     { key: 'team', label: '担当・チーム案件' },
     { key: 'recent', label: '最近使った案件・過去のマイジョブ' },
@@ -277,9 +281,9 @@ async function remove() {
                 <div class="mt-3 max-h-80 overflow-y-auto rounded border" aria-label="案件候補">
                     <p v-if="loading" class="p-3 text-sm text-gray-500">検索中...</p>
                     <p v-else-if="!projectGroups.length && !matchingBroadProjects.length" class="p-3 text-sm text-gray-500">該当する案件がありません。閉じて仮の案件名を入力できます。</p>
-                    <div v-if="matchingBroadProjects.length">
-                        <p class="bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800">大まかな案件</p>
-                        <button v-for="project in matchingBroadProjects" :key="project.id" type="button" class="flex w-full items-center justify-between gap-3 border-t px-3 py-2 text-left text-sm hover:bg-yellow-50" @click="chooseBroadProject(project)">
+                    <div v-for="group in broadProjectGroups" :key="group.key">
+                        <p class="bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800">{{ group.label }}</p>
+                        <button v-for="project in group.items" :key="project.id" type="button" class="flex w-full items-center justify-between gap-3 border-t px-3 py-2 text-left text-sm hover:bg-yellow-50" @click="chooseBroadProject(project)">
                             <span>{{ broadProjectLabel(project) }}</span>
                             <span v-if="!project.is_active" class="shrink-0 text-xs text-gray-500">休止中</span>
                         </button>

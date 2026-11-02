@@ -1,5 +1,5 @@
 // A scoped tree is kept together so searching never separates a child from its parents.
-export function treeRows(projects, query = '', showInactive = false, expanded = new Set()) {
+export function treeRows(projects, query = '', showInactive = false, expanded = new Set(), favoritesOnly = false) {
     const byId = new Map(projects.map(p => [p.id, p]));
     const children = new Map();
     for (const p of projects) {
@@ -11,6 +11,7 @@ export function treeRows(projects, query = '', showInactive = false, expanded = 
     const included = new Set();
     for (const p of projects) {
         const text = `${p.path || p.name} ${p.client?.name || ''}`.normalize('NFKC').toLocaleLowerCase();
+        if (favoritesOnly && !p.is_favorite) continue;
         if ((!showInactive && !p.selectable) || !terms.every(t => text.includes(t))) continue;
         let node = p;
         const seen = new Set();
@@ -23,7 +24,7 @@ export function treeRows(projects, query = '', showInactive = false, expanded = 
         for (const p of children.get(parent) || []) {
             if (!included.has(p.id) || seen.has(p.id)) continue;
             const childCount = (children.get(p.id) || []).filter(c => included.has(c.id)).length;
-            const open = terms.length > 0 || expanded.has(p.id);
+            const open = favoritesOnly || terms.length > 0 || expanded.has(p.id);
             rows.push({ ...p, depth, childCount, open });
             if (open) visit(p.id, depth + 1, new Set([...seen, p.id]));
         }
