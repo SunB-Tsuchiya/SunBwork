@@ -329,3 +329,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-11-02追記: 上記ProjectJob分類参照は本番94d42b779へ限定配備完了。新nullable FKのみ追加し、既存の紐付け0/件数保持/分類マスター不変更を検証。公開資産も確認済み。利用者画面での新操作/保存は未確認、USER_WORK_HUB_MANAGER1で別管理。
 
 2026-11-02 利用者指示（ローカル検証/未配備）: Coordinatorの案件作成/編集は「機密案件（部署の作業予定表に案件名を表示しない）」だけチェックする方式に反転。「機密案件以外はチェックを付けないでください。」を常時表示。画面computedのみ反転し、既存のshow_on_department_scheduleと公開範囲の意味は保持。新規は未チェック、既存非表示だけチェック。進捗はUSER_WORK_HUB_MANAGER1。
+
+2026-11-02追記: 機密案件だけチェックするCreate/EditのUI反転は本番614e8ec2dへ限定配備済み。DB値と表示範囲は保持。利用者画面の反転文言/新規未チェックは次の確認（USER_WORK_HUB_MANAGER1）。
