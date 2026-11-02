@@ -89,3 +89,15 @@ UnifiedMyJobBoxTestを合成SQLiteメモリで追加。既存4関連テストと
 最終確認: 実Vue script/SSR成功、対象ESLint成功、PHP6構文/実Ziggy GET+POST一致、members最終ビルド成功、manifest492参照欠落0と/members/build/確認。ビルドによる既存資産の削除は削除パスだけ復元し全保持。ソースdiff --check成功。共有Claudeソース/.env/ビルドは未編集。旧読取試用の画面確認は繰り返していない。
 
 配備準備: 固定元7f2868a06から今回の作成接続版だけを、ソース許可一覧/取得SHA/追跡変更なし/main/削除なし/依存・migration変更なし/PHP構文を照合してff-only。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force、config/cache/route/view clear、試用GET/POST登録確認を行うスクリプトを /tmp/unified-box-input-deploy-20261102.sh に用意する。正確な実行コマンドは `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/unified-box-input-deploy-20261102.sh`。実行は利用者承認後。現時点で本番配備/作成画面確認は未実施。
+
+## 2026-11-02 作成接続の限定配備成功
+
+利用者は提示済みの正確なSSHコマンドにyes。同じ/tmp/unified-box-input-deploy-20261102.shを実行してexit0。元7f2868a06/main/追跡変更なし、取得ef32b4e1352a3fd79ed6f375bcc24fb94b530260、15ソース一致、削除なし、依存/migration変更なし、PHP6構文を通過後ff-only。既定mysql名silverlamb759_sunbworkを設定値だけで照合。manifestの全資産存在/membersパス確認成功。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force成功、config/cache/route/view clear成功。GET|HEAD unified_previewとPOST unified_storeの登録/認証middlewareを確認。最後は追跡変更なし、既存未追跡5件保持。sales接続/業務記録調査/作業の試験登録は実施していない。
+
+作成接続の実装/コード検証/限定配備は完了、利用者の作成画面・保存・カレンダー表示確認はまだ。旧読取3点の成功は維持。一般公開/上長レビュー/編集削除完了統合は未実施。
+
+次の一手は情報出版SuperAdminで以下の3点を確認してもらうこと。
+1. 統合BOXを再読み込みし「マイジョブ作成」を押すと入力モーダルが開く。
+2. 確認用または実際の作業名・日付・開始/終了時刻を入れて保存でき、同じ内容の行と「今回登録」がBOXに表示される。
+3. その行の「カレンダー」から、入力した日・時刻に同じ作業が表示される。
+すべて問題なければ「成功」、違いがあれば番号と結果。数量/分類/詳細経路/既存カレンダー側での編集削除/別アカウント/評価値の変化は今回の成功から確認済みにしない。確認用作業の削除は依頼していないため、削除済みと推定しない。
