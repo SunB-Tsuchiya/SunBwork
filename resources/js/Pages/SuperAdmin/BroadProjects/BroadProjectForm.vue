@@ -27,6 +27,10 @@ const form = useForm({
     fiscal_year: props.project?.fiscal_year ?? null,
     is_active: props.project?.is_active ?? true,
 });
+const isPaused = computed({
+    get: () => !form.is_active,
+    set: (value) => { form.is_active = !value; },
+});
 let clientRequest = 0;
 
 function closeClientOptions() {
@@ -148,8 +152,11 @@ function save() {
                 </div>
             </div>
         </div>
-        <label v-if="allowStatus" class="flex items-center gap-2 text-sm"><input v-model="form.is_active" type="checkbox" />簡易予定で選択できる</label>
-        <div class="flex justify-end gap-3">
+        <div v-if="allowStatus" class="text-sm sm:col-span-2">
+            <label class="flex items-center gap-2"><input v-model="isPaused" type="checkbox" />休止にする</label>
+            <p class="mt-1 text-xs text-gray-500">休止すると、新しい作業や案件登録の選択候補から外れます。過去の記録は残ります。大グループを休止すると、その中の中グループも候補から外れます。</p>
+        </div>
+        <div class="flex justify-end gap-3 sm:col-span-2">
             <button v-if="isEditing" type="button" class="text-sm text-gray-600 underline" @click="emit('cancel')">キャンセル</button>
             <button type="submit" :disabled="form.processing" class="rounded px-4 py-2 text-sm font-medium disabled:opacity-50" :class="broadProjectColor(routePrefix)">{{ isEditing ? '変更を保存' : '登録する' }}</button>
         </div>
