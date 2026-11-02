@@ -137,3 +137,13 @@ UnifiedMyJobBoxTestを合成SQLiteメモリで追加。既存4関連テストと
 前の「保存までは成功」と今回の成功は別範囲。全分類の実データ件数照合、単位/分類を変更した再保存、全日時の一致やカレンダーリンク往復、日報/部署/分析の全配色、別本人実画面、上長レビューまでは未確認。確認済みの保存/分類/単位/青色を再依頼しない。一般公開は未承認のまま。
 
 次の一手はPLANの残る入力導線（試用カレンダーの入口を同じマイジョブ作成へ揃える範囲）を利用者と相談すること。一般Userの旧入口削除・本番公開まで進めない。現在の試用コードは本番f7ff846da、資料更新だけでは再配備しない。
+
+## 2026-11-03 詳細/続きと機能同等性を優先して調査
+
+利用者は詳細不足と続き登録への対応を指摘。「簡易とマイジョブは入力のしやすさ以外、同じ機能と役割」を確定要件とする。直前の「次はカレンダー入口統一」を保留へ置換。既存の入力/保存/分類/単位/青色の成功は維持するが、完全統合の成功としない。
+
+コード調査結果はMYJOB_FEATURE_PARITY_AUDIT1.md。現在は簡易クリックで編集しか開けず、独立entry行の詳細URLなし、続き参照/完了/ファイル情報等の保存機能なし。旧はsource_assignmentの続き/系列、supersedesの依頼置換、完了時祖先/表/校正連携がある。昼控除と昼前後の続き登録は別。昼専用自動分割ボタンは未特定で、確認できた一般の過去流用→続き操作を説明する。旧の複数eventsと続き別assignmentの意味も区別する。
+
+調査対象: UserCalendar/QuickWorkEntryModal、UnifiedMyJobBox/UnifiedPreview、PersonalWorkEntryと関連migration、DepartmentWorkController、MyJobCreateModal/MyJobSourcePicker/Create_Job、共通AssignmentForm/AssignmentDetailCard、MyProjectJobController/ProjectJobAssignmentController、MyJobBox/ShowとEvents/Show、EventControllerの系列/時間、PersonalWorkSchedule/WorkloadTrialAnalysis。根拠はローカル保存cecc7c9c5（アプリf7ff846da）。手元origin/mainはb1d57e1ddで、実リモート最新を再取得していない。SSH/実DB/新画面試験なし、アプリコード変更なし。
+
+次の一手: 詳細・続きの対応を中心に、完了/添付/依頼/表/校正/時間と数量の同等性を満たす共通仕事仕様をPLANへ具体化する。assignment本体へ統合するか両保存元を共通操作にするかは未決。分類/仮名だけで登録できる簡単さと旧ID/履歴/日報/集計を保護し、画面だけ同じにした別機能や無条件コピーを避ける。一般公開はしない。
