@@ -645,3 +645,5 @@ BOX統合の保留事項は維持: 旧マイジョブの未予定分/複数日�
 保存ce396f6bdから専用feature/unified-box-preview-20261102、/tmp/sunbwork-unified-box-20261102を作成。旧/tmpツリーは消失していたため、共有Claude作業を使わずGit保存版を復元。SSH/DB読取/配備なし。次はコード検証後に固定差分の限定配備を別途承認してもらう。
 
 2026-11-02 統合BOX初回コード検証: 合成29件308断言、実route/controller10組、実Vue SSR、対象ESLint、PHP7構文、members build/manifest491欠落0成功。一般User追加propなし、直URL403、通常入力/保存/日報/評価変更なし、新migrationなし。限定配備/利用者画面確認/一般公開は未実施。詳細と次の固定差分SSH承認はMYJOB_UNIFIED_BOX_MANAGER1.md。
+
+2026-11-02 統合BOX限定配備（確定）: 利用者が正確なSSHコマンドをyesで承認。固定元5462a2b09から7f2868a06へ19ソース一致/削除なし/依存変更なしを確認しff-only反映、PHP/manifest/独立変更履歴Seeder/cache/route確認成功。既存未追跡5件保持、sales/業務データ調査なし。一般公開・入力差替えなし。次は新ボタン・一覧表示・全期間での作業名検索/クリアの3点だけ画面確認、詳細はMYJOB_UNIFIED_BOX_MANAGER1.md。未予定や複数日の実例等を未依頼のまま確認済みにしない。

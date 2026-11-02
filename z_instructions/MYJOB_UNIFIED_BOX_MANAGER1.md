@@ -13,7 +13,8 @@
 | 3確認への回答 | 利用者が全て選択済み。未予定保持/従来ジョブ1行で複数日/簡易otherを含めると確定 |
 | 統合一覧コード/保存処理 | 読取試用のみ実装済み。保存処理は変更なし |
 | コード検証 | 合成29テスト308断言、実route/controller10組、実Vue SSR、対象ESLint、membersビルド成功。PHP7ファイル構文成功、manifest491参照欠落0と/members/を確認 |
-| 限定配備/統合画面確認 | 未実施。コード検証成功から推定しない |
+| 限定配備 | 2026-11-02 承認済みSSHで7f2868a06へ反映成功 |
+| 統合画面確認 | 未実施。次に案内する新試用入口/一覧/検索だけ確認待ち |
 
 ## 工程案
 
@@ -56,3 +57,15 @@ UnifiedMyJobBoxTestを合成SQLiteメモリで追加。既存4関連テストと
 最終検証: 対象Vue ESLint成功、PHP7ファイルphp -l成功、最終membersビルド成功、manifest491資産参照の欠落0、appの/members/build/と新ページを確認。ビルドによる既存7793資産の削除は削除パスだけGitから復元して保持。共有.env/ビルドには触れていない。SSRと実route/controllerは一時検証（/tmp/unified-box-verification）、永続テストはtests/Unit/UnifiedMyJobBoxTest.php。本番SSH/DB読取/配備は未実施。既存の分類やお気に入り等の利用者画面確認は繰り返していない。
 
 配備予定コマンドは `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/unified-box-preview-deploy-20261102.sh`。本番の固定元5462a2b09/main/追跡変更なし、取得版固定、今回ソース許可リスト一致、依存変更・削除なし、PHP構文を全て確認後にff-only。migrationなし、独立UnifiedMyJobBoxChangelogSeederだけ--force、cache/config/route/view clear。既存未追跡ファイルは操作しない。版不一致時は反映前停止し、他作業を取り込まない。実行は正確なコマンドの利用者承認後。
+
+## 2026-11-02 限定配備完了・初回画面確認待ち
+
+利用者は提示した正確なSSHコマンドにyes。変更せず同スクリプトを実行しexit0。元5462a2b09/main/追跡変更なし、取得7f2868a06e6f4b55ce6e6c406c5414886d2df4ab、19ソース許可リスト一致、依存/migration変更なし、削除なしを確認後にff-only更新。PHP7構文、既定mysql名silverlamb759_sunbworkの設定値照合、manifest資産欠落なしとmembersパス、新試用ルートGET|HEAD/認証middleware確認成功。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force成功、config/cache/route/view clear成功。業務記録の読取調査・変更やsales接続なし。最後は追跡変更なし、既存未追跡5件を保持。
+
+実装/コード検証/限定配備は完了。実ブラウザ画面確認/上長レビュー/一般公開は未完了。一般Userの通常画面/保存/日報/評価と公開制限を維持。
+
+次の一手は情報出版SuperAdminで以下の新しい3点を確認してもらうこと。
+1. マイジョブBOXを再読み込みし「統合BOX（試用）」ボタンが表示される。
+2. ボタンからエラーなく統合一覧を開ける（件数0でも開ければこの条件は可）。
+3. 「全期間」を選び、表示された作業名の一部で検索・クリアできる。全期間にも対象行がなければその旨を回答し、この条件は保留にする。
+すべて問題なければ「成功」、違い/対象なしなら項目番号と結果。未予定・複数日の実例/個々の日時/各リンク往復/別アカウント画面は今回の成功から確認済みにしない。既確認の分類/星/機密/休止画面は繰り返さない。
