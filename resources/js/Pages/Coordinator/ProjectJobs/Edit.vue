@@ -21,8 +21,8 @@
                 </div>
                 <BroadProjectPicker v-if="broadProjectLink.enabled" v-model="form.broad_project_id" :options="broadProjectLink.options" :suggestions="broadProjectLink.suggestions" :error="form.errors.broad_project_id" />
                 <label class="mb-4 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm">
-                    <input v-model="form.show_on_department_schedule" type="checkbox" class="mt-1 rounded" />
-                    <span><strong>部署の作業予定表に案件名を表示する</strong><br />極秘案件はチェックを外してください。既存の案件画面や日報の閲覧権限は変わりません。</span>
+                    <input v-model="isConfidential" type="checkbox" class="mt-1 rounded" />
+                    <span><strong>機密案件（部署の作業予定表に案件名を表示しない）</strong><br />機密案件以外はチェックを付けないでください。既存の案件画面や日報の閲覧権限は変わりません。</span>
                 </label>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">リーダー（代表Coordinator）</label>
@@ -684,6 +684,12 @@ const form = useForm({
     // 確認モーダルで「別作業として登録する」を選んだときのみ true にする
     allow_duplicate_jobcode: false,
 });
+// Keep the stored visibility flag compatible; only the checkbox meaning changes.
+const isConfidential = computed({
+    get: () => !form.show_on_department_schedule,
+    set: (value) => { form.show_on_department_schedule = !value; },
+});
+
 
 // ===== 重複チェック（受注番号・案件名） =====
 const { showDuplicateModal, titleDuplicates, jobcodeDuplicates, checkDuplicates, closeDuplicateModal } =

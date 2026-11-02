@@ -151,3 +151,5 @@ UI: Coordinator/ProjectJobs Create/Editのタイトル付近に共有の任意�
 対象: ProjectJobモデル/new migration、紐付け検証/候補サービス、Coordinator ProjectJobControllerのcreate/store/edit/update/show、共有選択Vue部品/Create/Edit/Show、独立ChangelogSeederと既存共通呼出、統合資料/合成テスト。新URLは追加せずZiggy変更なし。合成SQLiteメモリでNULL移行/会社部署role/旧NULL会社/親休止/解除/項目欠落保持/候補未自動選択/ID保持を確認し、Vue SSR/ESLint/変更PHP構文/members buildを実施。配備前に本番版/今回差分を固定し、追加migrationだけ--database=mysql/--path/--forceの正確なSSHコマンド提示・承認を得る。
 
 再開証拠: 旧/tmpツリーは消失。保存feature/user-work-hub-design-20261030=2620652ecを読み、新feature/project-broad-link-20261102を/tmp/sunbwork-project-broad-link-20261102へ作成。共有colayout-deployにはClaudeの変更があり未編集。手元origin/main=b1d57e1ddは古い参照。本番の最終確認968f164baから未SSHであり現在版の断定はしない。10/31の大中分類画面の既確認項目を繰り返さない。
+
+2026-11-02 紐付け保存成功と機密チェック反転（確定）: 利用者はページ説明後に「成功」と回答し、既存案件編集の①任意分類欄②検索して選択③更新後の選択保持と案件タイトル不変、の依頼3点を成功確認済みに変更。新規保存/詳細経路/別管理者確認へ拡張しない。同時に「表示する」のチェックは皆が外すため「機密案件の場合だけチェック」へ逆転し、機密以外は付けない注意を追加するよう指示。進行管理側Create/EditのUIだけを反転し、既存show_on_department_scheduleのDB意味・値は保持。通常は未チェック、非表示の既存案件だけチェック済み。追加DB移行・既存案件の一括更新なし。次は反転と既存値の対応をコード検証し、限定配備コマンドを提示する。一般公開の範囲は変えない。
