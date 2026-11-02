@@ -4,7 +4,7 @@
 
 ## この台帳の使い方
 
-このファイルを横断プロジェクトの決定・証拠の入口にする。**2026-10-30の利用者判断により、現在は入力統合とユーザー導線の設計を先に進める。現行管理は `USER_WORK_HUB_PLAN1.md` / `USER_WORK_HUB_MANAGER1.md` / `USER_WORK_HUB1_PROMPT.md`。** `JOB_EVALUATION_ROADMAP1.md` の評価優先順はこの直近作業順について置換されたが、評価側の未完了判断は保留として維持する。評価側の管理は `EVALUATION_SCORE_PLAN1.md` / MANAGER / PROMPT、入力と導線の履歴は `JOB_INPUT_REVIEW_PLAN1.md` / MANAGER / PROMPT、試用分析とガイドの履歴は `WORKLOAD_REBUILD_PLAN1/2.md` と `WORKLOAD_REVIEW_PLAN3.md` を参照する。過去の経緯は `JOB_REDESIGN_FLOW_AUDIT1.md` と `JOB_SYSTEM_RETHINK_NOTES1.md`。`PERSONAL_WORK*` と `JOB_REDESIGN*` は先行試用の資料であり、現方針に反する箇所はそのまま実装しない。手元にない資料は、手元の `origin/main` に存在する場合、`git show origin/main:z_instructions/<ファイル名>` で参照する。
+このファイルを横断プロジェクトの決定・証拠の入口にする。**2026-10-30の利用者判断により、現在は入力統合とユーザー導線の設計を先に進める。ハブ全体の管理は `USER_WORK_HUB_PLAN1.md` / `USER_WORK_HUB_MANAGER1.md` / `USER_WORK_HUB1_PROMPT.md`。2026-11-02開始の入力/BOX統合設計は `MYJOB_UNIFIED_BOX_PLAN1.md` / `MYJOB_UNIFIED_BOX_MANAGER1.md` / `MYJOB_UNIFIED_BOX1_PROMPT.md` を正本にする。** `JOB_EVALUATION_ROADMAP1.md` の評価優先順はこの直近作業順について置換されたが、評価側の未完了判断は保留として維持する。評価側の管理は `EVALUATION_SCORE_PLAN1.md` / MANAGER / PROMPT、入力と導線の履歴は `JOB_INPUT_REVIEW_PLAN1.md` / MANAGER / PROMPT、試用分析とガイドの履歴は `WORKLOAD_REBUILD_PLAN1/2.md` と `WORKLOAD_REVIEW_PLAN3.md` を参照する。過去の経緯は `JOB_REDESIGN_FLOW_AUDIT1.md` と `JOB_SYSTEM_RETHINK_NOTES1.md`。`PERSONAL_WORK*` と `JOB_REDESIGN*` は先行試用の資料であり、現方針に反する箇所はそのまま実装しない。手元にない資料は、手元の `origin/main` に存在する場合、`git show origin/main:z_instructions/<ファイル名>` で参照する。
 
 引継ぎ時は、まず `AGENTS.md` と本台帳を読み、次に作業対象の PLAN / MANAGER / PROMPT と実装、最新の利用者発言を照合する。作業ツリーが分岐していたら、ファイルの存在だけで最新と決めず `git status`、`git log`、`git show origin/main:<path>` で比較する。`origin/main` 自体も取得時点の参照なので、本番やリモートの最新状態と同一とは断定しない。`/tmp` の隔離作業ツリーが残るとは仮定しない。
 
@@ -631,3 +631,7 @@ BOX統合の保留事項は維持: 旧マイジョブの未予定分/複数日�
 2026-11-02 簡易入力の星候補呼出3点を利用者確認済み: 利用者「成功」により、直前に依頼したUserカレンダーで①時間選択→「簡単な作業予定を追加」→「案件を探す」を開く②「お気に入りの大まかな案件」に登録した分類を表示③選択して元のフォームへ反映、の3点を全確認済み。保存せず確認の依頼なので、この候補での簡易作業保存・評価/日報への反映は確認済みとしない。お気に入りの一覧登録/再読込保持/本人絞込、進行管理編集の星区切り/表示、簡易入力の星表示/選択反映まで利用者確認完了。星解除/別本人画面/休止保存等はコード検証済みと実画面未確認を区別したまま保持。確認済み画面の再試験は求めない。
 
 次工程の相談: 簡易入力を通常マイジョブにする入力/BOX統合の設計へ戻る。旧詳細形式・依頼転換/続き・既存ファイル・カレンダー参照を維持する。旧マイジョブの未予定分、複数日表示、簡易作業区分otherのBOXへの扱いを先に確定する。会議/外出/その他業務の通常予定を入れない確認は維持。統合実装/一般公開の追加承認を今回の成功から推定しない。
+
+2026-11-02 入力/BOX統合設計開始と非公開境界（確定）: 利用者は統合設計の継続へ「はい、進めましょう。一般ユーザーにはまだ公開したくないので慎重に」と了承。設計作業を開始し、MYJOB_UNIFIED_BOX_PLAN1.md / MYJOB_UNIFIED_BOX_MANAGER1.md / MYJOB_UNIFIED_BOX1_PROMPT.mdを新設。親USER_WORK_HUB計画の入力/BOX工程を扱う正本とし、アプリ実装/配備/一般公開は未承認・未着手。実所属INFO SuperAdmin本人だけの試用を維持し、分類管理許可のCoordinator/Leaderを統合BOXへ自動昇格させない。
+
+現行調査で旧BOXの締切/登録月と先頭予定表示、proof実行枠除外、簡易独立/イベント補足の別経路を確認。元IDを保つ読取統合を先行する案、DBコピー/名前一致結合/評価や日報計算変更なし。未予定の旧ジョブ、従来ジョブ複数日、簡易作業otherの3点を非同期質問で提示し回答待ち。推奨案を要件へ昇格させず、次は回答を新PLANへ反映して具体的な実装範囲を確認する。今回ソース/DB/本番変更なし。
