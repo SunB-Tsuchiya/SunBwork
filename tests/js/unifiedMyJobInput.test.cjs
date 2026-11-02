@@ -13,7 +13,7 @@ const page = 'resources/js/Pages/MyJobBox/UnifiedPreview.vue';
 let requests = [];
 let failSave = false;
 globalThis.__unifiedAxios = {
-    get: async (...args) => { requests.push(['get', ...args]); return { data: { default_category: 'other' } }; },
+    get: async (...args) => { requests.push(['get', ...args]); return { data: { default_category: 'other', broad_projects: globalThis.__pickerFixture || [] } }; },
     post: async (...args) => { requests.push(['post', ...args]); if (failSave) throw { response: { data: { errors: { title: ['保存の検証エラー'] } } } }; return { data: { id: 1 } }; },
     put: async (...args) => { requests.push(['put', ...args]); return { data: { id: 1 } }; },
 };
@@ -30,8 +30,9 @@ async function component(file, behavior = false) {
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior) source = source.replace('</script>', (file === modal
-                ? '\nglobalThis.__unifiedModal={form,save,heading,error,saving};'
+                ? '\nglobalThis.__unifiedModal={form,save,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject};'
                 : '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};') + '\n</script>');
+            if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
             return { loader: 'js', contents: compileScript(descriptor, { id: 'unified-input', inlineTemplate: !behavior, templateOptions: { ssr: !behavior } }).content, resolveDir: path.dirname(a.path) };
         });
@@ -46,6 +47,7 @@ const renderer = createRenderer({
 });
 async function settle() { await nextTick(); await Promise.resolve(); await nextTick(); }
 (async () => {
+    globalThis.__pickerFixture = [{id:1,name:'大分類',path:'大分類',is_active:true}, ...Array.from({length:40},(_,i)=>({id:i+2,parent_id:1,name:'中分類'+(i+2),path:'大分類 ／ 中分類'+(i+2),is_active:true,is_favorite:i===39})), {id:100,name:'別の大分類',path:'別の大分類',is_active:true}];
     const formComponent = await component(modal, true);
     const props = reactive({ show: false, date: '2026-12-01', entryPoint: 'myjob' });
     const saved = [];
@@ -53,6 +55,14 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     app.mount({}); props.show = true; await settle();
     let state = globalThis.__unifiedModal;
     assert.equal(state.heading.value, 'マイジョブ作成');
+    state.openProjectPicker(); await settle();
+    assert.deepEqual(state.broadTreeRows.value.map(p=>p.id),[1,100]);
+    state.toggleBroadProject(1); assert.equal(state.broadTreeRows.value.length,42);
+    state.toggleBroadProject(1); state.projectSearch.value='中分類41';
+    assert.deepEqual(state.broadTreeRows.value.map(p=>p.id),[1,41]);
+    state.chooseBroadProject(state.broadTreeRows.value[1]); assert.equal(state.form.broad_project_id,41);
+    state.form.broad_project_id='';
+
     assert.equal(state.form.work_date, '2026-12-01');
     assert.equal(state.form.planned_start_time, ''); assert.equal(state.form.planned_end_time, '');
     Object.assign(state.form, { title: '試用作業', planned_start_time: '09:00', planned_end_time: '09:30', actual_quantity: '' });
@@ -87,6 +97,8 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
         const html = ctx.teleports.body;
         assert.ok(html.includes(entryPoint === 'myjob' ? 'マイジョブ作成' : '簡単な作業予定を追加'));
         assert.equal(html.includes('カレンダーで選んだ時刻'), entryPoint === 'calendar');
+        for (const unit of ['ページ','ファイル','件','枚','点','冊']) assert.ok(html.includes('>'+unit+'</button>'));
+        assert.ok(html.includes('aria-expanded="false"')); assert.ok(html.includes('大まかな案件（42件）'));
         assert.ok(html.match(/type="time"[^>]*required/)); assert.ok(html.includes('閉じる'));
     }
     const actualPage = await component(page);

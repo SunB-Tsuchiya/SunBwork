@@ -214,7 +214,7 @@ class DepartmentWorkController extends Controller
             })->values();
 
         $selectedBroadId = (int) ($params['selected_broad_id'] ?? 0);
-        $broadProjects = app(\App\Services\BroadProjectFavorites::class)->candidates($viewer, $term, $selectedBroadId);
+        $broadProjects = app(\App\Services\BroadProjectFavorites::class)->candidates($viewer, '', $selectedBroadId, null);
 
         $recentTitles = PersonalWorkEntry::where('user_id', $viewer->id)
             ->whereNull('source_event_id')->whereNotNull('title')

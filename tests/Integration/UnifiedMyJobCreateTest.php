@@ -123,6 +123,8 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame('personal-work-'.$entry->id, $calendar[0]['id']);
         self::assertSame('2026-12-01T09:00:00', $calendar[0]['starts_at']);
         self::assertSame('2026-12-01T09:30:00', $calendar[0]['ends_at']);
+        self::assertSame('#4F46E5', $calendar[0]['_custom_color']);
+        self::assertSame('#FFFFFF', $calendar[0]['_custom_text_color']);
         self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('project_job_assignments')->count());
         self::assertSame(0, DB::table('project_jobs')->count());
     }

@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { computed, reactive, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
+import { treeRows } from '@/utils/broadProjectTree';
 import { workCategories, workActivities } from '@/Constants/personalWorkActivities';
 
 const props = defineProps({
@@ -17,6 +18,7 @@ const isMyJob = computed(() => props.entryPoint === 'myjob');
 const heading = computed(() => props.entry ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
 const projects = ref([]);
 const broadProjects = ref([]);
+const expandedBroadProjects = ref(new Set());
 const recentUnits = ref([]);
 const recentTitles = ref([]);
 const showTitleSuggestions = ref(false);
@@ -48,13 +50,20 @@ const time = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:
 const projectLabel = (project) => [project.title, project.jobcode, project.client_name].filter(Boolean).join(' / ');
 const broadProjectLabel = (project) => [project.path || project.name, project.client_name, !project.path && project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' / ');
 const matchingBroadProjects = computed(() => broadProjects.value.filter(project => {
-    const words = projectSearch.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-    return words.every(word => broadProjectLabel(project).toLocaleLowerCase().includes(word));
+    const words = projectSearch.value.normalize('NFKC').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    return words.every(word => broadProjectLabel(project).normalize('NFKC').toLocaleLowerCase().includes(word));
 }));
 const broadProjectGroups = computed(() => [
     {key: 'favorites', label: 'お気に入りの大まかな案件', items: matchingBroadProjects.value.filter(p => p.is_favorite)},
-    {key: 'other', label: '大まかな案件', items: matchingBroadProjects.value.filter(p => !p.is_favorite)},
 ].filter(group => group.items.length));
+const broadTreeRows = computed(() => treeRows(broadProjects.value.map(project => ({
+    ...project, selectable: project.is_active, client: { name: project.client_name || '' },
+})), projectSearch.value, true, expandedBroadProjects.value));
+function toggleBroadProject(id) {
+    const next = new Set(expandedBroadProjects.value);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    expandedBroadProjects.value = next;
+}
 const projectGroups = computed(() => [
     { key: 'team', label: '担当・チーム案件' },
     { key: 'recent', label: '最近使った案件・過去のマイジョブ' },
@@ -98,6 +107,7 @@ watch(includeCompleted, () => {
 });
 
 function openProjectPicker() {
+    expandedBroadProjects.value = new Set();
     projectSearch.value = '';
     includeCompleted.value = false;
     projectPickerOpen.value = true;
@@ -250,9 +260,12 @@ async function remove() {
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="text-sm">ページ数・数量（任意）<input v-model="form.actual_quantity" type="number" min="0" max="99999999" step="0.01" class="mt-1 w-full rounded border p-2" placeholder="例：100" /></label>
-                        <label class="text-sm">単位<input v-model="form.actual_unit" type="text" list="quick-work-unit-suggestions" maxlength="30" :required="form.actual_quantity !== ''" class="mt-1 w-full rounded border p-2" placeholder="ページ・件など" /></label>
+                        <label class="text-sm">単位<input v-model="form.actual_unit" type="text" maxlength="30" :required="form.actual_quantity !== ''" class="mt-1 w-full rounded border p-2" placeholder="ページ・件など" /></label>
                     </div>
-                    <datalist id="quick-work-unit-suggestions"><option v-for="unit in unitSuggestions" :key="unit" :value="unit" /></datalist>
+                    <div class="flex flex-wrap items-center gap-2 text-xs" aria-label="単位の候補">
+                        <span class="text-gray-500">単位を選択・自由入力：</span>
+                        <button v-for="unit in unitSuggestions" :key="unit" type="button" :aria-pressed="form.actual_unit === unit" class="rounded border px-2 py-1" :class="form.actual_unit === unit ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50'" @click="form.actual_unit = unit">{{ unit }}</button>
+                    </div>
                     <label class="block text-sm">作業種類（任意）
                         <select v-model="form.activity_type" class="mt-1 w-full rounded border p-2"><option value="">未指定</option><option v-for="[key, label] in workActivities[form.work_category] || workActivities.other" :key="key" :value="key">{{ label }}</option></select>
                     </label>
@@ -291,6 +304,16 @@ async function remove() {
                             <span>{{ broadProjectLabel(project) }}</span>
                             <span v-if="!project.is_active" class="shrink-0 text-xs text-gray-500">休止中</span>
                         </button>
+                    </div>
+                    <div v-if="broadTreeRows.length">
+                        <p class="bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800">大まかな案件（{{ matchingBroadProjects.length }}件）</p>
+                        <div v-for="project in broadTreeRows" :key="project.id" class="flex items-center gap-1 border-t px-2 py-1" :class="{ 'bg-gray-50': project.depth === 0, 'pl-8': project.depth > 0 }">
+                            <button v-if="project.childCount" type="button" class="h-8 w-8 shrink-0 rounded border bg-white text-lg text-blue-700" :disabled="Boolean(projectSearch.trim())" :title="projectSearch.trim() ? '検索中は一致する分類を展開します' : '中グループを開閉'" :aria-expanded="project.open" :aria-label="project.name + (project.open ? 'を閉じる' : 'を開く')" @click="toggleBroadProject(project.id)">{{ project.open ? '−' : '+' }}</button>
+                            <span v-else class="w-8 shrink-0"></span>
+                            <button type="button" class="min-w-0 flex-1 rounded px-2 py-2 text-left text-sm hover:bg-yellow-50" @click="chooseBroadProject(project)">
+                                {{ broadProjectLabel(project) }}<span v-if="project.childCount" class="ml-1 text-xs text-gray-500">（{{ project.childCount }}）</span>
+                            </button>
+                        </div>
                     </div>
                     <div v-for="group in projectGroups" :key="group.key">
                         <p class="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">{{ group.label }}</p>

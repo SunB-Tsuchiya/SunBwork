@@ -347,3 +347,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 従来1割当は1行・複数予定、独立簡易は各1行。同名で結合しない。supersedesの一意な同案件本人置換だけ対応し、続き/校正参照は別関係。月はJST作業月、未予定は締切/登録月。検索・完了除外・50件ページは統合後に適用。通常予定とイベント補足を独立行にしない。新DB/migration/保存APIなし、日報/評価計算変更なし。初回実装と配備/利用者確認はMYJOB_UNIFIED_BOX_MANAGER1.mdで別管理。一般公開・通常入力/カレンダー入口の統合は後工程。
 
 2026-11-02 作成接続（コード検証済み、反映/画面確認はMYJOB_UNIFIED_BOX_MANAGER1参照）: 統合BOXにマイジョブ作成を追加。QuickWorkEntryModalのentryPoint=myjobだけタイトル/説明と新規POST先user.myjobbox.unified_storeを変更し、同じ試用guard後に既存DepartmentWorkController::storeへ委譲。日付初期値JST今日、開始/終了は空欄必須。成功時の日付+IDで本人の保存月/該当ページへ戻り「今回登録」を表示。一般カレンダーの旧文言/既存保存先と日報・評価の集計は維持、新migration/assignment/events複製なし。詳細入力/依頼/添付は旧BOX経路を保持。
+
+2026-11-03 試用入力修正（実装/配備/画面確認はMYJOB_UNIFIED_BOX_MANAGER1で区別）: 簡易入力の大まかな案件は30件制限を外し、所属/activePathを満たす全件をExcel順で返す。parent_idと共通treeRowsで大見出し＋/−、検索時親文脈つき展開、根と中どちらも選択可、お気に入り近道を維持。単位はページ/ファイル/件/枚/点/冊と最近値を常時候補ボタンで選択でき、自由入力可。旧「簡易予定は淡いピンク」という表示方針はマイジョブ統合方針で置換し、個人/部署/日報の簡易作業も旧マイジョブ青#4F46E5に統一。作業種類の校正色やproofジョブ色は維持。保存データ/評価式/一般公開権限は変えない。

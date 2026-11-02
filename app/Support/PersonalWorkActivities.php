@@ -4,9 +4,9 @@ namespace App\Support;
 
 class PersonalWorkActivities
 {
-    public const COLOR = '#fbcfe8';
-    public const TEXT_COLOR = '#831843';
-    public const BORDER_COLOR = '#f472b6';
+    public const COLOR = '#4F46E5';
+    public const TEXT_COLOR = '#FFFFFF';
+    public const BORDER_COLOR = '#4338ca';
 
     public const COMMON = [
         'intake_allocation' => '受付・仕事の配分・担当調整',

@@ -12,8 +12,9 @@ export const workCategoryColors = {
     jimu: { bg: '#cffafe', text: '#155e75', border: '#67e8f9' },
     other: { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
 };
+export const personalWorkColors = { bg: '#4F46E5', text: '#FFFFFF', border: '#4338ca' };
 export const workSourceColors = {
-    quick: { bg: '#fce7f3', text: '#9d174d', border: '#f9a8d4' },
+    quick: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
     my_job: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
     assigned_job: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
     meeting: { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },

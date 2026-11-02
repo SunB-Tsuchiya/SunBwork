@@ -49,7 +49,7 @@ class BroadProjectFavorites
         });
     }
 
-    public function candidates(User $user, string $term = '', int $selectedId = 0): array
+    public function candidates(User $user, string $term = '', int $selectedId = 0, ?int $limit = 30): array
     {
         $ids = array_fill_keys($this->ids($user), true);
         $normalize = fn ($value) => mb_strtolower(mb_convert_kana($value, 'asKV', 'UTF-8'));
@@ -63,12 +63,13 @@ class BroadProjectFavorites
                 foreach ($words as $word) if (! str_contains($label, $word)) return false;
                 return true;
             })->map(fn ($node) => [
-                'id' => $node->id, 'name' => $node->name, 'path' => $node->pathLabel(),
+                'id' => $node->id, 'parent_id' => $node->parent_id, 'name' => $node->name, 'path' => $node->pathLabel(),
                 'client_name' => $node->client?->name, 'fiscal_year' => $node->fiscal_year,
                 'is_active' => $node->activePath(), 'is_favorite' => isset($ids[$node->id]),
             ])->values();
+        if ($limit === null) return $rows->all();
         // All matching favorites survive the normal 30-row limit; the current selection survives too.
         return $rows->where('id', $selectedId)->concat($rows->where('is_favorite', true))
-            ->concat($rows->where('is_favorite', false)->take(30))->unique('id')->values()->all();
+            ->concat($rows->where('is_favorite', false)->take($limit))->unique('id')->values()->all();
     }
 }

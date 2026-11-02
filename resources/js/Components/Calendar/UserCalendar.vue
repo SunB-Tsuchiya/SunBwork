@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { personalWorkColors } from '@/Constants/personalWorkActivities';
 import axios from 'axios';
 import { router } from '@inertiajs/vue3';
 import CalendarShell    from '@/Components/Schedule/CalendarShell.vue';
@@ -43,7 +44,7 @@ const quickWorkEvents = ref([]); // 簡易作業予定
 const diaryDates     = ref([]); // 日報マーカー [{ id, date: 'YYYY-MM-DD' }]
 const loading        = ref(false);
 const calendarError = ref('');
-const quickWorkColor = '#fbcfe8';
+const quickWorkColor = personalWorkColors.bg;
 let loadSequence = 0;
 
 // 日報マーカーをイベント形式に変換（MonthView 表示用）
@@ -624,7 +625,7 @@ async function saveWeekBreaks() {
 
 <template>
     <div v-if="departmentWorkEnabled" class="flex flex-wrap gap-x-3 gap-y-1 border-b bg-white px-3 py-1 text-xs text-gray-600">
-        <span class="inline-flex items-center gap-1 font-medium"><i class="h-2.5 w-2.5 rounded-full border border-pink-400" :style="{ backgroundColor: quickWorkColor }"></i>簡易作業予定</span>
+        <span class="inline-flex items-center gap-1 font-medium"><i class="h-2.5 w-2.5 rounded-full border border-indigo-600" :style="{ backgroundColor: quickWorkColor }"></i>マイジョブ（簡易入力）</span>
         <span v-if="calendarError" class="text-red-700" role="alert">{{ calendarError }}</span>
     </div>
     <CalendarShell

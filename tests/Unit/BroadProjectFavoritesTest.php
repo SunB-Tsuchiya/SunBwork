@@ -153,6 +153,19 @@ class BroadProjectFavoritesTest extends TestCase
         $this->rejects(fn () => $this->favorites->set($this->actor(), $child->fresh(), true));
     }
 
+    public function test_full_tree_preserves_parent_metadata_and_excludes_paused_or_foreign_nodes(): void
+    {
+        $root = $this->node('Root', ['sort_order' => 10]);
+        $child = $this->node('Child', ['parent_id' => $root->id]);
+        $this->node('Foreign', ['company_id' => 3, 'department_id' => 4]);
+        $paused = $this->node('Paused', ['is_active' => false]);
+        $this->node('Hidden child', ['parent_id' => $paused->id]);
+        $all = $this->favorites->candidates($this->actor(), '', 0, null);
+        self::assertSame([$root->id, $child->id], array_column($all, 'id'));
+        self::assertSame($root->id, (int) $all[1]['parent_id']);
+        self::assertSame('Root ／ Child', $all[1]['path']);
+    }
+
     public function test_favorites_beyond_thirty_and_search_are_available_without_duplicates(): void
     {
         $nodes = [];
@@ -162,6 +175,9 @@ class BroadProjectFavoritesTest extends TestCase
         $this->favorites->set($this->actor(), $nodes[39], true);
         $this->favorites->set($this->actor(), $nodes[38], true);
         $candidates = $this->favorites->candidates($this->actor());
+        $all = $this->favorites->candidates($this->actor(), '', 0, null);
+        self::assertSame(array_map(fn ($n) => $n->id, $nodes), array_column($all, 'id'));
+        self::assertCount(40, $all);
         self::assertCount(32, $candidates);
         self::assertSame([$nodes[38]->id, $nodes[39]->id], array_column(array_slice($candidates, 0, 2), 'id'));
         self::assertCount(32, array_unique(array_column($candidates, 'id')));

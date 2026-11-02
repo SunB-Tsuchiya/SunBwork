@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { personalWorkColors } from '../Constants/personalWorkActivities';
 import { route } from 'ziggy-js';
 
 // Diary timelines show ordinary events and the owner's trial work entries together.
@@ -29,9 +30,9 @@ export async function fetchDiaryTimelineEvents(date, userId, includeQuickWork = 
             start: event.starts_at,
             end: event.ends_at,
             allDay: false,
-            color: '#fbcfe8',
-            textColor: '#831843',
-            borderColor: '#f472b6',
+            color: personalWorkColors.bg,
+            textColor: personalWorkColors.text,
+            borderColor: personalWorkColors.border,
             tooltip: `${event.title || '作業予定'}（変更はカレンダーから）`,
             readOnly: true,
         }))

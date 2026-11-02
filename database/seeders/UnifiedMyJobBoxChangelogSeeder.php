@@ -25,5 +25,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
             'claude_notes' => 'Codex。専用POSTの厳しい試用guard後に既存DepartmentWorkController::storeへ委譲。1簡易記録のみ保存しassignment/events複製なし。旧カレンダーの入口と保存経路、日報・評価計算は維持。保存IDで本人行のページへ移動。',
         ]);
+        Changelog::updateOrCreate(['version' => 'unified-picker-20261103'], [
+            'title' => '試用マイジョブの分類選択と単位候補を改善',
+            'released_at' => '2026-11-03',
+            'summary' => '大まかな案件を全件の階層から選択し、単位を選びやすくしました。作業表示は青に統一します。',
+            'body' => '<p>試用マイジョブの大まかな案件は大見出しの＋で開閉し、検索時は一致する中分類と親を表示します。ページ・ファイル・件などの単位候補を常時選択でき、自由入力も残します。簡易入力由来の作業は従来のマイジョブと同じ青で表示します。一般公開やデータ移行は行いません。</p>',
+            'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
+            'claude_notes' => 'Codex。簡易案件候補の30件制限を除去し、部署/会社/activePath認可は維持。共通treeRowsで親子開閉。PHP/JSの簡易作業色を旧マイジョブ青へ合わせる。数量/保存/評価式は変更しない。',
+        ]);
     }
 }
