@@ -611,3 +611,7 @@ DB/API設計案: broad_project_favorites(user_id,broad_project_id,timestamps)と
 BOX統合の保留事項は維持: 旧マイジョブの未予定分/複数日をどう表示するか、簡易入力work_category=otherをBOXへ入れるか、依頼転換との重複表示をどう扱うかは未確定。会議/外出/その他業務の通常予定をBOXへ入れない確認は保持し、新お気に入りの検討で統合や一般公開が完了したことにしない。
 
 2026-11-02 個人お気に入り案の実装承認（確定）: 利用者は直前の「大/中を個別に星登録解除、本人だけの呼出、簡易入力と進行管理の分類選択でも使用、Excel順維持、BOX統合の前に実装」へ「はい、そうしましょう」。97b068d01末尾の提案をこの範囲で実装承認済みに置換。新テーブルと本人固定の冪等更新、現在のINFO SuperAdmin試用/同部署Coordinator/Leader分類管理の権限内で進める。一般User公開/BOX統合/共通順変更は含まない。次は合成検証とmembersビルドを完了し、専用migrationだけを指定する限定配備コマンドを提示する。
+
+2026-11-02 個人お気に入り限定配備完了: 利用者は正確な `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/broad-project-favorites-deploy-20261102.sh` にyes。同じスクリプトで本番614e8ec2d/main/追跡変更なし/取得4e816e1c6310a047a94da79addecb283d43ee95c/今回14ソース一致/依存変更・削除なしを照合。PHP9ソース実構文成功。mysql名silverlamb759_sunbworkとINFO会社2部署1を確認し、分類hash/案件件数/既存紐付け件数だけ私有検証ファイルへ保存。新favoriteテーブルmigrationだけ--database=mysql --path/--realpath --force成功後、固定SHAへ早送り。新テーブル0件、分類全列hash一致、案件件数保持/既存紐付け件数不変を確認。自動星登録・共通並び変更・旧作業変更なし。独立BroadProjectFavoritesChangelogSeederとconfig/cache/route/view clear全成功。最後も追跡変更なし/既存未追跡5件保持。sales接続未使用。
+
+公開manifestは検証済み版と一致し、app-D-EErEqR.js / Index-zPAloWnA.js / Create-VniFtbpH.jsはHTTP200。配備/公開資産と実画面を区別し、星の実際の登録や入力候補の画面確認はまだ未実施。次は上部Coordinator（進行管理）→「大まかな案件」を再読み込みし、よく使う分類1件で①☆を押して★になる、②再読み込みしても★が残る、③「お気に入りだけ」で登録した分類を絞り込める（親は文脈として表示）、の3点を依頼。全て問題なければ成功、相違は番号と結果。星解除/別本人の隔離/簡易入力と進行管理pickerの呼出は別の未確認条件。既確認の分類階層/共通順/任意紐付け/機密文言の画面を再依頼しない。一般User公開とBOX統合は未承認のまま。
