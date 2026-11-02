@@ -157,6 +157,7 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        (new UnifiedMyJobBoxChangelogSeeder())->run();
         (new WorkloadManagementMoveChangelogSeeder())->run();
         (new DepartmentRecordsPreviewChangelogSeeder())->run();
         (new UserWorkHubPreviewChangelogSeeder())->run();

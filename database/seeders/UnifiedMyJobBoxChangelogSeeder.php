@@ -1,0 +1,21 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Changelog;
+use Illuminate\Database\Seeder;
+
+class UnifiedMyJobBoxChangelogSeeder extends Seeder
+{
+    public function run(): void
+    {
+        Changelog::updateOrCreate(['version' => 'unified-box-preview-20261102'], [
+            'title' => 'Super Admin限定の統合マイジョブBOX試用',
+            'released_at' => '2026-11-02',
+            'summary' => '簡易入力と従来のジョブを本人用の読取一覧で確認する限定試用です。',
+            'body' => '<p>情報出版のSuper Admin本人だけの試用一覧です。未予定の従来ジョブを残し、複数日の予定を1行にまとめ、簡易入力の「その他」も含めます。検索・月選択・既存詳細やカレンダーへの移動に対応します。一般公開と入力の差し替えは別工程です。</p>',
+            'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
+            'claude_notes' => 'Codex。実所属INFO/非一般会社/本人固定/別会社コンテキスト拒否。新テーブル・一括移行・予定保存・完了更新・日報評価変更なし。CalculatesEventTimeでproof UTC/JST混在を解決。',
+        ]);
+    }
+}

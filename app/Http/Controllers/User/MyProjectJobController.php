@@ -179,7 +179,10 @@ class MyProjectJobController extends Controller
         // フラッシュデータからjobid/register_flagsを取得
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
+        $trialContext = session('superadmin_context.company_id');
         return Inertia::render('MyJobBox/Index', [
+            ...(app(\App\Services\UnifiedMyJobBox::class)->available($user, $trialContext === null ? null : (int) $trialContext)
+                ? ['unifiedBoxPreviewEnabled' => true] : []),
             'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($user),
             'jobs' => $jobs,
             'myAssignments' => $myAssignments,

@@ -392,6 +392,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     // MyJobBox: user-scoped JobBox page (personal messages/assignments)
     Route::get('/myjobbox', [\App\Http\Controllers\User\MyProjectJobController::class, 'index'])->name('user.myjobbox.index');
+    Route::get('/myjobbox/unified-preview', [\App\Http\Controllers\User\UnifiedMyJobBoxController::class, 'index'])->name('user.myjobbox.unified_preview');
     Route::get('/myjobbox/past-data', [\App\Http\Controllers\User\MyProjectJobController::class, 'pastData'])->name('user.myjobbox.past_data');
     Route::get('/myjobbox/pending-requests', [\App\Http\Controllers\User\MyProjectJobController::class, 'pendingRequests'])->name('user.myjobbox.pending_requests');
     Route::post('/myjobbox/assignments/{assignment}/complete', [\App\Http\Controllers\User\MyProjectJobController::class, 'completeAssignment'])->name('myjobbox.assignments.complete');
