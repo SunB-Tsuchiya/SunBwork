@@ -127,7 +127,16 @@ class UnifiedMyJobBox
         $total = $filtered->count();
         $last = max(1, (int) ceil($total / 50));
         $page = min($last, max(1, (int) ($filters['page'] ?? 1)));
-        return ['rows' => $filtered->slice(($page - 1) * 50, 50)->values()->all(), 'months' => $months,
+        $createdKey = null;
+        if (! empty($filters['created_entry'])) {
+            $key = 'entry:'.(int) $filters['created_entry'];
+            $index = $filtered->search(fn ($row) => $row['key'] === $key);
+            if ($index !== false) {
+                $page = (int) floor($index / 50) + 1;
+                $createdKey = $key;
+            }
+        }
+        return ['createdKey' => $createdKey, 'rows' => $filtered->slice(($page - 1) * 50, 50)->values()->all(), 'months' => $months,
             'filters' => ['q' => $q, 'period' => $period, 'hide_completed' => $hide],
             'pagination' => ['page' => $page, 'last' => $last, 'total' => $total]];
     }

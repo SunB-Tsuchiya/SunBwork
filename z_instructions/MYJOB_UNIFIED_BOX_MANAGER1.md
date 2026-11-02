@@ -75,3 +75,17 @@ UnifiedMyJobBoxTestを合成SQLiteメモリで追加。既存4関連テストと
 利用者は直前に依頼した3点へ「成功」と回答。情報出版SuperAdminで現行BOXの新ボタン表示、試用一覧をエラーなく開く、全期間で表示作業名の一部を検索してクリアする操作を確認済みに変更。未予定/複数日の実例・全日時の照合・詳細やカレンダー往復・別アカウント・上長レビューは未確認。既確認項目の再依頼は不要。一般公開は未承認。
 
 次の一手（提案、未実装）: 統合BOX試用に「マイジョブ作成」を設け既存QuickWorkEntryModalを開き、既存の簡易入力保存APIを使用する。作業日/開始/終了/作業名、任意案件・分類・数量を入力し、保存後はその作業月のBOXへ表示。既存の個人カレンダーにも同じ記録を表示し、assignment/eventsへの複製や日報・評価の新計算はしない。従来の詳細入力・依頼から登録・添付は旧経路を維持。実所属INFO SuperAdmin/本人/会社コンテキストの境界を維持し、一般UserにはボタンもAPI利用権限も追加しない。初回読取範囲を拡張するため、この次段階の仕様確認後に実装する。
+
+## 2026-11-02 作成接続の承認・実装・コード検証
+
+利用者yesにより前段末尾の作成接続案を確定。「提案/未実装」をこの工程について置換。SuperAdmin限定試用BOXへマイジョブ作成ボタンとQuickWorkEntryModal（myjob文脈）を接続。JST今日/時刻空欄で開き、日付変更可。既存のDepartmentWorkController::storeへ、厳しい統合BOXguardを持つ専用POSTから委譲する。旧カレンダーの既存POST/PUT・表示文言を維持。保存成功で作業日+IDを受け、検索/完了除外を解除して保存月と対象行ページへ移動、「今回登録」を表示。詳細入力/依頼/添付は既存BOXへ戻る案内を追加。新DB/複製/編集削除完了の統合なし。
+
+コード検証: 既存関連29テスト311断言と新Integration3テスト44断言、計32件355断言成功。IntegrationはTests/TestCaseやRefreshDatabaseを使わず、DB_CONNECTION=sqlite/DB_DATABASE=:memory:の明示条件でのみ起動。専用POSTのrole/一般会社/INFO外/別会社コンテキスト403、既存検証の時刻必須/終了順/数量単位/不正日付/別会社分類拒否、本人所属ID固定・不正source/assignment ID無視、1簡易記録だけ保存とBOX/既存mine APIの同じ日付時刻/分類、events/assignments/projects件数不変を確認。created_entryも本人行だけをページ表示し、不明IDは無視する。
+
+実Vue script/SSRの永続tests/js/unifiedMyJobInput.test.cjs成功。BOX/カレンダーのheading/説明、作成/編集POST/PUT先、必須時刻、開き直しリセット、保存失敗の内容保持、保存成功日付、JST境界、対象月とIDへの移動、旧BOXへの案内を確認。これはブラウザ実画面確認ではない。対象ESLintと変更PHP6構文成功、実Ziggy生成済み。最終ビルド/manifest/差分確認を行う。
+
+限定配備・作成の利用者画面確認は未実施。現在の本番7f2868a06（読取試用）と、初回3点の画面成功は保持し繰り返さない。次は固定差分の正確なSSHコマンドを準備して承認を得る。一般公開なし、カレンダー入口再編や編集削除完了統合は後工程。
+
+最終確認: 実Vue script/SSR成功、対象ESLint成功、PHP6構文/実Ziggy GET+POST一致、members最終ビルド成功、manifest492参照欠落0と/members/build/確認。ビルドによる既存資産の削除は削除パスだけ復元し全保持。ソースdiff --check成功。共有Claudeソース/.env/ビルドは未編集。旧読取試用の画面確認は繰り返していない。
+
+配備準備: 固定元7f2868a06から今回の作成接続版だけを、ソース許可一覧/取得SHA/追跡変更なし/main/削除なし/依存・migration変更なし/PHP構文を照合してff-only。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force、config/cache/route/view clear、試用GET/POST登録確認を行うスクリプトを /tmp/unified-box-input-deploy-20261102.sh に用意する。正確な実行コマンドは `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/unified-box-input-deploy-20261102.sh`。実行は利用者承認後。現時点で本番配備/作成画面確認は未実施。

@@ -163,6 +163,10 @@ class UnifiedMyJobBoxTest extends TestCase
         $this->assignment(1, ['desired_end_date' => '2026-11-20', 'completed' => true]);
         $this->assignment(2); $this->event(1, 2, '2026-11-30 23:30:00', '2026-12-01 00:30:00');
         $list = $this->box->listing($this->user(), 1, ['period' => '2026-11']);
+        $focused = $this->box->listing($this->user(), 1, ['period' => '2026-11', 'created_entry' => 1]);
+        self::assertSame('entry:1', $focused['createdKey']);
+        self::assertContains('entry:1', array_column($focused['rows'], 'key'));
+        self::assertNull($this->box->listing($this->user(), 1, ['period' => '2026-11', 'created_entry' => 999])['createdKey']);
         self::assertSame(57, $list['pagination']['total']); self::assertCount(50, $list['rows']);
         self::assertSame(7, count($this->box->listing($this->user(), 1, ['period' => '2026-11', 'page' => 2])['rows']));
         self::assertSame(56, $this->box->listing($this->user(), 1, ['period' => 'all', 'hide_completed' => true])['pagination']['total']);

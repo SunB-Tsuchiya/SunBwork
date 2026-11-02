@@ -17,5 +17,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
             'claude_notes' => 'Codex。実所属INFO/非一般会社/本人固定/別会社コンテキスト拒否。新テーブル・一括移行・予定保存・完了更新・日報評価変更なし。CalculatesEventTimeでproof UTC/JST混在を解決。',
         ]);
+        Changelog::updateOrCreate(['version' => 'unified-box-input-20261102'], [
+            'title' => '統合BOXの試用画面から簡易入力でマイジョブ作成',
+            'released_at' => '2026-11-02',
+            'summary' => '情報出版のSuper Admin限定で、統合BOXから簡易入力を開いて作業を登録できます。',
+            'body' => '<p>統合BOXの「マイジョブ作成」から日付と時刻を入力します。登録した同じ記録をBOXとカレンダーに表示し、従来の詳細入力・依頼からの登録・添付は既存BOXから使えます。一般ユーザーへの公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
+            'claude_notes' => 'Codex。専用POSTの厳しい試用guard後に既存DepartmentWorkController::storeへ委譲。1簡易記録のみ保存しassignment/events複製なし。旧カレンダーの入口と保存経路、日報・評価計算は維持。保存IDで本人行のページへ移動。',
+        ]);
     }
 }

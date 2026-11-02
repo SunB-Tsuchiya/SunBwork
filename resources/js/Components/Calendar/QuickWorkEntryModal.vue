@@ -6,12 +6,15 @@ import { workCategories, workActivities } from '@/Constants/personalWorkActiviti
 
 const props = defineProps({
     show: { type: Boolean, default: false },
+    entryPoint: { type: String, default: 'calendar' },
     date: { type: String, default: '' },
     startMin: { type: Number, default: null },
     endMin: { type: Number, default: null },
     entry: { type: Object, default: null },
 });
 const emit = defineEmits(['close', 'saved']);
+const isMyJob = computed(() => props.entryPoint === 'myjob');
+const heading = computed(() => props.entry ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
 const projects = ref([]);
 const broadProjects = ref([]);
 const recentUnits = ref([]);
@@ -165,12 +168,13 @@ async function save() {
             actual_quantity: form.actual_quantity === '' ? null : form.actual_quantity,
             actual_unit: form.actual_quantity === '' ? null : form.actual_unit,
         };
+        let response;
         if (props.entry?.id) {
-            await axios.put(route('schedule.department_work.update', { entry: props.entry.id }), payload);
+            response = await axios.put(route('schedule.department_work.update', { entry: props.entry.id }), payload);
         } else {
-            await axios.post(route('schedule.department_work.store'), payload);
+            response = await axios.post(route(isMyJob.value ? 'user.myjobbox.unified_store' : 'schedule.department_work.store'), payload);
         }
-        emit('saved', form.work_date);
+        emit('saved', form.work_date, response.data.id);
     } catch (err) {
         const first = Object.values(err.response?.data?.errors || {})[0];
         error.value = first?.[0] || err.response?.data?.message || '保存できませんでした。';
@@ -197,12 +201,12 @@ async function remove() {
 <template>
     <Teleport to="body">
         <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4" @click.self="emit('close')">
-            <div role="dialog" aria-modal="true" aria-label="簡単な作業予定" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+            <div role="dialog" aria-modal="true" :aria-label="heading" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div class="flex items-center justify-between gap-2">
-                    <h2 class="text-lg font-semibold">{{ entry ? '作業予定を編集' : '簡単な作業予定を追加' }}</h2>
+                    <h2 class="text-lg font-semibold">{{ heading }}</h2>
                     <button type="button" class="text-sm text-gray-500 hover:underline" @click="emit('close')">閉じる</button>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">カレンダーで選んだ時刻を、その日の作業予定として保存します。あとから時刻や内容を直せます。</p>
+                <p class="mt-1 text-xs text-gray-500">{{ isMyJob ? '日付と開始・終了時刻を入力して作業を登録します。登録した作業は、このBOXとカレンダーに表示されます。' : 'カレンダーで選んだ時刻を、その日の作業予定として保存します。あとから時刻や内容を直せます。' }}</p>
                 <p v-if="error" class="mt-3 rounded bg-red-50 p-2 text-sm text-red-700" role="alert">{{ error }}</p>
                 <form class="mt-4 space-y-3" @submit.prevent="save">
                     <label class="block text-sm">日付<input v-model="form.work_date" type="date" required class="mt-1 w-full rounded border p-2" /></label>

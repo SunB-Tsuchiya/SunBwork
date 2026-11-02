@@ -1,45 +1,30 @@
 # マイジョブ入力・BOX統合 再開用
 
-更新: 2026-11-02 JST。状態: 初回読取試用の実装承認・コード検証済み。一般User公開未承認、限定配備7f2868a06完了、入口・一覧・全期間検索/クリアの利用者画面確認済み。
+更新: 2026-11-02 JST。実装とコード検証、配備、利用者画面確認を分ける。一般公開は未承認。
 
 ## 最初に読む
 
-AGENTS.md → JOB_EVALUATION_CONTROL1.md → MYJOB_UNIFIED_BOX_PLAN1.md / MANAGER1.md。過去の経緯と成功記録はUSER_WORK_HUB_PLAN1/MANAGER1/1_PROMPT。現在の本番は7f2868a06。新しい資料があるだけで統合が配備済みとは扱わない。
+AGENTS.md → JOB_EVALUATION_CONTROL1.md → MYJOB_UNIFIED_BOX_PLAN1.md / MANAGER1.md。親計画はUSER_WORK_HUB_*、既確認画面の履歴もそこを参照。共有Claude変更を触らない。
 
-## 今回のユーザー指示
+## 現在地
 
-「簡易入力とマイジョブBOXの統合設計に進む」へ了承。ただし一般Userにはまだ公開したくないと強調。INFO SuperAdmin本人だけの試用を保護する。分類管理を開いたCoordinator/Leaderも、この新しい統合BOXの対象にはしない。
+- 作業: feature/unified-box-preview-20261102、/tmp/sunbwork-unified-box-20261102。旧/tmpは消失したため保存ce396f6bdから復元した。現在のGit版を必ず確認する。
+- 本番: 7f2868a06e6f4b55ce6e6c406c5414886d2df4ab。初回読取BOXは配備済み、利用者「成功」で新ボタン/一覧を開く/全期間の作業名検索・クリアの3点を確認済み。これらの再試験不要。
+- 最新の利用者yes: SA試用BOXから「マイジョブ作成」で既存簡易入力を開き、保存した同じ作業をBOX/カレンダーへ表示。旧詳細/依頼/添付経路を保持する段階を承認。
+- 作成接続: コード検証済み、限定配備/作成の利用者画面確認は未実施。次は固定差分のSSHコマンドを準備し承認を得る。ビルド/manifestの最終結果はMANAGERを参照。
 
-次の3点は非同期質問に利用者が回答し、確定済み。
+## 実装と境界
 
-1. 旧形式でカレンダー未登録のものも未予定として残す。
-2. 複数日に予定がある従来の1ジョブは1行にまとめ、複数日を表示する。
-3. 会議/外出などの通常予定を除外したまま、簡易入力の作業区分otherを含める。
+UnifiedMyJobBoxのGETと新POST user.myjobbox.unified_storeは実所属INFO・非一般会社のSuperAdmin本人だけ。別会社コンテキスト拒否。分類管理権限でCoordinator/Leaderへ広げない。一般Userの通常BOX/props/フォーム/カレンダーは維持。
 
-3点の再質問は不要。PLAN末尾へ初回実装範囲を具体化済み。閲覧専用プレビューの具体案へ利用者yes。初回コード実装済み。
+新POSTはguard後DepartmentWorkController::storeへ委譲し、既存検証と本人固定保存を再利用。新DB/複製なし。QuickWorkEntryModalのentryPoint=myjobだけ新規保存先/タイトル/説明を変更。通常カレンダーのPOST/PUT、日報/評価計算は変更しない。JST今日/時刻空欄を初期値にし、成功時だけ閉じる。保存日+IDから作業月・検索なし・完了除外なしの本人行ページへ移動し「今回登録」を表示。created_entryは本人一覧で一致するキーだけ使う。失敗時は内容を保持。
 
-## 調査の要点
+Q1未予定保持、Q2従来1割当1行複数日、Q3簡易otherを含めるは確定済み。通常会議/外出とsource_event_id付き補足は独立行にしない。自己割当は本人の旧未予定も残す。予定ある受信/proof/表作業も本人だけ。supersedesの一意な同案件本人置換だけ対応し、続きsource_assignment_id/校正coordinator_assignment_idを混同しない。同名結合禁止。時刻はCalculatesEventTimeのJST/校正UTC、予定月はJST実作業月、未予定は締切/登録月。
 
-旧BOXは自己割当だけで、月が締切/登録日基準、先頭予定中心の表示。proof+coordinator_assignment_idの実行枠を除外。簡易記録は別テーブルで、source_event_id付きは旧イベントの補足なので独立作業として二重にしない。
+## 検証と残り
 
-出典と元IDを保持した表示行を組み立て、初回は新DBテーブル不要の案。続き/依頼置換/校正の参照を混同せず、仕事名や時刻一致で自動結合しない。通常JST/proof UTCは既存CalculatesEventTimeを使う。日報・評価の計算を表示統合に合わせて変更しない。
+合成関連29件311断言+新Integration3件44断言、計32件355断言成功。DBは明示SQLiteメモリのみ、Tests/TestCase/RefreshDatabaseは使わない。実Vue script/SSRのtests/js/unifiedMyJobInput.test.cjs成功、対象ESLint/PHP6構文/実Ziggy生成成功。membersビルド・既存削除資産保持・manifestの最終証拠はMANAGERで確認する。
 
-最初はSuperAdminだけの確認入口から読取統合BOXを試し、一般Userの既存URL/props/フォームを保つ提案。入力通常化とカレンダーの入口整理は読取確認の次。詳細入力/依頼から登録/過去引用/添付を既存保存経路へ残す。
+本番SSH前に正確なコマンドを示し利用者承認。配備は固定元7f2868a06と今回固定版、許可ソース一覧一致、削除/依存/migration変更なし、ff-only。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force。既存未追跡5件保持。sales接続禁止。他Claude作業を取り込むpull/main同期をしない。
 
-## 作業場所と次
-
-feature/project-broad-link-20261102、/tmp/sunbwork-project-broad-link-20261102。共有ツリーはClaude作業があり触らない。元コード調査は70ca0778e。今回の作業は資料だけで、SSH/DB読取やアプリ配備をしていない。
-
-次はコード最終確認後、固定差分の正確なSSHコマンドを提示して限定配備の承認を得る。未予定の月所属は旧BOX互換の締切/登録月とする案を明示し、予定済みは作業月に揃える。既確認の分類・星・紐付け保存・機密/休止表示の画面チェックは繰り返さない。
-
-### 初回読取試用の実装再開点
-
-現在feature/unified-box-preview-20261102、/tmp/sunbwork-unified-box-20261102、元ce396f6bd。旧/tmpツリーは消失していたため保存版から作成。新専用GET/サービス/controller/Vue、旧BOXの認可済みprop/ボタンだけ、Ziggy、テスト、独立変更履歴。新migrationなし。一般向け通常フォーム/日報/評価/既存保存ルート変更なし。
-
-合成29件308断言、実route/controller10組、実Vue SSR、対象ESLintとmembers build成功。最終構文/manifest/ビルド更新の結果はMANAGERを読む。予定はJST実作業月、未予定は締切/登録月、従来割当は複数日を1行。依頼supersedesが一意で同案件本人なら対応、曖昧なら保持、続きやproof参照を同一視しない。
-
-旧試用本番最終版5462a2b09から今回固定版だけを早送りする配備スクリプトを準備する。SSH未承認・未実行。一般公開せず、画面成功を推定しない。過去の分類/星/機密/休止チェックは繰り返さない。
-
-2026-11-02 配備成功: 利用者承認済みの固定スクリプトで本番5462a2b09→7f2868a06、19ソース一致/既存ファイル保持/PHP構文/manifest/独立Seeder/cache/route確認全成功。現在の本番は7f2868a06e6f4b55ce6e6c406c5414886d2df4ab。以前の「次はSSH承認」「未実行」はこの記録で置換。次はMANAGER末尾3点（新ボタン表示/一覧を開く/全期間の作業名検索とクリア）の利用者回答。実画面成功を推定しない。一般公開・入力差替えは未承認。
-
-2026-11-02 利用者「成功」: 直前の新ボタン表示/一覧を開く/全期間での作業名検索・クリアの3点を確認済み。「次は3点の回答待ち」を置換。未予定・複数日の実例/詳細往復/別アカウントまで拡張しない。次はSA試用BOXの「マイジョブ作成」から既存簡易入力を開き、保存後BOX/既存カレンダーへ同一記録を表示する段階の相談。従来詳細/依頼/添付を維持、一般公開なし。まだ次段階コードは変更しない。
+未確認: 作成画面/実保存/BOXとカレンダーの往復、未予定/複数日の実例、別アカウント実画面、上長レビュー。一般公開・通常入口差替え・カレンダー入口再編・編集削除完了の統合は未承認。既確認の分類/星/機密/休止は繰り返さない。

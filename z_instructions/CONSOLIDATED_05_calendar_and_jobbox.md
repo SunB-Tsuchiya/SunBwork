@@ -345,3 +345,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 `user.myjobbox.unified_preview` は実所属INFO・非一般会社のSuperAdmin本人だけ。別会社コンテキストと他roleはサーバ403。現行BOXには認可済み本人だけ「統合BOX（試用）」を表示し、一般Userの通常BOX/入力を維持する。`UnifiedMyJobBox` が本人の独立簡易（other含む、source_event_id=NULL）、従来自分の割当（未予定含む）、本人の予定がある受信/校正/表作業を読み取り専用で統合する。
 
 従来1割当は1行・複数予定、独立簡易は各1行。同名で結合しない。supersedesの一意な同案件本人置換だけ対応し、続き/校正参照は別関係。月はJST作業月、未予定は締切/登録月。検索・完了除外・50件ページは統合後に適用。通常予定とイベント補足を独立行にしない。新DB/migration/保存APIなし、日報/評価計算変更なし。初回実装と配備/利用者確認はMYJOB_UNIFIED_BOX_MANAGER1.mdで別管理。一般公開・通常入力/カレンダー入口の統合は後工程。
+
+2026-11-02 作成接続（コード検証済み、反映/画面確認はMYJOB_UNIFIED_BOX_MANAGER1参照）: 統合BOXにマイジョブ作成を追加。QuickWorkEntryModalのentryPoint=myjobだけタイトル/説明と新規POST先user.myjobbox.unified_storeを変更し、同じ試用guard後に既存DepartmentWorkController::storeへ委譲。日付初期値JST今日、開始/終了は空欄必須。成功時の日付+IDで本人の保存月/該当ページへ戻り「今回登録」を表示。一般カレンダーの旧文言/既存保存先と日報・評価の集計は維持、新migration/assignment/events複製なし。詳細入力/依頼/添付は旧BOX経路を保持。
