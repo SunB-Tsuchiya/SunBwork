@@ -117,3 +117,15 @@ UnifiedMyJobBoxTestを合成SQLiteメモリで追加。既存4関連テストと
 次の一手: 修正の最終検証後、固定元ef32b4e13と今回だけのソース許可一覧を持つSSHスクリプトを提示し承認を得る。未配備/未画面確認。過去の保存チェックや初回一覧チェックを繰り返さない。次の新画面確認は分類全件/＋開閉・検索、単位選択、カレンダー青色を中心にする。
 
 2026-11-03 最終検証: PHP変更6ファイル構文、対象ESLint、実Vue script/SSR、共通treeテスト、33件362断言成功。members build成功、manifest493参照欠落0/membersパスを確認。既存資産は削除パスのみ復元して保持。新migration/route/依存変更なし。次は /tmp/unified-picker-deploy-20261103.sh を用意し、`ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/unified-picker-deploy-20261103.sh` の承認を得る。固定元ef32b4e13/main/追跡変更なし/今回許可ソースと固定取得SHA/削除・依存・migration変更なしを検証してff-only。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force、cache/config/route/view clear。今回の配備/新UI画面確認はまだ。
+
+## 2026-11-03 分類/単位/色の限定配備成功
+
+利用者は正確なSSHコマンドにyes。同じ/tmp/unified-picker-deploy-20261103.shを実行しexit0。元ef32b4e13/main/追跡変更なし、取得f7ff846daf90983c1cc6d47400e317b75b9ac3d0、16ソース一致、削除/依存/migration/route/Ziggy変更なし、PHP6構文を検証後ff-only更新。既定mysql名silverlamb759_sunbworkを設定値だけ照合。manifest全資産存在/membersパス、独立UnifiedMyJobBoxChangelogSeeder --database=mysql --force、config/cache/route/view clear成功。最後も追跡変更なし/既存未追跡5件保持。sales/業務記録調査・作業登録なし。
+
+今回のコード検証と限定配備は完了、修正UIの利用者画面確認は未実施。一般公開なし。利用者が既に成功と述べた保存は繰り返さない。色は保存済み記録にも表示時に適用され、作り直し不要。
+
+次の一手: 情報出版SuperAdminで次の3点を確認してもらう。
+1. 再読み込み後、作成画面の「案件を探す」で大見出しの＋/−が開閉し、以前見つからなかった分類を検索して選べる。
+2. 単位の「ファイル」「件」などが常時表示され、押すと単位欄へ反映される（保存不要）。
+3. カレンダーを再読み込みし、先ほど保存済みの作業が青で表示される。
+全部問題なければ「成功」、違えば番号と結果。全分類の実データ件数照合・全単位の保存・日報/部署/分析の全画面配色・カレンダー往復の日時照合までは確認済みにしない。
