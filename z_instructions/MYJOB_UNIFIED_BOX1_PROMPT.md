@@ -130,3 +130,5 @@ ff-onlyでb71へ更新、manifest全参照/members base/WorkDetailを確認。�
 次の一手: 固定元fdd6ab6b7/main/追跡変更なしから今回固定版だけを取得するSSHスクリプトを提示し承認を得る。新migration2026_11_03_150001_create_work_job_continuations_tableだけを固定版から私有stageへ抽出し--database=mysql --path/--realpath --force。既存ID範囲件数保持、receipt表新設時空・migration記録を確認後ff-only。独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、cache/route/manifest/5ルートと未追跡保持。自動巻戻し・他migration実行をしない。今回コードを配備成功・画面成功と扱わない。
 
 段階2a最終検証: 最終members build/manifest494参照欠落0/WorkDetailとmembers base、既存資産削除復元成功。実Vue script/SSR/対象ESLint成功。完了対象の日時表示追加後、Integration10件144断言と対象時間Unit2件66断言を再実行し成功（全体98件761断言の該当箇所）。追加2ルートの静的Ziggyは実生成と一致。diff --check成功。次は段階2a固定差分だけのSSH承認。今回まだ配備/画面確認なし。
+
+段階2a保存コード43eb9fa7d（feature/myjob-core-20261103、共有作業変更なし）。配備用/tmp/myjob-stage2a-deploy-20261103.shは固定元fdd6ab6b7と固定取得版、19ソース許可一覧、唯一の新migration、削除/依存変更なしを照合する。シェル構文・許可一覧のローカル照合成功。正確な承認対象は `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-stage2a-deploy-20261103.sh`。承認前にSSH実行しない。配備後の次の一手は新しい続き/系列/選択+祖先完了だけの画面確認で、既確認の入力/詳細/外観/単位/色を再試験しない。
