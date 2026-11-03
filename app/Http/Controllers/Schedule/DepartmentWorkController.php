@@ -381,6 +381,7 @@ class DepartmentWorkController extends Controller
         $user = $request->user();
         abort_unless($this->schedule->available($user) && (int) $entry->user_id === (int) $user->id, 403);
         abort_if($entry->diary_id, 422, '日報へ取り込んだ記録は日報編集画面で変更してください。');
+        abort_if(app(\App\Services\WorkJobReader::class)->hasEntryChildren((int) $entry->id), 422, '続きがあるため、この仕事は削除できません。');
         $entry->delete();
         return response()->noContent();
     }

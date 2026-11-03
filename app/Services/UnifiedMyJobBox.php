@@ -84,10 +84,10 @@ class UnifiedMyJobBox
             ->with(['projectJob' => $projectScope, 'broadProject' => $broadScope])->orderBy('id')->get();
         foreach ($entries as $entry) {
             $date = $entry->work_date->format('Y-m-d');
-            $rows[] = ['key' => 'entry:'.$entry->id, 'assignmentId' => null, 'title' => $entry->title,
+            $rows[] = ['key' => 'entry:'.$entry->id, 'entryId' => (int) $entry->id, 'assignmentId' => null, 'title' => $entry->title,
                 'project' => $entry->projectJob?->title ?? $entry->project_name_text ?? '',
                 'classification' => $entry->broadProject?->pathLabel() ?? '', 'kind' => '簡易入力',
-                'completed' => false, 'status' => '登録済み', 'slots' => [['date' => $date,
+                'completed' => (bool) $entry->completed_at, 'status' => $entry->completed_at ? '完了' : '登録済み', 'slots' => [['date' => $date,
                     'start' => substr($entry->planned_start_time ?? '', 0, 5), 'endDate' => $date,
                     'end' => substr($entry->planned_end_time ?? '', 0, 5)]],
                 'fallbackDate' => null, 'quantity' => $entry->actual_quantity === null ? null : trim($entry->actual_quantity.' '.($entry->actual_unit ?? '')),

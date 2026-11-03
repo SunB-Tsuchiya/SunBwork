@@ -349,3 +349,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-11-02 作成接続（コード検証済み、反映/画面確認はMYJOB_UNIFIED_BOX_MANAGER1参照）: 統合BOXにマイジョブ作成を追加。QuickWorkEntryModalのentryPoint=myjobだけタイトル/説明と新規POST先user.myjobbox.unified_storeを変更し、同じ試用guard後に既存DepartmentWorkController::storeへ委譲。日付初期値JST今日、開始/終了は空欄必須。成功時の日付+IDで本人の保存月/該当ページへ戻り「今回登録」を表示。一般カレンダーの旧文言/既存保存先と日報・評価の集計は維持、新migration/assignment/events複製なし。詳細入力/依頼/添付は旧BOX経路を保持。
 
 2026-11-03 試用入力修正（実装/配備/画面確認はMYJOB_UNIFIED_BOX_MANAGER1で区別）: 簡易入力の大まかな案件は30件制限を外し、所属/activePathを満たす全件をExcel順で返す。parent_idと共通treeRowsで大見出し＋/−、検索時親文脈つき展開、根と中どちらも選択可、お気に入り近道を維持。単位はページ/ファイル/件/枚/点/冊と最近値を常時候補ボタンで選択でき、自由入力可。旧「簡易予定は淡いピンク」という表示方針はマイジョブ統合方針で置換し、個人/部署/日報の簡易作業も旧マイジョブ青#4F46E5に統一。作業種類の校正色やproofジョブ色は維持。保存データ/評価式/一般公開権限は変えない。
+
+2026-11-03 共通マイジョブ段階1（反映/確認はMYJOB_UNIFIED_BOX_MANAGER1参照）: strict INFO・非一般会社SuperAdmin本人だけ、独立簡易をBOX/カレンダーの共通詳細user.myjobbox.entries.showから読む。編集/削除は専用の同一guard入口から既存の軽いフォーム/検証へ委譲、日報/子あり削除を保護。通常Userの新詳細許可propは返さない。4nullable完了/継続FKは基盤のみで、完了/続き作成のボタンは次段階。共通WorkMinuteLedgerは既存の休憩/優先/均等配分を挙動保持で抽出し、通常の分析出力は維持、任意record_minutesを詳細の記録時間へ使用。予定枠/昼休憩/休憩後の枠/試用V3記録時間を分け、未来は記録0。データコピー/新評価式/過去再採点/一般公開なし。

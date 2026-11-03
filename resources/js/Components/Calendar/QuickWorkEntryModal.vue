@@ -13,7 +13,7 @@ const props = defineProps({
     endMin: { type: Number, default: null },
     entry: { type: Object, default: null },
 });
-const emit = defineEmits(['close', 'saved']);
+const emit = defineEmits(['close', 'saved', 'deleted']);
 const isMyJob = computed(() => props.entryPoint === 'myjob');
 const heading = computed(() => props.entry ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
 const projects = ref([]);
@@ -180,7 +180,7 @@ async function save() {
         };
         let response;
         if (props.entry?.id) {
-            response = await axios.put(route('schedule.department_work.update', { entry: props.entry.id }), payload);
+            response = await axios.put(route(isMyJob.value ? 'user.myjobbox.entries.update' : 'schedule.department_work.update', { entry: props.entry.id }), payload);
         } else {
             response = await axios.post(route(isMyJob.value ? 'user.myjobbox.unified_store' : 'schedule.department_work.store'), payload);
         }
@@ -198,8 +198,9 @@ async function remove() {
     saving.value = true;
     error.value = '';
     try {
-        await axios.delete(route('schedule.department_work.destroy', { entry: props.entry.id }));
-        emit('saved', form.work_date);
+        await axios.delete(route(isMyJob.value ? 'user.myjobbox.entries.destroy' : 'schedule.department_work.destroy', { entry: props.entry.id }));
+        if (isMyJob.value) emit('deleted', form.work_date);
+        else emit('saved', form.work_date);
     } catch (err) {
         error.value = err.response?.data?.message || '削除できませんでした。';
     } finally {

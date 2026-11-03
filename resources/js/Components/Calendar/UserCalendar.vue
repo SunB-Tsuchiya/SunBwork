@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { personalWorkColors } from '@/Constants/personalWorkActivities';
 import axios from 'axios';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import CalendarShell    from '@/Components/Schedule/CalendarShell.vue';
 import MonthView        from '@/Components/Schedule/MonthView.vue';
 import WeekView         from '@/Components/Schedule/WeekView.vue';
@@ -45,6 +45,7 @@ const diaryDates     = ref([]); // 日報マーカー [{ id, date: 'YYYY-MM-DD' 
 const loading        = ref(false);
 const calendarError = ref('');
 const quickWorkColor = personalWorkColors.bg;
+const page = usePage();
 let loadSequence = 0;
 
 // 日報マーカーをイベント形式に変換（MonthView 表示用）
@@ -227,6 +228,10 @@ function openDetail(ev) {
         return;
     }
     if (ev._source === 'personal-work') {
+        if (page.props.workJobDetailEnabled && ev._work_entry?.id) {
+            router.get(route('user.myjobbox.entries.show', { entry: ev._work_entry.id, from: 'calendar' }));
+            return;
+        }
         quickWorkEntry.value = ev._work_entry;
         quickWorkDef.value = { date: ev._work_entry.work_date, startMin: null, endMin: null };
         showQuickWork.value = true;

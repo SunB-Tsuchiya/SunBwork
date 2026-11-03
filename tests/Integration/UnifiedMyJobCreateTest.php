@@ -31,7 +31,7 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('companies', function (Blueprint $t) { $t->id(); $t->string('company_type'); });
         Schema::create('departments', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->string('code'); });
         Schema::create('project_jobs', function (Blueprint $t) { $t->id(); $t->string('title')->nullable(); $t->integer('company_id')->nullable(); $t->integer('broad_project_id')->nullable(); });
-        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); });
+        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); });
         Schema::create('events', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('project_job_assignment_id')->nullable(); });
         Schema::create('workflow_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id')->nullable(); });
         Schema::create('broad_projects', function (Blueprint $t) {
@@ -46,6 +46,7 @@ class UnifiedMyJobCreateTest extends TestCase
             $t->integer('actual_minutes'); $t->text('result_note')->nullable(); $t->integer('source_event_id')->nullable();
             $t->integer('project_job_assignment_id')->nullable(); $t->integer('diary_id')->nullable(); $t->timestamps();
         });
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_120001_add_work_job_core_fields.php')->up();
         foreach (['user_monthly_schedules', 'user_monthly_breaks'] as $name) {
             Schema::create($name, function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->string('year_month'); $t->json('schedule'); });
         }
@@ -139,4 +140,68 @@ class UnifiedMyJobCreateTest extends TestCase
         catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
         self::assertSame(0, DB::table('personal_work_entries')->count());
     }
+    public function test_detail_route_and_edit_keep_identity_and_reject_cross_context_or_other_owner(): void
+    {
+        $id = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        $request = $this->request(['from' => 'box', 'q' => 'before', 'period' => 'all'], null, null, 'GET');
+        $request->headers->set('X-Inertia', 'true');
+        $response = app(\App\Http\Controllers\User\WorkJobDetailController::class)->show($request, $id, app(\App\Services\WorkJobReader::class));
+        $page = $response->toResponse($request)->getData(true);
+        self::assertSame('MyJobBox/WorkDetail', $page['component']); self::assertSame('before', $page['props']['back']['q']);
+        self::assertSame($id, $page['props']['work']['id']); self::assertSame(0, $page['props']['time']['recorded']);
+        $update = $this->request($this->payload(['work_date' => '2099-12-02', 'title' => 'Edited', 'source_entry_id' => 999, 'completed_at' => '2026-11-01']));
+        $result = app(\App\Http\Controllers\User\WorkJobDetailController::class)->update($update, $id, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class));
+        self::assertSame($id, $result->getData(true)['id']); self::assertSame(1, DB::table('personal_work_entries')->count());
+        $row = DB::table('personal_work_entries')->first();
+        self::assertSame('Edited', $row->title); self::assertSame('2099-12-02', $row->work_date);
+        self::assertNull($row->source_entry_id); self::assertNull($row->completed_at);
+        foreach ([[$this->user(), 2], [$this->user(['user_role' => 'user']), null]] as [$user, $context]) {
+            try { app(\App\Services\WorkJobReader::class)->detail($user, $id, $context); self::fail('Invalid access'); }
+            catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
+        }
+        try { app(\App\Services\WorkJobReader::class)->detail($this->user(['id' => 2]), $id); self::fail('Other owner'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        self::assertSame(0, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('events')->count());
+    }
+
+    public function test_mixed_parent_reader_preserves_ids_and_rejects_cycles_and_invalid_parent_pairs(): void
+    {
+        $root = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        $child = $this->save($this->request($this->payload(['work_date' => '2099-12-02'])))->getData(true)['id'];
+        DB::table('project_jobs')->insert(['id' => 1, 'company_id' => 1]);
+        DB::table('project_job_assignments')->insert(['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'source_personal_work_entry_id' => $root]);
+        DB::table('personal_work_entries')->where('id', $child)->update(['source_assignment_id' => 1]);
+        $reader = app(\App\Services\WorkJobReader::class);
+        $series = $reader->ancestors($this->user(), 'entry', $child);
+        self::assertSame(['entry', 'assignment', 'entry'], array_column($series, 'type'));
+        self::assertSame([$root, 1, $child], array_column($series, 'id'));
+        try { DB::table('personal_work_entries')->where('id', $root)->delete(); self::fail('Referenced parent deleted'); }
+        catch (\Illuminate\Database\QueryException $e) { self::assertSame(2, DB::table('personal_work_entries')->count()); }
+        DB::table('personal_work_entries')->where('id', $root)->update(['source_entry_id' => $child]);
+        try { $reader->ancestors($this->user(), 'entry', $child); self::fail('Cycle accepted'); }
+        catch (ValidationException $e) { self::assertNotEmpty($e->errors()); }
+        DB::table('personal_work_entries')->where('id', $child)->update(['source_entry_id' => $root]);
+        try { $reader->ancestors($this->user(), 'entry', $child); self::fail('Double parent accepted'); }
+        catch (ValidationException $e) { self::assertNotEmpty($e->errors()); }
+    }
+
+    public function test_detail_delete_keeps_child_and_diary_protection_and_can_delete_an_independent_leaf(): void
+    {
+        $id = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        $controller = app(\App\Http\Controllers\User\WorkJobDetailController::class);
+        $reader = app(\App\Services\WorkJobReader::class);
+        DB::table('personal_work_entries')->where('id', $id)->update(['diary_id' => 99]);
+        try { $controller->destroy($this->request(), $id, $reader, app(DepartmentWorkController::class)); self::fail('Diary entry deleted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        DB::table('personal_work_entries')->where('id', $id)->update(['diary_id' => null]);
+        $child = $this->save($this->request($this->payload(['work_date' => '2099-12-02'])))->getData(true)['id'];
+        DB::table('personal_work_entries')->where('id', $child)->update(['source_entry_id' => $id]);
+        try { $controller->destroy($this->request(), $id, $reader, app(DepartmentWorkController::class)); self::fail('Parent deleted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        $response = $controller->destroy($this->request(), $child, $reader, app(DepartmentWorkController::class));
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame([$id], DB::table('personal_work_entries')->pluck('id')->all());
+        self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('project_job_assignments')->count());
+    }
+
 }

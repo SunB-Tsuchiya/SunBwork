@@ -159,6 +159,8 @@ class CalendarController extends Controller
 
         return Inertia::render('Calendar', [
             'user'               => $user,
+            ...(app(\App\Services\UnifiedMyJobBox::class)->available($user, session('superadmin_context.company_id') === null ? null : (int) session('superadmin_context.company_id'))
+                ? ['workJobDetailEnabled' => true] : []),
             'initialDate'        => $initialDate,
             'initialView'        => $initialView,
             'eventItemTypes'     => $eventItemTypes,

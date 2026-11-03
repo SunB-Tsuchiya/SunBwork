@@ -34,7 +34,7 @@ class WorkloadTrialAnalysis
 
     public function __construct(private PersonalWorkSchedule $schedule) {}
 
-    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false, string $scoreVersion = 'trial_time_v2', bool $separateOvertime = true): array
+    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false, string $scoreVersion = 'trial_time_v2', bool $separateOvertime = true, bool $withRecordMinutes = false): array
     {
         $v3 = $scoreVersion === 'trial_time_v3';
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
@@ -336,7 +336,7 @@ class WorkloadTrialAnalysis
                     if ($actualEnd < $scheduledEnd) $actualEnd += 1440;
                     $overtimeRange = [$scheduledEnd, $actualEnd];
                 }
-                $ledger = $this->minuteLedger($items, $window, $overtimeRange);
+                $ledger = $this->minuteLedger($items, $window, $overtimeRange, $withRecordMinutes);
                 if ($withDaily) {
                     $dailyBreakdown = $this->splitBasePoints($ledger['activities'], $ledger['points']);
                     $daily[$date] = [
@@ -345,6 +345,7 @@ class WorkloadTrialAnalysis
                         'minutes' => $ledger['minutes'],
                         'base_points' => round($ledger['points'], 1),
                         ...$dailyBreakdown,
+                        ...($withRecordMinutes ? ['record_minutes' => $ledger['record_minutes']] : []),
                     ];
                 }
                 if ($ledger['minutes'] > 0) $recordedDays++;
@@ -591,42 +592,9 @@ class WorkloadTrialAnalysis
             .'-type-'.($assignment->work_item_type_id ?: 'none');
     }
 
-    private function minuteLedger(array $items, ?array $window, ?array $overtimeRange = null): array
+    private function minuteLedger(array $items, ?array $window, ?array $overtimeRange = null, bool $withRecords = false): array
     {
-        $lunchFrom = $window['break_start'] ?? 720;
-        $lunchTo = $window['break_end'] ?? 780;
-        $activities = [];
-        $covered = [];
-        $points = 0.0;
-        $timeBreakdown = ['job' => 0.0, 'quick' => 0.0, 'meeting' => 0.0, 'other' => 0.0];
-        $overtimeBreakdown = $timeBreakdown;
-        for ($minute = 0; $minute < 1440; $minute++) {
-            if ($minute >= $lunchFrom && $minute < $lunchTo) continue;
-            $active = array_values(array_filter($items, fn ($item) => $item['from'] <= $minute && $item['to'] > $minute));
-            if (! $active) continue;
-            $priority = max(array_column($active, 'priority'));
-            $active = array_values(array_filter($active, fn ($item) => $item['priority'] === $priority));
-            $covered[] = $minute;
-            $share = 1 / count($active);
-            foreach ($active as $item) {
-                $timeBreakdown[$item['time_group'] ?? 'other'] += $share;
-                if ($overtimeRange && $minute >= $overtimeRange[0] && $minute < $overtimeRange[1]) {
-                    $overtimeBreakdown[$item['time_group'] ?? 'other'] += $share;
-                }
-                $key = $item['work_category'].'|'.$item['activity_type'];
-                $activities[$key]['work_category'] = $item['work_category'];
-                $activities[$key]['activity_type'] = $item['activity_type'];
-                $activities[$key]['minutes'] = ($activities[$key]['minutes'] ?? 0) + $share;
-                $activities[$key]['points'] = ($activities[$key]['points'] ?? 0)
-                    + $share / 60 * PersonalWorkPoints::POINTS_PER_HOUR * $item['coefficient'];
-                $activities[$key]['records'][$item['key']] = true;
-                $points += $share / 60 * PersonalWorkPoints::POINTS_PER_HOUR * $item['coefficient'];
-            }
-        }
-        return ['minutes' => count($covered), 'points' => $points, 'activities' => $activities,
-            'time_breakdown_minutes' => $timeBreakdown,
-            'overtime_breakdown_minutes' => $overtimeBreakdown,
-            'covered' => $covered];
+        return (new WorkMinuteLedger)->calculate($items, $window, $overtimeRange, $withRecords);
     }
 
     private function wholeMinuteBreakdown(array $values, int $total): array

@@ -186,3 +186,19 @@ L01添付/ファイル情報、L02依頼ジョブ関連、L03表/校正専用操
 設計の各業務ルールは**提案**。U01〜U03は案ができたが利用者確定前。既存コード/DBは未変更、M01〜M12の実装状態はまだ未。一般公開なし、保存/分類/単位/青色等の既確認を繰り返さない。根拠版cf222f928、今回SSH/実DB読取なし。
 
 次の一手: 具体設計案を利用者へ説明し、保存元保持/選択+祖先完了/兄弟子維持/子あり削除拒否/初回完了解除なしの範囲で実装するか確認を得る。AGENTS.mdの大規模実装前のPLAN/MANAGER/PROMPT確認に従う。実装承認後もSSH配備は別の固定差分・正確なコマンド承認が必要。M11の既存簡易から旧方式への同一仕事受渡しは後段の設計・確認が残り、全必須完了とは報告しない。
+
+## 2026-11-03 具体設計承認・段階1コード検証
+
+利用者yesで設計案を承認。以前の「実装前確認待ち」を置換。ブランチfeature/myjob-core-20261103（同じ隔離ツリー/tmp/sunbwork-unified-input-fix-20261103）で段階1実装。共有Claudeソース・設定は触らない。本番最新証拠f7ff846da、今回まだSSHなし。
+
+実装: WorkJobReader/WorkJobDetailController/WorkDetail.vue、BOX/カレンダーから同じentry詳細、本人/会社部署/context/SA guard、軽い編集、保護付き削除と専用deletedイベント。新migrationはentry.completed_at/source_entry_id/source_assignment_idとPJA.source_personal_work_entry_idの4nullable追加/FKだけ。既存行コピーなし、新fieldsは通常フォームvalidationに含めず改ざん書込不可。共通ledger抽出、analyzeに任意記録別出力、詳細の予定/昼休憩/記録値分離。一般UserのCalendarには新detail許可propを返さず従来モーダル経路を維持。
+
+検証: 関連Unit88件579断言、Integration6件78断言、計94件657断言成功。既存V2/V3分析の全出力不変（任意内訳を除く）、均等配分/会議優先/日跨ぎ/proof UTC/日別休憩、未来予定の算入なし、詳細GET全SELECT、ID保持編集/状態と元参照の改ざん無視、混在祖先読取/循環・二重親・他人/context拒否、FK削除保護/日報・子あり422/末尾削除を確認。実Vue script/SSRで詳細エスケープ/項目/時間、edit先/削除先と削除後戻り、既存Calendar saved互換を確認。対象ESLint、PHP13構文、実Ziggy3定義一致成功。ブラウザ画面確認ではない。
+
+各Mの段階1状態: M01独立簡易詳細、M02同一記録編集は実装/合成検証済み・未配備/画面未確認。M07/M08/M09/M12は共通時間・削除保護・混在参照・認可の基盤を実装した部分対応。M03/M04/M05/M06/M10の操作、M09旧フォーム相互受渡し、M11旧方式切替は未完。全必須完了と報告しない。
+
+次の一手: 最終members build/manifest/既存資産保持を確認し、固定元f7ff846daから段階1だけを反映するSSHスクリプトを提示して承認を得る。新migrationだけ--database=mysql --path/--realpath --force、前後の件数/新列NULL保持を確認。対象migration前の別のmigrationを一括実行しない。一般公開なし、既確認の保存/分類/単位/青色の再確認は不要。
+
+段階1最終検証: 最終members build成功、manifest494資産参照欠落0、WorkDetailページと/members/build/を確認。既存削除資産は削除パスのみ復元して保持。実Vue script/SSRと対象ESLint成功、3新ルートは実Ziggy生成と一致。PHP13ファイルphp -l成功、routesは実Artisan起動/生成で構文確認済み（配備前lintにも含める）。ソースdiff --check成功。
+
+限定配備案: 固定元f7ff846da/main/追跡変更なし/取得固定SHAと今回ソース許可一覧を照合し、依存・削除なしを確認。新migration2026_11_03_120001_add_work_job_core_fieldsだけを固定版から私有stageへ抽出して--database=mysql --path/--realpath --force。前後のentry/PJA件数、4新列NULL維持と存在を照合し、既存行コピー/バックフィルなしを確認後ff-only。失敗時は停止し自動巻戻し/他migration実行をしない。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force、cache/config/route/view clear、3新ルート確認。既存未追跡5件保持。正確な実行コマンドは `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-core-stage1-deploy-20261103.sh`。利用者承認前には実行しない。

@@ -60,3 +60,11 @@ BroadProjectFavoritesはoptional limit=nullで全件元順/parent_id、Departmen
 時間は予定枠/控除後予定/現在までの記録を区別。既存分析ledgerの休憩・優先・均等配分を挙動保持共通化する案、既存時間/点/日数/内訳不変を合成で検証。旧詳細computeChainSeriesの直接parse/既定休憩独自計算を盲目的にコピーしない。M11の既存簡易から旧方式への同一仕事受渡しは後段の明示設計を残す。自動コピー/一括移行をしない、全必須完了と報告しない。
 
 アプリ/DB/配備変更なし。本番最新証拠f7ff846da。調査元cf222f928、追加SSHなし。一般公開/カレンダー入口再編は保留。
+
+## 最新: 承認済み設計・段階1の限定配備準備（2026-11-03）
+
+利用者yesで具体設計承認。feature/myjob-core-20261103、/tmp/sunbwork-unified-input-fix-20261103で段階1コード作成。詳細/同一ID編集/保護削除、typed本人参照と祖先読取、4nullable完了/継続FK、既存分析ledgerの挙動保持抽出と任意記録別内訳、BOX/カレンダーのstrict詳細入口。削除をdeletedイベントで扱い、旧Calendarのsavedは維持。一般Userの新detail許可propなし。
+
+94件657断言、実Vue script/SSR、対象ESLint、PHP13構文、実Ziggy3定義一致成功。最終ビルド/manifest結果はMANAGERを読む。旧V2/V3の全分析出力不変と詳細GET書込なしを合成で確認。M01/M02の初回経路はコード/合成確認、配備/利用者画面はまだ。続き/完了操作・全子孫系列・旧フォーム相互継続/M11切替は残り、段階2以降の実装許可は得ているがまだコード接続していない。
+
+次は固定元f7ff846daから今回固定版だけのSSH承認。新migration2026_11_03_120001_add_work_job_core_fieldsだけを指定実行、全一括migrate禁止。既存件数/新列NULLと未追跡5件保持を確認。一般公開/入口ナビ整理は保留、既確認の保存/分類/単位/色を再試験しない。

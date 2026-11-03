@@ -16,6 +16,9 @@ class PersonalWorkEntry extends Model
 
     protected $casts = [
         'work_date' => 'date:Y-m-d',
+        'completed_at' => 'datetime',
+        'source_entry_id' => 'integer',
+        'source_assignment_id' => 'integer',
         'actual_quantity' => 'decimal:2',
         'actual_minutes' => 'integer',
     ];

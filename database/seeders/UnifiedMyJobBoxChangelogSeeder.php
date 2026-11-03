@@ -33,5 +33,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
             'claude_notes' => 'Codex。簡易案件候補の30件制限を除去し、部署/会社/activePath認可は維持。共通treeRowsで親子開閉。PHP/JSの簡易作業色を旧マイジョブ青へ合わせる。数量/保存/評価式は変更しない。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-detail-core-20261103'], [
+            'title' => '試用マイジョブに詳細ページと時間内訳を追加',
+            'released_at' => '2026-11-03',
+            'summary' => '情報出版Super Admin限定で、BOXとカレンダーから作業の詳細を開き、同じ記録を編集できます。',
+            'body' => '<p>簡易入力で作った仕事にも詳細ページを追加しました。予定枠、昼休憩との重なり、作業分析の試用V3と同じ条件による記録時間を分けて表示します。既存記録のコピーや一般公開は行いません。続き・完了操作は次の段階で接続します。</p>',
+            'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
+            'claude_notes' => 'Codex。nullable完了/相互継続FK基盤、本人INFO SA/context guard、共通ledgerの挙動保持抽出、詳細から旧簡易フォーム編集/保護付き削除。M03〜M06/M09〜M11の全対応を完了扱いにしない。',
+        ]);
     }
 }

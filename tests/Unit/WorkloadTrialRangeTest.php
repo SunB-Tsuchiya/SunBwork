@@ -494,6 +494,50 @@ class WorkloadTrialRangeTest extends TestCase
 
     }
 
+    public function test_record_breakdown_keeps_every_existing_analysis_value_unchanged(): void
+    {
+        foreach ([1, 2] as $id) $this->insert('personal_work_entries', [
+            'id' => $id, 'user_id' => 1, 'company_id' => 1, 'department_id' => 1,
+            'work_date' => '2026-10-29', 'actual_minutes' => 360, 'work_category' => 'dtp', 'activity_type' => 'revision',
+            'plan_slot' => 'hour', 'planned_start_time' => '09:00', 'planned_end_time' => '15:00', 'entry_visibility' => 'department',
+        ]);
+        foreach (['trial_time_v2', 'trial_time_v3'] as $version) {
+            $service = new WorkloadTrialAnalysis(new PersonalWorkSchedule);
+            $start = Carbon::parse('2026-10-29', 'Asia/Tokyo');
+            $normal = $service->analyze($this->user, collect([$this->user]), $start, $start->copy()->endOfDay(), true, $version);
+            $detailed = $service->analyze($this->user, collect([$this->user]), $start, $start->copy()->endOfDay(), true, $version, true, true);
+            self::assertSame(150.0, $detailed[0]['daily'][0]['record_minutes']['quick-1']);
+            self::assertSame(150.0, $detailed[0]['daily'][0]['record_minutes']['quick-2']);
+            foreach ($detailed[0]['daily'] as &$day) unset($day['record_minutes']);
+            unset($day);
+            self::assertSame($normal, $detailed);
+        }
+    }
+
+    public function test_work_detail_uses_other_work_for_overlap_and_separates_future_plans(): void
+    {
+        $this->insert('departments', ['id' => 1, 'company_id' => 1, 'code' => 'INFO']);
+        $this->user->forceFill(['user_role' => 'superadmin']);
+        $this->user->setRelation('company', new \App\Models\Company(['company_type' => 'sunbrain']));
+        foreach ([1, 2] as $id) $this->insert('personal_work_entries', [
+            'id' => $id, 'user_id' => 1, 'company_id' => 1, 'department_id' => 1,
+            'work_date' => '2026-10-29', 'actual_minutes' => 360, 'work_category' => 'dtp', 'activity_type' => 'revision',
+            'plan_slot' => 'hour', 'planned_start_time' => '09:00', 'planned_end_time' => '15:00', 'entry_visibility' => 'department',
+        ]);
+        $schedule = new PersonalWorkSchedule;
+        $reader = new \App\Services\WorkJobReader(new \App\Services\UnifiedMyJobBox(new \App\Services\UserWorkHub($schedule)), $schedule, new WorkloadTrialAnalysis($schedule));
+        $connection = $this->database->getConnection(); $connection->enableQueryLog();
+        $detail = $reader->detail($this->user, 1, 1);
+        self::assertSame(['planned' => 360, 'lunch' => 60, 'afterLunch' => 300, 'recorded' => 150.0], $detail['time']);
+        foreach ($connection->getQueryLog() as $query) self::assertMatchesRegularExpression('/^select /i', $query['query']);
+        $this->insert('personal_work_entries', ['id' => 3, 'user_id' => 1, 'company_id' => 1, 'department_id' => 1,
+            'work_date' => '2026-10-31', 'actual_minutes' => 60, 'work_category' => 'other', 'plan_slot' => 'hour',
+            'planned_start_time' => '09:00', 'planned_end_time' => '10:00', 'entry_visibility' => 'private']);
+        $future = $reader->detail($this->user, 3, 1);
+        self::assertSame(60, $future['time']['planned']); self::assertSame(0.0, $future['time']['recorded']);
+        self::assertSame('private', $future['work']['entry_visibility']);
+    }
+
     private function analyze(string $from, string $to, string $version = 'trial_time_v3'): array
     {
         return (new WorkloadTrialAnalysis(new PersonalWorkSchedule()))->analyze($this->user, collect([$this->user]),

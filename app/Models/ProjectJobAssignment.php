@@ -71,6 +71,7 @@ class ProjectJobAssignment extends Model
         'scheduled' => 'boolean',
         'scheduled_at' => 'datetime',
         'source_assignment_id' => 'integer',
+        'source_personal_work_entry_id' => 'integer',
         'supersedes_assignment_id' => 'integer',
         'coordinator_assignment_id' => 'integer',
         'file_info' => 'array',
