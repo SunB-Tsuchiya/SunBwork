@@ -391,7 +391,7 @@ class DepartmentWorkController extends Controller
     }
 
     /** Shared validation for ordinary and explicit continuation creation. */
-    public function validatedEntry(Request $request, User $user, bool $allowLegacySlot = false, ?PersonalWorkEntry $existing = null): array
+    public function validatedEntry(Request $request, User $user, bool $allowLegacySlot = false, ?PersonalWorkEntry $existing = null, ?int $sourceProjectId = null): array
     {
         $data = $request->validate([
             'work_date' => ['required', 'date_format:Y-m-d'],
@@ -433,13 +433,17 @@ class DepartmentWorkController extends Controller
         }
         if (! empty($data['project_job_id'])) {
             $permitted = ProjectJob::whereKey($data['project_job_id'])
-                ->where('company_id', $user->company_id)
-                ->where(function ($query) use ($user) {
+                ->where(function ($query) use ($user, $sourceProjectId) {
+                    $query->where('company_id', $user->company_id);
+                    if ($sourceProjectId) $query->orWhere(fn ($source) => $source->whereKey($sourceProjectId)->whereNull('company_id'));
+                })
+                ->where(function ($query) use ($user, $sourceProjectId) {
                     $query->where('show_on_department_schedule', true)
                         ->orWhere('user_id', $user->id)
                         ->orWhereHas('coordinators', fn ($q) => $q->where('users.id', $user->id))
                         ->orWhereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
                         ->orWhereHas('projectJobAssignments', fn ($q) => $q->where('user_id', $user->id));
+                    if ($sourceProjectId) $query->orWhere('id', $sourceProjectId);
                 })->exists();
             if (! $permitted) abort(403);
             $data['project_name_text'] = null;

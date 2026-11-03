@@ -174,6 +174,8 @@ watch(() => props.show, async (show) => {
         form.planned_start_time = ''; form.planned_end_time = '';
         form.actual_quantity = ''; form.result_note = '';
         requestToken.value = globalThis.crypto.randomUUID();
+        if (form.project_job_id && props.entry?.project_label) selectedProject.value = { id: form.project_job_id, title: props.entry.project_label };
+        showMore.value = Boolean(form.activity_type || form.entry_visibility === 'private');
     }
     await loadProjects(true);
 });
@@ -190,7 +192,7 @@ async function save() {
         };
         let response;
         if (props.continuationSource) {
-            response = await axios.post(route('user.myjobbox.entries.continue', { entry: props.continuationSource.id }), { ...payload, request_token: requestToken.value });
+            response = await axios.post(route(props.continuationSource.type === 'assignment' ? 'user.myjobbox.work_assignments.continue' : 'user.myjobbox.entries.continue', props.continuationSource.type === 'assignment' ? { assignment: props.continuationSource.id } : { entry: props.continuationSource.id }), { ...payload, request_token: requestToken.value });
         } else if (props.entry?.id) {
             response = await axios.put(route(isMyJob.value ? 'user.myjobbox.entries.update' : 'schedule.department_work.update', { entry: props.entry.id }), payload);
         } else {

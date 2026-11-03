@@ -49,5 +49,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
             'claude_notes' => 'Codex。段階2aのentry系列のみ。明示FK/本人SA context guard、ancestor root locks、同一transactionの再送受付、子あり削除保護。旧新相互継続/混在完了/M11未完。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-legacy-continue-20261103'], [
+            'title' => '旧マイジョブから簡易入力の続きと共通系列を試用',
+            'released_at' => '2026-11-03',
+            'summary' => '情報出版Super Admin限定で旧形式の詳細から簡易形式の続きへ登録できます。',
+            'body' => '<p>元の仕事と予定を保持し、続き元を明示して簡易入力で新しい作業を登録します。両形式を含む系列で全予定と予定・記録時間を分けて確認できます。旧形式との混在完了と簡易から旧詳細形式への継続は次段階です。一般公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
+            'claude_notes' => 'Codex。段階2b-1: typed assignment sourceと再送受付の拡張、全予定/UTC-JST/結果補足・系列外配分、旧親削除前の子チェック。一般User新propなし。混在完了/逆方向/M11は未完。',
+        ]);
     }
 }

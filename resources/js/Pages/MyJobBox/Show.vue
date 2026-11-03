@@ -120,7 +120,7 @@
             </div>
 
             <!-- チェーン（続きジョブ）パネル -->
-            <div v-if="hasChain" class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
+            <div v-if="hasChain && !workJobContinuation" class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
                 <div class="border-b border-orange-200 bg-orange-100 px-5 py-3">
                     <h3 class="text-sm font-semibold text-orange-800">↩ 続きジョブ シリーズ（{{ chainItems.length }}件）</h3>
                 </div>
@@ -185,6 +185,8 @@
                     </div>
                 </div>
             </div>
+
+            <LegacyWorkJobContinuation v-if="workJobContinuation" :data="workJobContinuation" />
 
             <!-- アクションボタン -->
             <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
@@ -276,6 +278,7 @@
 </template>
 
 <script setup>
+import LegacyWorkJobContinuation from '@/Components/LegacyWorkJobContinuation.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
@@ -283,7 +286,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
-const { projectJob, assignment, canDelete, linkedProgressCellCount, proofRequested, proofRequestInfo } = defineProps({
+const { projectJob, assignment, canDelete, linkedProgressCellCount, proofRequested, proofRequestInfo, workJobContinuation } = defineProps({
+    workJobContinuation: { type: Object, default: null },
     projectJob: Object,
     assignment: Object,
     canDelete: { type: Boolean, default: false },

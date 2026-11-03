@@ -773,3 +773,31 @@ ff-onlyで8fdeへ更新、manifest全参照/WorkDetail/members base、独立Unif
 確定: 利用者「成功」により、直前に依頼したカレンダー再読み込み後の既存完了簡易仕事の【完了】接頭辞と薄い表示を画面確認済みに変更。「今回表示未確認」を置換。配備証拠9dc166668、資料保存c96231d4c。未依頼の日/週/月すべての個別画面や未完の実例表示・部署帯を今回の成功から確認済みへ広げない。新たな作成/完了/削除は依頼していない。簡易形式同士の続き/系列/選択+祖先完了と、追加カレンダー表示は依頼した画面確認まで完了。
 
 次の一手: 承認済み段階2b（旧形式と簡易形式の相互継続・混在系列の全予定/時間・完了連動）を実装/合成検証する。旧の進行表/銀本別DB/proof/通知への副作用と祖先反映・本人認可・冪等/transactionを切り分け、兄弟未完を維持する。M11同一仕事の旧形式切替は別設計で残る。一般公開・カレンダー入口再編は保留、既確認画面を繰り返さない。今回資料記録のみ、追加SSH/DB/アプリ変更なし。
+
+## 2026-11-03 段階2b-1開始（旧形式→簡易続き・混在系列の時間）
+
+確定: 利用者の中断後の「勧めましょう」は続行指示として受領。保存d38ad053a/本番最新実行証拠9dc166668、専用ツリー変更なしを確認。前段の確認済み画面は繰り返さない。段階2bのうち、まず旧形式詳細→簡易の続き、混在系列の全予定/記録時間、旧削除の子保護を2b-1として実装する。簡易→旧詳細形式の継続と混在完了/旧通知・進行表・銀本・proof副作用は2b-2に残す。利用者へこの順を説明済み。全必須対応完了とは扱わない。
+
+影響: WorkJobReader/WorkJobMutation、旧MyProjectJobController/旧詳細、新詳細・共通WorkJobSeries/LegacyWorkJobContinuation・QuickWorkEntryModal、専用旧source POST、共通保存validation、migration/route/Ziggy/試験/既存管理資料。旧詳細の新prop/入口は本人INFO SA・実会社context限定、一般Userへ追加しない。旧URLと旧専用操作を保持。旧だけの従来集計UIを一般Userで置換しない。
+
+保存設計追加: work_job_continuations.source_entry_idをnullableにし、source_assignment_id nullableを追加するmigration2026_11_03_180001_support_legacy_work_continuation_sourcesのみ。既存受付は変更せず旧source列はNULL。歴史的な元IDにFKを追加しない。サーバ書込で二者排他、同じ数値IDの別型を再送として扱わない。結果entryの既存FK/冪等キーは維持。混在元も本人全系列認可/root順lock後にsource_assignment_idのentryを作成、元assignment/events/数量をコピー・更新しない。source_event_id等を流用しない。
+
+NULL会社の旧ProjectJobは共通readerで本人自己割当の元と同じ案件であることを確認した場合に限り、新しい続きの候補として検証許可。他会社は拒否。通常の新規作成の会社境界は維持。元projectが非公開/元予定privateなら続き初期値もprivate、数量/結果/時刻は空。
+
+混在時間は既存CalculatesEventTimeでproof UTC/JSTを解決し全有効予定を日毎に分割、日別休憩/既存V3分析の配分内訳を再利用する。source_event結果補足がある日はそのquickキーを読み、同じeventを二重算入しない。未来は記録0。系列100ノード/各旧仕事1000予定/対象366日を超えたら明示エラー、黙って切り捨てない。時刻/予定/評価の保存値は変更しない。
+
+次の一手: 旧→簡易の本人/role/context/会社/型/再送・数量非コピー・全予定/UTC月境界/昼/重複/結果補足/未来/旧親削除拒否を合成SQLiteメモリで確認し、実Vue/SSR/ルート生成/build後、固定差分SSHの別承認。今回未配備、2b-1の実画面は未確認。
+
+## 2026-11-03 段階2b-1コード検証・限定配備準備
+
+実装: 旧MyJobの本人INFO SA/context限定prop/入口から共通簡易フォームで続き作成。typed assignment sourceを専用POSTで受け、元をroot順lock後に会社/候補を再検証する。既存receiptはentry/assignmentの排他元列で同じ数値IDの型違いを拒否し、再送同ID・元数量/予定不変を維持。NULL会社案件は検証済みの元と同一案件だけ許可。元private予定があればprivate初期値、旧種別と簡易種類の無理な同一視をせず職種区分/案件/タイトル/単位を初期値にする。数量結果時間は空。
+
+共通WorkJobSeriesを旧新詳細で再利用。旧の複数予定/日跨ぎ/校正UTCは全枠を表示し、日別のV3分配を全仕事から取得。補足entryのquickキーはその元eventの記録として読み、独立仕事として系列に増やさない。元旧ジョブの削除は行lockと子参照チェックを銀本/進行表解除より先に実行。旧onlyの一般ユーザーUIは置換せず新prop/入口なし。混在の続き作成は可、混在完了はサーバ/UIで未接続を維持。
+
+検証: 関連Unit90件698断言、Integration13件200断言、計103件898断言成功。旧→簡易の冪等・型違い拒否・元不変・単位/非公開初期値・本人/role/context/会社・旧親削除拒否、NULL会社案件の通常新規拒否と検証元だけ許可、旧詳細trial propと一般Userへのpropなしを実route/controllerで確認。旧schemaのreceiptを持った状態でnullable+新元列を追加しても全値と再送が保持されることをSQLiteメモリで確認（テスト内でも対象:memory:を明示確認、実DB不使用）。
+
+混在時間合成は旧2予定・補足結果entry・系列外同時作業・簡易続き・未来proof UTC月境界・取消予定を使い、旧仕事予定240分/記録150分、系列予定360分/記録210分、proof JST11/01 08〜09・未来記録0、他人のevent拒否・GET全SELECTを確認。既存V2/V3出力不変の回帰も成功。実Vue script/SSRで旧source POST、旧入口から新詳細へ、共有系列の全枠/日跨ぎ/旧新リンクを確認、既確認の簡易フォーム/完了/Calendar経路互換も成功。対象ESLint0errors、旧Show.vueの既存未使用変数3warningsは保持。PHP構文と追加Ziggy1定義の実生成一致成功。members build/manifest495参照欠落0、旧新詳細とmembers base、既存削除資産保持、diff --check成功。実MySQL並行試験/利用者画面は今回まだ。
+
+状態: 2b-1は実装/コード検証済み・未配備/未画面確認。混在全予定/時間のM05/M07を前進、M09の旧→簡易のみ対応。逆方向継続と混在完了/旧副作用は2b-2、M11同一仕事の旧形式切替は別設計で未完。一般公開・ナビ入口再編は保留。
+
+次の一手: 固定元9dc166668から今回固定差分だけの/tmp/myjob-stage2b1-deploy-20261103.shを提示してSSH別承認。唯一のmigration2026_11_03_180001_support_legacy_work_continuation_sourcesだけを固定版からstageへ抽出し--database=mysql --path/--realpath --force。前後の既存ID件数/受付ハッシュを照合、新元列NULL・旧元列nullableを確認し、ff-only後に独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、cache/manifest/旧source新POST認証と未追跡保持を確認する。自動rollback/他migrationなし。正確なコマンドは `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-stage2b1-deploy-20261103.sh`、承認前に実行しない。

@@ -27,13 +27,13 @@ async function component(file, behavior = false) {
         b.onResolve({ filter: /^vue(\/server-renderer)?$/ }, a => ({ path: require.resolve(a.path), external: true }));
         b.onResolve({ filter: /^(axios|ziggy-js|@inertiajs\/vue3)$/ }, a => ({ path: a.path, namespace: 'mock' }));
         b.onLoad({ filter: /.*/, namespace: 'mock' }, a => ({ loader: 'js', contents: a.path === 'axios' ? 'export default globalThis.__unifiedAxios;' : a.path === 'ziggy-js' ? `export const route=${route.toString()};` : `const {h}=require('vue'); export const router=globalThis.__unifiedRouter; export const Link={props:['href'],setup(p,{slots}){return ()=>h('a',{href:p.href},slots.default?.())}};` }));
-        b.onResolve({ filter: /^@\// }, a => a.path.endsWith('.vue') ? { path: a.path, namespace: 'shell' } : { path: path.join(root, 'resources/js', a.path.slice(2) + '.js') });
+        b.onResolve({ filter: /^@\// }, a => a.path.endsWith('/WorkJobSeries.vue') ? {path:path.join(root,'resources/js',a.path.slice(2))} : a.path.endsWith('.vue') ? { path: a.path, namespace: 'shell' } : { path: path.join(root, 'resources/js', a.path.slice(2) + '.js') });
         b.onLoad({ filter: /.*/, namespace: 'shell' }, () => ({ loader: 'js', contents: `const {h}=require('vue'); export default {setup(p,{slots}){return ()=>h('div',{},[slots.header?.(),slots.tabs?.(),slots.default?.()])}};` }));
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
-            if (behavior) source = source.replace('</script>', (file === modal
+            if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
                 ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject};'
-                : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError};') + '\n</script>');
+                : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError};') + '\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
             return { loader: 'js', contents: compileScript(descriptor, { id: 'unified-input', inlineTemplate: !behavior, templateOptions: { ssr: !behavior } }).content, resolveDir: path.dirname(a.path) };
@@ -105,6 +105,9 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     const countBeforeDelete=requests.length; await state.remove(); assert.equal(requests.length,countBeforeDelete);
     props.show=false; await settle(); props.show=true; await settle(); await state.save();
     assert.notEqual(requests.at(-1)[2].request_token,failedToken);
+    props.show=false; await settle(); props.continuationSource={type:'assignment',id:7}; props.show=true; await settle();
+    Object.assign(state.form,{planned_start_time:'13:00',planned_end_time:'15:00'}); await state.save();
+    assert.equal(requests.at(-1)[1],'user.myjobbox.work_assignments.continue{"assignment":7}');
     app.unmount();
     const preview = await component(page, true);
     const pageProps = { rows: [], months: ['2026-11'], filters: { q: 'old search', period: '2026-11', hide_completed: true }, pagination: { total: 0, page: 1, last: 1 } };
@@ -155,5 +158,14 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     for (const text of ['マイジョブ詳細','編集','予定枠','昼休憩との重なり','記録時間','150分','360分','90 ページ','案件情報','作業詳細','スケジュール','予定を編集','続きのマイジョブを作成','完了にする','シリーズ合計','300分','未完了の仕事あり','未完了','&lt;script&gt;work&lt;/script&gt;']) assert.ok(detailHtml.includes(text), text);
     assert.ok(!detailHtml.includes('<script>work</script>'));
     assert.ok(!detailHtml.includes('90.00'));
+    const seriesComponent=await component('resources/js/Components/WorkJobSeries.vue');
+    const oldSeries={items:[{key:'assignment:1',type:'assignment',id:1,title:'旧形式',slots:[{date:'2026-10-29',start:'09:00',endDate:'2026-10-29',end:'12:00'},{date:'2026-10-30',start:'23:00',endDate:'2026-10-31',end:'01:00'}],time:{afterLunch:300,recorded:150}},{key:'entry:1',type:'entry',id:1,parentKey:'assignment:1',title:'新しい続き',slots:[{date:'2026-10-31',start:'13:00',endDate:'2026-10-31',end:'15:00'}],time:{afterLunch:120,recorded:0}}],totals:{afterLunch:420,recorded:150}};
+    const seriesHtml=await renderToString(createSSRApp(seriesComponent,{series:oldSeries}));
+    for(const text of ['旧形式','新しい続き','09:00','23:00','2026-10-31','01:00','13:00','420分','150分'])assert.ok(seriesHtml.includes(text),text);
+    assert.ok(seriesHtml.includes('user.myjobbox.show'));assert.ok(seriesHtml.includes('user.myjobbox.entries.show'));
+    const legacyComponent=await component('resources/js/Components/LegacyWorkJobContinuation.vue',true);
+    const legacyApp=renderer.createApp({render:()=>h(legacyComponent,{data:{source:{type:'assignment',id:7},prefill:{title:'旧形式'},series:oldSeries}})});legacyApp.mount({});
+    globalThis.__legacyContinuation.show.value=true; globalThis.__legacyContinuation.saved('2026-12-02',42);
+    assert.equal(globalThis.__legacyContinuation.show.value,false); assert.equal(globalThis.__detailVisit[0],'user.myjobbox.entries.show{"entry":42}');legacyApp.unmount();
     console.log('Actual Vue input: BOX/calendar contexts, reset, required time, failure retention, POST/PUT destinations, JST date, saved-month navigation, preserved legacy paths passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

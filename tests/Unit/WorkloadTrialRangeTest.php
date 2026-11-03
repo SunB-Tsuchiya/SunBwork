@@ -553,6 +553,47 @@ class WorkloadTrialRangeTest extends TestCase
 
     }
 
+
+    public function test_mixed_series_uses_all_legacy_events_result_supplement_and_proof_jst_without_double_counting(): void
+    {
+        $connection = $this->database->getConnection();
+        foreach (['source_entry_id', 'source_assignment_id', 'completed_at'] as $column) $connection->statement('alter table personal_work_entries add column '.$column.' integer');
+        foreach (['source_personal_work_entry_id integer', 'source_assignment_id integer', 'company_id integer', 'department_id integer', 'title text'] as $column) $connection->statement('alter table project_job_assignments add column '.$column);
+        $this->insert('departments', ['id' => 1, 'company_id' => 1, 'code' => 'INFO']);
+        $this->user->forceFill(['user_role' => 'superadmin']);
+        $this->user->setRelation('company', new \App\Models\Company(['company_type' => 'sunbrain']));
+        $this->insert('project_jobs', ['id' => 1, 'company_id' => 1, 'user_id' => 1, 'show_on_department_schedule' => 1, 'title' => '共通案件']);
+        $this->insert('project_job_assignments', ['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'title' => '旧形式']);
+        $this->insert('project_job_assignments', ['id' => 2, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'source_assignment_id' => 1, 'job_type' => 'proof', 'title' => '校正']);
+        foreach ([['id' => 1, 'starts_at' => '2026-10-29 09:00:00', 'ends_at' => '2026-10-29 12:00:00'], ['id' => 2, 'starts_at' => '2026-10-29 13:00:00', 'ends_at' => '2026-10-29 14:00:00'], ['id' => 4, 'starts_at' => '2026-10-29 16:00:00', 'ends_at' => '2026-10-29 17:00:00', 'cancelled_at' => '2026-10-29 15:00:00']] as $event) {
+            $this->insert('events', $event + ['user_id' => 1, 'project_job_assignment_id' => 1, 'event_item_type_id' => 1]);
+        }
+        $this->insert('events', ['id' => 3, 'user_id' => 1, 'project_job_assignment_id' => 2, 'event_item_type_id' => 1, 'starts_at' => '2026-10-31 23:00:00', 'ends_at' => '2026-11-01 00:00:00']);
+        $base = ['user_id' => 1, 'company_id' => 1, 'department_id' => 1, 'work_date' => '2026-10-29', 'work_category' => 'dtp', 'activity_type' => 'revision', 'plan_slot' => 'hour', 'entry_visibility' => 'department'];
+        $this->insert('personal_work_entries', ['id' => 1, 'source_assignment_id' => 1, 'title' => '簡易の続き', 'planned_start_time' => '14:00', 'planned_end_time' => '15:00', 'actual_minutes' => 60] + $base);
+        $this->insert('personal_work_entries', ['id' => 50, 'source_event_id' => 1, 'planned_start_time' => '09:00', 'planned_end_time' => '12:00', 'actual_minutes' => 180] + $base);
+        $this->insert('personal_work_entries', ['id' => 99, 'title' => '系列外の仕事', 'planned_start_time' => '09:00', 'planned_end_time' => '12:00', 'actual_minutes' => 180] + $base);
+        $schedule = new PersonalWorkSchedule;
+        $reader = new \App\Services\WorkJobReader(new \App\Services\UnifiedMyJobBox(new \App\Services\UserWorkHub($schedule)), $schedule, new WorkloadTrialAnalysis($schedule));
+        $connection->enableQueryLog();
+        $series = $reader->series($this->user, 1, 1, true, 'assignment');
+        self::assertCount(3, $series['items']);
+        $items = collect($series['items'])->keyBy('key');
+        self::assertCount(2, $items['assignment:1']['slots']);
+        self::assertSame(240, $items['assignment:1']['time']['afterLunch']);
+        self::assertEqualsWithDelta(150, $items['assignment:1']['time']['recorded'], 0.00001);
+        self::assertSame('2026-11-01', $items['assignment:2']['slots'][0]['date']);
+        self::assertSame('08:00', $items['assignment:2']['slots'][0]['start']);
+        self::assertSame('09:00', $items['assignment:2']['slots'][0]['end']);
+        self::assertSame(0.0, $items['assignment:2']['time']['recorded']);
+        self::assertSame(360, $series['totals']['afterLunch']);
+        self::assertEqualsWithDelta(210, $series['totals']['recorded'], 0.00001);
+        foreach ($connection->getQueryLog() as $query) self::assertMatchesRegularExpression('/^select /i', $query['query']);
+        $connection->table('events')->where('id', 1)->update(['user_id' => 2]);
+        try { $reader->series($this->user, 1, 1, true, 'assignment'); self::fail('Foreign event owner exposed'); }
+        catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
+    }
+
     private function analyze(string $from, string $to, string $version = 'trial_time_v3'): array
     {
         return (new WorkloadTrialAnalysis(new PersonalWorkSchedule()))->analyze($this->user, collect([$this->user]),

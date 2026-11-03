@@ -29,6 +29,13 @@ class WorkJobDetailController extends Controller
         return response()->json($result, $result['replayed'] ? 200 : 201);
     }
 
+    public function continueAssignment(Request $request, int $assignment, \App\Services\WorkJobMutation $jobs, DepartmentWorkController $entries)
+    {
+        $context = $request->session()->get('superadmin_context.company_id');
+        $result = $jobs->continueEntry($request, $assignment, $context === null ? null : (int) $context, $entries, 'assignment');
+        return response()->json($result, $result['replayed'] ? 200 : 201);
+    }
+
     public function complete(Request $request, int $entry, \App\Services\WorkJobMutation $jobs)
     {
         $context = $request->session()->get('superadmin_context.company_id');

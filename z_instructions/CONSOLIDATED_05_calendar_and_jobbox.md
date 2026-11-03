@@ -357,3 +357,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 `WorkJobMutation`はentry→entryの継続元を明示してtransaction内で保存。`work_job_continuations`に本人+UUIDハッシュ/元entry/validated payloadハッシュ/結果entryを保存して同一送信を冪等にする。結果削除後のFKはNULLになり、同送信の再試行を410で拒否する。元・兄弟・出来高をコピーせず、フォームは数量/結果/時刻を空にする。`WorkJobReader::series`は型付き参照の全子孫を最大100件、全ノード認可/循環検知で読み、同日全仕事を対象にしたV3分配を日別再利用する。予定枠合計と分配後の記録合計を区別する。完了はentry本人と祖先のみ、完了時刻既存値を保持し未来の予定を記録に変えない。削除はentry row lock後に日報/子保護を再確認する。旧新相互継続・混在完了・旧専用副作用は段階2bで未接続、既存旧操作を変えない。実装/配備/画面確認の状態はMANAGERを参照。一般公開未承認。
 
 2026-11-03 補足: 簡易形式の明示完了は、本人カレンダーAPI `DepartmentWorkController::mine` で `completed_at` から `completed` と【完了】接頭辞へ投影する。日/週/月の既存完了opacityを使う。`entryCalendarTitle`の既定は接頭辞を付けず、部署タイムテーブルの既存省略を維持。保存title/時刻/評価を変更しない。配備/画面確認状態はMYJOB_UNIFIED_BOX_MANAGER1.md参照。
+
+2026-11-03 段階2b-1: 情報出版SuperAdmin本人の旧MyJob詳細にだけ`workJobContinuation`を付け、旧→簡易の専用POSTと共通WorkJobSeriesを追加。receiptの元IDをentry/assignmentで排他に保持、数値IDが同じでも同じ元と扱わない。旧親の削除は行lock後に子参照を先に確認し、進行表/銀本解除等より前に拒否する。混在系列は全eventをJSTへ解決し日別V3配分と結果補足quickキーを使い、予定と記録を別々に合計。逆方向継続/混在完了の旧副作用は次工程。一般公開未承認。状態はMYJOB_UNIFIED_BOX_MANAGER1.md参照。

@@ -30,9 +30,12 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(':memory:', config('database.connections.sqlite.database'));
         Schema::create('companies', function (Blueprint $t) { $t->id(); $t->string('company_type'); });
         Schema::create('departments', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->string('code'); });
-        Schema::create('project_jobs', function (Blueprint $t) { $t->id(); $t->string('title')->nullable(); $t->integer('company_id')->nullable(); $t->integer('broad_project_id')->nullable(); });
-        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); });
-        Schema::create('events', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('project_job_assignment_id')->nullable(); });
+        Schema::create('project_jobs', function (Blueprint $t) { $t->id(); $t->string('title')->nullable(); $t->integer('company_id')->nullable(); $t->integer('broad_project_id')->nullable(); $t->boolean('show_on_department_schedule')->default(true); $t->integer('user_id')->nullable(); });
+        Schema::create('users', function (Blueprint $t) { $t->id(); $t->string('name')->nullable(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
+        Schema::create('project_job_coordinators', function (Blueprint $t) { $t->integer('project_job_id'); $t->integer('user_id'); });
+        Schema::create('project_team_members', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); });
+        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); });
+        Schema::create('events', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('project_job_assignment_id')->nullable(); $t->dateTime('starts_at')->nullable(); $t->dateTime('ends_at')->nullable(); $t->dateTime('cancelled_at')->nullable(); $t->string('visibility')->nullable(); });
         Schema::create('workflow_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id')->nullable(); });
         Schema::create('broad_projects', function (Blueprint $t) {
             $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->string('name'); $t->boolean('is_active'); $t->integer('parent_id')->nullable(); $t->integer('fiscal_year')->nullable();
@@ -48,12 +51,14 @@ class UnifiedMyJobCreateTest extends TestCase
         });
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_120001_add_work_job_core_fields.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_150001_create_work_job_continuations_table.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_180001_support_legacy_work_continuation_sources.php')->up();
         foreach (['user_monthly_schedules', 'user_monthly_breaks'] as $name) {
             Schema::create($name, function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->string('year_month'); $t->json('schedule'); });
         }
         DB::table('companies')->insert([['id' => 1, 'company_type' => 'sunbrain'], ['id' => 2, 'company_type' => 'general']]);
         DB::table('departments')->insert([['id' => 1, 'company_id' => 1, 'code' => 'INFO'], ['id' => 2, 'company_id' => 1, 'code' => 'OTHER'], ['id' => 3, 'company_id' => 2, 'code' => 'INFO']]);
         DB::table('broad_projects')->insert([['id' => 1, 'company_id' => 1, 'department_id' => 1, 'name' => '承認済み分類', 'is_active' => true], ['id' => 2, 'company_id' => 2, 'department_id' => 3, 'name' => '別会社', 'is_active' => true]]);
+        DB::table('users')->insert([['id' => 1, 'company_id' => 1, 'department_id' => 1], ['id' => 2, 'company_id' => 1, 'department_id' => 1]]);
         DB::table('events')->insert(['id' => 99, 'user_id' => 1]);
     }
 
@@ -303,7 +308,7 @@ class UnifiedMyJobCreateTest extends TestCase
         DB::table('project_job_assignments')->insert(['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'source_personal_work_entry_id' => $root]);
         DB::table('personal_work_entries')->where('id', $child)->update(['source_entry_id' => null, 'source_assignment_id' => 1]);
         $series = app(\App\Services\WorkJobReader::class)->series($this->user(), $child);
-        self::assertCount(3, $series['items']); self::assertNull($series['totals']); self::assertFalse($series['operationsEnabled']);
+        self::assertCount(3, $series['items']); self::assertSame(60, $series['totals']['planned']); self::assertFalse($series['operationsEnabled']); self::assertTrue($series['canContinue']);
         try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $child, null); self::fail('Mixed completion accepted prematurely'); }
         catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
         self::assertSame(0, DB::table('personal_work_entries')->whereNotNull('completed_at')->count());
@@ -331,6 +336,86 @@ class UnifiedMyJobCreateTest extends TestCase
         try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $root, null); self::fail('Cyclic completion'); }
         catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
         self::assertSame(0, DB::table('personal_work_entries')->whereNotNull('completed_at')->count());
+    }
+
+    public function test_legacy_source_creates_one_simple_continuation_without_mutating_parent_and_with_typed_replay(): void
+    {
+        DB::table('project_jobs')->insert(['id' => 1, 'company_id' => 1, 'title' => '同じ案件']);
+        DB::table('project_job_assignments')->insert(['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'title' => '旧形式', 'amounts_unit' => 'file']);
+        $reader = app(\App\Services\WorkJobReader::class);
+        $prefill = $reader->continuationPrefill($this->user(), 1, null);
+        self::assertSame('旧形式', $prefill['title']); self::assertSame('ファイル', $prefill['actual_unit']);
+        self::assertSame('department', $prefill['entry_visibility']);
+        DB::table('events')->insert(['id' => 100, 'user_id' => 1, 'project_job_assignment_id' => 1, 'visibility' => 'private']);
+        self::assertSame('private', $reader->continuationPrefill($this->user(), 1, null)['entry_visibility']);
+        self::assertArrayNotHasKey('actual_quantity', $prefill); self::assertArrayNotHasKey('planned_start_time', $prefill);
+        $before = (array) DB::table('project_job_assignments')->find(1);
+        $request = $this->request($this->payload(['work_date' => '2099-12-02', 'actual_quantity' => null, 'actual_unit' => 'ファイル', 'request_token' => 'ae305d54-75b4-431b-adb2-eb6b9e546014']));
+        $mutation = app(\App\Services\WorkJobMutation::class);
+        $created = $mutation->continueEntry($request, 1, null, app(DepartmentWorkController::class), 'assignment');
+        $child = $created['id']; self::assertFalse($created['replayed']);
+        self::assertSame($child, $mutation->continueEntry($request, 1, null, app(DepartmentWorkController::class), 'assignment')['id']);
+        $entry = DB::table('personal_work_entries')->find($child);
+        self::assertNull($entry->source_entry_id); self::assertSame(1, $entry->source_assignment_id); self::assertNull($entry->actual_quantity);
+        self::assertSame($before, (array) DB::table('project_job_assignments')->find(1));
+        self::assertSame(1, DB::table('work_job_continuations')->count());
+        self::assertSame(1, DB::table('personal_work_entries')->count());
+        $receipt = DB::table('work_job_continuations')->first(); self::assertNull($receipt->source_entry_id); self::assertSame(1, $receipt->source_assignment_id);
+        // Entry and assignment ID 1 must not alias even with the same request UUID.
+        try { $mutation->continueEntry($request, $child, null, app(DepartmentWorkController::class)); self::fail('Typed source mismatch accepted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        $series = $reader->series($this->user(), 1, null, true, 'assignment');
+        self::assertSame(['assignment:1', 'entry:'.$child], array_column($series['items'], 'key'));
+        self::assertTrue($series['items'][0]['current']); self::assertTrue($series['canContinue']); self::assertFalse($series['operationsEnabled']);
+        self::assertSame(30, $series['totals']['afterLunch']);
+        try { app(\App\Http\Controllers\User\MyProjectJobController::class)->destroyAssignment($this->request(), \App\Models\ProjectJobAssignmentByMyself::findOrFail(1)); self::fail('Legacy parent deleted before checking continuation'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        self::assertSame($before, (array) DB::table('project_job_assignments')->find(1));
+        foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$user, $context]) {
+            try { $mutation->continueEntry($this->request($request->all(), $user, $context), 1, $context, app(DepartmentWorkController::class), 'assignment'); self::fail('Legacy unauthorized continuation'); }
+            catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
+        }
+    }
+
+    public function test_legacy_null_company_project_is_allowed_only_through_authorized_source_and_old_page_trial_prop_is_scoped(): void
+    {
+        DB::table('project_jobs')->insert([['id' => 1, 'title' => '過去案件', 'company_id' => null], ['id' => 2, 'title' => '他社案件', 'company_id' => 2]]);
+        DB::table('project_job_assignments')->insert(['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'title' => '旧形式']);
+        $payload = $this->payload(['work_date' => '2099-12-02', 'project_job_id' => 1, 'broad_project_id' => null, 'request_token' => 'be305d54-75b4-431b-adb2-eb6b9e546014']);
+        try { $this->save($this->request($payload)); self::fail('Unscoped NULL company accepted'); }
+        catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+        $request = $this->request($payload);
+        $created = app(\App\Services\WorkJobMutation::class)->continueEntry($request, 1, null, app(DepartmentWorkController::class), 'assignment');
+        self::assertSame(1, DB::table('personal_work_entries')->find($created['id'])->project_job_id);
+        try { app(\App\Services\WorkJobMutation::class)->continueEntry($this->request(array_replace($payload, ['project_job_id' => 2])), 1, null, app(DepartmentWorkController::class), 'assignment'); self::fail('Foreign company allowed'); }
+        catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+        $sync = $this->createMock(\App\Services\MGinbon\MGinbonAssignmentSyncService::class);
+        $sync->method('detailContext')->willReturn(null); $this->app->instance(\App\Services\MGinbon\MGinbonAssignmentSyncService::class, $sync);
+        $request = $this->request([], null, null, 'GET'); $request->headers->set('X-Inertia', 'true');
+        $controller = app(\App\Http\Controllers\User\MyProjectJobController::class);
+        $assignment = \App\Models\ProjectJobAssignmentByMyself::findOrFail(1);
+        $props = $controller->showAssignment($assignment, $request)->toResponse($request)->getData(true)['props'];
+        self::assertSame(['type' => 'assignment', 'id' => 1], $props['workJobContinuation']['source']);
+        self::assertCount(2, $props['workJobContinuation']['series']['items']);
+        $ordinary = $this->request([], $this->user(['user_role' => 'user']), null, 'GET'); $ordinary->headers->set('X-Inertia', 'true');
+        self::assertArrayNotHasKey('workJobContinuation', $controller->showAssignment($assignment, $ordinary)->toResponse($ordinary)->getData(true)['props']);
+    }
+
+    public function test_source_schema_extension_preserves_existing_simple_continuation_receipts(): void
+    {
+        $root = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        $this->continueWork($root, ['work_date' => '2099-12-02']);
+        $before = (array) DB::table('work_job_continuations')->first();
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_11_03_180001_support_legacy_work_continuation_sources.php';
+        // Reconstruct the former schema solely in this test's explicitly verified memory database.
+        self::assertSame('sqlite', DB::getDefaultConnection());
+        self::assertSame(':memory:', DB::connection()->getDatabaseName());
+        $migration->down();
+        self::assertFalse(Schema::hasColumn('work_job_continuations', 'source_assignment_id'));
+        $migration->up();
+        self::assertSame($before, (array) DB::table('work_job_continuations')->first());
+        self::assertSame(200, $this->continueWork($root, ['work_date' => '2099-12-02'])->getStatusCode());
+        self::assertSame(2, DB::table('personal_work_entries')->count());
     }
 
 }

@@ -487,7 +487,20 @@ class MyProjectJobController extends Controller
             }
         } catch (\Throwable $e) {}
 
+        $trialContinuation = [];
+        $context = $request->session()->get('superadmin_context.company_id');
+        $context = $context === null ? null : (int) $context;
+        if (app(\App\Services\UnifiedMyJobBox::class)->available($user, $context)) {
+            $reader = app(\App\Services\WorkJobReader::class);
+            $trialContinuation['workJobContinuation'] = [
+                'source' => ['type' => 'assignment', 'id' => (int) $assignment->id],
+                'prefill' => $reader->continuationPrefill($user, (int) $assignment->id, $context),
+                'series' => $reader->series($user, (int) $assignment->id, $context, true, 'assignment'),
+            ];
+        }
+
         return Inertia::render('MyJobBox/Show', [
+            ...$trialContinuation,
             'projectJob'              => $projectJob,
             'assignment'              => $assignment,
             'canDelete'               => $canDelete,
@@ -507,40 +520,47 @@ class MyProjectJobController extends Controller
             abort(403, '削除する権限がありません。');
         }
 
-        // 銀本専用進行表を先に未登録へ戻す（別DBなので明示的な同期が必要）。
-        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
-            ->release($assignment->id, $user->id);
+        return DB::transaction(function () use ($assignment, $user) {
+            \App\Models\ProjectJobAssignment::whereKey($assignment->id)->lockForUpdate()->firstOrFail();
+            abort_if(\App\Models\PersonalWorkEntry::where('source_assignment_id', $assignment->id)->exists()
+                || \App\Models\ProjectJobAssignment::where('source_assignment_id', $assignment->id)->exists(),
+                422, '続きがあるため、この仕事は削除できません。');
+            // 銀本専用進行表を先に未登録へ戻す（別DBなので明示的な同期が必要）。
+            app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                ->release($assignment->id, $user->id);
 
-        // ProgressCell の assignment_id と completed_at をクリア
-        try {
-            \App\Models\ProgressCell::where('assignment_id', $assignment->id)
-                ->update(['assignment_id' => null, 'completed_at' => null]);
-        } catch (\Throwable $e) {
-            // progress_cells テーブルが存在しない場合は無視
-        }
-
-        // WorkflowCell の assignment_id と関連フィールドをクリア
-        \App\Models\WorkflowCell::where('assignment_id', $assignment->id)
-            ->update([
-                'assignment_id'    => null,
-                'completed_at'     => null,
-                'assigned_user_id' => null,
-                'value_user_id'    => null,
-            ]);
-
-        // 関連するカレンダーイベントを削除（削除後の幽霊イベントを防ぐ）
-        try {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
-                \App\Models\Event::where('project_job_assignment_id', $assignment->id)->delete();
+            // ProgressCell の assignment_id と completed_at をクリア
+            try {
+                \App\Models\ProgressCell::where('assignment_id', $assignment->id)
+                    ->update(['assignment_id' => null, 'completed_at' => null]);
+            } catch (\Throwable $e) {
+                // progress_cells テーブルが存在しない場合は無視
             }
-        } catch (\Throwable $e) {
-            // ignore
-        }
 
-        $assignment->delete();
+            // WorkflowCell の assignment_id と関連フィールドをクリア
+            \App\Models\WorkflowCell::where('assignment_id', $assignment->id)
+                ->update([
+                    'assignment_id'    => null,
+                    'completed_at'     => null,
+                    'assigned_user_id' => null,
+                    'value_user_id'    => null,
+                ]);
 
-        return redirect()->route('user.myjobbox.index')
-            ->with('success', 'ジョブ割り当てを削除しました。');
+            // 関連するカレンダーイベントを削除（削除後の幽霊イベントを防ぐ）
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
+                    \App\Models\Event::where('project_job_assignment_id', $assignment->id)->delete();
+                }
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            $assignment->delete();
+
+            return redirect()->route('user.myjobbox.index')
+                ->with('success', 'ジョブ割り当てを削除しました。');
+        });
+
     }
 
     public function create()

@@ -226,3 +226,17 @@ L/M11: 旧添付/依頼/表校正経路の存続は維持し、簡易を既存�
 続きフォームは元の分類/仮名/種類/単位/公開範囲を初期値にし、時間/数量/結果は空。完了は選択+entry祖先のみ更新し、兄弟/子や数量/時間/評価を変更しない。全系列を100ノード上限で明示参照から読み全件認可、同名は結合しない。日毎の既存V3配分をキャッシュし合計前精度を保持。予定枠合計と記録合計を区別し、混在系列の未接続時間は合計を出さず旧詳細確認と明示、操作を出さない。旧形式に祖先がある新操作はサーバでも拒否。旧形式の実連動は段階2bで検証する。
 
 次の一手: 合成SQLiteメモリで昼前後300分、翌日/分岐/祖先完了・兄弟維持、再送非複製、削除保護/削除後再送、本人/role/context/休止分類、混在拒否と部分更新なしを検証し、実Vue/SSR/route生成/buildを確認。配備は固定migrationだけを指定するSSH別承認。
+
+## 2026-11-03 段階2b-1開始（旧形式→簡易続き・混在系列の時間）
+
+確定: 利用者の中断後の「勧めましょう」は続行指示として受領。保存d38ad053a/本番最新実行証拠9dc166668、専用ツリー変更なしを確認。前段の確認済み画面は繰り返さない。段階2bのうち、まず旧形式詳細→簡易の続き、混在系列の全予定/記録時間、旧削除の子保護を2b-1として実装する。簡易→旧詳細形式の継続と混在完了/旧通知・進行表・銀本・proof副作用は2b-2に残す。利用者へこの順を説明済み。全必須対応完了とは扱わない。
+
+影響: WorkJobReader/WorkJobMutation、旧MyProjectJobController/旧詳細、新詳細・共通WorkJobSeries/LegacyWorkJobContinuation・QuickWorkEntryModal、専用旧source POST、共通保存validation、migration/route/Ziggy/試験/既存管理資料。旧詳細の新prop/入口は本人INFO SA・実会社context限定、一般Userへ追加しない。旧URLと旧専用操作を保持。旧だけの従来集計UIを一般Userで置換しない。
+
+保存設計追加: work_job_continuations.source_entry_idをnullableにし、source_assignment_id nullableを追加するmigration2026_11_03_180001_support_legacy_work_continuation_sourcesのみ。既存受付は変更せず旧source列はNULL。歴史的な元IDにFKを追加しない。サーバ書込で二者排他、同じ数値IDの別型を再送として扱わない。結果entryの既存FK/冪等キーは維持。混在元も本人全系列認可/root順lock後にsource_assignment_idのentryを作成、元assignment/events/数量をコピー・更新しない。source_event_id等を流用しない。
+
+NULL会社の旧ProjectJobは共通readerで本人自己割当の元と同じ案件であることを確認した場合に限り、新しい続きの候補として検証許可。他会社は拒否。通常の新規作成の会社境界は維持。元projectが非公開/元予定privateなら続き初期値もprivate、数量/結果/時刻は空。
+
+混在時間は既存CalculatesEventTimeでproof UTC/JSTを解決し全有効予定を日毎に分割、日別休憩/既存V3分析の配分内訳を再利用する。source_event結果補足がある日はそのquickキーを読み、同じeventを二重算入しない。未来は記録0。系列100ノード/各旧仕事1000予定/対象366日を超えたら明示エラー、黙って切り捨てない。時刻/予定/評価の保存値は変更しない。
+
+次の一手: 旧→簡易の本人/role/context/会社/型/再送・数量非コピー・全予定/UTC月境界/昼/重複/結果補足/未来/旧親削除拒否を合成SQLiteメモリで確認し、実Vue/SSR/ルート生成/build後、固定差分SSHの別承認。今回未配備、2b-1の実画面は未確認。
