@@ -68,3 +68,17 @@ BroadProjectFavoritesはoptional limit=nullで全件元順/parent_id、Departmen
 94件657断言、実Vue script/SSR、対象ESLint、PHP13構文、実Ziggy3定義一致成功。最終ビルド/manifest結果はMANAGERを読む。旧V2/V3の全分析出力不変と詳細GET書込なしを合成で確認。M01/M02の初回経路はコード/合成確認、配備/利用者画面はまだ。続き/完了操作・全子孫系列・旧フォーム相互継続/M11切替は残り、段階2以降の実装許可は得ているがまだコード接続していない。
 
 次は固定元f7ff846daから今回固定版だけのSSH承認。新migration2026_11_03_120001_add_work_job_core_fieldsだけを指定実行、全一括migrate禁止。既存件数/新列NULLと未追跡5件保持を確認。一般公開/入口ナビ整理は保留、既確認の保存/分類/単位/色を再試験しない。
+
+## 2026-11-03 段階1の限定配備完了・新詳細画面の確認待ち
+
+確定: 利用者の再開指示で保存b71ce41caを再確認し、正確なSSHコマンドへのyesを得て /tmp/myjob-core-stage1-deploy-20261103.sh を実行、exit0。固定元f7ff846da/main/追跡変更なし、取得固定b71ce41caa328530af120900ed43fc906d1ebdc7、27ソース許可一覧/削除なし/依存変更なし/PHP14構文を照合。既定mysqlとDB名silverlamb759_sunbworkを確認後、新migration2026_11_03_120001_add_work_job_core_fieldsだけを--database=mysql --path/--realpath --forceで実行。4新列NULL、entry/PJA/events/diariesの既存ID範囲の件数保持を照合（並行する新規高ID登録は許容）。他migration/一括移行なし。
+
+ff-onlyでb71へ更新、manifest全参照/members base/WorkDetailを確認。独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、config/cache/route/view clear成功。GET/PUT/DELETEの3新ルート登録を確認。最終追跡変更なし、未追跡5件は配備前後完全一致。sales接続/業務内容出力/作業試験登録なし。共有Claude作業は未変更。
+
+状態: M01/M02の段階1経路とM07/M08/M09/M12の基盤はコード検証・限定配備済み、今回の利用者画面確認は未実施。M03/M04等の完了・続き操作、全子孫系列、旧フォーム相互継続/M11は未完。一般公開・カレンダー入口再編は保留。既確認の保存/分類/単位/青色を再依頼しない。
+
+次の一手: 情報出版SuperAdminで次の新規3点を画面確認してもらう。
+1. 統合BOX（試用）の簡易入力由来の既存行で「詳細」を開き、作業名・日付時刻・数量等と「時間の内訳」が表示される。未来の予定の記録時間は0、予定枠とは別表示である。
+2. その詳細の「編集」から進み・結果など1項目を変更保存し、詳細へ戻って反映される。BOXでも同じ行が更新され、余分な行が増えない。
+3. カレンダーで同じ作業をクリックすると詳細が開き、「戻る」でその日のカレンダーへ戻れる。
+全項目問題なければ「成功」、違いがあれば番号と結果。削除/続き/完了/系列/別アカウント/全評価比較/上長レビューは今回の依頼に含めない。

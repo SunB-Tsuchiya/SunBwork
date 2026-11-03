@@ -202,3 +202,17 @@ L01添付/ファイル情報、L02依頼ジョブ関連、L03表/校正専用操
 段階1最終検証: 最終members build成功、manifest494資産参照欠落0、WorkDetailページと/members/build/を確認。既存削除資産は削除パスのみ復元して保持。実Vue script/SSRと対象ESLint成功、3新ルートは実Ziggy生成と一致。PHP13ファイルphp -l成功、routesは実Artisan起動/生成で構文確認済み（配備前lintにも含める）。ソースdiff --check成功。
 
 限定配備案: 固定元f7ff846da/main/追跡変更なし/取得固定SHAと今回ソース許可一覧を照合し、依存・削除なしを確認。新migration2026_11_03_120001_add_work_job_core_fieldsだけを固定版から私有stageへ抽出して--database=mysql --path/--realpath --force。前後のentry/PJA件数、4新列NULL維持と存在を照合し、既存行コピー/バックフィルなしを確認後ff-only。失敗時は停止し自動巻戻し/他migration実行をしない。独立UnifiedMyJobBoxChangelogSeederだけ--database=mysql --force、cache/config/route/view clear、3新ルート確認。既存未追跡5件保持。正確な実行コマンドは `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-core-stage1-deploy-20261103.sh`。利用者承認前には実行しない。
+
+## 2026-11-03 段階1の限定配備完了・新詳細画面の確認待ち
+
+確定: 利用者の再開指示で保存b71ce41caを再確認し、正確なSSHコマンドへのyesを得て /tmp/myjob-core-stage1-deploy-20261103.sh を実行、exit0。固定元f7ff846da/main/追跡変更なし、取得固定b71ce41caa328530af120900ed43fc906d1ebdc7、27ソース許可一覧/削除なし/依存変更なし/PHP14構文を照合。既定mysqlとDB名silverlamb759_sunbworkを確認後、新migration2026_11_03_120001_add_work_job_core_fieldsだけを--database=mysql --path/--realpath --forceで実行。4新列NULL、entry/PJA/events/diariesの既存ID範囲の件数保持を照合（並行する新規高ID登録は許容）。他migration/一括移行なし。
+
+ff-onlyでb71へ更新、manifest全参照/members base/WorkDetailを確認。独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、config/cache/route/view clear成功。GET/PUT/DELETEの3新ルート登録を確認。最終追跡変更なし、未追跡5件は配備前後完全一致。sales接続/業務内容出力/作業試験登録なし。共有Claude作業は未変更。
+
+状態: M01/M02の段階1経路とM07/M08/M09/M12の基盤はコード検証・限定配備済み、今回の利用者画面確認は未実施。M03/M04等の完了・続き操作、全子孫系列、旧フォーム相互継続/M11は未完。一般公開・カレンダー入口再編は保留。既確認の保存/分類/単位/青色を再依頼しない。
+
+次の一手: 情報出版SuperAdminで次の新規3点を画面確認してもらう。
+1. 統合BOX（試用）の簡易入力由来の既存行で「詳細」を開き、作業名・日付時刻・数量等と「時間の内訳」が表示される。未来の予定の記録時間は0、予定枠とは別表示である。
+2. その詳細の「編集」から進み・結果など1項目を変更保存し、詳細へ戻って反映される。BOXでも同じ行が更新され、余分な行が増えない。
+3. カレンダーで同じ作業をクリックすると詳細が開き、「戻る」でその日のカレンダーへ戻れる。
+全項目問題なければ「成功」、違いがあれば番号と結果。削除/続き/完了/系列/別アカウント/全評価比較/上長レビューは今回の依頼に含めない。
