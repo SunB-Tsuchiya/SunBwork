@@ -18,7 +18,21 @@ class WorkJobDetailController extends Controller
             'from' => ['nullable', 'in:box,calendar'], 'period' => ['nullable', 'regex:/^(all|[0-9]{4}-(0[1-9]|1[0-2]))$/'],
             'q' => ['nullable', 'string', 'max:200'], 'page' => ['nullable', 'integer', 'min:1'], 'hide_completed' => ['nullable', 'boolean'],
         ]);
-        return Inertia::render('MyJobBox/WorkDetail', $data + ['back' => $back]);
+        return Inertia::render('MyJobBox/WorkDetail', $data + ['back' => $back,
+            'series' => $jobs->series($request->user(), $entry, $context === null ? null : (int) $context)]);
+    }
+
+    public function continueEntry(Request $request, int $entry, \App\Services\WorkJobMutation $jobs, DepartmentWorkController $entries)
+    {
+        $context = $request->session()->get('superadmin_context.company_id');
+        $result = $jobs->continueEntry($request, $entry, $context === null ? null : (int) $context, $entries);
+        return response()->json($result, $result['replayed'] ? 200 : 201);
+    }
+
+    public function complete(Request $request, int $entry, \App\Services\WorkJobMutation $jobs)
+    {
+        $context = $request->session()->get('superadmin_context.company_id');
+        return response()->json($jobs->completeEntry($request->user(), $entry, $context === null ? null : (int) $context));
     }
 
     public function destroy(Request $request, int $entry, WorkJobReader $jobs, DepartmentWorkController $entries)

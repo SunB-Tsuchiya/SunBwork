@@ -380,13 +380,17 @@ class DepartmentWorkController extends Controller
     {
         $user = $request->user();
         abort_unless($this->schedule->available($user) && (int) $entry->user_id === (int) $user->id, 403);
-        abort_if($entry->diary_id, 422, '日報へ取り込んだ記録は日報編集画面で変更してください。');
-        abort_if(app(\App\Services\WorkJobReader::class)->hasEntryChildren((int) $entry->id), 422, '続きがあるため、この仕事は削除できません。');
-        $entry->delete();
+        DB::transaction(function () use ($entry) {
+            $locked = PersonalWorkEntry::whereKey($entry->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->diary_id, 422, '日報へ取り込んだ記録は日報編集画面で変更してください。');
+            abort_if(app(\App\Services\WorkJobReader::class)->hasEntryChildren((int) $locked->id), 422, '続きがあるため、この仕事は削除できません。');
+            $locked->delete();
+        });
         return response()->noContent();
     }
 
-    private function validatedEntry(Request $request, User $user, bool $allowLegacySlot = false, ?PersonalWorkEntry $existing = null): array
+    /** Shared validation for ordinary and explicit continuation creation. */
+    public function validatedEntry(Request $request, User $user, bool $allowLegacySlot = false, ?PersonalWorkEntry $existing = null): array
     {
         $data = $request->validate([
             'work_date' => ['required', 'date_format:Y-m-d'],

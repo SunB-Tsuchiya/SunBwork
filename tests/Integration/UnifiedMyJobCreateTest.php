@@ -47,6 +47,7 @@ class UnifiedMyJobCreateTest extends TestCase
             $t->integer('project_job_assignment_id')->nullable(); $t->integer('diary_id')->nullable(); $t->timestamps();
         });
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_120001_add_work_job_core_fields.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_150001_create_work_job_continuations_table.php')->up();
         foreach (['user_monthly_schedules', 'user_monthly_breaks'] as $name) {
             Schema::create($name, function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->string('year_month'); $t->json('schedule'); });
         }
@@ -202,6 +203,124 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(204, $response->getStatusCode());
         self::assertSame([$id], DB::table('personal_work_entries')->pluck('id')->all());
         self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('project_job_assignments')->count());
+    }
+
+    private function continueWork(int $source, array $data = [], ?User $user = null, ?int $context = null)
+    {
+        return app(\App\Http\Controllers\User\WorkJobDetailController::class)->continueEntry(
+            $this->request($this->payload($data + ['request_token' => 'de305d54-75b4-431b-adb2-eb6b9e546014']), $user, $context),
+            $source, app(\App\Services\WorkJobMutation::class), app(DepartmentWorkController::class));
+    }
+
+    public function test_continuation_lunch_next_day_replay_and_completion_keep_siblings_quantities_and_legacy_tables(): void
+    {
+        $root = $this->save($this->request($this->payload(['work_date' => '2099-12-01', 'planned_start_time' => '09:00', 'planned_end_time' => '12:00', 'actual_quantity' => 90, 'result_note' => '元の結果'])))->getData(true)['id'];
+        $before = (array) DB::table('personal_work_entries')->find($root);
+        $args = ['work_date' => '2099-12-01', 'planned_start_time' => '13:00', 'planned_end_time' => '15:00', 'actual_quantity' => null, 'actual_unit' => null, 'result_note' => null,
+            'source_entry_id' => 999, 'source_assignment_id' => 999, 'completed_at' => '2000-01-01', 'user_id' => 999];
+        $first = $this->continueWork($root, $args); self::assertSame(201, $first->getStatusCode());
+        $child = $first->getData(true)['id'];
+        self::assertSame(200, $this->continueWork($root, $args)->getStatusCode());
+        self::assertSame(2, DB::table('personal_work_entries')->count());
+        self::assertSame(1, DB::table('work_job_continuations')->count());
+        $new = DB::table('personal_work_entries')->find($child);
+        self::assertSame($root, $new->source_entry_id); self::assertNull($new->source_assignment_id);
+        self::assertNull($new->completed_at); self::assertNull($new->actual_quantity); self::assertNull($new->result_note); self::assertSame(1, $new->user_id);
+        self::assertSame($before, (array) DB::table('personal_work_entries')->find($root));
+        $series = app(\App\Services\WorkJobReader::class)->series($this->user(), $child);
+        self::assertSame(300, $series['totals']['afterLunch']); self::assertSame(0.0, $series['totals']['recorded']);
+        self::assertTrue($series['operationsEnabled']); self::assertFalse($series['allCompleted']);
+        self::assertSame(['entry:'.$root, 'entry:'.$child], array_column($series['items'], 'key'));
+        $sibling = $this->continueWork($root, $args + ['unused' => true] + [])->getData(true)['id'];
+        self::assertSame($child, $sibling); // Arbitrary unvalidated fields do not alter replay identity.
+        $tomorrow = $this->continueWork($root, array_replace($args, ['request_token' => 'fe305d54-75b4-431b-adb2-eb6b9e546014', 'work_date' => '2099-12-02']))->getData(true)['id'];
+        $mutation = app(\App\Services\WorkJobMutation::class);
+        self::assertSame([$root, $child], $mutation->completeEntry($this->user(), $child, null)['completed_ids']);
+        $completedAt = DB::table('personal_work_entries')->find($root)->completed_at;
+        self::assertNotNull($completedAt); self::assertNull(DB::table('personal_work_entries')->find($tomorrow)->completed_at);
+        $mutation->completeEntry($this->user(), $child, null);
+        self::assertSame($completedAt, DB::table('personal_work_entries')->find($root)->completed_at);
+        self::assertSame(90, (int) DB::table('personal_work_entries')->find($root)->actual_quantity);
+        self::assertFalse(app(\App\Services\WorkJobReader::class)->series($this->user(), $root)['allCompleted']);
+        $mutation->completeEntry($this->user(), $tomorrow, null);
+        self::assertTrue(app(\App\Services\WorkJobReader::class)->series($this->user(), $child)['allCompleted']);
+        $reopened = $this->continueWork($root, array_replace($args, ['request_token' => 'ae305d54-75b4-431b-adb2-eb6b9e546014']))->getData(true)['id'];
+        self::assertNull(DB::table('personal_work_entries')->find($reopened)->completed_at);
+        self::assertFalse(app(\App\Services\WorkJobReader::class)->series($this->user(), $root)['allCompleted']);
+        self::assertSame(0.0, app(\App\Services\WorkJobReader::class)->series($this->user(), $root)['totals']['recorded']);
+        self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('project_job_assignments')->count());
+    }
+
+    public function test_continuation_rejects_wrong_context_owner_retired_classification_and_changed_replay_and_does_not_resurrect_deleted_result(): void
+    {
+        $root = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        $result = $this->continueWork($root, ['work_date' => '2099-12-02']);
+        $child = $result->getData(true)['id'];
+        try { $this->continueWork($root, ['work_date' => '2099-12-03']); self::fail('Changed replay accepted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        self::assertSame(2, DB::table('personal_work_entries')->count());
+        foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$user, $context]) {
+            try { $this->continueWork($root, [], $user, $context); self::fail('Unauthorized continuation'); }
+            catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
+            try { app(\App\Services\WorkJobMutation::class)->completeEntry($user, $root, $context); self::fail('Unauthorized completion'); }
+            catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
+        }
+        try { $this->continueWork($root, [], $this->user(['id' => 2])); self::fail('Other owner continuation'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        DB::table('broad_projects')->where('id', 1)->update(['is_active' => false]);
+        try { $this->continueWork($root, ['request_token' => 'fe305d54-75b4-431b-adb2-eb6b9e546014']); self::fail('Retired classification accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('broad_project_id', $e->errors()); }
+        DB::table('broad_projects')->where('id', 1)->update(['is_active' => true]);
+        app(\App\Http\Controllers\User\WorkJobDetailController::class)->destroy($this->request(), $child, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class));
+        try { $this->continueWork($root, ['work_date' => '2099-12-02']); self::fail('Deleted result recreated'); }
+        catch (HttpException $e) { self::assertSame(410, $e->getStatusCode()); }
+        self::assertSame(1, DB::table('personal_work_entries')->count());
+    }
+
+    public function test_series_rejects_unauthorized_children_cycles_and_double_parent_and_mixed_completion_has_no_partial_writes(): void
+    {
+        $root = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        $child = $this->continueWork($root, ['work_date' => '2099-12-02'])->getData(true)['id'];
+        DB::table('personal_work_entries')->where('id', $child)->update(['user_id' => 2]);
+        try { app(\App\Services\WorkJobReader::class)->series($this->user(), $root); self::fail('Foreign child exposed'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        DB::table('personal_work_entries')->where('id', $child)->update(['user_id' => 1, 'broad_project_id' => 2]);
+        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $root, null); self::fail('Foreign classification child accepted'); }
+        catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
+        self::assertSame(0, DB::table('personal_work_entries')->whereNotNull('completed_at')->count());
+        DB::table('personal_work_entries')->where('id', $child)->update(['broad_project_id' => 1]);
+        DB::table('project_jobs')->insert(['id' => 1, 'company_id' => 1]);
+        DB::table('project_job_assignments')->insert(['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'source_personal_work_entry_id' => $root]);
+        DB::table('personal_work_entries')->where('id', $child)->update(['source_entry_id' => null, 'source_assignment_id' => 1]);
+        $series = app(\App\Services\WorkJobReader::class)->series($this->user(), $child);
+        self::assertCount(3, $series['items']); self::assertNull($series['totals']); self::assertFalse($series['operationsEnabled']);
+        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $child, null); self::fail('Mixed completion accepted prematurely'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertSame(0, DB::table('personal_work_entries')->whereNotNull('completed_at')->count());
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(1)->completed);
+    }
+
+    public function test_invalid_continuation_input_and_large_tree_stop_without_partial_creation(): void
+    {
+        $root = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        foreach ([['request_token' => 'invalid'], ['planned_end_time' => '08:00']] as $invalid) {
+            try { $this->continueWork($root, $invalid); self::fail('Invalid continuation accepted'); }
+            catch (ValidationException $e) { self::assertNotEmpty($e->errors()); }
+        }
+        self::assertSame(1, DB::table('personal_work_entries')->count());
+        self::assertSame(0, DB::table('work_job_continuations')->count());
+        $template = (array) DB::table('personal_work_entries')->find($root);
+        unset($template['id']);
+        for ($i = 0; $i < 99; $i++) DB::table('personal_work_entries')->insert(array_replace($template, ['source_entry_id' => $root]));
+        self::assertCount(100, app(\App\Services\WorkJobReader::class)->series($this->user(), $root)['items']);
+        try { $this->continueWork($root); self::fail('Tree exceeded limit'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertSame(100, DB::table('personal_work_entries')->count());
+        self::assertSame(0, DB::table('work_job_continuations')->count());
+        DB::table('personal_work_entries')->where('id', $root)->update(['source_entry_id' => $root]);
+        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $root, null); self::fail('Cyclic completion'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertSame(0, DB::table('personal_work_entries')->whereNotNull('completed_at')->count());
     }
 
 }

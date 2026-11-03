@@ -6,6 +6,7 @@ const { build } = require('esbuild');
 const { parse, compileScript } = require('@vue/compiler-sfc');
 const { createRenderer, createSSRApp, h, reactive, nextTick } = require('vue');
 const { renderToString } = require('vue/server-renderer');
+globalThis.crypto ||= require('node:crypto').webcrypto;
 const root = path.resolve(__dirname, '../..');
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-unified-input-'));
 const modal = 'resources/js/Components/Calendar/QuickWorkEntryModal.vue';
@@ -32,7 +33,7 @@ async function component(file, behavior = false) {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior) source = source.replace('</script>', (file === modal
                 ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject};'
-                : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref};') + '\n</script>');
+                : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError};') + '\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
             return { loader: 'js', contents: compileScript(descriptor, { id: 'unified-input', inlineTemplate: !behavior, templateOptions: { ssr: !behavior } }).content, resolveDir: path.dirname(a.path) };
@@ -89,6 +90,21 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     props.entryPoint = 'calendar'; await settle(); await state.remove();
     assert.equal(requests.at(-1)[1], 'schedule.department_work.destroy{"entry":7}');
     assert.equal(saved.length, beforeDelete + 1); global.confirm = oldConfirm;
+    props.show = false; await settle();
+    props.entryPoint = 'myjob'; props.entry = {id:7,work_date:'2026-12-01',title:'元の作業',broad_project_id:41,actual_quantity:'90.00',actual_unit:'冊',result_note:'元の結果',planned_start_time:'09:00',planned_end_time:'12:00',entry_visibility:'private'};
+    props.continuationSource = {id:7}; props.show = true; await settle();
+    assert.equal(state.heading.value,'続きのマイジョブを作成');
+    assert.equal(state.form.title,'元の作業'); assert.equal(state.form.broad_project_id,41);
+    assert.equal(state.form.actual_quantity,''); assert.equal(state.form.actual_unit,'冊'); assert.equal(state.form.result_note,'');
+    assert.equal(state.form.planned_start_time,''); assert.equal(state.form.planned_end_time,''); assert.equal(state.form.entry_visibility,'private');
+    Object.assign(state.form,{work_date:'2026-12-02',planned_start_time:'13:00',planned_end_time:'15:00'});
+    failSave=true; await state.save(); const failedToken=requests.at(-1)[2].request_token;
+    assert.match(failedToken,/^[0-9a-f-]{36}$/); failSave=false; await state.save();
+    assert.equal(requests.at(-1)[1],'user.myjobbox.entries.continue{"entry":7}');
+    assert.equal(requests.at(-1)[2].request_token,failedToken); assert.equal(requests.at(-1)[2].actual_quantity,null); assert.equal(requests.at(-1)[2].actual_unit,'冊');
+    const countBeforeDelete=requests.length; await state.remove(); assert.equal(requests.length,countBeforeDelete);
+    props.show=false; await settle(); props.show=true; await settle(); await state.save();
+    assert.notEqual(requests.at(-1)[2].request_token,failedToken);
     app.unmount();
     const preview = await component(page, true);
     const pageProps = { rows: [], months: ['2026-11'], filters: { q: 'old search', period: '2026-11', hide_completed: true }, pagination: { total: 0, page: 1, last: 1 } };
@@ -119,15 +135,24 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     const detailApp = renderer.createApp({render:()=>h(detailBehavior,detailProps)}); detailApp.mount({});
     globalThis.__detailState.editing.value = true; globalThis.__detailState.saved();
     assert.equal(globalThis.__detailState.editing.value, false);
-    assert.deepEqual(globalThis.__detailReload, [{only:['work','time','ancestors'],preserveScroll:true}]);
+    assert.deepEqual(globalThis.__detailReload, [{only:['work','time','ancestors','series'],preserveScroll:true}]);
     globalThis.__detailState.deleted(); assert.equal(globalThis.__detailVisit[0], 'calendar.index{"date":"2026-11-03","view":"day"}');
+    globalThis.__detailState.continuing.value=true; globalThis.__detailState.saved('2026-12-02',8);
+    assert.equal(globalThis.__detailVisit[0],'user.myjobbox.entries.show{"entry":8}');
+    assert.equal(globalThis.__detailState.continuing.value,false);
+    globalThis.__detailState.confirmationOpen.value=true;
+    failSave=true; await globalThis.__detailState.complete(); failSave=false;
+    assert.equal(globalThis.__detailState.confirmationOpen.value,true); assert.ok(globalThis.__detailState.completeError.value);
+    await globalThis.__detailState.complete(); assert.equal(globalThis.__detailState.confirmationOpen.value,false);
+    assert.equal(requests.at(-1)[1],'user.myjobbox.entries.complete{"entry":1}');
+    assert.equal(globalThis.__detailState.completing.value,false);
     detailApp.unmount();
     const workDetail = await component('resources/js/Pages/MyJobBox/WorkDetail.vue');
     const detailHtml = await renderToString(createSSRApp(workDetail, {
         work: {id:1,title:'<script>work</script>',work_date:'2026-11-03',planned_start_time:'09:00',planned_end_time:'15:00',work_category:'other',actual_quantity:'90.00',actual_unit:'ページ',completed:false},
-        time:{planned:360,lunch:60,afterLunch:300,recorded:150}, ancestors:[], back:{from:'box',period:'all',q:'search'},
+        time:{planned:360,lunch:60,afterLunch:300,recorded:150}, series:{items:[{key:'entry:1',type:'entry',id:1,title:'朝',date:'2026-11-03',start:'09:00',end:'12:00',completed:true,time:{afterLunch:180,recorded:150}},{key:'entry:2',type:'entry',id:2,title:'午後',date:'2026-11-03',start:'13:00',end:'15:00',parentKey:'entry:1',current:true,completed:false,time:{afterLunch:120,recorded:0}}],totals:{afterLunch:300,recorded:150},operationsEnabled:true,allCompleted:false,completionTargets:[]}, ancestors:[], back:{from:'box',period:'all',q:'search'},
     }));
-    for (const text of ['マイジョブ詳細','編集','予定枠','昼休憩との重なり','記録時間','150分','360分','90 ページ','案件情報','作業詳細','スケジュール','予定を編集','未完了','&lt;script&gt;work&lt;/script&gt;']) assert.ok(detailHtml.includes(text), text);
+    for (const text of ['マイジョブ詳細','編集','予定枠','昼休憩との重なり','記録時間','150分','360分','90 ページ','案件情報','作業詳細','スケジュール','予定を編集','続きのマイジョブを作成','完了にする','シリーズ合計','300分','未完了の仕事あり','未完了','&lt;script&gt;work&lt;/script&gt;']) assert.ok(detailHtml.includes(text), text);
     assert.ok(!detailHtml.includes('<script>work</script>'));
     assert.ok(!detailHtml.includes('90.00'));
     console.log('Actual Vue input: BOX/calendar contexts, reset, required time, failure retention, POST/PUT destinations, JST date, saved-month navigation, preserved legacy paths passed');

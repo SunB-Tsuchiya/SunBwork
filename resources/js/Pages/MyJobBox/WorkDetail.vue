@@ -1,4 +1,5 @@
 <script setup>
+import axios from 'axios';
 import { ref, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
@@ -7,8 +8,12 @@ import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import QuickWorkEntryModal from '@/Components/Calendar/QuickWorkEntryModal.vue';
 import { workCategories, workActivities } from '@/Constants/personalWorkActivities';
 
-const props = defineProps({ work: Object, time: Object, ancestors: Array, back: Object });
+const props = defineProps({ work: Object, time: Object, ancestors: Array, back: Object, series: { type: Object, default: () => ({items:[],operationsEnabled:false,completionTargets:[]}) } });
 const editing = ref(false);
+const continuing = ref(false);
+const completing = ref(false);
+const completeError = ref('');
+const confirmationOpen = ref(false);
 const backHref = computed(() => props.back?.from === 'calendar'
     ? route('calendar.index', { date: props.work.work_date, view: 'day' })
     : route('user.myjobbox.unified_preview', {
@@ -23,9 +28,27 @@ function deleted() {
     editing.value = false;
     router.visit(backHref.value);
 }
-function saved() {
+function saved(date, id) {
+    if (continuing.value) {
+        continuing.value = false;
+        router.visit(route('user.myjobbox.entries.show', { entry: id }));
+        return;
+    }
     editing.value = false;
-    router.reload({ only: ['work', 'time', 'ancestors'], preserveScroll: true });
+    router.reload({ only: ['work', 'time', 'ancestors', 'series'], preserveScroll: true });
+}
+async function complete() {
+    if (completing.value) return;
+    completing.value = true; completeError.value = '';
+    try {
+        await axios.post(route('user.myjobbox.entries.complete', { entry: props.work.id }));
+        confirmationOpen.value = false;
+        router.reload({ only: ['work', 'time', 'ancestors', 'series'], preserveScroll: true });
+    } catch (err) {
+        completeError.value = err.response?.data?.message || '完了にできませんでした。';
+    } finally {
+        completing.value = false;
+    }
 }
 </script>
 
@@ -79,17 +102,39 @@ function saved() {
                 </dl>
                 <p class="mt-4 text-xs leading-relaxed text-gray-500">記録時間は、作業分析の試用V3と同じ条件で、現在までの時間に昼休憩・重複・会議などの配分を反映します。未来の予定枠や完了状態とは別です。</p>
             </section>
-            <section v-if="ancestors.length > 1" class="rounded bg-white p-4 shadow sm:p-6">
-                <h3 class="font-semibold text-gray-800">続き元の仕事</h3>
-                <ol class="mt-3 space-y-2 text-sm"><li v-for="item in ancestors" :key="item.type + ':' + item.id">
-                    <Link :href="item.type === 'entry' ? route('user.myjobbox.entries.show', { entry: item.id }) : route('user.myjobbox.show', { assignment: item.id })" class="text-blue-700 underline">{{ item.title || '（作業名なし）' }}</Link><span class="ml-2 text-gray-500">{{ item.completed ? '完了' : '未完了' }}</span>
-                </li></ol>
+            <section v-if="series.items.length > 1" class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-orange-200 bg-orange-100 px-5 py-3"><h3 class="text-sm font-semibold text-orange-800">↩ 続きジョブ シリーズ（{{ series.items.length }}件）</h3><span class="text-xs text-orange-800">{{ series.allCompleted ? '系列すべて完了' : '未完了の仕事あり' }}</span></div>
+                <ol class="divide-y divide-orange-100">
+                    <li v-for="(item, index) in series.items" :key="item.key" class="flex items-start gap-3 px-5 py-3" :class="item.current ? 'bg-orange-100' : ''">
+                        <span class="rounded-full bg-orange-200 px-2 text-xs text-orange-800">{{ index + 1 }}</span>
+                        <div class="min-w-0 flex-1">
+                            <Link :href="item.type === 'entry' ? route('user.myjobbox.entries.show', { entry: item.id }) : route('user.myjobbox.show', { assignment: item.id })" class="text-sm text-blue-700 underline">{{ item.title || '（作業名なし）' }}</Link>
+                            <span v-if="item.current" class="ml-2 rounded-full bg-orange-600 px-2 py-0.5 text-xs text-white">現在</span><span class="ml-2 rounded-full px-2 py-0.5 text-xs" :class="item.completed ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'">{{ item.completed ? '完了' : '未完了' }}</span>
+                            <p v-if="item.date" class="mt-1 text-xs text-gray-500">{{ item.date }} {{ item.start }}〜{{ item.end }}</p>
+                            <p v-if="item.parentKey" class="mt-1 text-xs text-orange-800">続き元：{{ series.items.findIndex(parent => parent.key === item.parentKey) + 1 }}. {{ series.items.find(parent => parent.key === item.parentKey)?.title || '（作業名なし）' }}</p>
+                        </div>
+                        <div v-if="item.time" class="text-right text-xs"><p>休憩を除く予定 {{ minutes(item.time.afterLunch) }}</p><p class="mt-1 text-blue-700">記録 {{ minutes(item.time.recorded) }}</p></div><span v-else class="text-xs text-gray-500">時間は旧詳細で確認</span>
+                    </li>
+                </ol>
+                <div v-if="series.totals" class="flex flex-wrap justify-between gap-2 border-t border-orange-200 px-5 py-3 text-sm font-semibold text-orange-800"><span>シリーズ合計</span><span>休憩を除く予定 {{ minutes(series.totals.afterLunch) }} ／ 記録 {{ minutes(series.totals.recorded) }}</span></div>
+                <p class="px-5 pb-3 text-xs text-gray-500">予定は各枠の合計、記録は同じ日の他の仕事も含めた重複・会議等の配分後の合計です。</p>
+            </section>
+            <p v-if="!series.operationsEnabled" class="rounded border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">旧形式を含む系列の操作は、相互接続の対応後に利用できます。</p>
+            <section v-if="confirmationOpen" role="region" aria-labelledby="complete-heading" class="rounded-lg border border-yellow-300 bg-yellow-50 p-5">
+                <h3 id="complete-heading" class="font-semibold text-gray-900">次の仕事を完了にしますか？</h3>
+                <ul class="my-3 list-inside list-disc text-sm"><li v-for="item in series.completionTargets" :key="item.type + ':' + item.id">{{ item.title || '（作業名なし）' }} {{ item.date }} {{ item.start }}〜{{ item.end }}{{ item.completed ? '（完了済み）' : '' }}</li></ul>
+                <p class="mb-3 text-sm text-gray-600">この仕事と続き元を完了にします。ほかの続きの状態や、予定・数量は変わりません。</p>
+                <p v-if="completeError" role="alert" class="mb-3 text-sm text-red-700">{{ completeError }}</p>
+                <div class="flex justify-end gap-2"><button type="button" :disabled="completing" class="rounded border px-3 py-2 text-sm" @click="confirmationOpen = false">キャンセル</button><button type="button" :disabled="completing" class="rounded bg-yellow-700 px-3 py-2 text-sm text-white disabled:opacity-50" @click="complete">{{ completing ? '処理中…' : '完了にする' }}</button></div>
             </section>
             <div class="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
+                <button v-if="series.operationsEnabled" type="button" class="rounded border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700" @click="continuing = true">続きのマイジョブを作成</button>
                 <Link :href="route('calendar.index', { date: work.work_date, view: 'day' })" class="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">この日のカレンダー</Link>
                 <button type="button" class="rounded bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" @click="editing = true">予定を編集</button>
+                <button v-if="series.operationsEnabled && !work.completed" type="button" class="rounded bg-yellow-700 px-3 py-2 text-sm font-semibold text-white" @click="completeError = ''; confirmationOpen = true">完了にする</button>
+                <span v-if="work.completed" class="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">完了済み</span>
             </div>
         </div>
-        <QuickWorkEntryModal :show="editing" :entry="work" entry-point="myjob" @close="editing = false" @saved="saved" @deleted="deleted" />
+        <QuickWorkEntryModal :show="editing || continuing" :entry="work" :continuation-source="continuing ? {id: work.id} : null" :date="work.work_date" entry-point="myjob" @close="editing = false; continuing = false" @saved="saved" @deleted="deleted" />
     </AppLayout>
 </template>

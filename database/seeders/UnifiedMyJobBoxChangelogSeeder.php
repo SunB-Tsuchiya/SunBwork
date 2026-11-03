@@ -41,5 +41,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
             'claude_notes' => 'Codex。nullable完了/相互継続FK基盤、本人INFO SA/context guard、共通ledgerの挙動保持抽出、詳細から旧簡易フォーム編集/保護付き削除。M03〜M06/M09〜M11の全対応を完了扱いにしない。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-chain-simple-20261103'], [
+            'title' => '試用マイジョブの続き登録・完了・系列表示',
+            'released_at' => '2026-11-03',
+            'summary' => '簡易入力の仕事から続きの仕事を登録し、系列と予定・記録時間を確認できます。',
+            'body' => '<p>情報出版Super Admin限定。続き作成時は分類や種類を初期値にし、数量・結果・時間は新たに入力します。完了は選んだ仕事と続き元だけに反映し、ほかの続きは未完のまま残します。二重送信で重複作成しない受付を追加しました。旧形式との相互継続と完了連動は次段階で、一般公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
+            'claude_notes' => 'Codex。段階2aのentry系列のみ。明示FK/本人SA context guard、ancestor root locks、同一transactionの再送受付、子あり削除保護。旧新相互継続/混在完了/M11未完。',
+        ]);
     }
 }

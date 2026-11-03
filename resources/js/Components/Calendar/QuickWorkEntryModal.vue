@@ -12,10 +12,12 @@ const props = defineProps({
     startMin: { type: Number, default: null },
     endMin: { type: Number, default: null },
     entry: { type: Object, default: null },
+    continuationSource: { type: Object, default: null },
 });
 const emit = defineEmits(['close', 'saved', 'deleted']);
 const isMyJob = computed(() => props.entryPoint === 'myjob');
-const heading = computed(() => props.entry ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
+const requestToken = ref('');
+const heading = computed(() => props.continuationSource ? '続きのマイジョブを作成' : props.entry ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
 const projects = ref([]);
 const broadProjects = ref([]);
 const expandedBroadProjects = ref(new Set());
@@ -166,20 +168,30 @@ watch(() => props.show, async (show) => {
     form.actual_unit = props.entry?.actual_unit || 'ページ';
     form.result_note = props.entry?.result_note || '';
     showMore.value = Boolean(form.result_note || form.activity_type || form.entry_visibility === 'private');
+    if (props.continuationSource) {
+        form.work_date = props.date || props.entry?.work_date || '';
+        form.plan_slot = 'hour';
+        form.planned_start_time = ''; form.planned_end_time = '';
+        form.actual_quantity = ''; form.result_note = '';
+        requestToken.value = globalThis.crypto.randomUUID();
+    }
     await loadProjects(true);
 });
 
 async function save() {
+    if (saving.value) return;
     saving.value = true;
     error.value = '';
     try {
         const payload = {
             ...form, project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
             actual_quantity: form.actual_quantity === '' ? null : form.actual_quantity,
-            actual_unit: form.actual_quantity === '' ? null : form.actual_unit,
+            actual_unit: form.actual_quantity === '' && !props.continuationSource ? null : form.actual_unit,
         };
         let response;
-        if (props.entry?.id) {
+        if (props.continuationSource) {
+            response = await axios.post(route('user.myjobbox.entries.continue', { entry: props.continuationSource.id }), { ...payload, request_token: requestToken.value });
+        } else if (props.entry?.id) {
             response = await axios.put(route(isMyJob.value ? 'user.myjobbox.entries.update' : 'schedule.department_work.update', { entry: props.entry.id }), payload);
         } else {
             response = await axios.post(route(isMyJob.value ? 'user.myjobbox.unified_store' : 'schedule.department_work.store'), payload);
@@ -194,7 +206,7 @@ async function save() {
 }
 
 async function remove() {
-    if (!props.entry?.id || !confirm('この作業予定を削除しますか？')) return;
+    if (props.continuationSource || !props.entry?.id || !confirm('この作業予定を削除しますか？')) return;
     saving.value = true;
     error.value = '';
     try {
@@ -211,11 +223,11 @@ async function remove() {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4" @click.self="emit('close')">
+        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4" @click.self="!saving && emit('close')">
             <div role="dialog" aria-modal="true" :aria-label="heading" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div class="flex items-center justify-between gap-2">
                     <h2 class="text-lg font-semibold">{{ heading }}</h2>
-                    <button type="button" class="text-sm text-gray-500 hover:underline" @click="emit('close')">閉じる</button>
+                    <button type="button" class="text-sm text-gray-500 hover:underline" @click="!saving && emit('close')">閉じる</button>
                 </div>
                 <p class="mt-1 text-xs text-gray-500">{{ isMyJob ? '日付と開始・終了時刻を入力して作業を登録します。登録した作業は、このBOXとカレンダーに表示されます。' : 'カレンダーで選んだ時刻を、その日の作業予定として保存します。あとから時刻や内容を直せます。' }}</p>
                 <p v-if="error" class="mt-3 rounded bg-red-50 p-2 text-sm text-red-700" role="alert">{{ error }}</p>
@@ -280,7 +292,7 @@ async function remove() {
                         </label>
                     </div>
                     <div class="flex justify-between border-t pt-3">
-                        <button v-if="entry && !entry.diary_id" type="button" :disabled="saving" class="text-sm text-red-700 hover:underline" @click="remove">削除</button><span v-else></span>
+                        <button v-if="entry && !entry.diary_id && !continuationSource" type="button" :disabled="saving" class="text-sm text-red-700 hover:underline" @click="remove">削除</button><span v-else></span>
                         <button type="submit" :disabled="saving" class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{{ saving ? '保存中...' : '保存' }}</button>
                     </div>
                 </form>

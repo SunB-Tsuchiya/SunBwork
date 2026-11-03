@@ -536,6 +536,21 @@ class WorkloadTrialRangeTest extends TestCase
         $future = $reader->detail($this->user, 3, 1);
         self::assertSame(60, $future['time']['planned']); self::assertSame(0.0, $future['time']['recorded']);
         self::assertSame('private', $future['work']['entry_visibility']);
+        foreach (['source_entry_id', 'source_assignment_id', 'completed_at'] as $column) $connection->statement('alter table personal_work_entries add column '.$column.' integer');
+        $connection->statement('alter table project_job_assignments add column source_personal_work_entry_id integer');
+        $connection->table('personal_work_entries')->where('id', 2)->update(['source_entry_id' => 1]);
+        // A same-time unrelated third job must remain in the allocation, outside the series.
+        $this->insert('personal_work_entries', ['id' => 4, 'user_id' => 1, 'company_id' => 1, 'department_id' => 1,
+            'work_date' => '2026-10-29', 'actual_minutes' => 360, 'work_category' => 'dtp', 'activity_type' => 'revision',
+            'plan_slot' => 'hour', 'planned_start_time' => '09:00', 'planned_end_time' => '15:00', 'entry_visibility' => 'department']);
+        $connection->flushQueryLog();
+        $series = $reader->series($this->user, 2, 1);
+        self::assertCount(2, $series['items']);
+        self::assertSame(600, $series['totals']['afterLunch']);
+        self::assertEqualsWithDelta(200, $series['totals']['recorded'], 0.00001);
+        foreach ($series['items'] as $item) self::assertEqualsWithDelta(100, $item['time']['recorded'], 0.00001);
+        foreach ($connection->getQueryLog() as $query) self::assertMatchesRegularExpression('/^select /i', $query['query']);
+
     }
 
     private function analyze(string $from, string $to, string $version = 'trial_time_v3'): array

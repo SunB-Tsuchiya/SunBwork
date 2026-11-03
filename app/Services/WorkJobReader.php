@@ -28,6 +28,13 @@ class WorkJobReader
             throw ValidationException::withMessages(['source' => 'この仕事は参照できません。']);
         }
         $job->load('projectJob');
+        if ($job instanceof PersonalWorkEntry) {
+            $job->load('broadProject.parent');
+            foreach ([$job->broadProject, $job->broadProject?->parent] as $broad) {
+                if ($broad && ((int) $broad->company_id !== (int) $user->company_id
+                    || (int) $broad->department_id !== (int) $user->department_id)) throw new AuthorizationException;
+            }
+        }
         if ($job->projectJob && $job->projectJob->company_id !== null && (int) $job->projectJob->company_id !== (int) $user->company_id) throw new AuthorizationException;
         return $job;
     }
@@ -65,10 +72,58 @@ class WorkJobReader
             || ProjectJobAssignment::where('source_personal_work_entry_id', $id)->exists();
     }
 
-    public function detail(User $user, int $id, ?int $context = null): array
+    /** Complete tree, with explicit source identities. No title-based merging. */
+    public function series(User $user, int $id, ?int $context = null, bool $withTimes = true): array
+    {
+        $ancestors = $this->ancestors($user, 'entry', $id, $context);
+        $queue = [$ancestors[0]]; $seen = []; $items = []; $recordDays = []; $mixed = false;
+        while ($queue) {
+            $node = array_shift($queue);
+            $key = $node['type'].':'.$node['id'];
+            if (isset($seen[$key]) || count($seen) >= 100) throw ValidationException::withMessages(['source' => '系列の関係・件数を確認してください。']);
+            $seen[$key] = true;
+            $job = $this->resolve($user, $node['type'], (int) $node['id'], $context);
+            $parent = $this->parent($job);
+            $item = ['key' => $key, 'type' => $node['type'], 'id' => (int) $job->id, 'title' => $job->title,
+                'parentKey' => $parent ? $parent['type'].':'.$parent['id'] : null,
+                'current' => $node['type'] === 'entry' && (int) $job->id === $id,
+                'completed' => $job instanceof PersonalWorkEntry ? (bool) $job->completed_at : (bool) $job->completed,
+                'date' => null, 'start' => null, 'end' => null, 'time' => null];
+            if ($job instanceof PersonalWorkEntry && $withTimes) {
+                $detail = $this->detail($user, (int) $job->id, $context, $recordDays, false);
+                $item['date'] = $detail['work']['work_date'];
+                $item['start'] = $detail['work']['display_start'];
+                $item['end'] = $detail['work']['display_end'];
+                $item['time'] = $detail['time'];
+            } elseif (! ($job instanceof PersonalWorkEntry)) {
+                $mixed = true;
+            }
+            $items[] = $item;
+            $entryColumn = $job instanceof PersonalWorkEntry ? 'source_entry_id' : 'source_assignment_id';
+            $assignmentColumn = $job instanceof PersonalWorkEntry ? 'source_personal_work_entry_id' : 'source_assignment_id';
+            $children = PersonalWorkEntry::where($entryColumn, $job->id)->orderBy('id')->limit(101)->pluck('id');
+            $oldChildren = ProjectJobAssignment::where($assignmentColumn, $job->id)->orderBy('id')->limit(101)->pluck('id');
+            if (count($items) + count($queue) + $children->count() + $oldChildren->count() > 100) throw ValidationException::withMessages(['source' => '系列が多いため確認が必要です。']);
+            foreach ($children as $child) $queue[] = ['type' => 'entry', 'id' => (int) $child];
+            foreach ($oldChildren as $child) $queue[] = ['type' => 'assignment', 'id' => (int) $child];
+        }
+        usort($items, fn ($a, $b) => [$a['date'] ?? '', $a['start'] ?? '', $a['key']] <=> [$b['date'] ?? '', $b['start'] ?? '', $b['key']]);
+        $totals = null;
+        if (! $mixed && $withTimes) {
+            $totals = [];
+            foreach (['planned', 'lunch', 'afterLunch', 'recorded'] as $field) $totals[$field] = array_sum(array_column(array_column($items, 'time'), $field));
+        }
+        return ['items' => $items, 'totals' => $totals, 'allCompleted' => ! in_array(false, array_column($items, 'completed'), true),
+            'operationsEnabled' => ! $mixed,
+            'completionTargets' => array_map(function ($ancestor) use ($items) {
+                $item = collect($items)->firstWhere('key', $ancestor['type'].':'.$ancestor['id']);
+                return $ancestor + ['date' => $item['date'], 'start' => $item['start'], 'end' => $item['end']];
+            }, $ancestors)];
+    }
+
+    public function detail(User $user, int $id, ?int $context = null, array &$recordDays = [], bool $withAncestors = true): array
     {
         $entry = $this->resolve($user, 'entry', $id, $context);
-        $entry->load('broadProject.parent');
         if ($entry->broadProject && ((int) $entry->broadProject->company_id !== (int) $user->company_id
             || (int) $entry->broadProject->department_id !== (int) $user->department_id)) throw new AuthorizationException;
         $date = $entry->work_date->format('Y-m-d');
@@ -78,10 +133,12 @@ class WorkJobReader
         $lunch = $range ? max(0, min($range[1], $window['break_end'] ?? 780) - max($range[0], $window['break_start'] ?? 720)) : 0;
         $recorded = 0.0;
         if ($date <= Carbon::now('Asia/Tokyo')->toDateString()) {
-            $day = Carbon::parse($date, 'Asia/Tokyo');
-            $people = $this->analysis->analyze($user, collect([$user]), $day->copy()->startOfDay(), $day->copy()->endOfDay(), true, 'trial_time_v3', true, true);
-            $daily = collect($people[0]['daily'] ?? [])->firstWhere('date', $date);
-            $recorded = (float) ($daily['record_minutes']['quick-'.$entry->id] ?? 0);
+            if (! array_key_exists($date, $recordDays)) {
+                $day = Carbon::parse($date, 'Asia/Tokyo');
+                $people = $this->analysis->analyze($user, collect([$user]), $day->copy()->startOfDay(), $day->copy()->endOfDay(), true, 'trial_time_v3', true, true);
+                $recordDays[$date] = collect($people[0]['daily'] ?? [])->firstWhere('date', $date)['record_minutes'] ?? [];
+            }
+            $recorded = (float) ($recordDays[$date]['quick-'.$entry->id] ?? 0);
         }
         $clock = fn ($minute) => ($minute >= 1440 ? '翌日 ' : '').sprintf('%02d:%02d', intdiv($minute, 60) % 24, $minute % 60);
         return ['work' => [
@@ -97,6 +154,6 @@ class WorkJobReader
             'actual_quantity' => $entry->actual_quantity, 'actual_unit' => $entry->actual_unit, 'diary_id' => $entry->diary_id,
             'completed' => (bool) $entry->completed_at,
         ], 'time' => ['planned' => $planned, 'lunch' => $lunch, 'afterLunch' => max(0, $planned - $lunch), 'recorded' => $recorded],
-            'ancestors' => $this->ancestors($user, 'entry', $id, $context)];
+            'ancestors' => $withAncestors ? $this->ancestors($user, 'entry', $id, $context) : []];
     }
 }

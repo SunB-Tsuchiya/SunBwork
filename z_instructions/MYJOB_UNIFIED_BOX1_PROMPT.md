@@ -106,3 +106,27 @@ ff-onlyでb71へ更新、manifest全参照/members base/WorkDetailを確認。�
 次段階の調査: WorkJobReader/WorkJobDetailController、QuickWorkEntryModal、DepartmentWorkControllerのstore/update/validatedEntry、旧MyProjectJobController::completeAssignmentとproof連動を再読。旧完了処理には祖先反映、銀本進行同期、進行表/依頼通知、event件名、proof依頼への副作用があり、単に新完了フラグを付ける処理や旧controllerの無条件再呼出だけでは混在系列の原子性/認可/再送通知防止を満たさない。続きは既存保存validationを再利用しつつ、型付き元参照と数量/結果/時刻のリセット、transactionと冪等キーを共通mutationで実装する。系列は祖先だけでなく兄弟/全子孫を含め、全ノード認可・循環上限・同日全仕事の配分時間を保つ必要がある。これは実装の確認事項で、新たな利用者要件ではない。
 
 次の一手: 承認済みMYJOB_CORE_DESIGN1段階2の続き作成・完了・全系列を実装/合成検証する。影響は共通mutation/readサービス、簡易フォーム/新詳細、旧保存・完了入口/旧詳細、route/Ziggyと対応テスト。昼前後/翌日・旧新相互継続・分岐の祖先だけ完了・二重送信・本人/会社/部署・子あり削除を合成SQLiteメモリで検証。旧の通知/表/校正への影響を切り分けて扱い、実装済みと配備/画面確認は別記録にする。後工程で続き系列と操作欄も旧外観を踏襲する。M11は別設計の残りとして保持。今回追加アプリ変更/SSH/DB操作なし。
+
+## 2026-11-03 段階2a: 簡易形式の続き・完了・全系列（実装中）
+
+利用者「続けましょう」により承認済み段階2を開始。旧完了には銀本別DB/進行表/通知/proof連動があるため、まず既存独立entry同士の続き・完了を段階2aとして接続し、旧新相互継続と混在完了は段階2bに残す。全必須完了・混在完了実装済みと扱わない。一般公開なし。影響: WorkJobMutation/WorkJobReader、新詳細controller/page、QuickWorkEntryModal、既存保存validation/削除保護、route/Ziggy、合成テスト。
+
+再送対策の具体化: 新migration2026_11_03_150001_create_work_job_continuations_tableは空の送信受付表のみ追加。request_key(SHA256本人+UUID)主キー、本人ID/元entryID/validated payloadハッシュ、作成entryFK(nullable・削除時NULL)、timestamps。既存行コピー/バックフィルなし。続きと受付を同一transactionで保存、祖先をroot順lockして同一系列の再送を直列化。再送は同じID、別内容は422、削除済み結果の再送は410とし再作成しない。元entryIDは削除後も履歴として保持しFKにしない。旧入力の通常POSTにはこの表を使わない。
+
+続きフォームは元の分類/仮名/種類/単位/公開範囲を初期値にし、時間/数量/結果は空。完了は選択+entry祖先のみ更新し、兄弟/子や数量/時間/評価を変更しない。全系列を100ノード上限で明示参照から読み全件認可、同名は結合しない。日毎の既存V3配分をキャッシュし合計前精度を保持。予定枠合計と記録合計を区別し、混在系列の未接続時間は合計を出さず旧詳細確認と明示、操作を出さない。旧形式に祖先がある新操作はサーバでも拒否。旧形式の実連動は段階2bで検証する。
+
+次の一手: 合成SQLiteメモリで昼前後300分、翌日/分岐/祖先完了・兄弟維持、再送非複製、削除保護/削除後再送、本人/role/context/休止分類、混在拒否と部分更新なしを検証し、実Vue/SSR/route生成/buildを確認。配備は固定migrationだけを指定するSSH別承認。
+
+## 2026-11-03 段階2aコード検証・限定配備準備
+
+段階2a実装: WorkJobMutation、WorkJobReader全系列、専用continue/complete POST、QuickWorkEntryModal継続文脈、旧詳細風の系列カード/完了確認/下部操作。分類/種類/単位/公開範囲を初期値にし時間/数量/結果/完了は引き継がない。数量空でも継続時の単位は保持し次の続きで冊等を再利用できる。保存失敗時は同じUUID、開き直した別操作は別UUID。送信中の閉じる/連打を防ぐ。完了確認は対象名と日付時刻を表示。entry祖先をroot順lockし同一transactionで継続とreceipt、または選択+祖先の完了だけを保存。削除も行lock後に日報/子参照を再確認。通常作成/評価/旧完了通知は変更しない。
+
+コード検証: 関連Unit88件617断言、Integration10件144断言、計98件761断言成功。昼前後300分/翌日/分岐と祖先のみ完了/再完了時刻不変/完了元から未完再開/未来記録0、元数量結果不変、再送同ID/異内容422/削除済410非復活/入力無効時非作成、100件境界/循環拒否/元削除保護、他人/会社部署分類/role/context拒否、混在操作拒否で部分更新なしを確認。系列外を含む同日3仕事の分配後時間を使い、系列2件の記録計200分/予定計600分を合成確認。通常V2/V3分析の従来出力不変は維持。SQLiteメモリのみで、実MySQLの並行リクエスト実験は行っていない。
+
+実Vue script/SSRで元初期値/数量結果時刻クリア/単位保持、失敗再送キー維持/別操作キー更新、継続専用POST/新詳細へ移動、削除非表示と不可、完了失敗時確認維持/成功reload、シリーズ/合計/状態/既存編集とCalendar互換を確認。対象ESLint、PHP構文、追加2Ziggy定義が実生成と一致。最終members build/manifestは下の最終追記を参照。
+
+状態: M03〜M06/M10は独立entry系列の実装・コード検証済みで、限定配備/今回画面確認は未。M05混在の時間/全予定・M09旧新相互継続/旧副作用のM03連動は段階2b未接続。M08/M12はentry保護と全ノード認可を強化。M11同一仕事の旧方式切替は引き続き未設計/未完。一般公開・カレンダー入口再編は保留。既確認詳細/外観/数量/分類/単位/色は再試験しない。
+
+次の一手: 固定元fdd6ab6b7/main/追跡変更なしから今回固定版だけを取得するSSHスクリプトを提示し承認を得る。新migration2026_11_03_150001_create_work_job_continuations_tableだけを固定版から私有stageへ抽出し--database=mysql --path/--realpath --force。既存ID範囲件数保持、receipt表新設時空・migration記録を確認後ff-only。独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、cache/route/manifest/5ルートと未追跡保持。自動巻戻し・他migration実行をしない。今回コードを配備成功・画面成功と扱わない。
+
+段階2a最終検証: 最終members build/manifest494参照欠落0/WorkDetailとmembers base、既存資産削除復元成功。実Vue script/SSR/対象ESLint成功。完了対象の日時表示追加後、Integration10件144断言と対象時間Unit2件66断言を再実行し成功（全体98件761断言の該当箇所）。追加2ルートの静的Ziggyは実生成と一致。diff --check成功。次は段階2a固定差分だけのSSH承認。今回まだ配備/画面確認なし。

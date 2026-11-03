@@ -394,6 +394,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/myjobbox', [\App\Http\Controllers\User\MyProjectJobController::class, 'index'])->name('user.myjobbox.index');
     Route::get('/myjobbox/unified-preview', [\App\Http\Controllers\User\UnifiedMyJobBoxController::class, 'index'])->name('user.myjobbox.unified_preview');
     Route::post('/myjobbox/unified-preview', [\App\Http\Controllers\User\UnifiedMyJobBoxController::class, 'store'])->name('user.myjobbox.unified_store');
+    Route::post('/myjobbox/work-entries/{entry}/continue', [\App\Http\Controllers\User\WorkJobDetailController::class, 'continueEntry'])->whereNumber('entry')->name('user.myjobbox.entries.continue');
+    Route::post('/myjobbox/work-entries/{entry}/complete', [\App\Http\Controllers\User\WorkJobDetailController::class, 'complete'])->whereNumber('entry')->name('user.myjobbox.entries.complete');
     Route::get('/myjobbox/work-entries/{entry}', [\App\Http\Controllers\User\WorkJobDetailController::class, 'show'])->whereNumber('entry')->name('user.myjobbox.entries.show');
     Route::put('/myjobbox/work-entries/{entry}', [\App\Http\Controllers\User\WorkJobDetailController::class, 'update'])->whereNumber('entry')->name('user.myjobbox.entries.update');
     Route::delete('/myjobbox/work-entries/{entry}', [\App\Http\Controllers\User\WorkJobDetailController::class, 'destroy'])->whereNumber('entry')->name('user.myjobbox.entries.destroy');
