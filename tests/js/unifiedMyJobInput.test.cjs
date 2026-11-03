@@ -124,10 +124,11 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     detailApp.unmount();
     const workDetail = await component('resources/js/Pages/MyJobBox/WorkDetail.vue');
     const detailHtml = await renderToString(createSSRApp(workDetail, {
-        work: {id:1,title:'<script>work</script>',work_date:'2026-11-03',planned_start_time:'09:00',planned_end_time:'15:00',work_category:'other',actual_quantity:2,actual_unit:'ファイル',completed:false},
+        work: {id:1,title:'<script>work</script>',work_date:'2026-11-03',planned_start_time:'09:00',planned_end_time:'15:00',work_category:'other',actual_quantity:'90.00',actual_unit:'ページ',completed:false},
         time:{planned:360,lunch:60,afterLunch:300,recorded:150}, ancestors:[], back:{from:'box',period:'all',q:'search'},
     }));
-    for (const text of ['マイジョブ詳細','編集','予定枠','昼休憩との重なり','記録時間','150分','360分','2 ファイル','未完了','&lt;script&gt;work&lt;/script&gt;']) assert.ok(detailHtml.includes(text), text);
+    for (const text of ['マイジョブ詳細','編集','予定枠','昼休憩との重なり','記録時間','150分','360分','90 ページ','案件情報','作業詳細','スケジュール','予定を編集','未完了','&lt;script&gt;work&lt;/script&gt;']) assert.ok(detailHtml.includes(text), text);
     assert.ok(!detailHtml.includes('<script>work</script>'));
+    assert.ok(!detailHtml.includes('90.00'));
     console.log('Actual Vue input: BOX/calendar contexts, reset, required time, failure retention, POST/PUT destinations, JST date, saved-month navigation, preserved legacy paths passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
