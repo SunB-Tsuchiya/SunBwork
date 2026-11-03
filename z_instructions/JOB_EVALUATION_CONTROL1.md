@@ -739,3 +739,15 @@ ff-onlyでb71へ更新、manifest全参照/members base/WorkDetailを確認。�
 状態: M03〜M06/M10は独立entry系列の実装・コード検証済みで、限定配備/今回画面確認は未。M05混在の時間/全予定・M09旧新相互継続/旧副作用のM03連動は段階2b未接続。M08/M12はentry保護と全ノード認可を強化。M11同一仕事の旧方式切替は引き続き未設計/未完。一般公開・カレンダー入口再編は保留。既確認詳細/外観/数量/分類/単位/色は再試験しない。
 
 次の一手: 固定元fdd6ab6b7/main/追跡変更なしから今回固定版だけを取得するSSHスクリプトを提示し承認を得る。新migration2026_11_03_150001_create_work_job_continuations_tableだけを固定版から私有stageへ抽出し--database=mysql --path/--realpath --force。既存ID範囲件数保持、receipt表新設時空・migration記録を確認後ff-only。独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、cache/route/manifest/5ルートと未追跡保持。自動巻戻し・他migration実行をしない。今回コードを配備成功・画面成功と扱わない。
+
+## 2026-11-03 段階2aの限定配備成功・画面確認待ち
+
+確定: 利用者が正確なSSHコマンドにyes。承認済み/tmp/myjob-stage2a-deploy-20261103.sh実行exit0。本番固定元fdd6ab6b7/main/追跡変更なし、取得固定8fde44d148885aea38d2bf33020d8d2e3be2380c、19ソース許可一覧、削除/依存変更なし、PHP9構文を照合。既定mysql・DB名silverlamb759_sunbwork・段階1列の存在を確認後、2026_11_03_150001_create_work_job_continuations_tableだけ--database=mysql --path/--realpath --forceで実行成功。新受付表は空、既存entry/PJA/events/diariesの既存ID範囲の件数保持を確認。既存業務記録の内容出力/試験作成や完了/一括migration/バックフィル/コピーなし。sales接続なし。
+
+ff-onlyで8fdeへ更新、manifest全参照/WorkDetail/members base、独立UnifiedMyJobBoxChangelogSeeder --database=mysql --force、config/cache/route/view clear成功。5つのentry認証付きルートの名前/件数/auth middlewareを照合。最終追跡変更なし、未追跡5件は前後完全一致。共有Claude作業未変更。段階2aはコード検証/限定配備済み、利用者画面確認はまだ。旧新相互継続/混在完了・旧副作用は段階2b、M11は別設計として未完。一般公開・ナビ入口再編は保留。
+
+次の一手: 情報出版SuperAdminで、完了にしてよい簡易形式の確認用仕事を元に、新規3項目を確認してもらう。
+1. 元の詳細「続きのマイジョブを作成」で分類/種類/単位を引き継ぎ、開始終了・数量・結果は空。新しい日/時刻で1件保存し、もう一度同じ元の詳細から別の続き1件を保存できる（同日午後と翌日など、兄弟2件を作る）。
+2. 系列に元+続き2件が表示され、各詳細へ移動でき、休憩を除く予定と記録の合計が別々に表示される。
+3. 片方の続きで「完了にする」を押すと元と選択した続きが対象として表示される。確定後、元とその続きが完了、もう一方は未完了のまま。
+全部問題なければ「成功」、違いがあれば番号と結果。過去の保存/詳細/外観/分類/単位候補/青色を再試験しない。実データの全計算照合、旧新相互継続、混在副作用、再送/削除のブラウザ確認や確認用仕事の削除は今回依頼しない。

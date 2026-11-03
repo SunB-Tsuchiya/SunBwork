@@ -266,3 +266,15 @@ ff-onlyでb71へ更新、manifest全参照/members base/WorkDetailを確認。�
 段階2a最終検証: 最終members build/manifest494参照欠落0/WorkDetailとmembers base、既存資産削除復元成功。実Vue script/SSR/対象ESLint成功。完了対象の日時表示追加後、Integration10件144断言と対象時間Unit2件66断言を再実行し成功（全体98件761断言の該当箇所）。追加2ルートの静的Ziggyは実生成と一致。diff --check成功。次は段階2a固定差分だけのSSH承認。今回まだ配備/画面確認なし。
 
 段階2a保存コード43eb9fa7d（feature/myjob-core-20261103、共有作業変更なし）。配備用/tmp/myjob-stage2a-deploy-20261103.shは固定元fdd6ab6b7と固定取得版、19ソース許可一覧、唯一の新migration、削除/依存変更なしを照合する。シェル構文・許可一覧のローカル照合成功。正確な承認対象は `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-stage2a-deploy-20261103.sh`。承認前にSSH実行しない。配備後の次の一手は新しい続き/系列/選択+祖先完了だけの画面確認で、既確認の入力/詳細/外観/単位/色を再試験しない。
+
+## 2026-11-03 段階2aの限定配備成功・画面確認待ち
+
+確定: 利用者が正確なSSHコマンドにyes。承認済み/tmp/myjob-stage2a-deploy-20261103.sh実行exit0。本番固定元fdd6ab6b7/main/追跡変更なし、取得固定8fde44d148885aea38d2bf33020d8d2e3be2380c、19ソース許可一覧、削除/依存変更なし、PHP9構文を照合。既定mysql・DB名silverlamb759_sunbwork・段階1列の存在を確認後、2026_11_03_150001_create_work_job_continuations_tableだけ--database=mysql --path/--realpath --forceで実行成功。新受付表は空、既存entry/PJA/events/diariesの既存ID範囲の件数保持を確認。既存業務記録の内容出力/試験作成や完了/一括migration/バックフィル/コピーなし。sales接続なし。
+
+ff-onlyで8fdeへ更新、manifest全参照/WorkDetail/members base、独立UnifiedMyJobBoxChangelogSeeder --database=mysql --force、config/cache/route/view clear成功。5つのentry認証付きルートの名前/件数/auth middlewareを照合。最終追跡変更なし、未追跡5件は前後完全一致。共有Claude作業未変更。段階2aはコード検証/限定配備済み、利用者画面確認はまだ。旧新相互継続/混在完了・旧副作用は段階2b、M11は別設計として未完。一般公開・ナビ入口再編は保留。
+
+次の一手: 情報出版SuperAdminで、完了にしてよい簡易形式の確認用仕事を元に、新規3項目を確認してもらう。
+1. 元の詳細「続きのマイジョブを作成」で分類/種類/単位を引き継ぎ、開始終了・数量・結果は空。新しい日/時刻で1件保存し、もう一度同じ元の詳細から別の続き1件を保存できる（同日午後と翌日など、兄弟2件を作る）。
+2. 系列に元+続き2件が表示され、各詳細へ移動でき、休憩を除く予定と記録の合計が別々に表示される。
+3. 片方の続きで「完了にする」を押すと元と選択した続きが対象として表示される。確定後、元とその続きが完了、もう一方は未完了のまま。
+全部問題なければ「成功」、違いがあれば番号と結果。過去の保存/詳細/外観/分類/単位候補/青色を再試験しない。実データの全計算照合、旧新相互継続、混在副作用、再送/削除のブラウザ確認や確認用仕事の削除は今回依頼しない。
