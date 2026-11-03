@@ -288,3 +288,9 @@ ff-onlyで8fdeへ更新、manifest全参照/WorkDetail/members base、独立Unif
 次の一手: APIの完了祖先/選択・未完継続の区別、保存値不変/既定タイトル/接頭辞重複なし/部署帯不変を合成検証し、PHPのみ固定差分配備をSSH別承認。今回追加表示は未配備・未画面確認。旧形式との相互継続/混在完了/旧副作用は段階2b、M11は別設計で未完のまま。
 
 カレンダー完了表示のコード検証: 関連Unit42件235断言、Integration10件155断言、計52件390断言成功。APIで完了元/選択済み続き/完了翌日分はcompleted=trueと【完了】、再開した未完続きはfalse/接頭辞なし、元保存タイトル・開始終了不変を確認。helperの接頭辞二重付与なし/無題カテゴリfallback/未完/部署帯の接頭辞なしを確認。関連時間テストも成功。PHP2変更ファイル構文成功。日/週/月は既存completed opacity0.45を利用（ソース照合、今回その3実画面を確認したわけではない）。Vue/JS/asset/route/DB変更なし、build不要。固定元8fde44d14から今回ソースだけの/tmp/myjob-calendar-completed-deploy-20261103.shを用意し、正確な `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-calendar-completed-deploy-20261103.sh` の承認を得る。今回表示は未配備/利用者未確認。
+
+## 2026-11-03 カレンダー完了表示の限定配備成功
+
+確定: 利用者が正確なSSHコマンドにyes。承認済み/tmp/myjob-calendar-completed-deploy-20261103.sh実行exit0。固定元8fde44d14/main/追跡変更なし、取得固定9dc166668a25ca3be92d181b8f9d0302a96ad180、9ソース許可一覧/削除なし/JS・build・route・migration・依存変更なし、PHP4構文を照合しff-only更新。DB設定の既定mysql名だけ照合、業務記録参照/変更・migration/Seeder実行なし。manifest/members base、config/cache/route/view clear成功。最終追跡変更なし・既存未追跡5件の前後完全一致。共有Claude作業未変更、一般公開なし。
+
+今回のカレンダー完了表示はコード検証・限定配備済み、利用者画面は未確認。次の一手: 同じカレンダーを再読み込みし、既に完了した簡易形式の元/続きが【完了】付きの薄い表示になることを確認してもらう。未完の続きも同じ画面にあれば従来どおりの表示であることも確認。新たな仕事作成/完了操作や既確認の系列/保存/外観チェックは依頼しない。「成功」はこの表示確認の成功、未完の実例を表示していなければ未完の実画面まで確認済みにしない。旧新相互継続/混在完了/M11は未完のまま。
