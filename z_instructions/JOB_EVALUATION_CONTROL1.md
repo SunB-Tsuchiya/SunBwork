@@ -801,3 +801,14 @@ NULL会社の旧ProjectJobは共通readerで本人自己割当の元と同じ案
 状態: 2b-1は実装/コード検証済み・未配備/未画面確認。混在全予定/時間のM05/M07を前進、M09の旧→簡易のみ対応。逆方向継続と混在完了/旧副作用は2b-2、M11同一仕事の旧形式切替は別設計で未完。一般公開・ナビ入口再編は保留。
 
 次の一手: 固定元9dc166668から今回固定差分だけの/tmp/myjob-stage2b1-deploy-20261103.shを提示してSSH別承認。唯一のmigration2026_11_03_180001_support_legacy_work_continuation_sourcesだけを固定版からstageへ抽出し--database=mysql --path/--realpath --force。前後の既存ID件数/受付ハッシュを照合、新元列NULL・旧元列nullableを確認し、ff-only後に独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、cache/manifest/旧source新POST認証と未追跡保持を確認する。自動rollback/他migrationなし。正確なコマンドは `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-stage2b1-deploy-20261103.sh`、承認前に実行しない。
+
+## 2026-11-03 段階2b-1の限定配備成功・画面確認待ち
+
+確定: 利用者が正確なSSHコマンドにyes。承認済み/tmp/myjob-stage2b1-deploy-20261103.shを実行しexit0。本番固定元9dc166668/main/追跡変更なし、取得固定e4db5c2fcd0e7feb6f502ddc1747bc03ac6aa74a、23ソース許可一覧/削除・依存変更なし/PHP10構文を照合。既定mysql・DB名silverlamb759_sunbwork・旧受付schemaを確認後、唯一のmigration2026_11_03_180001_support_legacy_work_continuation_sourcesだけ--database=mysql --path/--realpath --forceで実行成功。既存entry/PJA/events/diariesの既存ID範囲件数と既存receiptキーに対する内容ハッシュ保持、新元列NULL・旧元列nullableを検証。仕事コピー/一括移行/本番試験登録・完了操作/sales接続なし。
+
+ff-onlyでe4dbへ更新、manifest全参照/WorkDetail/members base、独立UnifiedMyJobBoxChangelogSeeder --database=mysql --force、config/cache/route/view clear成功。新旧source continuation POSTの名前/POST/auth middleware照合成功。最終追跡変更なし、未追跡5件の前後完全一致。共有Claude作業未変更。一般公開なし。2b-1はコード検証・限定配備済み、今回の利用者画面確認は未実施。逆方向継続/混在完了・旧副作用は2b-2、M11は別設計で未完。
+
+次の一手: 情報出版SuperAdminで以下2項目を確認してもらう。
+1. 統合BOXの従来形式で登録した仕事の詳細から「続きのマイジョブを作成」を開ける。元の案件・作業名・単位が初期値になり、時刻・数量・結果は空。日付/開始終了を入れて続き1件を保存できる。
+2. 保存後の詳細で元の旧仕事と簡易の続きが同じ系列に表示され、作業日/時刻と予定・記録の合計が別に表示される。系列の元を押して旧詳細へ戻り、そこから新しい続きの詳細へ移動できる。
+全部問題なければ「成功」、違いがあれば番号と結果。旧仕事の全複数予定/UTC月境界/全時間値の実データ照合・再送・削除・一般アカウント・混在完了は今回依頼しない。既確認の簡易同士の続き/完了/カレンダー完了表示は繰り返さない。
