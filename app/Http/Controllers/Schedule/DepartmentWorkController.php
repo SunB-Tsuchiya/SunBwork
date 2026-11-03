@@ -267,7 +267,8 @@ class DepartmentWorkController extends Controller
             $day = Carbon::parse($date, 'Asia/Tokyo')->startOfDay();
             return [
                 'id' => 'personal-work-'.$entry->id,
-                'title' => $this->schedule->entryCalendarTitle($entry),
+                'title' => $this->schedule->entryCalendarTitle($entry, true),
+                'completed' => (bool) $entry->completed_at,
                 'starts_at' => $day->copy()->addMinutes($interval[0])->format('Y-m-d\TH:i:s'),
                 'ends_at' => $day->copy()->addMinutes($interval[1])->format('Y-m-d\TH:i:s'),
                 'is_own' => true,

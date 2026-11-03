@@ -197,18 +197,21 @@ class PersonalWorkSchedule
         ];
     }
 
-    public function entryCalendarTitle(PersonalWorkEntry $entry): string
+    public function entryCalendarTitle(PersonalWorkEntry $entry, bool $includeCompletion = false): string
     {
         $projectName = $entry->projectJob?->title
             ?: ($entry->broad_project_id ? $entry->broadProject?->name : null)
             ?: $entry->project_name_text;
         $workTitle = trim($entry->title ?? '');
 
-        if ($projectName && $workTitle && $projectName !== $workTitle) return $projectName.'／'.$workTitle;
-        return $projectName ?: ($workTitle ?: match ($entry->work_category) {
-            'shinko' => '進行管理', 'eigyo' => '営業', 'dtp' => '組版・DTP・制作',
-            'kousei' => '校正', 'jimu' => '事務', default => 'その他',
-        });
+        $title = $projectName && $workTitle && $projectName !== $workTitle
+            ? $projectName.'／'.$workTitle
+            : ($projectName ?: ($workTitle ?: match ($entry->work_category) {
+                'shinko' => '進行管理', 'eigyo' => '営業', 'dtp' => '組版・DTP・制作',
+                'kousei' => '校正', 'jimu' => '事務', default => 'その他',
+            }));
+        return $includeCompletion && $entry->completed_at && ! str_starts_with($title, '【完了】')
+            ? '【完了】'.$title : $title;
     }
 
     public function workWindow(User $user, string $date): ?array

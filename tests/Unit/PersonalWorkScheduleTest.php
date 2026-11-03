@@ -293,4 +293,24 @@ class PersonalWorkScheduleTest extends TestCase
         $this->assertSame('my_job', $result['kind']);
         $this->assertSame('#4F46E5', $result['_custom_color']);
     }
+    public function test_calendar_completion_is_display_only_and_department_timeline_stays_without_prefix(): void
+    {
+        $service = new PersonalWorkSchedule();
+        $entry = new PersonalWorkEntry(['user_id' => 10, 'company_id' => 1, 'department_id' => 1,
+            'title' => '確認用の仕事', 'work_category' => 'other', 'entry_visibility' => 'department']);
+        $entry->setDateFormat('Y-m-d H:i:s');
+        $entry->completed_at = '2026-11-03 18:00:00';
+        $entry->setRelation('projectJob', null); $entry->setRelation('broadProject', null);
+        $viewer = (new User)->forceFill(['id' => 10, 'company_id' => 1, 'department_id' => 1]);
+        self::assertSame('【完了】確認用の仕事', $service->entryCalendarTitle($entry, true));
+        self::assertSame('確認用の仕事', $service->entryForViewer($entry, $viewer)['title']);
+        self::assertSame('確認用の仕事', $entry->title);
+        $entry->title = '【完了】確認用の仕事';
+        self::assertSame('【完了】確認用の仕事', $service->entryCalendarTitle($entry, true));
+        $entry->title = ''; $entry->work_category = 'dtp';
+        self::assertSame('【完了】組版・DTP・制作', $service->entryCalendarTitle($entry, true));
+        $entry->completed_at = null;
+        self::assertSame('組版・DTP・制作', $service->entryCalendarTitle($entry, true));
+    }
+
 }

@@ -248,6 +248,16 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertNull(DB::table('personal_work_entries')->find($reopened)->completed_at);
         self::assertFalse(app(\App\Services\WorkJobReader::class)->series($this->user(), $root)['allCompleted']);
         self::assertSame(0.0, app(\App\Services\WorkJobReader::class)->series($this->user(), $root)['totals']['recorded']);
+        $calendar = collect(app(DepartmentWorkController::class)->mine($this->request(['start' => '2099-12-01', 'end' => '2099-12-02'], null, null, 'GET'))->getData(true)['events'])->keyBy('id');
+        foreach ([$root, $child, $tomorrow] as $done) {
+            self::assertTrue($calendar['personal-work-'.$done]['completed']);
+            self::assertStringStartsWith('【完了】', $calendar['personal-work-'.$done]['title']);
+        }
+        self::assertFalse($calendar['personal-work-'.$reopened]['completed']);
+        self::assertStringStartsNotWith('【完了】', $calendar['personal-work-'.$reopened]['title']);
+        self::assertSame('2099-12-01T09:00:00', $calendar['personal-work-'.$root]['starts_at']);
+        self::assertSame('2099-12-01T12:00:00', $calendar['personal-work-'.$root]['ends_at']);
+        self::assertSame($before['title'], DB::table('personal_work_entries')->find($root)->title);
         self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('project_job_assignments')->count());
     }
 
