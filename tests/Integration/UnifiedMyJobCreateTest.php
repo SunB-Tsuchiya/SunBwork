@@ -30,15 +30,16 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(':memory:', config('database.connections.sqlite.database'));
         Schema::create('companies', function (Blueprint $t) { $t->id(); $t->string('company_type'); });
         Schema::create('departments', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->string('code'); });
-        Schema::create('project_jobs', function (Blueprint $t) { $t->id(); $t->string('title')->nullable(); $t->integer('company_id')->nullable(); $t->integer('broad_project_id')->nullable(); $t->boolean('show_on_department_schedule')->default(true); $t->integer('user_id')->nullable(); });
+        Schema::create('project_jobs', function (Blueprint $t) { $t->id(); $t->string('title')->nullable(); $t->integer('company_id')->nullable(); $t->integer('broad_project_id')->nullable(); $t->boolean('show_on_department_schedule')->default(true); $t->integer('user_id')->nullable(); $t->integer('client_id')->nullable(); });
+        Schema::create('clients', function (Blueprint $t) { $t->id(); $t->string('name'); $t->integer('company_id')->nullable(); });
         Schema::create('users', function (Blueprint $t) { $t->id(); $t->string('name')->nullable(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
         Schema::create('project_job_coordinators', function (Blueprint $t) { $t->integer('project_job_id'); $t->integer('user_id'); });
         Schema::create('project_team_members', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); });
-        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); });
+        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); $t->timestamps(); });
         Schema::create('events', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('project_job_assignment_id')->nullable(); $t->dateTime('starts_at')->nullable(); $t->dateTime('ends_at')->nullable(); $t->dateTime('cancelled_at')->nullable(); $t->string('visibility')->nullable(); });
         Schema::create('workflow_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id')->nullable(); });
         Schema::create('broad_projects', function (Blueprint $t) {
-            $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->string('name'); $t->boolean('is_active'); $t->integer('parent_id')->nullable(); $t->integer('fiscal_year')->nullable();
+            $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->string('name'); $t->boolean('is_active'); $t->integer('parent_id')->nullable(); $t->integer('fiscal_year')->nullable(); $t->integer('client_id')->nullable();
         });
         Schema::create('personal_work_entries', function (Blueprint $t) {
             $t->id(); $t->integer('user_id'); $t->integer('company_id'); $t->integer('department_id'); $t->date('work_date');
@@ -416,6 +417,79 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame($before, (array) DB::table('work_job_continuations')->first());
         self::assertSame(200, $this->continueWork($root, ['work_date' => '2099-12-02'])->getStatusCode());
         self::assertSame(2, DB::table('personal_work_entries')->count());
+    }
+
+    public function test_past_picker_includes_simple_work_with_typed_ids_filters_and_trial_scope(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-11-04 10:00:00');
+        try {
+            $simple = $this->save($this->request($this->payload(['work_date' => '2026-11-03', 'title' => null])))->getData(true)['id'];
+            DB::table('project_jobs')->insert(['id' => 1, 'company_id' => 1, 'title' => '旧案件']);
+            DB::table('project_job_assignments')->insert(['id' => $simple, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'title' => '旧ジョブ', 'desired_end_date' => '2026-11-03', 'created_at' => '2026-11-03 09:00:00']);
+            $past = fn ($data = [], $user = null, $context = null) => app(\App\Http\Controllers\User\MyProjectJobController::class)->pastData($this->request($data, $user, $context, 'GET'))->getData(true);
+            $rows = collect($past()['records'])->keyBy('key');
+            self::assertCount(2, $rows); self::assertArrayHasKey('entry:'.$simple, $rows); self::assertArrayHasKey('assignment:'.$simple, $rows);
+            self::assertSame('承認済み分類', $rows['entry:'.$simple]['title']);
+            self::assertNull($rows['entry:'.$simple]['project_job_id']);
+            self::assertArrayNotHasKey('actual_quantity', $rows['entry:'.$simple]['work_entry']);
+            self::assertArrayNotHasKey('result_note', $rows['entry:'.$simple]['work_entry']);
+            self::assertArrayNotHasKey('planned_start_time', $rows['entry:'.$simple]['work_entry']);
+            foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$user, $context]) {
+                $ordinary = $past([], $user, $context)['records']; self::assertCount(1, $ordinary); self::assertArrayNotHasKey('source_type', $ordinary[0]);
+            }
+            DB::table('personal_work_entries')->where('id', $simple)->update(['completed_at' => '2026-11-03 18:00:00']);
+            self::assertCount(1, $past(['hide_completed' => 1])['records']);
+            DB::table('personal_work_entries')->where('id', $simple)->update(['user_id' => 2]);
+            self::assertCount(1, $past()['records']);
+            DB::table('personal_work_entries')->where('id', $simple)->update(['user_id' => 1, 'company_id' => 2]);
+            self::assertCount(1, $past()['records']);
+            DB::table('personal_work_entries')->where('id', $simple)->update(['company_id' => 1, 'source_event_id' => 99]);
+            self::assertCount(1, $past()['records']);
+            DB::table('personal_work_entries')->where('id', $simple)->update(['source_event_id' => null, 'created_at' => '2026-09-01', 'work_date' => '2026-09-01']);
+            self::assertCount(1, $past()['records']);
+            self::assertCount(2, $past(['mode' => 'project'])['records']);
+            self::assertSame(1, DB::table('personal_work_entries')->count());
+        } finally { \Carbon\Carbon::setTestNow(); }
+    }
+
+    public function test_simple_history_client_and_project_filters_and_independent_reuse_keep_source_unmodified(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-11-04 10:00:00');
+        try {
+            DB::table('clients')->insert(['id' => 1, 'name' => '取引先', 'company_id' => 1]);
+            DB::table('project_jobs')->insert(['id' => 1, 'title' => '旧NULL会社案件', 'company_id' => null, 'client_id' => 1]);
+            $source = $this->save($this->request($this->payload(['work_date' => '2026-11-03'])))->getData(true)['id'];
+            DB::table('personal_work_entries')->where('id', $source)->update(['project_job_id' => 1, 'broad_project_id' => null]);
+            $data = app(\App\Http\Controllers\User\MyProjectJobController::class)->pastData($this->request(['mode' => 'project', 'client_id' => 1], null, null, 'GET'))->getData(true);
+            self::assertCount(1, $data['records']); self::assertSame(1, $data['clients'][0]['id']); self::assertSame(1, $data['projects'][0]['id']);
+            self::assertSame('旧NULL会社案件', $data['records'][0]['work_entry']['project_label']);
+            $before = (array) DB::table('personal_work_entries')->find($source);
+            $copy = $this->save($this->request($this->payload(['reuse_entry_id' => $source, 'project_job_id' => 1, 'broad_project_id' => null, 'source_entry_id' => $source, 'actual_quantity' => null])))->getData(true)['id'];
+            self::assertNotSame($source, $copy); self::assertSame($before, (array) DB::table('personal_work_entries')->find($source));
+            self::assertNull(DB::table('personal_work_entries')->find($copy)->source_entry_id);
+            self::assertNull(DB::table('personal_work_entries')->find($copy)->source_assignment_id);
+            self::assertSame(0, DB::table('work_job_continuations')->count());
+            try { $this->save($this->request($this->payload(['reuse_entry_id' => $source]), $this->user(['id' => 2]))); self::fail('Foreign history reused'); }
+            catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        } finally { \Carbon\Carbon::setTestNow(); }
+    }
+
+    public function test_simple_history_continuation_keeps_selected_calendar_window_and_does_not_copy_results(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-11-04 10:00:00');
+        try {
+            $source = $this->save($this->request($this->payload(['work_date' => '2026-11-03', 'actual_quantity' => 90, 'result_note' => '元の結果'])))->getData(true)['id'];
+            $before = (array) DB::table('personal_work_entries')->find($source);
+            $history = app(\App\Http\Controllers\User\MyProjectJobController::class)->pastData($this->request([], null, null, 'GET'))->getData(true)['records'][0];
+            self::assertSame('entry', $history['source_type']);
+            $body = $history['work_entry'] + ['request_token' => 'ce305d54-75b4-431b-adb2-eb6b9e546014', 'work_date' => '2026-11-04', 'planned_start_time' => '13:15', 'planned_end_time' => '14:15', 'plan_slot' => 'hour', 'actual_quantity' => null, 'result_note' => null];
+            $result = app(\App\Services\WorkJobMutation::class)->continueEntry($this->request($body), $source, null, app(DepartmentWorkController::class));
+            $entry = DB::table('personal_work_entries')->find($result['id']);
+            self::assertSame('2026-11-04', $entry->work_date); self::assertSame('13:15', $entry->planned_start_time); self::assertSame('14:15', $entry->planned_end_time);
+            self::assertSame($source, $entry->source_entry_id); self::assertNull($entry->actual_quantity); self::assertNull($entry->result_note); self::assertNull($entry->completed_at);
+            self::assertSame($before, (array) DB::table('personal_work_entries')->find($source));
+            self::assertSame(0, DB::table('project_job_assignments')->count());
+        } finally { \Carbon\Carbon::setTestNow(); }
     }
 
 }

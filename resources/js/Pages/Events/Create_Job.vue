@@ -1,4 +1,7 @@
 <script setup>
+import MyJobHistoryInput from '@/Components/MyJobHistoryInput.vue';
+import { router } from '@inertiajs/vue3';
+import { route } from 'ziggy-js';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import { usePage } from '@inertiajs/vue3';
@@ -40,6 +43,19 @@ const modalProjects = ref([]);
 
 // ── 続き確認モーダル ──────────────────────────────────────────────────────
 const showContinueModal = ref(false);
+const historySelection = ref(null);
+function reuseSimple(record, kind) {
+    if (record.source_type !== 'entry') return false;
+    const minute = value => /^\d{2}:\d{2}$/.test(value || '') ? Number(value.slice(0, 2)) * 60 + Number(value.slice(3)) : null;
+    historySelection.value = { record, kind, date: page.props.date || new Date().toLocaleDateString('sv-SE'),
+        startMin: minute(prefillEvent.value?.start_time), endMin: minute(prefillEvent.value?.desired_time) };
+    showContinueModal.value = false; pendingRecord.value = null;
+    return true;
+}
+function historySaved(date, id) {
+    historySelection.value = null;
+    router.visit(route('user.myjobbox.entries.show', { entry: id }));
+}
 const pendingRecord = ref(null);
 
 function selectRecord(rec) {
@@ -51,6 +67,7 @@ function selectRecord(rec) {
 function applyContinuation() {
     const rec = pendingRecord.value;
     if (!rec) return;
+    if (reuseSimple(rec, 'continue')) return;
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,
@@ -77,6 +94,7 @@ function applyContinuation() {
 function applyAsNew() {
     const rec = pendingRecord.value;
     if (!rec) return;
+    if (reuseSimple(rec, 'new')) return;
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,
@@ -282,6 +300,8 @@ onMounted(() => {
             </div>
         </div>
 
+        <MyJobHistoryInput :selection="historySelection" @close="historySelection = null" @saved="historySaved" />
+
         <!-- Reuse modal -->
         <Teleport to="body">
             <div v-if="showModal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16">
@@ -366,7 +386,7 @@ onMounted(() => {
                                 <tbody class="divide-y divide-gray-100 bg-white">
                                     <tr
                                         v-for="rec in records"
-                                        :key="rec.id"
+                                        :key="rec.key || rec.id"
                                         @click="selectRecord(rec)"
                                         class="cursor-pointer hover:bg-blue-50"
                                         :class="rec.completed ? 'text-gray-400' : ''"
@@ -454,7 +474,7 @@ onMounted(() => {
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 bg-white">
-                                    <tr v-for="rec in requestRecords" :key="rec.id" @click="applyRequestJob(rec)" class="cursor-pointer hover:bg-indigo-50">
+                                    <tr v-for="rec in requestRecords" :key="rec.key || rec.id" @click="applyRequestJob(rec)" class="cursor-pointer hover:bg-indigo-50">
                                         <td class="px-3 py-2">{{ rec.sender_name }}</td>
                                         <td class="max-w-[8rem] truncate px-3 py-2">{{ rec.project_job_name }}</td>
                                         <td class="max-w-[10rem] truncate px-3 py-2 font-medium">{{ rec.title }}</td>

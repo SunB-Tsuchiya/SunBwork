@@ -3,6 +3,7 @@ import axios from 'axios';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import AssignmentForm from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
+import MyJobHistoryInput from '@/Components/MyJobHistoryInput.vue';
 import MyJobSourcePicker from '@/Components/MyJobSourcePicker.vue';
 
 const props = defineProps({
@@ -16,6 +17,7 @@ const options = ref(null);
 const loading = ref(false);
 const loadError = ref('');
 const picker = ref(null);
+const historySelection = ref(null);
 const formAssignments = ref([]);
 const formKey = ref(0);
 const reuseAssignmentId = ref(null);
@@ -52,6 +54,7 @@ async function loadOptions() {
 
 watch(() => props.show, visible => {
     if (visible) {
+        historySelection.value = null;
         options.value = null;
         picker.value = null;
         reuseAssignmentId.value = null;
@@ -68,13 +71,19 @@ function close() {
 
 function onKeydown(event) {
     if (props.show && event.key === 'Escape') {
+        if (historySelection.value) return;
         if (picker.value) picker.value = null;
         else close();
     }
 }
 
 function onSourceSelected({ record, kind }) {
-    if (!options.value || !record?.project_job_id) return;
+    if (!options.value) return;
+    if (record?.source_type === 'entry') {
+        historySelection.value = { record, kind, date: props.date || new Date().toLocaleDateString('sv-SE'), startMin: props.startMin, endMin: props.endMin };
+        return;
+    }
+    if (!record?.project_job_id) return;
     const clientId = record.client_id ?? null;
     if (clientId && !options.value.userClients?.some(client => String(client.id) === String(clientId))) {
         options.value.userClients = [...(options.value.userClients || []), { id: clientId, name: record.client_name || '取引先' }];
@@ -119,7 +128,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 p-3 sm:p-6" @click.self="close">
+        <div v-if="show" v-show="!historySelection" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 p-3 sm:p-6" @click.self="close">
             <div role="dialog" aria-modal="true" aria-labelledby="my-job-modal-title"
                 class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-6">
@@ -159,4 +168,5 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
             </div>
         </div>
     </Teleport>
+    <MyJobHistoryInput :selection="historySelection" @close="historySelection = null" @saved="(date, id) => { historySelection = null; emit('saved', date, id); }" />
 </template>

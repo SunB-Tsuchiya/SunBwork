@@ -144,7 +144,7 @@ function choose(record, kind) {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        <tr v-for="record in records" :key="record.id">
+                        <tr v-for="record in records" :key="record.key || record.id">
                             <template v-if="props.mode === 'past'">
                                 <td class="px-3 py-2">{{ record.created_at || '—' }}</td>
                                 <td class="px-3 py-2">{{ record.client_name || '—' }}</td>

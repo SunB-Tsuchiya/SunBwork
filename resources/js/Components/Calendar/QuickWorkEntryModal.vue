@@ -13,11 +13,12 @@ const props = defineProps({
     endMin: { type: Number, default: null },
     entry: { type: Object, default: null },
     continuationSource: { type: Object, default: null },
+    reuseEntryId: { type: Number, default: null },
 });
 const emit = defineEmits(['close', 'saved', 'deleted']);
 const isMyJob = computed(() => props.entryPoint === 'myjob');
 const requestToken = ref('');
-const heading = computed(() => props.continuationSource ? '続きのマイジョブを作成' : props.entry ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
+const heading = computed(() => props.continuationSource ? '続きのマイジョブを作成' : props.entry?.id ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
 const projects = ref([]);
 const broadProjects = ref([]);
 const expandedBroadProjects = ref(new Set());
@@ -171,7 +172,8 @@ watch(() => props.show, async (show) => {
     if (props.continuationSource) {
         form.work_date = props.date || props.entry?.work_date || '';
         form.plan_slot = 'hour';
-        form.planned_start_time = ''; form.planned_end_time = '';
+        form.planned_start_time = props.startMin !== null ? time(props.startMin) : '';
+        form.planned_end_time = props.endMin !== null && props.endMin < 1440 ? time(props.endMin) : '';
         form.actual_quantity = ''; form.result_note = '';
         requestToken.value = globalThis.crypto.randomUUID();
         if (form.project_job_id && props.entry?.project_label) selectedProject.value = { id: form.project_job_id, title: props.entry.project_label };
@@ -186,7 +188,7 @@ async function save() {
     error.value = '';
     try {
         const payload = {
-            ...form, project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
+            ...form, ...(props.reuseEntryId ? { reuse_entry_id: props.reuseEntryId } : {}), project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
             actual_quantity: form.actual_quantity === '' ? null : form.actual_quantity,
             actual_unit: form.actual_quantity === '' && !props.continuationSource ? null : form.actual_unit,
         };

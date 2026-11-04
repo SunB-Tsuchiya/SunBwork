@@ -57,5 +57,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
             'claude_notes' => 'Codex。段階2b-1: typed assignment sourceと再送受付の拡張、全予定/UTC-JST/結果補足・系列外配分、旧親削除前の子チェック。一般User新propなし。混在完了/逆方向/M11は未完。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-history-simple-20261104'], [
+            'title' => '過去データから簡易マイジョブを流用',
+            'released_at' => '2026-11-04',
+            'summary' => '簡易入力の仕事も過去データ一覧で選び、続きや独立した仕事として登録できます。',
+            'body' => '<p>情報出版Super Admin限定。従来のカレンダー時間ドラッグからの過去データ流用を保ち、簡易作成した仕事を追加します。選択したカレンダーの日付・時間枠を引き継ぎ、数量・結果は新たに入力します。「続き」と「新規として引用」を区別して保存します。一般公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
+            'claude_notes' => 'Codex。pastDataへの本人entryのtrial限定追加、typed key、モーダル/旧ページのMyJobHistoryInput。新規引用はreuse_entry_idの本人元検証後に通常entry作成、source FKなし。既存詳細の続きボタン維持。混在完了/簡易→旧詳細形式/M11未完。',
+        ]);
     }
 }

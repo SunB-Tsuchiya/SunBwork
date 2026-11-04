@@ -26,14 +26,14 @@ async function component(file, behavior = false) {
     await build({ entryPoints: [path.join(root, file)], outfile, bundle: true, platform: 'node', format: 'cjs', external: ['vue', 'vue/server-renderer'], plugins: [{ name: 'vue-test', setup(b) {
         b.onResolve({ filter: /^vue(\/server-renderer)?$/ }, a => ({ path: require.resolve(a.path), external: true }));
         b.onResolve({ filter: /^(axios|ziggy-js|@inertiajs\/vue3)$/ }, a => ({ path: a.path, namespace: 'mock' }));
-        b.onLoad({ filter: /.*/, namespace: 'mock' }, a => ({ loader: 'js', contents: a.path === 'axios' ? 'export default globalThis.__unifiedAxios;' : a.path === 'ziggy-js' ? `export const route=${route.toString()};` : `const {h}=require('vue'); export const router=globalThis.__unifiedRouter; export const Link={props:['href'],setup(p,{slots}){return ()=>h('a',{href:p.href},slots.default?.())}};` }));
+        b.onLoad({ filter: /.*/, namespace: 'mock' }, a => ({ loader: 'js', contents: a.path === 'axios' ? 'export default globalThis.__unifiedAxios;' : a.path === 'ziggy-js' ? `export const route=${route.toString()};` : `const {h}=require('vue'); export const router=globalThis.__unifiedRouter; export const usePage=()=>globalThis.__historyPage||{props:{}}; export const Link={props:['href'],setup(p,{slots}){return ()=>h('a',{href:p.href},slots.default?.())}};` }));
         b.onResolve({ filter: /^@\// }, a => a.path.endsWith('/WorkJobSeries.vue') ? {path:path.join(root,'resources/js',a.path.slice(2))} : a.path.endsWith('.vue') ? { path: a.path, namespace: 'shell' } : { path: path.join(root, 'resources/js', a.path.slice(2) + '.js') });
         b.onLoad({ filter: /.*/, namespace: 'shell' }, () => ({ loader: 'js', contents: `const {h}=require('vue'); export default {setup(p,{slots}){return ()=>h('div',{},[slots.header?.(),slots.tabs?.(),slots.default?.()])}};` }));
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
                 ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject};'
-                : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError};') + '\n</script>');
+                : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError};') + '\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
             return { loader: 'js', contents: compileScript(descriptor, { id: 'unified-input', inlineTemplate: !behavior, templateOptions: { ssr: !behavior } }).content, resolveDir: path.dirname(a.path) };
@@ -108,6 +108,12 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     props.show=false; await settle(); props.continuationSource={type:'assignment',id:7}; props.show=true; await settle();
     Object.assign(state.form,{planned_start_time:'13:00',planned_end_time:'15:00'}); await state.save();
     assert.equal(requests.at(-1)[1],'user.myjobbox.work_assignments.continue{"assignment":7}');
+    props.show=false; await settle(); props.continuationSource={type:'entry',id:7}; props.startMin=795; props.endMin=855; props.date='2026-12-04'; props.entry.work_date='2026-12-04'; props.show=true; await settle();
+    assert.equal(state.form.planned_start_time,'13:15'); assert.equal(state.form.planned_end_time,'14:15'); assert.equal(state.form.work_date,'2026-12-04');
+    props.show=false; await settle(); props.entry={title:'新規引用',work_date:'2026-12-04',actual_quantity:null,actual_unit:'冊'}; props.continuationSource=null; props.reuseEntryId=7; props.show=true; await settle();
+    assert.equal(state.heading.value,'マイジョブ作成'); await state.save();
+    assert.equal(requests.at(-1)[0],'post'); assert.equal(requests.at(-1)[1],'user.myjobbox.unified_store'); assert.equal(requests.at(-1)[2].reuse_entry_id,7);
+    assert.equal(requests.at(-1)[2].planned_start_time,'13:15'); assert.equal(requests.at(-1)[2].planned_end_time,'14:15');
     app.unmount();
     const preview = await component(page, true);
     const pageProps = { rows: [], months: ['2026-11'], filters: { q: 'old search', period: '2026-11', hide_completed: true }, pagination: { total: 0, page: 1, last: 1 } };
@@ -167,5 +173,28 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     const legacyApp=renderer.createApp({render:()=>h(legacyComponent,{data:{source:{type:'assignment',id:7},prefill:{title:'旧形式'},series:oldSeries}})});legacyApp.mount({});
     globalThis.__legacyContinuation.show.value=true; globalThis.__legacyContinuation.saved('2026-12-02',42);
     assert.equal(globalThis.__legacyContinuation.show.value,false); assert.equal(globalThis.__detailVisit[0],'user.myjobbox.entries.show{"entry":42}');legacyApp.unmount();
+    const sourceRecord={id:7,source_type:'entry',project_job_id:null,work_entry:{id:7,title:'簡易の仕事',actual_unit:'冊',broad_project_id:41}};
+    const selection=reactive({record:sourceRecord,kind:'continue',date:'2026-12-04',startMin:795,endMin:855});
+    const historyInput=await component('resources/js/Components/MyJobHistoryInput.vue',true);
+    const inputApp=renderer.createApp({render:()=>h(historyInput,{selection})}); inputApp.mount({});
+    assert.deepEqual(globalThis.__historyInput.source.value,{type:'entry',id:7});
+    assert.equal(globalThis.__historyInput.entry.value.actual_quantity,null); assert.equal(globalThis.__historyInput.entry.value.result_note,null);
+    assert.equal(globalThis.__historyInput.entry.value.work_date,'2026-12-04');
+    selection.kind='new'; await settle(); assert.equal(globalThis.__historyInput.source.value,null); assert.equal(globalThis.__historyInput.entry.value.id,undefined); inputApp.unmount();
+    const realDocument=global.document, realWindow=global.window;
+    global.document={addEventListener(){},removeEventListener(){}}; global.window={location:{search:''}};
+    const create=await component('resources/js/Components/MyJobCreateModal.vue',true);
+    const createProps=reactive({show:false,date:'2026-12-04',startMin:795,endMin:855});
+    const createApp=renderer.createApp({render:()=>h(create,createProps)});createApp.mount({});createProps.show=true;await settle();
+    globalThis.__createHistory.onSourceSelected({record:sourceRecord,kind:'continue'});
+    assert.deepEqual(globalThis.__createHistory.historySelection.value,{record:sourceRecord,kind:'continue',date:'2026-12-04',startMin:795,endMin:855});
+    globalThis.__createHistory.onSourceSelected({record:sourceRecord,kind:'new'}); assert.equal(globalThis.__createHistory.historySelection.value.kind,'new');createApp.unmount();
+    globalThis.__historyPage={props:{date:'2026-12-05',prefillEvent:{start_time:'00:00',desired_time:'01:00'}}};
+    const oldPage=await component('resources/js/Pages/Events/Create_Job.vue',true);
+    const oldPageApp=renderer.createApp({render:()=>h(oldPage)});oldPageApp.mount({});
+    globalThis.__pageHistory.pendingRecord.value=sourceRecord; globalThis.__pageHistory.applyContinuation();
+    assert.equal(globalThis.__pageHistory.historySelection.value.startMin,0); assert.equal(globalThis.__pageHistory.historySelection.value.endMin,60); assert.equal(globalThis.__pageHistory.historySelection.value.date,'2026-12-05');
+    globalThis.__pageHistory.pendingRecord.value=sourceRecord;globalThis.__pageHistory.applyAsNew();assert.equal(globalThis.__pageHistory.historySelection.value.kind,'new');
+    oldPageApp.unmount(); global.document=realDocument;global.window=realWindow;
     console.log('Actual Vue input: BOX/calendar contexts, reset, required time, failure retention, POST/PUT destinations, JST date, saved-month navigation, preserved legacy paths passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

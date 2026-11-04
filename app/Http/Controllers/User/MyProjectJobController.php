@@ -948,6 +948,11 @@ class MyProjectJobController extends Controller
                 ->values();
         }
 
+        $context = $request->session()->get('superadmin_context.company_id');
+        if (app(\App\Services\UnifiedMyJobBox::class)->available($user, $context === null ? null : (int) $context)) {
+            return response()->json(app(\App\Services\SimpleMyJobHistory::class)->merge($request, $records, $clients, $projects));
+        }
+
         return response()->json([
             'records'  => $records,
             'clients'  => $clients,
