@@ -40,6 +40,7 @@ class WorkloadTrialRangeTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-10-30 10:00:00', 'Asia/Tokyo'));
 
         $schemas = [
+            'work_job_completion_syncs' => 'id integer primary key, assignment_id integer, user_id integer, synced_at text',
             'users' => 'id integer primary key, name text, company_id integer, department_id integer, is_ghost integer default 0',
             'departments' => 'id integer primary key, company_id integer, code text',
             'work_records' => 'id integer primary key, user_id integer, date text, start_time text, end_time text, scheduled_end text, overtime_minutes integer default 0',

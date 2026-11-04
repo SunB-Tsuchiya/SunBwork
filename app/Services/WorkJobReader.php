@@ -126,7 +126,9 @@ class WorkJobReader
             foreach (['planned', 'lunch', 'afterLunch', 'recorded'] as $field) $totals[$field] = array_sum(array_column(array_column($items, 'time'), $field));
         }
         return ['items' => $items, 'totals' => $totals, 'allCompleted' => ! in_array(false, array_column($items, 'completed'), true),
-            'operationsEnabled' => ! $mixed, 'canContinue' => true, 'mixed' => $mixed,
+            'operationsEnabled' => true, 'canContinue' => true, 'mixed' => $mixed,
+            'syncPending' => \Illuminate\Support\Facades\DB::table('work_job_completion_syncs')->whereNull('synced_at')
+                ->where('user_id', $user->id)->whereIn('assignment_id', array_column(array_filter($items, fn ($item) => $item['type'] === 'assignment'), 'id'))->exists(),
             'completionTargets' => array_map(function ($ancestor) use ($items) {
                 $item = collect($items)->firstWhere('key', $ancestor['type'].':'.$ancestor['id']);
                 return $ancestor + ['date' => $item['date'], 'start' => $item['start'], 'end' => $item['end']];

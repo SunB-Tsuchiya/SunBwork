@@ -80,7 +80,8 @@ class JobNotificationService
     public static function notifyCompleted(
         User $user,
         ProjectJobAssignment $assignment,
-        ProjectJob $projectJob
+        ProjectJob $projectJob,
+        bool $strict = false
     ): void {
         if (!$assignment->sender_id || $assignment->sender_id === $user->id) {
             return;
@@ -114,6 +115,7 @@ class JobNotificationService
                 ]);
             }
         } catch (\Throwable $e) {
+            if ($strict) throw $e;
             Log::warning('JobNotification create failed (completed)', ['error' => $e->getMessage()]);
         }
     }
@@ -156,7 +158,8 @@ class JobNotificationService
     public static function notifyProgressCompleted(
         User $user,
         ProjectJob $projectJob,
-        ProjectJobAssignment $assignment
+        ProjectJobAssignment $assignment,
+        bool $strict = false
     ): void {
         try {
             $jobTitle = $projectJob->title ?? '案件';
@@ -174,6 +177,7 @@ class JobNotificationService
                 ]);
             }
         } catch (\Throwable $e) {
+            if ($strict) throw $e;
             Log::warning('JobNotification create failed (progress_completed)', ['error' => $e->getMessage()]);
         }
     }
@@ -230,7 +234,7 @@ class JobNotificationService
      * ⑦ 校正完了通知（依頼者へ）
      * 「「タイトル」の校正が完了しました」
      */
-    public static function notifyProofCompleted(User $completedBy, ProofRequest $proofRequest): void
+    public static function notifyProofCompleted(User $completedBy, ProofRequest $proofRequest, bool $strict = false): void
     {
         try {
             JobNotification::create([
@@ -242,6 +246,7 @@ class JobNotificationService
                 'message'        => "「{$proofRequest->title}」の校正が完了しました",
             ]);
         } catch (\Throwable $e) {
+            if ($strict) throw $e;
             Log::warning('JobNotification create failed (proof_completed)', ['error' => $e->getMessage()]);
         }
     }

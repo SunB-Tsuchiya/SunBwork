@@ -27,3 +27,6 @@ Schedule::command('sales:prune-preview-cache')->hourly();
 
 // Clerkの定期予定を毎日補充（画面表示時にも補充する）
 Schedule::command('clerk:generate-schedules')->dailyAt('00:15')->timezone('Asia/Tokyo')->withoutOverlapping();
+
+// Durable retry for the separate MGinbon DB after trial MyJob completion.
+Schedule::command('work-jobs:sync-completions')->everyMinute()->withoutOverlapping();

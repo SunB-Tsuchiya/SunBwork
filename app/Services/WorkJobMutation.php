@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Explicit simple continuations from either source; mixed completion stays disconnected. */
+/** Explicit simple continuations from either source; mixed completion uses the same authorized ancestor locks. */
 class WorkJobMutation
 {
     public function __construct(private WorkJobReader $reader) {}
@@ -71,11 +71,30 @@ class WorkJobMutation
 
     public function completeEntry(User $user, int $id, ?int $context): array
     {
-        return DB::transaction(function () use ($user, $id, $context) {
-            $ancestors = $this->lockAncestors($user, $id, $context);
-            $ids = array_column($ancestors, 'id');
-            PersonalWorkEntry::whereIn('id', $ids)->whereNull('completed_at')->update(['completed_at' => now()]);
-            return ['id' => $id, 'completed_ids' => $ids];
+        return $this->completeWork($user, 'entry', $id, $context);
+    }
+
+    public function completeWork(User $user, string $type, int $id, ?int $context): array
+    {
+        if (DB::transactionLevel() !== 0) throw new \LogicException('Completion must own its transaction');
+        $result = DB::transaction(function () use ($user, $type, $id, $context) {
+            $ancestors = $this->lockAncestors($user, $id, $context, $type, true);
+            $entryIds = []; $assignments = [];
+            foreach ($ancestors as $node) {
+                if ($node['type'] === 'entry') $entryIds[] = $node['id'];
+                else $assignments[] = $this->reader->resolve($user, 'assignment', $node['id'], $context);
+            }
+            app(WorkJobLegacyCompletion::class)->complete($user, $assignments);
+            PersonalWorkEntry::whereIn('id', $entryIds)->whereNull('completed_at')->update(['completed_at' => now()]);
+            return ['id' => $id, 'type' => $type, 'completed_ids' => $entryIds,
+                'completed_targets' => array_map(fn ($node) => ['type' => $node['type'], 'id' => $node['id']], $ancestors),
+                'sync_ids' => $assignments ? DB::table('work_job_completion_syncs')
+                    ->whereIn('assignment_id', array_map(fn ($a) => $a->id, $assignments))->whereNull('synced_at')->pluck('id')->all() : []];
         }, 3);
+        // This method owns the transaction. Do not issue a cross-DB write before its commit.
+        $pending = 0;
+        foreach ($result['sync_ids'] as $receipt) if (! app(WorkJobCompletionSync::class)->run((int) $receipt)) $pending++;
+        unset($result['sync_ids']);
+        return $result + ['pending_syncs' => $pending];
     }
 }

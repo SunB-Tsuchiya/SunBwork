@@ -104,7 +104,6 @@ async function complete() {
                 <p class="mt-4 text-xs leading-relaxed text-gray-500">記録時間は、作業分析の試用V3と同じ条件で、現在までの時間に昼休憩・重複・会議などの配分を反映します。未来の予定枠や完了状態とは別です。</p>
             </section>
             <WorkJobSeries :series="series" />
-            <p v-if="!series.operationsEnabled" class="rounded border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">旧形式を含む系列の完了は現在対応中です。続きの登録と系列の確認は利用できます。</p>
             <section v-if="confirmationOpen" role="region" aria-labelledby="complete-heading" class="rounded-lg border border-yellow-300 bg-yellow-50 p-5">
                 <h3 id="complete-heading" class="font-semibold text-gray-900">次の仕事を完了にしますか？</h3>
                 <ul class="my-3 list-inside list-disc text-sm"><li v-for="item in series.completionTargets" :key="item.type + ':' + item.id">{{ item.title || '（作業名なし）' }} {{ item.date }} {{ item.start }}〜{{ item.end }}{{ item.completed ? '（完了済み）' : '' }}</li></ul>

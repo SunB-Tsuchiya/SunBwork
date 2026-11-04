@@ -533,7 +533,11 @@ function goChainItem(item) {
 // ---- 完了処理 ----
 async function submitComplete() {
     try {
-        if (!confirm('このジョブを完了としてマークしますか？')) return;
+        const targets = workJobContinuation?.series?.completionTargets;
+        const message = workJobContinuation?.series?.mixed && targets
+            ? `次の仕事を完了にします。\n${targets.map(item => item.title || '（作業名なし）').join('\n')}\nほかの続きの状態や、予定・数量は変わりません。`
+            : 'このジョブを完了としてマークしますか？';
+        if (!confirm(message)) return;
         if (!assignment || !assignment.id) {
             alert('割当情報が見つかりません。');
             return;
@@ -550,6 +554,12 @@ async function submitComplete() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (res.ok) {
+            const result = await res.json();
+            if (result.pending_syncs > 0) {
+                router.reload({ preserveScroll: true });
+                isSubmittingComplete.value = false;
+                return;
+            }
             const savedUrl = sessionStorage.getItem('myjobbox_index_url');
             const indexUrl = savedUrl || (typeof route === 'function' ? route('user.myjobbox.index') : '/myjobbox');
             window.location.href = indexUrl;

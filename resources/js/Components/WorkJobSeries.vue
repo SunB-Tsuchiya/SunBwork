@@ -6,6 +6,7 @@ const minutes = value => `${Number(Number(value || 0).toFixed(1))}分`;
 </script>
 
 <template>
+    <p v-if="series.syncPending" role="status" class="rounded border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">仕事は完了しました。銀本への反映は再試行待ちです。</p>
 <section v-if="series.items.length > 1" class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-orange-200 bg-orange-100 px-5 py-3"><h3 class="text-sm font-semibold text-orange-800">↩ 続きジョブ シリーズ（{{ series.items.length }}件）</h3><span class="text-xs text-orange-800">{{ series.allCompleted ? '系列すべて完了' : '未完了の仕事あり' }}</span></div>
                 <ol class="divide-y divide-orange-100">

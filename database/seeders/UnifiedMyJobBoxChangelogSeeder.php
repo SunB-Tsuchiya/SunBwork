@@ -73,5 +73,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
             'claude_notes' => 'Codex。QuickWorkEntryModal内の既存Picker、旧/簡易typed sourceと旧独立引用の本人確認。依頼はevents.create_job open=requestへ日時保持で遷移しsupersedes既存処理利用。混在完了/M11等未完。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-mixed-complete-20261105'], [
+            'title' => '旧形式と簡易形式の続きジョブの完了連動を試用',
+            'released_at' => '2026-11-05',
+            'summary' => '情報出版Super Admin限定で、両形式を含む系列の仕事と続き元を完了にできます。',
+            'body' => '<p>選んだ仕事と続き元を完了にし、ほかの続きの状態・予定・数量は保ちます。従来の予定表示・進行表・校正依頼と通知を連動し、再送による通知の重複を防ぎます。銀本への反映は失敗時に再試行し、詳細画面に反映待ちを示します。一般公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
+            'claude_notes' => 'Codex。root順lock/全系列認可、既定DB更新と厳格通知のtransaction、銀本は明示祖先単位の永続受付と既存scheduler再試行。旧のみ/一般User経路は維持。簡易→旧詳細続き/M11は別の未完工程。',
+        ]);
     }
 }

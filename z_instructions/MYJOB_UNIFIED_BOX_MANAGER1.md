@@ -436,3 +436,27 @@ ff-onlyでe4dbへ更新、manifest全参照/WorkDetail/members base、独立Unif
 引継ぎ証拠: 保存コミット5374ac94aのCONTROL/PLAN/MANAGER/PROMPT末尾と今回の利用者回答を照合。旧/tmp/sunbwork-myjob-history-20261104は消失していたため、同コミットからfeature/myjob-confirmed-20261105、/tmp/sunbwork-myjob-confirmed-20261105を復元。共有colayout-deployのClaude変更は未変更。本番版の最終記録は7e9947b2311f6ad2a42581cb52c1917ccfa17487で、今回SSHによる再取得・追加配備はしていない。
 
 次の一手: 旧形式と簡易形式が混在する続き系列の完了連動について、既存の進行表・銀本・校正・通知の副作用を整理し、祖先のみ完了／兄弟維持と再送時の整合性を満たす実装範囲を具体化する。簡易→旧詳細形式の続き、M11同一仕事の旧形式切替は引き続き未完。今回は確認記録のみでアプリ変更・DB操作なし。
+
+
+## 2026-11-05 段階2b-2 混在系列の完了連動に着手（確定）
+
+利用者「勧めてください」により既存承認の混在完了工程を進める。直前の成功済みの引用/依頼入口試験は繰り返さない。基準40e20577e（アプリ7e9947b23）。共有Claude作業保護、INFO SuperAdmin本人試用と実会社context境界、一般公開未承認を維持。
+
+設計: typed sourceの選択+祖先をroot順lockし系列全件認可後、entry.completed_atと旧completed/status、対象旧予定の完了接頭辞、ProgressCell、対応ProofRequestと通知を既定DBの同一transactionで確定。兄弟/子・時間/数量/評価を変更しない。既完了を再送しても通知は増やさない。旧形式詳細の既存完了入口も、本人試用かつ簡易を含む場合のみ共通処理へ接続。一般利用者/旧だけの従来経路は維持。
+
+銀本は別DBなので既定DBと同時commitを保証しない。既定DBに小さな同期受付表を追加し完了と同時保存、commit後に既存銀本同期を実行。失敗時は受付を残し専用command/既存schedulerから再試行。未反映を詳細に表示し、成功したと偽らない。対象は明示旧祖先のみ、sales接続なし。校正supersedesの関連は本人・同案件を検証し、対応が曖昧なら全更新前に拒否する。
+
+影響予定: WorkJobMutation/Reader、新完了副作用service/銀本同期受付serviceとmigration/command、既存旧完了controller、既存通知service（新経路だけ厳格失敗）、既存詳細/共通系列、console schedule、専用seeder、合成テストと管理資料。新ページ/一般公開/簡易→旧詳細続き/M11切替は含めない。検証: 明示SQLite :memory:、本人/会社/role/全系列認可、旧新交互祖先と兄弟維持、通知非重複、進行表/校正/予定の反映・失敗rollback、銀本失敗/再試行の受付保持。実Vue/SSRとmembers build後、固定差分配備はSSH別承認。現時点は調査/設計記録、実装/新検証/新配備/新画面確認はまだ。
+
+
+## 2026-11-05 混在系列の完了連動: 実装・コード検証完了、未配備
+
+WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接続。root順lock/再読取と系列全件認可後、entry完了/旧completed+status/旧予定の接頭辞/ProgressCell/対応校正依頼+依頼元proof_completed_at/通知を既定DB内で確定。兄弟/子・数量/時刻/評価値は保持。新規に完了へ遷移した旧仕事だけ通知対象、同案件の進行表通知は一操作一回。校正は本人・同案件の明示supersedes又はproof割当だけ、複数の有効候補は全更新rollback。再送で既完了の元から後に登録された別校正依頼を完了にしない。
+
+旧MyJob詳細の既存完了入口も、本人INFO SA試用かつ簡易を含む系列だけ共通処理へ接続。確認文に対象祖先を列挙。旧のみ/一般Userの既存完了処理と通知の既定挙動は維持（通知serviceのstrict引数は新経路のみtrue）。簡易詳細でも混在時の完了ボタンを有効化。一般公開なし。
+
+銀本は既定DBのwork_job_completion_syncs受付（今回migration2026_11_05_120001のみ新規）を同時作成、commit後に既存MGinbon同期を呼ぶ。旧serviceに任意includeAncestors=trueを追加し、受付実行ではfalseで認可済みの当該旧祖先だけ処理する。後から変わった系列や未認可祖先へ同期を拡張しない。失敗は受付に残しwork-jobs:sync-completionsと既存scheduler毎分で再試行。詳細の共通系列に反映待ち表示、旧詳細は反映待ちなら一覧へ移動せず再読取。同期待ち旧仕事の削除はrelease前に拒否。receiptを保持するため新テーブルには削除連動FKなし。外部DBとの同時commitは保証せず、銀本の既存状態条件による再試行で重複履歴を防ぐ。sales不使用。
+
+検証: 関連Unit95件707断言、合成Integration28件367断言、計123件1074断言成功。SQLite :memory:だけで既定DBと別銀本DBの実同期を確認（銀本commit後の受付ACK消失からの再試行も履歴重複なし）。交互型祖先/兄弟子維持、旧入口接続、進行表/予定/校正/通知、校正候補曖昧・他人supersedes・通知失敗rollback、本人/role/contextと既存時間回帰、銀本失敗/command再試行/未反映表示/削除保護を確認。実Vue script/SSRは既存フォーム回帰に加え旧詳細の対象列挙と反映待ちreload、共通系列の反映待ち表示を確認。PHP9構文成功、実Vue検査成功、対象ESLintエラー0（旧Show既存未使用変数3警告）、members最終build成功（既存Browserslist古いデータ通知のみ）、manifest全資産欠落0とmembers base確認、削除された旧資産は復元、diff --check成功。PHPUnit結果キャッシュはread-only vendorへ書けない警告のみでテストは成功。
+
+状態: 実装/コード検証済み、今回の限定配備・利用者画面確認・上長レビューは未実施。既確認の引用/依頼入口は繰り返さない。簡易→旧詳細形式の続きとM11同一仕事の旧形式切替は別の未完工程。次の一手: 固定元7e9947b23から今回だけを配備するスクリプトと差分許可一覧を作成し、正確なSSHコマンドの承認を得る。本番HEADが違う、追跡変更がある、未追跡が違う場合は配備前に停止。今回migrationだけ--database=mysql --force、独立Seederのみ、一般公開なし。業務データの試験登録・完了はSSHで行わない。

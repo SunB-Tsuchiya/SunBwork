@@ -35,8 +35,8 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('users', function (Blueprint $t) { $t->id(); $t->string('name')->nullable(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
         Schema::create('project_job_coordinators', function (Blueprint $t) { $t->integer('project_job_id'); $t->integer('user_id'); });
         Schema::create('project_team_members', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); });
-        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->integer('supersedes_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); $t->timestamps(); });
-        Schema::create('events', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('project_job_assignment_id')->nullable(); $t->dateTime('starts_at')->nullable(); $t->dateTime('ends_at')->nullable(); $t->dateTime('cancelled_at')->nullable(); $t->string('visibility')->nullable(); });
+        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->integer('supersedes_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->integer('status_id')->nullable(); $t->timestamp('proof_completed_at')->nullable(); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); $t->timestamps(); });
+        Schema::create('events', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('project_job_assignment_id')->nullable(); $t->dateTime('starts_at')->nullable(); $t->dateTime('ends_at')->nullable(); $t->dateTime('cancelled_at')->nullable(); $t->string('visibility')->nullable(); $t->string('title')->nullable(); $t->timestamps(); });
         Schema::create('workflow_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id')->nullable(); });
         Schema::create('broad_projects', function (Blueprint $t) {
             $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->string('name'); $t->boolean('is_active'); $t->integer('parent_id')->nullable(); $t->integer('fiscal_year')->nullable(); $t->integer('client_id')->nullable();
@@ -53,6 +53,13 @@ class UnifiedMyJobCreateTest extends TestCase
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_120001_add_work_job_core_fields.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_150001_create_work_job_continuations_table.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_180001_support_legacy_work_continuation_sources.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_05_120001_create_work_job_completion_syncs.php')->up();
+        Schema::create('statuses', function (Blueprint $t) { $t->id(); $t->string('key'); $t->string('slug'); });
+        DB::table('statuses')->insert(['id' => 1, 'key' => 'completed', 'slug' => 'completed']);
+        Schema::create('progress_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
+        Schema::create('proof_requests', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('proofreader_id'); $t->integer('project_job_assignment_id')->nullable(); $t->integer('requester_id'); $t->string('title'); $t->string('status'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
+        Schema::create('job_notifications', function (Blueprint $t) { $t->id(); $t->string('type'); $t->integer('sender_id'); $t->integer('recipient_id'); $t->integer('project_job_id'); $t->integer('assignment_id')->nullable(); $t->text('message'); $t->timestamps(); });
+        config(['database.connections.mginbon.database' => '']);
         foreach (['user_monthly_schedules', 'user_monthly_breaks'] as $name) {
             Schema::create($name, function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->string('year_month'); $t->json('schedule'); });
         }
@@ -293,7 +300,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(1, DB::table('personal_work_entries')->count());
     }
 
-    public function test_series_rejects_unauthorized_children_cycles_and_double_parent_and_mixed_completion_has_no_partial_writes(): void
+    public function test_series_rejects_unauthorized_children_and_completes_authorized_mixed_ancestors(): void
     {
         $root = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
         $child = $this->continueWork($root, ['work_date' => '2099-12-02'])->getData(true)['id'];
@@ -309,11 +316,11 @@ class UnifiedMyJobCreateTest extends TestCase
         DB::table('project_job_assignments')->insert(['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'source_personal_work_entry_id' => $root]);
         DB::table('personal_work_entries')->where('id', $child)->update(['source_entry_id' => null, 'source_assignment_id' => 1]);
         $series = app(\App\Services\WorkJobReader::class)->series($this->user(), $child);
-        self::assertCount(3, $series['items']); self::assertSame(60, $series['totals']['planned']); self::assertFalse($series['operationsEnabled']); self::assertTrue($series['canContinue']);
-        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $child, null); self::fail('Mixed completion accepted prematurely'); }
-        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
-        self::assertSame(0, DB::table('personal_work_entries')->whereNotNull('completed_at')->count());
-        self::assertFalse((bool) DB::table('project_job_assignments')->find(1)->completed);
+        self::assertCount(3, $series['items']); self::assertSame(60, $series['totals']['planned']); self::assertTrue($series['operationsEnabled']); self::assertTrue($series['canContinue']);
+        app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $child, null);
+        self::assertSame(2, DB::table('personal_work_entries')->whereNotNull('completed_at')->count());
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(1)->completed);
+        self::assertSame(1, DB::table('work_job_completion_syncs')->whereNotNull('synced_at')->count());
     }
 
     public function test_invalid_continuation_input_and_large_tree_stop_without_partial_creation(): void
@@ -367,7 +374,7 @@ class UnifiedMyJobCreateTest extends TestCase
         catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
         $series = $reader->series($this->user(), 1, null, true, 'assignment');
         self::assertSame(['assignment:1', 'entry:'.$child], array_column($series['items'], 'key'));
-        self::assertTrue($series['items'][0]['current']); self::assertTrue($series['canContinue']); self::assertFalse($series['operationsEnabled']);
+        self::assertTrue($series['items'][0]['current']); self::assertTrue($series['canContinue']); self::assertTrue($series['operationsEnabled']);
         self::assertSame(30, $series['totals']['afterLunch']);
         try { app(\App\Http\Controllers\User\MyProjectJobController::class)->destroyAssignment($this->request(), \App\Models\ProjectJobAssignmentByMyself::findOrFail(1)); self::fail('Legacy parent deleted before checking continuation'); }
         catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
@@ -527,4 +534,205 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(0, DB::table('personal_work_entries')->count()); self::assertSame(4, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('events')->count());
     }
 
+
+    private function mixedFixture(bool $proof = false): array
+    {
+        DB::table('project_jobs')->insert(['id' => 10, 'company_id' => 1, 'title' => '合成案件', 'user_id' => 2]);
+        DB::table('project_job_assignments')->insert(['id' => 10, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 1, 'title' => '旧元', 'job_type' => $proof ? 'proof' : 'work']);
+        $entry = $this->save($this->request($this->payload(['work_date' => '2099-12-01'])))->getData(true)['id'];
+        $sibling = $this->save($this->request($this->payload(['work_date' => '2099-12-02'])))->getData(true)['id'];
+        DB::table('personal_work_entries')->whereIn('id', [$entry, $sibling])->update(['source_assignment_id' => 10]);
+        DB::table('events')->insert(['id' => 100, 'user_id' => 1, 'project_job_assignment_id' => 10, 'title' => '旧予定', 'starts_at' => '2099-12-01 09:00:00', 'ends_at' => '2099-12-01 10:00:00']);
+        DB::table('progress_cells')->insert(['assignment_id' => 10]);
+        return [$entry, $sibling];
+    }
+
+    public function test_mixed_completion_updates_legacy_progress_events_and_notifies_once_without_changing_siblings(): void
+    {
+        [$entry, $sibling] = $this->mixedFixture();
+        $before = (array) DB::table('personal_work_entries')->find($sibling);
+        $mutation = app(\App\Services\WorkJobMutation::class);
+        $result = $mutation->completeEntry($this->user(), $entry, null);
+        self::assertSame([['type' => 'assignment', 'id' => 10], ['type' => 'entry', 'id' => $entry]], $result['completed_targets']);
+        self::assertSame(0, $result['pending_syncs']);
+        self::assertSame(1, DB::table('project_job_assignments')->find(10)->status_id);
+        self::assertNotNull(DB::table('progress_cells')->first()->completed_at);
+        self::assertSame('【完了】旧予定', DB::table('events')->find(100)->title);
+        self::assertSame('2099-12-01 09:00:00', DB::table('events')->find(100)->starts_at);
+        self::assertSame($before, (array) DB::table('personal_work_entries')->find($sibling));
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'progress_completed')->count());
+        $at = DB::table('personal_work_entries')->find($entry)->completed_at;
+        $mutation->completeEntry($this->user(), $entry, null);
+        self::assertSame($at, DB::table('personal_work_entries')->find($entry)->completed_at);
+        self::assertSame(1, DB::table('job_notifications')->count());
+        self::assertSame(1, DB::table('work_job_completion_syncs')->count());
+        self::assertFalse(app(\App\Services\WorkJobReader::class)->series($this->user(), $entry)['allCompleted']);
+    }
+
+    public function test_legacy_completion_entrypoint_handles_alternating_types_and_keeps_descendants_pending(): void
+    {
+        [$entry, $sibling] = $this->mixedFixture();
+        DB::table('project_job_assignments')->insert(['id' => 11, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 1, 'title' => '旧続き', 'source_personal_work_entry_id' => $entry]);
+        $child = $this->save($this->request($this->payload()))->getData(true)['id'];
+        DB::table('personal_work_entries')->where('id', $child)->update(['source_assignment_id' => 11]);
+        $result = app(\App\Http\Controllers\User\MyProjectJobController::class)->completeAssignment($this->request(), \App\Models\ProjectJobAssignment::findOrFail(11))->getData(true);
+        self::assertTrue($result['success']); self::assertCount(3, $result['completed_targets']);
+        self::assertSame(2, DB::table('project_job_assignments')->where('completed', true)->count());
+        self::assertNotNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        foreach ([$sibling, $child] as $pending) self::assertNull(DB::table('personal_work_entries')->find($pending)->completed_at);
+        self::assertSame(1, DB::table('job_notifications')->count());
+    }
+
+    public function test_mixed_proof_completion_is_atomic_and_replay_does_not_duplicate_notifications(): void
+    {
+        [$entry] = $this->mixedFixture(true);
+        DB::table('project_job_assignments')->insert(['id' => 20, 'project_job_id' => 10, 'user_id' => 2, 'sender_id' => 2]);
+        DB::table('proof_requests')->insert(['id' => 1, 'project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '合成校正', 'status' => 'in_progress', 'project_job_assignment_id' => 20]);
+        $mutation = app(\App\Services\WorkJobMutation::class);
+        $mutation->completeEntry($this->user(), $entry, null);
+        self::assertSame('completed', DB::table('proof_requests')->find(1)->status);
+        self::assertNotNull(DB::table('proof_requests')->find(1)->completed_at);
+        self::assertNotNull(DB::table('project_job_assignments')->find(20)->proof_completed_at);
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
+        $mutation->completeEntry($this->user(), $entry, null);
+        self::assertSame(2, DB::table('job_notifications')->count());
+    }
+
+    public function test_ambiguous_proof_and_notification_failure_roll_back_every_default_database_change(): void
+    {
+        [$entry] = $this->mixedFixture(true);
+        $data = ['project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '合成校正', 'status' => 'assigned'];
+        DB::table('proof_requests')->insert([$data, $data]);
+        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null); self::fail('Ambiguous proof accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(10)->completed);
+        self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        self::assertNull(DB::table('progress_cells')->first()->completed_at);
+        self::assertSame('旧予定', DB::table('events')->find(100)->title);
+        self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+        DB::table('proof_requests')->where('id', 2)->update(['status' => 'cancelled']);
+        DB::statement("CREATE TRIGGER fail_synthetic_notification BEFORE INSERT ON job_notifications BEGIN SELECT RAISE(ABORT, 'synthetic notification failure'); END");
+        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null); self::fail('Notification failure swallowed'); }
+        catch (\Illuminate\Database\QueryException $e) { self::assertStringContainsString('synthetic notification failure', $e->getMessage()); }
+        self::assertSame('assigned', DB::table('proof_requests')->find(1)->status);
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(10)->completed);
+        self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        self::assertNull(DB::table('progress_cells')->first()->completed_at);
+        self::assertSame('旧予定', DB::table('events')->find(100)->title);
+        self::assertSame(0, DB::table('job_notifications')->count()); self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+    }
+
+    public function test_mginbon_failure_leaves_durable_pending_receipt_and_retry_is_idempotent(): void
+    {
+        [$entry] = $this->mixedFixture();
+        $sync = new class extends \App\Services\MGinbon\MGinbonAssignmentSyncService {
+            public bool $fail = true;
+            public int $calls = 0;
+            public function complete(\App\Models\ProjectJobAssignment $assignment, ?int $actorId = null, ?string $occurredOn = null, bool $includeAncestors = true): void {
+                $this->calls++;
+                if ($this->fail) throw new \RuntimeException('Synthetic separate DB unavailable');
+            }
+        };
+        $this->app->instance(\App\Services\MGinbon\MGinbonAssignmentSyncService::class, $sync);
+        $result = app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null);
+        self::assertSame(1, $result['pending_syncs']); self::assertSame(1, $sync->calls);
+        self::assertNotNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        $receipt = DB::table('work_job_completion_syncs')->first();
+        self::assertSame(1, $receipt->attempts); self::assertNull($receipt->synced_at);
+        self::assertTrue(app(\App\Services\WorkJobReader::class)->series($this->user(), $entry)['syncPending']);
+        $sync->fail = false;
+        self::assertSame(0, \Illuminate\Support\Facades\Artisan::call('work-jobs:sync-completions'));
+        self::assertSame(2, $sync->calls); self::assertNotNull(DB::table('work_job_completion_syncs')->first()->synced_at);
+        self::assertFalse(app(\App\Services\WorkJobReader::class)->series($this->user(), $entry)['syncPending']);
+        app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null);
+        self::assertSame(2, $sync->calls); self::assertSame(1, DB::table('job_notifications')->count());
+    }
+
+    public function test_mixed_completion_rejects_foreign_ancestor_before_any_write(): void
+    {
+        [$entry] = $this->mixedFixture();
+        DB::table('project_job_assignments')->where('id', 10)->update(['user_id' => 2, 'sender_id' => 2]);
+        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null); self::fail('Foreign ancestor completed'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(10)->completed);
+        self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+        self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_actual_separate_memory_mginbon_sync_preserves_milestones_and_is_idempotent(): void
+    {
+        [$entry] = $this->mixedFixture();
+        config(['database.connections.mginbon' => ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']]);
+        DB::purge('mginbon');
+        $db = DB::connection('mginbon');
+        self::assertSame(':memory:', $db->getDatabaseName());
+        foreach ([
+            'mginbon_work_packages' => 'id integer primary key, project_job_assignment_id integer, mginbon_item_id integer, mginbon_project_id integer, mginbon_stage_definition_id integer, status text, completed_at text, updated_at text',
+            'mginbon_work_package_tasks' => 'mginbon_work_package_id integer, mginbon_stage_task_id integer',
+            'mginbon_stage_tasks' => 'id integer primary key, project_job_assignment_id integer, mginbon_item_subject_id integer, status text, updated_at text',
+            'mginbon_stage_definitions' => 'id integer primary key, code text',
+            'mginbon_milestones' => 'id integer primary key, mginbon_item_id integer, mginbon_item_subject_id integer, code text, occurred_on text, source text, created_at text, updated_at text',
+            'mginbon_change_logs' => 'id integer primary key, mginbon_project_id integer, mginbon_item_id integer, mginbon_item_subject_id integer, changed_by integer, field_path text, old_value text, new_value text, source text, created_at text, updated_at text',
+        ] as $table => $columns) $db->statement("create table $table ($columns)");
+        $db->table('mginbon_stage_definitions')->insert(['id' => 1, 'code' => 'text_input']);
+        $db->table('mginbon_work_packages')->insert(['id' => 1, 'project_job_assignment_id' => 10, 'mginbon_item_id' => 1, 'mginbon_project_id' => 1, 'mginbon_stage_definition_id' => 1, 'status' => 'in_progress']);
+        $db->table('mginbon_stage_tasks')->insert(['id' => 1, 'project_job_assignment_id' => 10, 'mginbon_item_subject_id' => 1, 'status' => 'assigned']);
+        $db->table('mginbon_work_package_tasks')->insert(['mginbon_work_package_id' => 1, 'mginbon_stage_task_id' => 1]);
+        $result = app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null);
+        self::assertSame(0, $result['pending_syncs']);
+        self::assertSame('completed', $db->table('mginbon_work_packages')->find(1)->status);
+        self::assertSame('completed', $db->table('mginbon_stage_tasks')->find(1)->status);
+        $receipt = DB::table('work_job_completion_syncs')->first();
+        self::assertSame($receipt->occurred_on, $db->table('mginbon_milestones')->first()->occurred_on);
+        self::assertSame('text_input_completed_on', $db->table('mginbon_milestones')->first()->code);
+        self::assertSame(2, $db->table('mginbon_change_logs')->count());
+        // Simulate the main-DB acknowledgement being lost after the separate DB committed.
+        DB::table('work_job_completion_syncs')->where('id', $receipt->id)->update(['synced_at' => null]);
+        self::assertTrue(app(\App\Services\WorkJobCompletionSync::class)->run($receipt->id));
+        self::assertSame(2, $db->table('mginbon_change_logs')->count());
+        self::assertSame(1, $db->table('mginbon_milestones')->count());
+        DB::purge('mginbon');
+    }
+
+    public function test_replaying_completed_proof_ancestor_does_not_complete_a_later_unrelated_request(): void
+    {
+        [$entry] = $this->mixedFixture(true);
+        DB::table('proof_requests')->insert(['project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '初回', 'status' => 'assigned']);
+        $mutation = app(\App\Services\WorkJobMutation::class);
+        $mutation->completeEntry($this->user(), $entry, null);
+        DB::table('proof_requests')->insert(['project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '後の依頼', 'status' => 'assigned']);
+        $mutation->completeEntry($this->user(), $entry, null);
+        self::assertSame('assigned', DB::table('proof_requests')->find(2)->status);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
+    }
+
+    public function test_superseded_proof_request_is_completed_only_for_the_same_owner_and_project(): void
+    {
+        [$entry] = $this->mixedFixture();
+        DB::table('project_job_assignments')->insert(['id' => 20, 'project_job_id' => 10, 'user_id' => 2, 'sender_id' => 2, 'job_type' => 'proof']);
+        DB::table('project_job_assignments')->where('id', 10)->update(['supersedes_assignment_id' => 20]);
+        DB::table('proof_requests')->insert(['project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '合成依頼', 'status' => 'assigned']);
+        try { app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null); self::fail('Foreign superseded request accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+        DB::table('project_job_assignments')->where('id', 20)->update(['user_id' => 1]);
+        app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $entry, null);
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertSame('completed', DB::table('proof_requests')->first()->status);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
+    }
+
+    public function test_pending_sync_protects_legacy_deletion_before_any_separate_database_release(): void
+    {
+        DB::table('project_jobs')->insert(['id' => 10, 'company_id' => 1]);
+        DB::table('project_job_assignments')->insert(['id' => 10, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 1, 'completed' => true]);
+        DB::table('work_job_completion_syncs')->insert(['assignment_id' => 10, 'user_id' => 1, 'company_id' => 1, 'department_id' => 1, 'occurred_on' => '2026-11-05']);
+        try { app(\App\Http\Controllers\User\MyProjectJobController::class)->destroyAssignment($this->request(), \App\Models\ProjectJobAssignmentByMyself::findOrFail(10)); self::fail('Pending legacy job deleted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); self::assertStringContainsString('再試行待ち', $e->getMessage()); }
+        self::assertSame(1, DB::table('project_job_assignments')->count());
+        self::assertSame(1, DB::table('work_job_completion_syncs')->count());
+    }
 }

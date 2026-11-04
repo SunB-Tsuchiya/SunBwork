@@ -204,6 +204,16 @@ class MyProjectJobController extends Controller
         if (!$user || $assignment->user_id !== $user->id) {
             return response()->json(['error' => 'Access denied'], 403);
         }
+        $context = $request->session()->get('superadmin_context.company_id');
+        $context = $context === null ? null : (int) $context;
+        if (app(\App\Services\UnifiedMyJobBox::class)->available($user, $context)
+            && (int) $assignment->sender_id === (int) $user->id) {
+            $series = app(\App\Services\WorkJobReader::class)->series($user, (int) $assignment->id, $context, false, 'assignment');
+            if (collect($series['items'])->contains('type', 'entry')) {
+                return response()->json(['success' => true, 'assignment_id' => $assignment->id]
+                    + app(\App\Services\WorkJobMutation::class)->completeWork($user, 'assignment', (int) $assignment->id, $context));
+            }
+        }
         try {
             // completed カラムが存在する場合のみセット（カラム不存在時の SQL エラーを防ぐ）
             if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignments', 'completed')) {
@@ -525,6 +535,10 @@ class MyProjectJobController extends Controller
             abort_if(\App\Models\PersonalWorkEntry::where('source_assignment_id', $assignment->id)->exists()
                 || \App\Models\ProjectJobAssignment::where('source_assignment_id', $assignment->id)->exists(),
                 422, '続きがあるため、この仕事は削除できません。');
+            if (\Illuminate\Support\Facades\Schema::hasTable('work_job_completion_syncs')) {
+                abort_if(DB::table('work_job_completion_syncs')->where('assignment_id', $assignment->id)->whereNull('synced_at')->exists(),
+                    422, '銀本への完了反映が再試行待ちのため、まだ削除できません。');
+            }
             // 銀本専用進行表を先に未登録へ戻す（別DBなので明示的な同期が必要）。
             app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
                 ->release($assignment->id, $user->id);

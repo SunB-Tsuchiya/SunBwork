@@ -167,13 +167,13 @@ class MGinbonAssignmentSyncService
      * Completing a continuation also completes the MGinbon package attached to
      * one of its ancestors.
      */
-    public function complete(ProjectJobAssignment $assignment, ?int $actorId = null, ?string $occurredOn = null): void
+    public function complete(ProjectJobAssignment $assignment, ?int $actorId = null, ?string $occurredOn = null, bool $includeAncestors = true): void
     {
         if (! $this->isConfigured()) {
             return;
         }
 
-        $assignmentIds = $this->lineageIds($assignment);
+        $assignmentIds = $includeAncestors ? $this->lineageIds($assignment) : [$assignment->id];
         $db = DB::connection('mginbon');
         $occurredOn ??= now()->toDateString();
 
