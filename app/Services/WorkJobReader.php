@@ -181,6 +181,12 @@ class WorkJobReader
     public function continuationPrefill(User $user, int $id, ?int $context): array
     {
         $job = $this->resolve($user, 'assignment', $id, $context);
+        return $this->assignmentPrefill($user, $job, Event::where('project_job_assignment_id', $job->id)->where('visibility', 'private')->exists());
+    }
+
+    /** Metadata only, from an already authorized source; no quantity/result/time copying. */
+    public function assignmentPrefill(User $user, ProjectJobAssignment $job, bool $private): array
+    {
         $code = PersonalWorkRole::forUser($user)['code'] ?? 'other';
         $category = $job->job_type === 'proof' ? 'kousei' : match ($code) {
             'shinko', 'eigyo', 'kousei', 'jimu' => $code, 'operator', 'seisaku' => 'dtp', default => 'other',
@@ -189,7 +195,7 @@ class WorkJobReader
             'project_job_id' => $job->project_job_id, 'project_label' => $job->projectJob?->title,
             'work_category' => $category, 'activity_type' => '', 'actual_unit' => $job->amounts_unit === 'file' ? 'ファイル' : 'ページ',
             'entry_visibility' => $job->projectJob?->show_on_department_schedule
-                && ! Event::where('project_job_assignment_id', $job->id)->where('visibility', 'private')->exists() ? 'department' : 'private'];
+                && ! $private ? 'department' : 'private'];
     }
 
     public function detail(User $user, int $id, ?int $context = null, array &$recordDays = [], bool $withAncestors = true): array

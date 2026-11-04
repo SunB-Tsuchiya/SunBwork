@@ -1,5 +1,7 @@
 <script setup>
 import axios from 'axios';
+import { router, usePage } from '@inertiajs/vue3';
+import MyJobSourcePicker from '@/Components/MyJobSourcePicker.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import { treeRows } from '@/utils/broadProjectTree';
@@ -18,7 +20,14 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved', 'deleted']);
 const isMyJob = computed(() => props.entryPoint === 'myjob');
 const requestToken = ref('');
-const heading = computed(() => props.continuationSource ? '続きのマイジョブを作成' : props.entry?.id ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
+const sourcePickerOpen = ref(false);
+const historyChoice = ref(null);
+const page = usePage();
+const activeContinuation = computed(() => historyChoice.value?.kind === 'continue'
+    ? { type: historyChoice.value.type, id: historyChoice.value.id } : props.continuationSource);
+const canSelectSource = computed(() => !props.entry?.id && !props.continuationSource
+    && (isMyJob.value || page.props.userWorkHub?.enabled));
+const heading = computed(() => activeContinuation.value ? '続きのマイジョブを作成' : props.entry?.id ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
 const projects = ref([]);
 const broadProjects = ref([]);
 const expandedBroadProjects = ref(new Set());
@@ -34,6 +43,7 @@ const showMore = ref(false);
 let searchTimer;
 let searchRequest = 0;
 const saving = ref(false);
+const handingOff = ref(false);
 const loading = ref(false);
 const error = ref('');
 const form = reactive({
@@ -148,6 +158,7 @@ function clearProject() {
 watch(() => props.show, async (show) => {
     if (!show) { showTitleSuggestions.value = false; projectPickerOpen.value = false; return; }
     error.value = '';
+    sourcePickerOpen.value = false; historyChoice.value = null; handingOff.value = false;
     clearTimeout(searchTimer);
     projectSearch.value = '';
     selectedProject.value = null;
@@ -182,23 +193,55 @@ watch(() => props.show, async (show) => {
     await loadProjects(true);
 });
 
+async function chooseHistory({ record, kind }) {
+    if (saving.value || handingOff.value || !['new', 'continue'].includes(kind)) return;
+    const type = record.source_type === 'entry' ? 'entry' : 'assignment';
+    const seed = type === 'entry' ? record.work_entry : record.simple_prefill;
+    if (!seed) { error.value = 'この仕事は引用できません。ほかの仕事を選んでください。'; return; }
+    historyChoice.value = { type, id: record.id, kind };
+    Object.assign(form, {
+        work_category: seed.work_category || 'other', activity_type: seed.activity_type || '', plan_slot: 'hour',
+        title: seed.title || '', project_job_id: seed.project_job_id || '', broad_project_id: seed.broad_project_id || '',
+        project_name_text: seed.project_name_text || '', entry_visibility: seed.entry_visibility || 'department',
+        actual_quantity: '', actual_unit: seed.actual_unit || 'ページ', result_note: '',
+    });
+    selectedProject.value = seed.project_job_id ? {id: seed.project_job_id, title: seed.project_label || record.project_job_name} : null;
+    selectedBroadProject.value = null;
+    showMore.value = Boolean(form.activity_type || form.entry_visibility === 'private');
+    requestToken.value = globalThis.crypto.randomUUID();
+    sourcePickerOpen.value = false; error.value = '';
+    await loadProjects();
+}
+
+function openRequests() {
+    if (saving.value || handingOff.value) return;
+    const params = { date: form.work_date, open: 'request' };
+    for (const [value, prefix] of [[form.planned_start_time, 'start'], [form.planned_end_time, 'end']]) {
+        if (/^\d{2}:\d{2}$/.test(value || '')) {
+            params[prefix + 'Hour'] = value.slice(0, 2); params[prefix + 'Minute'] = value.slice(3);
+        }
+    }
+    handingOff.value = true;
+    router.get(route('events.create_job'), params, { onFinish: () => { handingOff.value = false; } });
+}
+
 async function save() {
-    if (saving.value) return;
+    if (saving.value || handingOff.value) return;
     saving.value = true;
     error.value = '';
     try {
         const payload = {
-            ...form, ...(props.reuseEntryId ? { reuse_entry_id: props.reuseEntryId } : {}), project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
+            ...form, ...(historyChoice.value?.kind === 'new' ? { [historyChoice.value.type === 'entry' ? 'reuse_entry_id' : 'reuse_assignment_id']: historyChoice.value.id } : (!historyChoice.value && props.reuseEntryId ? { reuse_entry_id: props.reuseEntryId } : {})), project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
             actual_quantity: form.actual_quantity === '' ? null : form.actual_quantity,
-            actual_unit: form.actual_quantity === '' && !props.continuationSource ? null : form.actual_unit,
+            actual_unit: form.actual_quantity === '' && !activeContinuation.value && !historyChoice.value ? null : form.actual_unit,
         };
         let response;
-        if (props.continuationSource) {
-            response = await axios.post(route(props.continuationSource.type === 'assignment' ? 'user.myjobbox.work_assignments.continue' : 'user.myjobbox.entries.continue', props.continuationSource.type === 'assignment' ? { assignment: props.continuationSource.id } : { entry: props.continuationSource.id }), { ...payload, request_token: requestToken.value });
+        if (activeContinuation.value) {
+            response = await axios.post(route(activeContinuation.value.type === 'assignment' ? 'user.myjobbox.work_assignments.continue' : 'user.myjobbox.entries.continue', activeContinuation.value.type === 'assignment' ? { assignment: activeContinuation.value.id } : { entry: activeContinuation.value.id }), { ...payload, request_token: requestToken.value });
         } else if (props.entry?.id) {
             response = await axios.put(route(isMyJob.value ? 'user.myjobbox.entries.update' : 'schedule.department_work.update', { entry: props.entry.id }), payload);
         } else {
-            response = await axios.post(route(isMyJob.value ? 'user.myjobbox.unified_store' : 'schedule.department_work.store'), payload);
+            response = await axios.post(route(isMyJob.value || historyChoice.value ? 'user.myjobbox.unified_store' : 'schedule.department_work.store'), payload);
         }
         emit('saved', form.work_date, response.data.id);
     } catch (err) {
@@ -227,15 +270,21 @@ async function remove() {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4" @click.self="!saving && emit('close')">
-            <div role="dialog" aria-modal="true" :aria-label="heading" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4" @click.self="!saving && !handingOff && emit('close')">
+            <div role="dialog" aria-modal="true" :aria-label="heading" :class="sourcePickerOpen ? 'max-w-3xl' : 'max-w-lg'" class="max-h-[90vh] w-full overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div class="flex items-center justify-between gap-2">
                     <h2 class="text-lg font-semibold">{{ heading }}</h2>
-                    <button type="button" class="text-sm text-gray-500 hover:underline" @click="!saving && emit('close')">閉じる</button>
+                    <button type="button" class="text-sm text-gray-500 hover:underline" @click="!saving && !handingOff && emit('close')">閉じる</button>
                 </div>
                 <p class="mt-1 text-xs text-gray-500">{{ isMyJob ? '日付と開始・終了時刻を入力して作業を登録します。登録した作業は、このBOXとカレンダーに表示されます。' : 'カレンダーで選んだ時刻を、その日の作業予定として保存します。あとから時刻や内容を直せます。' }}</p>
                 <p v-if="error" class="mt-3 rounded bg-red-50 p-2 text-sm text-red-700" role="alert">{{ error }}</p>
-                <form class="mt-4 space-y-3" @submit.prevent="save">
+                <div v-if="canSelectSource && !sourcePickerOpen" class="mt-3 flex flex-wrap gap-2 border-b pb-3">
+                    <button type="button" :disabled="saving || handingOff" class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-700 disabled:opacity-50" @click="sourcePickerOpen = true">過去ジョブから引用</button>
+                    <button type="button" :disabled="saving || handingOff" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 disabled:opacity-50" @click="openRequests">{{ handingOff ? '移動中…' : '依頼ジョブから登録' }}</button>
+                </div>
+                <MyJobSourcePicker v-if="sourcePickerOpen" mode="past" :simple-input="true" class="mt-4" @cancel="sourcePickerOpen = false" @selected="chooseHistory" />
+                <p v-if="historyChoice && !sourcePickerOpen" class="mt-3 rounded bg-indigo-50 p-2 text-sm text-indigo-800">{{ historyChoice.kind === 'continue' ? '選択した仕事の続きとして登録します。' : '元の仕事とは独立した仕事として登録します。' }}</p>
+                <form v-show="!sourcePickerOpen" class="mt-4 space-y-3" @submit.prevent="save">
                     <label class="block text-sm">日付<input v-model="form.work_date" type="date" required class="mt-1 w-full rounded border p-2" /></label>
                     <div v-if="entry && form.plan_slot !== 'hour'" class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                         この記録は以前の「{{ { am: '午前', pm: '午後', full: '終日' }[form.plan_slot] || '予定枠' }}」形式です。
@@ -296,8 +345,8 @@ async function remove() {
                         </label>
                     </div>
                     <div class="flex justify-between border-t pt-3">
-                        <button v-if="entry && !entry.diary_id && !continuationSource" type="button" :disabled="saving" class="text-sm text-red-700 hover:underline" @click="remove">削除</button><span v-else></span>
-                        <button type="submit" :disabled="saving" class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{{ saving ? '保存中...' : '保存' }}</button>
+                        <button v-if="entry?.id && !entry.diary_id && !continuationSource" type="button" :disabled="saving || handingOff" class="text-sm text-red-700 hover:underline" @click="remove">削除</button><span v-else></span>
+                        <button type="submit" :disabled="saving || handingOff" class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{{ saving ? '保存中...' : '保存' }}</button>
                     </div>
                 </form>
             </div>

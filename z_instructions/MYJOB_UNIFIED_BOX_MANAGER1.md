@@ -394,3 +394,23 @@ ff-onlyでe4dbへ更新、manifest全参照/WorkDetail/members base、独立Unif
 - 一般公開は未承認。旧詳細の追加続きボタンと従来のドラッグ→流用は保持。混在系列完了/簡易→旧詳細の続き/M11同一仕事の旧形式切替は別の残作業として保持する。依頼の旧経路への入口ができたことだけで、それらを全完了にしない。
 
 状態: この新しい入口2機能は方針/次工程として確定、今回まだコード実装/検証/配備/画面確認なし。次の一手は簡易フォームと既存MyJobCreateModal/MyJobSourcePickerの引渡しを、選択日時/引用元の型/旧依頼の認可と重複防止を含め具体化し実装する。本ターンは資料記録のみ、追加SSH/実DB/アプリ変更なし。
+
+## 2026-11-04 簡易フォームの過去引用・依頼引渡し実装開始
+
+利用者「続けましょう」により前節の2入口を実装。QuickWorkEntryModal内で既存MyJobSourcePickerを開き、簡易/旧形式の両履歴を選べる。日付/開始終了は入力済み/ドラッグ値を保持、分類/作業区分/タイトル/単位/公開範囲を初期値にし、数量/結果は空。続きはtyped sourceの既存専用POST、独立引用は元型ごとのreuse IDを付けた通常新規POST（元FKなし）。旧履歴の簡易初期値は既存WorkJobReaderのメタデータ生成を共通化し、一括取得した元/非公開予定情報から作る。通常の旧作成側の引用と依頼フォームは維持。
+
+依頼ボタンは既存events.create_jobへopen=requestと日付・開始終了（0時を含む）を付けて移動し、既存の未登録依頼一覧を自動で開く。移動時にPOST/仕事作成はしない。選択後は元のsupersedes登録/登録済み判定を使う。編集/続きフォームに新しい引用切替入口を出さず、新規のINFO SA試用文脈に限定する。一般公開は未承認。混在完了は別の未完工程なので、簡易側の引用選択では完了連動を実装済みと約束しない説明を使う。
+
+影響: QuickWorkEntryModal/MyJobSourcePicker、履歴初期値のSimpleMyJobHistory/WorkJobReader、独立旧引用のUnifiedMyJobBoxController、対応テストと既存管理資料。新route/migration/依存なし。次は実Vueの簡易フォーム入口→引用/依頼→旧選択までと、合成SQLiteメモリの本人/元型/二重元拒否/保存非複製を検証し、members buildの後に固定差分配備をSSH別承認。今回まだ限定配備/利用者画面確認なし。
+
+## 2026-11-04 簡易フォーム自身の引用・依頼入口コード検証
+
+実装済み: QuickWorkEntryModalの新規作成・INFO SA試用文脈に「過去ジョブから引用」「依頼ジョブから登録」。既存編集/propsでの続き作成へ元の切替入口を出さない。引用選択時だけダイアログを広げ、同じフォーム内の既存Pickerを使う。旧/簡易の両履歴について入力中の日付/開始終了を保持し、分類/種類/作業名/単位/公開範囲を初期化、数量/結果は空。続きは元型別の既存専用POST、独立引用は本人検証済みreuse_entry_id/reuse_assignment_idの通常新規POSTで元FKなし。2つのreuse元の同時指定は422。
+
+依頼入口はevents.create_jobへopen=requestとフォーム現在の日時を渡し既存依頼一覧を自動表示する。移動中は再度の移動/簡易保存/閉じるを止め、移動完了で解除する。元のsupersedes/二重登録防止処理を使い、移動時に仕事を作成しない。先行の詳細下部ボタン/従来のドラッグ→流用を保持。旧履歴の簡易初期値はWorkJobReaderの既存生成を共通化し、SimpleMyJobHistoryで対象元・非公開予定を一括取得。保存時は本人自己割当・会社部署contextを共通readerで再検証する。一般公開なし。
+
+検証: 関連Unit90件698断言、Integration18件269断言、計108件967断言成功。独立旧引用の元保持/元FKなし/日時維持、二重元422/他人・受信依頼を過去自己ジョブとして引用不可、未登録本人宛て依頼のみの旧一覧・GET時entry/PJA件数不変、既存の簡易引用・再送・系列/時間/認可の回帰を確認。実Vue script/SSRで簡易フォーム内の両型の引用/続きAPI選択・数量結果リセット/日時保持（0時含む）・旧引用時reuse型、依頼へのGETと移動中POST抑止/解除、旧ページでopen=request→依頼選択→supersedes設定と時間枠保持まで確認。trial flag falseのCalendarと既存編集では入口なし、trial新規では入口ありを確認。対象ESLint、PHP4構文、members最終build/manifest全資産欠落0/members base、旧削除資産復元、diff --check成功。新route/Ziggy/migration/依存なし。ブラウザ画面確認はまだ。
+
+状態: 今回入口2機能は実装/コード検証済み・未配備/未画面確認。混在完了/簡易→旧詳細形式の続き/M11同一仕事切替は未完のまま。過去のドラッグ→旧作成→簡易引用の成功は維持し、新入口の確認へ流用しない。
+
+次の一手: 固定元0c45eef09から今回だけの/tmp/myjob-entrypoints-deploy-20261104.shを用意して正確なSSHコマンドの別承認。本番HEAD/main/追跡変更なし・固定SHAとソース許可一覧・削除/route/Ziggy/migration/依存変更なしを照合してff-only、独立UnifiedMyJobBoxChangelogSeederのみ--database=mysql --force、cache/manifest/未追跡保持確認。実DBで依頼の試験登録は行わない。配備後は簡易フォームからの引用/依頼引渡しだけを利用者に確認してもらう。

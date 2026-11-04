@@ -65,5 +65,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
             'claude_notes' => 'Codex。pastDataへの本人entryのtrial限定追加、typed key、モーダル/旧ページのMyJobHistoryInput。新規引用はreuse_entry_idの本人元検証後に通常entry作成、source FKなし。既存詳細の続きボタン維持。混在完了/簡易→旧詳細形式/M11未完。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-simple-sources-20261104'], [
+            'title' => '簡易作成から過去引用と依頼登録を選択',
+            'released_at' => '2026-11-04',
+            'summary' => '簡易入力から過去ジョブを引用し、依頼は従来のマイジョブ登録へ引き継げます。',
+            'body' => '<p>情報出版Super Admin限定。簡易作成画面の過去ジョブから、続きか独立引用を選び、入力済みの日付・時間を保持します。依頼ジョブから登録を選ぶと、その日時で従来の登録画面を開きます。移動時に仕事を作成せず、既存の依頼登録処理を使います。一般公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_UNIFIED_BOX_PLAN1.md'],
+            'claude_notes' => 'Codex。QuickWorkEntryModal内の既存Picker、旧/簡易typed sourceと旧独立引用の本人確認。依頼はevents.create_job open=requestへ日時保持で遷移しsupersedes既存処理利用。混在完了/M11等未完。',
+        ]);
     }
 }

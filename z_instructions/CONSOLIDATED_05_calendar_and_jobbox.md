@@ -361,3 +361,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-11-03 段階2b-1: 情報出版SuperAdmin本人の旧MyJob詳細にだけ`workJobContinuation`を付け、旧→簡易の専用POSTと共通WorkJobSeriesを追加。receiptの元IDをentry/assignmentで排他に保持、数値IDが同じでも同じ元と扱わない。旧親の削除は行lock後に子参照を先に確認し、進行表/銀本解除等より前に拒否する。混在系列は全eventをJSTへ解決し日別V3配分と結果補足quickキーを使い、予定と記録を別々に合計。逆方向継続/混在完了の旧副作用は次工程。一般公開未承認。状態はMYJOB_UNIFIED_BOX_MANAGER1.md参照。
 
 2026-11-04: 普段の導線はカレンダーのドラッグ→ジョブ作成→過去データから流用→続き/独立引用。SimpleMyJobHistoryは本人INFO SA/context限定で簡易entryも一覧に加える。同じ数値IDでも型付きkeyで区別し、MyJobHistoryInputから既存QuickWorkEntryModalへ渡す。ドラッグ日時は両入口で維持、数量/結果/状態はコピーしない。続きはentry元FK、独立引用は本人reuse_entry_idの検証後に元FKなしで新規登録。旧形式を選んだ場合の従来入力・依頼と、追加した旧詳細下部の続きボタンは保持。一般公開なし。
+
+2026-11-04 簡易作成自身の入口: QuickWorkEntryModalのINFO SA新規文脈に過去ジョブ引用と依頼登録を追加。過去選択はフォーム内のMyJobSourcePickerで、型付き元のcontinueまたは本人元reuse IDによる独立新規。日付/時刻を維持し数量/結果をリセット。依頼はevents.create_job(open=request)へ日時だけ渡して従来登録、移動中は簡易保存を抑止。既存の旧形式流用/依頼登録/詳細ボタンは維持。混在完了/M11とは別工程。一般公開未承認。

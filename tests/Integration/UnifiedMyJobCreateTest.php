@@ -35,7 +35,7 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('users', function (Blueprint $t) { $t->id(); $t->string('name')->nullable(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
         Schema::create('project_job_coordinators', function (Blueprint $t) { $t->integer('project_job_id'); $t->integer('user_id'); });
         Schema::create('project_team_members', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); });
-        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); $t->timestamps(); });
+        Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->integer('supersedes_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); $t->timestamps(); });
         Schema::create('events', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('project_job_assignment_id')->nullable(); $t->dateTime('starts_at')->nullable(); $t->dateTime('ends_at')->nullable(); $t->dateTime('cancelled_at')->nullable(); $t->string('visibility')->nullable(); });
         Schema::create('workflow_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id')->nullable(); });
         Schema::create('broad_projects', function (Blueprint $t) {
@@ -490,6 +490,41 @@ class UnifiedMyJobCreateTest extends TestCase
             self::assertSame($before, (array) DB::table('personal_work_entries')->find($source));
             self::assertSame(0, DB::table('project_job_assignments')->count());
         } finally { \Carbon\Carbon::setTestNow(); }
+    }
+
+    public function test_simple_form_can_independently_quote_authorized_old_job_and_reject_ambiguous_or_received_sources(): void
+    {
+        DB::table('project_jobs')->insert(['id' => 1, 'title' => '旧案件', 'company_id' => null]);
+        DB::table('project_job_assignments')->insert(['id' => 1, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 1, 'title' => '【完了】旧ジョブ', 'amounts_unit' => 'file', 'created_at' => '2026-11-04 09:00:00']);
+        $history = app(\App\Http\Controllers\User\MyProjectJobController::class)->pastData($this->request(['mode' => 'project'], null, null, 'GET'))->getData(true)['records'][0];
+        self::assertSame('旧ジョブ', $history['simple_prefill']['title']); self::assertSame('ファイル', $history['simple_prefill']['actual_unit']);
+        self::assertArrayNotHasKey('actual_quantity', $history['simple_prefill']); self::assertArrayNotHasKey('planned_start_time', $history['simple_prefill']);
+        $before = (array) DB::table('project_job_assignments')->find(1);
+        $body = $this->payload(['reuse_assignment_id' => 1, 'project_job_id' => 1, 'broad_project_id' => null, 'work_date' => '2026-12-04', 'planned_start_time' => '13:15', 'planned_end_time' => '14:15', 'actual_quantity' => null]);
+        $id = $this->save($this->request($body))->getData(true)['id'];
+        $entry = DB::table('personal_work_entries')->find($id);
+        self::assertNull($entry->source_entry_id); self::assertNull($entry->source_assignment_id); self::assertNull($entry->completed_at);
+        self::assertSame('13:15', $entry->planned_start_time); self::assertSame('14:15', $entry->planned_end_time);
+        self::assertSame($before, (array) DB::table('project_job_assignments')->find(1));
+        try { $this->save($this->request($body + ['reuse_entry_id' => $id])); self::fail('Two reuse sources accepted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        try { $this->save($this->request($body, $this->user(['id' => 2]))); self::fail('Other owner reused'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        DB::table('project_job_assignments')->insert(['id' => 2, 'project_job_id' => 1, 'user_id' => 1, 'sender_id' => 2, 'title' => '受信依頼']);
+        try { $this->save($this->request(array_replace($body, ['reuse_assignment_id' => 2]))); self::fail('Request treated as self history'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        self::assertSame(1, DB::table('personal_work_entries')->count()); self::assertSame(1, DB::table('events')->count());
+    }
+
+    public function test_existing_request_picker_lists_only_own_unconverted_requests_without_writing_work(): void
+    {
+        DB::table('project_jobs')->insert(['id' => 1, 'title' => '依頼案件', 'company_id' => 1]);
+        foreach ([['id' => 1, 'user_id' => 1, 'sender_id' => 2], ['id' => 2, 'user_id' => 2, 'sender_id' => 1], ['id' => 3, 'user_id' => 1, 'sender_id' => 2], ['id' => 4, 'user_id' => 1, 'sender_id' => 1, 'supersedes_assignment_id' => 3]] as $row) {
+            DB::table('project_job_assignments')->insert($row + ['project_job_id' => 1, 'title' => '依頼', 'created_at' => '2026-11-04 09:00:00']);
+        }
+        $rows = app(\App\Http\Controllers\User\MyProjectJobController::class)->pendingRequests($this->request([], null, null, 'GET'))->getData(true)['records'];
+        self::assertCount(1, $rows); self::assertSame(1, $rows[0]['id']);
+        self::assertSame(0, DB::table('personal_work_entries')->count()); self::assertSame(4, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('events')->count());
     }
 
 }

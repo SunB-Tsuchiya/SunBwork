@@ -32,8 +32,8 @@ async function component(file, behavior = false) {
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
-                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject};'
-                : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError};') + '\n</script>');
+                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
+                : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection,showRequestModal,requestRecords,applyRequestJob,formAssignments,prefillEvent};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError};') + '\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
             return { loader: 'js', contents: compileScript(descriptor, { id: 'unified-input', inlineTemplate: !behavior, templateOptions: { ssr: !behavior } }).content, resolveDir: path.dirname(a.path) };
@@ -114,6 +114,23 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     assert.equal(state.heading.value,'マイジョブ作成'); await state.save();
     assert.equal(requests.at(-1)[0],'post'); assert.equal(requests.at(-1)[1],'user.myjobbox.unified_store'); assert.equal(requests.at(-1)[2].reuse_entry_id,7);
     assert.equal(requests.at(-1)[2].planned_start_time,'13:15'); assert.equal(requests.at(-1)[2].planned_end_time,'14:15');
+    props.show=false;await settle();props.entry=null;props.continuationSource=null;props.reuseEntryId=null;props.show=true;await settle();
+    assert.equal(state.canSelectSource.value,true);
+    Object.assign(state.form,{work_date:'2026-12-04',planned_start_time:'00:00',planned_end_time:'01:00',actual_quantity:90,result_note:'入力済み'});
+    const entryHistory={id:9,source_type:'entry',work_entry:{title:'引用元',work_category:'dtp',activity_type:'revision',actual_unit:'冊',broad_project_id:41,entry_visibility:'private'}};
+    await state.chooseHistory({record:entryHistory,kind:'continue'});
+    assert.equal(state.heading.value,'続きのマイジョブを作成');assert.equal(state.form.planned_start_time,'00:00');assert.equal(state.form.planned_end_time,'01:00');
+    assert.equal(state.form.actual_quantity,'');assert.equal(state.form.result_note,'');assert.equal(state.form.actual_unit,'冊');
+    await state.save();assert.equal(requests.at(-1)[1],'user.myjobbox.entries.continue{"entry":9}');
+    const oldHistory={id:9,source_type:'assignment',simple_prefill:{title:'旧ジョブ',project_job_id:3,project_label:'旧案件',work_category:'other',actual_unit:'ファイル',entry_visibility:'private'}};
+    await state.chooseHistory({record:oldHistory,kind:'new'});await state.save();
+    assert.equal(requests.at(-1)[1],'user.myjobbox.unified_store');assert.equal(requests.at(-1)[2].reuse_assignment_id,9);assert.equal(requests.at(-1)[2].reuse_entry_id,undefined);
+    assert.equal(requests.at(-1)[2].actual_quantity,null);assert.equal(requests.at(-1)[2].actual_unit,'ファイル');
+    await state.chooseHistory({record:oldHistory,kind:'continue'});await state.save();assert.equal(requests.at(-1)[1],'user.myjobbox.work_assignments.continue{"assignment":9}');
+    const beforeRequest=requests.length;state.openRequests();
+    assert.deepEqual(globalThis.__unifiedNavigation.slice(0,2),['events.create_job',{date:'2026-12-04',open:'request',startHour:'00',startMinute:'00',endHour:'01',endMinute:'00'}]);assert.equal(requests.length,beforeRequest);
+    assert.equal(state.handingOff.value,true);await state.save();assert.equal(requests.length,beforeRequest);globalThis.__unifiedNavigation[2].onFinish();assert.equal(state.handingOff.value,false);
+    props.show=false;await settle();props.show=true;await settle();assert.equal(state.historyChoice.value,null);assert.equal(state.activeContinuation.value,null);
     app.unmount();
     const preview = await component(page, true);
     const pageProps = { rows: [], months: ['2026-11'], filters: { q: 'old search', period: '2026-11', hide_completed: true }, pagination: { total: 0, page: 1, last: 1 } };
@@ -135,6 +152,17 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
         for (const unit of ['ページ','ファイル','件','枚','点','冊']) assert.ok(html.includes('>'+unit+'</button>'));
         assert.ok(html.includes('aria-expanded="false"')); assert.ok(html.includes('大まかな案件（42件）'));
         assert.ok(html.match(/type="time"[^>]*required/)); assert.ok(html.includes('閉じる'));
+    }
+    {
+        const ctx={};await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'myjob'}),ctx);
+        assert.ok(ctx.teleports.body.includes('過去ジョブから引用'));assert.ok(ctx.teleports.body.includes('依頼ジョブから登録'));
+        const savedPage=globalThis.__historyPage;
+        globalThis.__historyPage={props:{userWorkHub:{enabled:false}}};const normalCtx={};
+        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),normalCtx);assert.ok(!normalCtx.teleports.body.includes('過去ジョブから引用'));
+        globalThis.__historyPage={props:{userWorkHub:{enabled:true}}};const trialCtx={};
+        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),trialCtx);assert.ok(trialCtx.teleports.body.includes('過去ジョブから引用'));globalThis.__historyPage=savedPage;
+        const editCtx={};await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'myjob',entry:{id:7}}),editCtx);
+        assert.ok(!editCtx.teleports.body.includes('過去ジョブから引用'));assert.ok(!editCtx.teleports.body.includes('依頼ジョブから登録'));
     }
     const actualPage = await component(page);
     const html = await renderToString(createSSRApp(actualPage, pageProps));
@@ -195,6 +223,17 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     globalThis.__pageHistory.pendingRecord.value=sourceRecord; globalThis.__pageHistory.applyContinuation();
     assert.equal(globalThis.__pageHistory.historySelection.value.startMin,0); assert.equal(globalThis.__pageHistory.historySelection.value.endMin,60); assert.equal(globalThis.__pageHistory.historySelection.value.date,'2026-12-05');
     globalThis.__pageHistory.pendingRecord.value=sourceRecord;globalThis.__pageHistory.applyAsNew();assert.equal(globalThis.__pageHistory.historySelection.value.kind,'new');
-    oldPageApp.unmount(); global.document=realDocument;global.window=realWindow;
+    oldPageApp.unmount();
+    globalThis.__historyPage={props:{date:'2026-12-04',prefillEvent:{start_time:'00:00',desired_time:'01:00'}}};
+    const originalFetch=global.fetch;const fetched=[];
+    global.window.location.search='?open=request';global.document.querySelector=()=>null;
+    global.fetch=async(url)=>{fetched.push(url);return{ok:true,json:async()=>({records:[{id:27,project_job_id:3,title:'依頼作業'}]})}};
+    const requestsApp=renderer.createApp({render:()=>h(oldPage)});requestsApp.mount({});await settle();
+    assert.equal(globalThis.__pageHistory.showRequestModal.value,true);assert.ok(fetched[0].startsWith('user.myjobbox.pending_requests'));
+    assert.equal(globalThis.__pageHistory.requestRecords.value[0].id,27);
+    globalThis.__pageHistory.applyRequestJob(globalThis.__pageHistory.requestRecords.value[0]);
+    assert.equal(globalThis.__pageHistory.formAssignments.value[0].supersedes_assignment_id,27);
+    assert.equal(globalThis.__pageHistory.prefillEvent.value.start_time,'00:00');assert.equal(globalThis.__pageHistory.prefillEvent.value.desired_time,'01:00');
+    requestsApp.unmount();global.fetch=originalFetch;global.document=realDocument;global.window=realWindow;
     console.log('Actual Vue input: BOX/calendar contexts, reset, required time, failure retention, POST/PUT destinations, JST date, saved-month navigation, preserved legacy paths passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

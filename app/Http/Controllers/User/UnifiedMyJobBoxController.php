@@ -15,9 +15,11 @@ class UnifiedMyJobBoxController extends Controller
         $context = $request->session()->get('superadmin_context.company_id');
         abort_unless($box->available($request->user(), $context === null ? null : (int) $context), 403);
 
-        if ($request->filled('reuse_entry_id')) {
-            $id = $request->validate(['reuse_entry_id' => ['required', 'integer', 'min:1']])['reuse_entry_id'];
-            $source = app(\App\Services\WorkJobReader::class)->resolve($request->user(), 'entry', (int) $id, $context === null ? null : (int) $context);
+        abort_if($request->filled('reuse_entry_id') && $request->filled('reuse_assignment_id'), 422, '引用元は1件だけ選んでください。');
+        if ($request->filled('reuse_entry_id') || $request->filled('reuse_assignment_id')) {
+            $field = $request->filled('reuse_entry_id') ? 'reuse_entry_id' : 'reuse_assignment_id';
+            $id = $request->validate([$field => ['required', 'integer', 'min:1']])[$field];
+            $source = app(\App\Services\WorkJobReader::class)->resolve($request->user(), $field === 'reuse_entry_id' ? 'entry' : 'assignment', (int) $id, $context === null ? null : (int) $context);
             $user = $request->user();
             $data = $entries->validatedEntry($request, $user, false, null, $source->project_job_id ? (int) $source->project_job_id : null);
             $entry = \App\Models\PersonalWorkEntry::create($data + ['user_id' => $user->id, 'company_id' => $user->company_id, 'department_id' => $user->department_id]);

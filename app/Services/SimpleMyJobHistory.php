@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PersonalWorkEntry;
+use App\Models\Event;
 use App\Models\ProjectJobAssignmentByMyself;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -50,8 +51,20 @@ class SimpleMyJobHistory
                 'history_sort' => $entry->created_at?->format('Y-m-d H:i:s') ?? $entry->work_date->format('Y-m-d'),
                 'work_item_type' => '簡易入力', 'estimated_hours' => null, 'work_entry' => $work];
         });
-        $oldDates = ProjectJobAssignmentByMyself::where('user_id', $user->id)->whereIn('id', $records->pluck('id'))->get(['id', 'created_at'])->keyBy('id');
-        $old = $records->map(fn ($row) => $row + ['source_type' => 'assignment', 'key' => 'assignment:'.$row['id'], 'history_sort' => $oldDates->get($row['id'])?->created_at?->format('Y-m-d H:i:s') ?? $row['created_at'] ?? '']);
+        $oldModels = ProjectJobAssignmentByMyself::where('user_id', $user->id)->whereIn('id', $records->pluck('id'))
+            ->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $user->company_id))
+            ->where(fn ($query) => $query->whereNull('department_id')->orWhere('department_id', $user->department_id))
+            ->with('projectJob')->get()->filter(fn ($job) => ! $job->projectJob || $job->projectJob->company_id === null
+                || (int) $job->projectJob->company_id === (int) $user->company_id)->keyBy('id');
+        $privateIds = Event::whereIn('project_job_assignment_id', $oldModels->keys())->where('visibility', 'private')
+            ->pluck('project_job_assignment_id')->flip();
+        $reader = app(WorkJobReader::class);
+        $old = $records->filter(fn ($row) => $oldModels->has($row['id']))->map(function ($row) use ($oldModels, $privateIds, $reader, $user) {
+            $job = $oldModels->get($row['id']);
+            return $row + ['source_type' => 'assignment', 'key' => 'assignment:'.$row['id'],
+                'history_sort' => $job->created_at?->format('Y-m-d H:i:s') ?? $row['created_at'] ?? '',
+                'simple_prefill' => $reader->assignmentPrefill($user, $job, $privateIds->has($job->id))];
+        });
         $all = $old->concat($simple)->sortByDesc('history_sort')->take(100)->map(function ($row) { unset($row['history_sort']); return $row; })->values();
         return ['records' => $all, 'clients' => $clients->concat($entryClients)->unique('id')->values(),
             'projects' => $projects->concat($entryProjects)->unique('id')->values()];

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { computed, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
-const props = defineProps({ mode: { type: String, required: true } });
+const props = defineProps({ mode: { type: String, required: true }, simpleInput: { type: Boolean, default: false } });
 const emit = defineEmits(['cancel', 'selected']);
 const searchMode = ref('date');
 const dateRange = ref('yesterday');
@@ -81,7 +81,7 @@ function choose(record, kind) {
             <button type="button" class="block w-full rounded bg-orange-500 px-4 py-2 text-left text-sm text-white" @click="choose(pendingRecord, 'continue')">
                 ↩ 続きとして設定（元ジョブと連動）
             </button>
-            <p class="text-xs text-gray-600">作業時間を合算し、完了時には元ジョブも完了します。</p>
+            <p class="text-xs text-gray-600">{{ simpleInput ? '元の仕事と同じ系列で作業時間を確認できます。' : '作業時間を合算し、完了時には元ジョブも完了します。' }}</p>
             <button type="button" class="block w-full rounded bg-indigo-600 px-4 py-2 text-left text-sm text-white" @click="choose(pendingRecord, 'new')">
                 新規として引用（独立したジョブ）
             </button>
