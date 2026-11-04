@@ -323,6 +323,9 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 
 銀本は既定DBのwork_job_completion_syncs受付（今回migration2026_11_05_120001のみ新規）を同時作成、commit後に既存MGinbon同期を呼ぶ。旧serviceに任意includeAncestors=trueを追加し、受付実行ではfalseで認可済みの当該旧祖先だけ処理する。後から変わった系列や未認可祖先へ同期を拡張しない。失敗は受付に残しwork-jobs:sync-completionsと既存scheduler毎分で再試行。詳細の共通系列に反映待ち表示、旧詳細は反映待ちなら一覧へ移動せず再読取。同期待ち旧仕事の削除はrelease前に拒否。receiptを保持するため新テーブルには削除連動FKなし。外部DBとの同時commitは保証せず、銀本の既存状態条件による再試行で重複履歴を防ぐ。sales不使用。
 
-検証: 関連Unit95件707断言、合成Integration28件367断言、計123件1074断言成功。SQLite :memory:だけで既定DBと別銀本DBの実同期を確認（銀本commit後の受付ACK消失からの再試行も履歴重複なし）。交互型祖先/兄弟子維持、旧入口接続、進行表/予定/校正/通知、校正候補曖昧・他人supersedes・通知失敗rollback、本人/role/contextと既存時間回帰、銀本失敗/command再試行/未反映表示/削除保護を確認。実Vue script/SSRは既存フォーム回帰に加え旧詳細の対象列挙と反映待ちreload、共通系列の反映待ち表示を確認。PHP9構文成功、実Vue検査成功、対象ESLintエラー0（旧Show既存未使用変数3警告）、members最終build成功（既存Browserslist古いデータ通知のみ）、manifest全資産欠落0とmembers base確認、削除された旧資産は復元、diff --check成功。PHPUnit結果キャッシュはread-only vendorへ書けない警告のみでテストは成功。
+検証: 関連Unit95件707断言、合成Integration28件367断言、計123件1074断言成功。SQLite :memory:だけで既定DBと別銀本DBの実同期を確認（銀本commit後の受付ACK消失からの再試行も履歴重複なし）。交互型祖先/兄弟子維持、旧入口接続、進行表/予定/校正/通知、校正候補曖昧・他人supersedes・通知失敗rollback、本人/role/contextと既存時間回帰、銀本失敗/command再試行/未反映表示/削除保護を確認。実Vue script/SSRは既存フォーム回帰に加え旧詳細の対象列挙と反映待ちreload、共通系列の反映待ち表示を確認。PHP9構文成功、実Vue検査成功、対象ESLintエラー0（旧Show既存未使用変数3警告）、members最終build成功（既存Browserslist古いデータ通知のみ）、manifest全資産欠落0とmembers base確認、削除された旧資産は復元、ソース差分のdiff --check成功（生成JSには既存ソース由来の末尾空白警告あり）。PHPUnit結果キャッシュはread-only vendorへ書けない警告のみでテストは成功。
 
 状態: 実装/コード検証済み、今回の限定配備・利用者画面確認・上長レビューは未実施。既確認の引用/依頼入口は繰り返さない。簡易→旧詳細形式の続きとM11同一仕事の旧形式切替は別の未完工程。次の一手: 固定元7e9947b23から今回だけを配備するスクリプトと差分許可一覧を作成し、正確なSSHコマンドの承認を得る。本番HEADが違う、追跡変更がある、未追跡が違う場合は配備前に停止。今回migrationだけ--database=mysql --force、独立Seederのみ、一般公開なし。業務データの試験登録・完了はSSHで行わない。
+
+
+2026-11-05 配備準備: アプリ/ビルド保存d19ce2928。固定元7e9947b23、今回だけの23ソース許可一覧と削除なしを照合する/tmp/myjob-mixed-completion-deploy-20261105.shを作成しsh -n成功。対象ブランチfeature/myjob-confirmed-20261105。既存未追跡5件の一致とmain/追跡変更なしを前提に、専用migration1件だけと専用Seederを既定mysqlへ--force、manifest/cache/専用command登録を確認する。業務データの試験登録・完了/同期command実行/sales接続はしない。コード検証に加え、生成JS末尾空白警告を除くソースdiff --check成功。次の一手はこの正確なSSHコマンドの承認。配備も画面確認もまだ。
