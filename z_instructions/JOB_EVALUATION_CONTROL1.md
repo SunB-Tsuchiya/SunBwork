@@ -936,3 +936,16 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 
 
 2026-11-05 配備準備: アプリ/ビルド保存d19ce2928。固定元7e9947b23、今回だけの23ソース許可一覧と削除なしを照合する/tmp/myjob-mixed-completion-deploy-20261105.shを作成しsh -n成功。対象ブランチfeature/myjob-confirmed-20261105。既存未追跡5件の一致とmain/追跡変更なしを前提に、専用migration1件だけと専用Seederを既定mysqlへ--force、manifest/cache/専用command登録を確認する。業務データの試験登録・完了/同期command実行/sales接続はしない。コード検証に加え、生成JS末尾空白警告を除くソースdiff --check成功。次の一手はこの正確なSSHコマンドの承認。配備も画面確認もまだ。
+
+
+## 2026-11-05 混在系列完了の限定配備成功・画面確認待ち
+
+確定: 利用者が正確なSSHコマンドをyesで承認。/tmp/myjob-mixed-completion-deploy-20261105.shを実行しexit0。固定元7e9947b2311f6ad2a42581cb52c1917ccfa17487/main/追跡変更なし/既存未追跡5件一致、取得ブランチと固定先a2f031c0e0c2101b4844d9c1ffb65cd37c9a35e5、23ソース許可一覧/削除なし/PHP13構文/既存schedule:run cronを照合後ff-only。既定DB設定がmysql・silverlamb759_sunbworkと確認した直後に今回migration2026_11_05_120001だけ--database=mysql --forceで成功。manifest496資産欠落0/members base、独立UnifiedMyJobBoxChangelogSeeder --database=mysql --force、config/cache/route/view clear、専用再試行command登録成功。最後に追跡変更なし・未追跡5件前後一致、本番HEAD一致。業務仕事の調査/試験完了/専用同期commandの実行/sales接続なし。共有Claude作業未変更、一般公開未承認。
+
+状態: 混在完了は実装・コード検証・限定配備済み、利用者画面確認と上長レビューは未実施。過去引用/依頼入口の確認済みを流用しない。
+
+次の一手（今回新たに依頼する画面確認）: 再読み込み後、確認用の未完了旧形式の元ジョブと、その簡易形式の続き2件を使い、片方の簡易詳細から以下3点を確認する。
+1. 「完了にする」で対象として選んだ仕事と旧形式の元が表示され、完了後に両方が完了になる。
+2. もう片方の続きは未完了のまま。再読み込み後も系列状態を保持し、予定時刻・数量は変わらない。
+3. カレンダーでも今回完了した仕事が【完了】表示になる。
+全部問題なければ「成功」、違いがあれば番号と結果。実業務の校正/銀本案件の完了試験は依頼せず、合成検証と区別する。旧詳細側の既存完了ボタンからの混在操作、全元型/全日時/別本人、校正通知/銀本実例、簡易→旧詳細続き/M11をこの回答だけで確認済みにしない。
