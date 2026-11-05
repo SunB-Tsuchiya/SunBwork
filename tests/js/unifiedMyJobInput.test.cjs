@@ -112,7 +112,7 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     props.show=false; await settle(); props.continuationSource={type:'entry',id:7}; props.startMin=795; props.endMin=855; props.date='2026-12-04'; props.entry.work_date='2026-12-04'; props.show=true; await settle();
     assert.equal(state.form.planned_start_time,'13:15'); assert.equal(state.form.planned_end_time,'14:15'); assert.equal(state.form.work_date,'2026-12-04');
     const legacyRequestCount=requests.length;state.form.planned_start_time='00:00';state.form.planned_end_time='01:15';state.openLegacyContinuation();
-    assert.deepEqual(globalThis.__unifiedNavigation.slice(0,2),['events.create_job',{date:'2026-12-04',continue_entry:7,startHour:'00',startMinute:'00',endHour:'01',endMinute:'15'}]);
+    assert.deepEqual(globalThis.__unifiedNavigation.slice(0,2),['events.create_job',{date:'2026-12-04',continue_entry:7,startHour:0,startMinute:0,endHour:1,endMinute:15}]);
     assert.equal(requests.length,legacyRequestCount);await state.save();assert.equal(requests.length,legacyRequestCount);globalThis.__unifiedNavigation[2].onFinish();
     props.show=false; await settle(); props.entry={title:'新規引用',work_date:'2026-12-04',actual_quantity:null,actual_unit:'冊'}; props.continuationSource=null; props.reuseEntryId=7; props.show=true; await settle();
     assert.equal(state.heading.value,'マイジョブ作成'); await state.save();
@@ -257,9 +257,10 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     assert.deepEqual(globalThis.__detailReload,[{preserveScroll:true}]);assert.equal(globalThis.__legacyComplete.isSubmittingComplete.value,false);
     legacyShowApp.unmount();global.confirm=previousConfirm;global.route=previousRoute;global.sessionStorage=previousSession;
     global.fetch=originalFetch;global.document=realDocument;global.window=realWindow;
-    globalThis.__historyPage={props:{date:'2026-12-04',simpleContinuation:{id:7,title:'<script>source</script>',classification:'大分類 ／ 中分類'}}};
+    globalThis.__historyPage={props:{date:'2026-12-04',simpleContinuation:{id:7,title:'<script>source</script>',classification:'大分類 ／ 中分類'},assignments:[{source_personal_work_entry_id:7}]}};
     const legacyPageComponent=await component('resources/js/Pages/Events/Create_Job.vue');const legacyPageHtml=await renderToString(createSSRApp(legacyPageComponent));
     assert.ok(legacyPageHtml.includes('簡易ジョブからの続き'));assert.ok(legacyPageHtml.includes('大分類 ／ 中分類'));assert.ok(legacyPageHtml.includes('&lt;script&gt;source&lt;/script&gt;'));
+    globalThis.__historyPage.props.assignments=[{source_assignment_id:9}];const changedLegacyHtml=await renderToString(createSSRApp(legacyPageComponent));assert.ok(!changedLegacyHtml.includes('簡易ジョブからの続き'));
     const oldForm=await component('resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue',true);
     const oldWindow=global.window,oldDocument=global.document,oldRoute=global.route,oldAlert=global.alert,oldFetch=global.fetch;
     global.fetch=async()=>({ok:true,json:async()=>[]});

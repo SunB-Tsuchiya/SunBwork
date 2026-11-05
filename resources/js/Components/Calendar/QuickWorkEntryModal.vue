@@ -219,7 +219,7 @@ function openLegacyContinuation() {
     const params = { date: form.work_date, continue_entry: source.id };
     for (const [value, prefix] of [[form.planned_start_time, 'start'], [form.planned_end_time, 'end']]) {
         if (/^\d{2}:\d{2}$/.test(value || '')) {
-            params[prefix + 'Hour'] = value.slice(0, 2); params[prefix + 'Minute'] = value.slice(3);
+            params[prefix + 'Hour'] = Number(value.slice(0, 2)); params[prefix + 'Minute'] = Number(value.slice(3));
         }
     }
     handingOff.value = true;

@@ -5,13 +5,12 @@ import { route } from 'ziggy-js';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import { usePage } from '@inertiajs/vue3';
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 function goBack() { window.history.back(); }
 
 const page = usePage();
 const projectJob = ref(page.props.projectJob || null);
-const simpleContinuation = page.props.simpleContinuation || null;
 const members = page.props.members || [];
 const userClients = page.props.userClients || [];
 const userProjects = page.props.userProjects || [];
@@ -27,6 +26,7 @@ const prefillTitle = page.props.prefill_title ?? null;
 const formAssignments = ref(
     page.props.assignments?.length ? page.props.assignments : prefillTitle ? [{ id: null, title: prefillTitle, project_job_id: null }] : [],
 );
+const simpleContinuation = computed(() => page.props.simpleContinuation && String(formAssignments.value[0]?.source_personal_work_entry_id) === String(page.props.simpleContinuation.id) ? page.props.simpleContinuation : null);
 const formKey = ref(0); // increment to force re-mount of AssignmentFormUser
 
 // ── Reuse modal state ──────────────────────────────────────────────────────

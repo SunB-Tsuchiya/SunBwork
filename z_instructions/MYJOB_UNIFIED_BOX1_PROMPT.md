@@ -500,3 +500,7 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 実Vue script/SSRは、entryだけ旧形式入口表示/旧assignmentには非表示、router GET日時/移動中POST抑止、元の表示とエスケープ、実AssignmentFormの型付き元ID/UUID/空数量NULL/ドラッグ日時（00:00〜01:15）を含むPOSTを確認。解析器は未変更でstub利用、実業務ファイルは未収集。既存入力・詳細/ファイルUI回帰成功。対象ESLintエラー0（旧AssignmentForm既存未使用21警告のみ）。members最終build終了0（既存Browserslist通知のみ）、manifest497資産欠落0/members base・旧資産復元/削除なし・ソースdiff --check成功。ビルドからブラウザ確認を推定しない。
 
 状態: 実装/コード検証/ビルド完了、未配備/利用者画面未確認/上長レビュー未実施。次の一手は本番最終証拠27fba7502を固定元に今回だけの許可差分・migration1件/専用Seederの配備を準備し、正確なSSHコマンドの承認を得る。確認済みの簡易同士/旧→簡易/既存引用/ファイル説明は再試験不要。クライアント補完は工程3、一般公開は未承認のまま。
+
+2026-11-06 配備準備完了: アプリ固定315e83672401490df2d8e35270062d7670736844。/tmp/myjob-legacy-continuation-deploy-20261106.sh（SHA256 57a6aa23a3595b16476c833c3729480961c4847409f9913d892470130f5ac9db）を作成。固定元27fba7502から今回だけの17ソース＋build、削除/依存/route定義変更なしを照合しff-only。今回migration2026_11_06_120001だけ--database=mysql --force、独立Seeder/manifest/cache/未追跡5件保持を確認する。業務仕事の試験登録/完了、クライアント補完、sales接続なし。次は正確なSSHコマンドの承認。未配備/利用者画面未確認、一般公開なし。
+
+2026-11-06 UI最終補強: 旧画面で別の過去ジョブを選び直した場合、現在のsource_personal_work_entry_idと一致する時だけ元ジョブの案内を表示する。実SSRで選択変更後の案内非表示も確認。旧形式へ渡す時分は数値化して0時/先頭0付き分をinteger validationへ正しく渡す（Laravel validateIntegerの実装を照合）。既存実Vue/旧フォームPOST検査、対象ESLint成功。最終members build終了0/manifest497資産欠落0/members base/旧資産保持/削除なし。PHP/DB処理は直前の135件1247断言成功版から変更なし。未配備/利用者画面未確認。
