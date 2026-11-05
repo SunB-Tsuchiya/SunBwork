@@ -1044,3 +1044,10 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 2026-11-05 旧説明の折り畳みコード検証: 既存の実Vue script/SSR検査成功、旧はdetails/summary・open属性なし、新は従来div表示を確認。対象ESLintエラー0、members build終了0（既存Browserslist通知のみ）、manifest497資産欠落0/members base、旧資産復元・削除差分なし。API/保存/PHP/route/migration/依存の変更なし。配備/ブラウザ開閉はまだ未確認。次は固定元694cf4311から今回の表示差分だけのSSH承認。
 
 2026-11-05 配備準備: 保存27fba750212830c1d954a4d45788b33ac216e060。/tmp/myjob-help-toggle-deploy-20261105.sh（SHA256 e2ca2a0e907e03f3e67dfad14935fe30fe97ea717a06e678d23a1592994eed33）で固定元694cf4311から今回の5ソース＋buildだけを照合しff-only。PHP/API/route/migration/依存なし、DB処理/Seederなし。既存未追跡5件を保持しmanifestとview clearを確認する。次はこの正確なSSHコマンドの承認。利用者の既確認3点は再試験しない。
+
+
+## 2026-11-05 旧式ファイル説明の折り畳み配備成功・開閉確認待ち
+
+利用者が正確なSSHコマンドをyesで承認。/tmp/myjob-help-toggle-deploy-20261105.sh実行exit0。固定元694cf4311/main/追跡変更なし/未追跡5件一致、固定先27fba750212830c1d954a4d45788b33ac216e060と5ソース許可一覧/削除なしを照合しff-only。manifest497資産欠落0/members base、view clear、最終HEAD/追跡変更なし/未追跡5件前後一致を確認。PHP/API/route/migration/依存/DB/Seeder変更なし。共有Claude作業未変更、一般公開未承認は維持。実装/コード検証/配備済み、今回のブラウザ開閉は未確認。
+
+次の一手: 旧式のジョブ入力画面を再読み込みし、「作業ファイル情報」の説明が最初は見出しだけで、見出しを押すと説明が開き、もう一度押すと閉じることだけ確認してもらう。すべて問題なければ「成功」、違いがあれば結果。既確認のファイル読取/新式保存/旧再選択保存/予定数量保持は繰り返さない。
