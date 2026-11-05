@@ -32,6 +32,12 @@ class WorkJobMutation
         return $again;
     }
 
+    public function lockContinuationSource(User $user, int $id, ?int $context): array
+    {
+        if (DB::transactionLevel() < 1) throw new \LogicException('Continuation requires a transaction');
+        return $this->lockAncestors($user, $id, $context, 'entry', true);
+    }
+
     public function continueEntry(Request $request, int $source, ?int $context, DepartmentWorkController $entries, string $sourceType = 'entry'): array
     {
         $user = $request->user();
@@ -49,7 +55,7 @@ class WorkJobMutation
             if ($receipt) {
                 abort_unless((int) $receipt->user_id === (int) $user->id && (int) ($sourceType === 'entry' ? $receipt->source_entry_id : $receipt->source_assignment_id) === $source
                     && ($sourceType === 'entry' ? $receipt->source_assignment_id === null : $receipt->source_entry_id === null)
-                    && hash_equals($receipt->payload_hash, $hash), 422, '同じ送信キーの内容が変わっています。画面を開き直してください。');
+                    && $receipt->assignment_id === null && hash_equals($receipt->payload_hash, $hash), 422, '同じ送信キーの内容が変わっています。画面を開き直してください。');
                 abort_unless($receipt->entry_id, 410, '作成済みの続きは削除されています。');
                 $this->reader->resolve($user, 'entry', (int) $receipt->entry_id, $context);
                 return ['id' => (int) $receipt->entry_id, 'replayed' => true];

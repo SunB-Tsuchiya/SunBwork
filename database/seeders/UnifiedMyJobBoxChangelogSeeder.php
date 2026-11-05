@@ -89,5 +89,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_DETAIL_HANDOFF_DESIGN1.md'],
             'claude_notes' => 'Codex。entryの任意説明/file_info/details_version、本人試用専用PUT、型/件数検証と合計再算定、楽観ロック・同内容再送対応。既存詳細のFileInfoDisplay/useFileAnalyzer再利用。旧説明は利用者が明示した両形式への修正として既存フォームに適用。ファイル本体なし。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-entry-legacy-continue-20261106'], [
+            'title' => '簡易マイジョブから旧形式の続きを登録',
+            'released_at' => '2026-11-06',
+            'summary' => '情報出版Super Admin限定で、続きの入力中に日時を引き継いで旧形式へ進めます。',
+            'body' => '<p>元の簡易ジョブを残し、新しい旧形式の作業を同じ系列へ登録します。元の数量・完了・ファイル一覧はコピーしません。二重送信で仕事や予定を増やさず、予定保存に失敗した場合は登録全体を取り消します。一般公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
+            'claude_notes' => 'Codex。型付きsource_personal_work_entry_id、本人試用/実会社context、root順lockと旧保存を包むtransaction、受付assignment_id拡張。既存カレンダー流用/簡易同士/旧→簡易を維持。クライアント補完は工程3、一般公開は未承認。',
+        ]);
     }
 }

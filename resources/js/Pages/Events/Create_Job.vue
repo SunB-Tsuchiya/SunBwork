@@ -11,6 +11,7 @@ function goBack() { window.history.back(); }
 
 const page = usePage();
 const projectJob = ref(page.props.projectJob || null);
+const simpleContinuation = page.props.simpleContinuation || null;
 const members = page.props.members || [];
 const userClients = page.props.userClients || [];
 const userProjects = page.props.userProjects || [];
@@ -282,6 +283,11 @@ onMounted(() => {
 
             <div class="rounded border border-gray-100 p-4 shadow-sm">
                 <h2 class="mb-4 text-lg font-medium text-gray-700">割当内容</h2>
+                <div v-if="simpleContinuation" class="mb-4 rounded border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
+                    <p class="font-semibold">簡易ジョブからの続き</p>
+                    <p class="mt-1">{{ simpleContinuation.title || '（作業名なし）' }}<span v-if="simpleContinuation.classification"> ／ {{ simpleContinuation.classification }}</span></p>
+                    <p class="mt-1 text-xs">元の仕事を残し、保存後も同じ系列になります。数量・ファイル情報は新しい作業の分を入力してください。具体案件が未指定の場合は「その他」を初期値にしています。</p>
+                </div>
                 <AssignmentFormUser
                     mode="user"
                     :key="formKey"

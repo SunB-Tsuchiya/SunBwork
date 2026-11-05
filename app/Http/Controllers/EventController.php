@@ -1987,6 +1987,22 @@ class EventController extends Controller
      */
     public function createJob(Request $request)
     {
+        $entryContinuation = null;
+        $continuationContext = $request->session()->get('superadmin_context.company_id');
+        $continuationContext = $continuationContext === null ? null : (int) $continuationContext;
+        if ($request->filled('continue_entry')) {
+            $entryContinuation = $request->validate([
+                'continue_entry' => ['required', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'],
+                'startHour' => ['nullable', 'integer', 'between:0,23'], 'startMinute' => ['nullable', 'integer', 'between:0,59'],
+                'endHour' => ['nullable', 'integer', 'between:0,23'], 'endMinute' => ['nullable', 'integer', 'between:0,59'],
+                'job' => ['prohibited'], 'source_job_assignment_id' => ['prohibited'],
+                'project_job_id' => ['prohibited'], 'client_id' => ['prohibited'], 'title' => ['prohibited'],
+                'stage_id' => ['prohibited'], 'size_id' => ['prohibited'], 'work_item_type_id' => ['prohibited'],
+                'row_id' => ['prohibited'], 'col_key' => ['prohibited'],
+                'progress_sheet_id' => ['prohibited'], 'workflow_sheet_id' => ['prohibited'],
+            ])['continue_entry'];
+            app(\App\Services\WorkJobReader::class)->resolve($request->user(), 'entry', (int) $entryContinuation, $continuationContext);
+        }
         $myJobModal = $request->boolean('myjob_modal');
         if ($myJobModal) {
             abort_unless(app(PersonalWorkSchedule::class)->available($request->user()), 403);
@@ -2302,6 +2318,14 @@ class EventController extends Controller
             'difficulties' => $difficulties,
             'prefillEvent' => $prefillEvent,
         ];
+
+        if ($entryContinuation !== null) {
+            $seed = app(\App\Services\LegacyWorkJobContinuation::class)->prefill($request->user(), (int) $entryContinuation, $continuationContext, $otherProjectId ? (int) $otherProjectId : null);
+            $props['assignments'] = [$seed['assignment']];
+            $props['simpleContinuation'] = $seed['source'];
+            $props['userProjects'] = collect($props['userProjects'])->push($seed['project'])->unique('id')->values();
+            if ($seed['client']) $props['userClients'] = collect($props['userClients'])->push($seed['client'])->unique('id')->values();
+        }
 
         try {
             \Illuminate\Support\Facades\Log::info('INERTIA_PROPS createJob', ['props' => ['date' => $date, 'jobId' => $jobId]]);

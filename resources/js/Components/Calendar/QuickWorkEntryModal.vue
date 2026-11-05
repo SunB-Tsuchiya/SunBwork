@@ -213,6 +213,19 @@ async function chooseHistory({ record, kind }) {
     await loadProjects();
 }
 
+function openLegacyContinuation() {
+    const source = activeContinuation.value;
+    if (saving.value || handingOff.value || !source || (source.type && source.type !== 'entry')) return;
+    const params = { date: form.work_date, continue_entry: source.id };
+    for (const [value, prefix] of [[form.planned_start_time, 'start'], [form.planned_end_time, 'end']]) {
+        if (/^\d{2}:\d{2}$/.test(value || '')) {
+            params[prefix + 'Hour'] = value.slice(0, 2); params[prefix + 'Minute'] = value.slice(3);
+        }
+    }
+    handingOff.value = true;
+    router.get(route('events.create_job'), params, { onFinish: () => { handingOff.value = false; } });
+}
+
 function openRequests() {
     if (saving.value || handingOff.value) return;
     const params = { date: form.work_date, open: 'request' };
@@ -343,6 +356,10 @@ async function remove() {
                         <label class="block text-sm">部署一覧での表示
                             <select v-model="form.entry_visibility" class="mt-1 w-full rounded border p-2"><option value="department">内容を表示</option><option value="private">内容を非公開</option></select>
                         </label>
+                    </div>
+                    <div v-if="activeContinuation && (!activeContinuation.type || activeContinuation.type === 'entry')" class="rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                        <button type="button" :disabled="saving || handingOff" class="font-semibold underline disabled:opacity-50" @click="openLegacyContinuation">日時を引き継いで旧形式で続きを入力</button>
+                        <p class="mt-1">詳細な項目を使う場合に選んでください。元の仕事を残し、同じ系列に新しい作業を登録します。</p>
                     </div>
                     <div class="flex justify-between border-t pt-3">
                         <button v-if="entry?.id && !entry.diary_id && !continuationSource" type="button" :disabled="saving || handingOff" class="text-sm text-red-700 hover:underline" @click="remove">削除</button><span v-else></span>

@@ -27,6 +27,14 @@ class ProjectJobAssignmentController extends Controller
      */
     public function store(Request $request, ProjectJob $projectJob)
     {
+        if (collect($request->input('assignments', []))->contains(fn ($slot) => is_array($slot) && isset($slot['source_personal_work_entry_id']) && $slot['source_personal_work_entry_id'] !== '')) {
+            return app(\App\Services\LegacyWorkJobContinuation::class)->store($request, $projectJob, fn () => $this->storeAssignments($request, $projectJob));
+        }
+        return $this->storeAssignments($request, $projectJob);
+    }
+
+    private function storeAssignments(Request $request, ProjectJob $projectJob)
+    {
         $myJobModal = $request->boolean('myjob_modal');
         if ($myJobModal) {
             abort_unless(app(PersonalWorkSchedule::class)->available($request->user()), 403);
@@ -64,6 +72,9 @@ class ProjectJobAssignmentController extends Controller
                     'assignments.0.project_job_id' => '選択した案件を確認してください。',
                 ]);
             }
+            $entrySource = $slot['source_personal_work_entry_id'] ?? null;
+            $entryParent = $entrySource ? app(\App\Services\WorkJobReader::class)->resolve($user, 'entry', (int) $entrySource, $request->session()->get('superadmin_context.company_id')) : null;
+            $ownEntryPast = $entryParent && (int) $entryParent->project_job_id === (int) $projectJob->id;
             $ownPast = $sourceId || $reuseId;
             if ($ownPast && !ProjectJobAssignmentByMyself::whereKey($sourceId ?: $reuseId)
                 ->where('user_id', $user->id)->where('project_job_id', $projectJob->id)->exists()) {
@@ -80,7 +91,7 @@ class ProjectJobAssignmentController extends Controller
                     'assignments.0.supersedes_assignment_id' => '依頼ジョブは既に登録済みか、選択できません。',
                 ]);
             }
-            abort_unless($isOther || $ownPast || $requestId || (! $projectJob->completed && ($isMember || $isLeader || $isCoordinator)), 403);
+            abort_unless($isOther || $ownPast || $ownEntryPast || $requestId || (! $projectJob->completed && ($isMember || $isLeader || $isCoordinator)), 403);
             if ($slot['desired_time'] <= $slot['start_time']) {
                 throw ValidationException::withMessages([
                     'assignments.0.desired_time' => '終了時刻は開始時刻より後にしてください。',
@@ -141,7 +152,7 @@ class ProjectJobAssignmentController extends Controller
                 }
             }
 
-            DB::transaction(function () use ($projectJob, $a, $user, $myJobModal, &$createdAssignmentIds) {
+            DB::transaction(function () use ($projectJob, $a, $user, $myJobModal, &$createdAssignmentIds, $request) {
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
@@ -362,7 +373,7 @@ class ProjectJobAssignmentController extends Controller
 
                         $event->save();
 
-                        if ($eventStart) {
+                        if ($eventStart && empty($request->input('assignments.0.source_personal_work_entry_id'))) {
                             app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
                                 ->start($assignment, $eventStart->toDateString(), $user?->id);
                         }
@@ -370,7 +381,7 @@ class ProjectJobAssignmentController extends Controller
                         // ── 重複イベントの interruption_minutes 処理 ──────────────────
                         // 作成したイベントと時間が重複する既存イベントを探し、
                         // 長い方のイベントから重複分を差し引く（interruption_minutes に加算）
-                        if ($eventStart && $eventEnd) {
+                        if ($eventStart && $eventEnd && empty($request->input('assignments.0.source_personal_work_entry_id'))) {
                             try {
                                 $newDuration = $eventEnd->diffInMinutes($eventStart, false); // 秒→負になる可能性に注意
                                 $newDurationMins = abs((int)$eventEnd->diffInMinutes($eventStart));

@@ -180,3 +180,31 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 検証: 関連Unit95件707断言、合成Integration28件367断言、計123件1074断言成功。SQLite :memory:だけで既定DBと別銀本DBの実同期を確認（銀本commit後の受付ACK消失からの再試行も履歴重複なし）。交互型祖先/兄弟子維持、旧入口接続、進行表/予定/校正/通知、校正候補曖昧・他人supersedes・通知失敗rollback、本人/role/contextと既存時間回帰、銀本失敗/command再試行/未反映表示/削除保護を確認。実Vue script/SSRは既存フォーム回帰に加え旧詳細の対象列挙と反映待ちreload、共通系列の反映待ち表示を確認。PHP9構文成功、実Vue検査成功、対象ESLintエラー0（旧Show既存未使用変数3警告）、members最終build成功（既存Browserslist古いデータ通知のみ）、manifest全資産欠落0とmembers base確認、削除された旧資産は復元、ソース差分のdiff --check成功（生成JSには既存ソース由来の末尾空白警告あり）。PHPUnit結果キャッシュはread-only vendorへ書けない警告のみでテストは成功。
 
 状態: 実装/コード検証済み、今回の限定配備・利用者画面確認・上長レビューは未実施。既確認の引用/依頼入口は繰り返さない。簡易→旧詳細形式の続きとM11同一仕事の旧形式切替は別の未完工程。次の一手: 固定元7e9947b23から今回だけを配備するスクリプトと差分許可一覧を作成し、正確なSSHコマンドの承認を得る。本番HEADが違う、追跡変更がある、未追跡が違う場合は配備前に停止。今回migrationだけ--database=mysql --force、独立Seederのみ、一般公開なし。業務データの試験登録・完了はSSHで行わない。
+
+
+## 2026-11-06 工程1 簡易→旧形式の続きを実装（確定・着手）
+
+利用者「では1から行きましょう」によりM09逆方向を開始。既存の続き用簡易フォームに「日時を引き継いで旧形式で続きを入力」を追加し、元がentryの場合だけ従来Events/Create_Jobへ渡す。カレンダードラッグ→過去引用→続きの既存導線もこの入口を利用できる。簡易同士/旧→簡易の既存操作は維持。入力済み日時は保持し、元の分類/タイトル/説明を参照、数量/結果/完了/ファイル一覧は自動複製しない。具体案件がない場合は旧形式の既存「その他」を初期値にし、元の大/中分類はsource_personal_work_entry_idの明示関係で保持する。クライアント補完は工程3のまま。
+
+保存案: 既存PJA.source_personal_work_entry_idを使い新しい旧形式の仕事と予定を1件ずつ作る。同一仕事の変換とは異なる。旧保存を本人INFO SA・実会社contextの専用分岐で包み、元と祖先をroot順lock・全系列認可後に既定DB transactionで登録。旧保存で予定作成エラーが握り潰されても、専用分岐は予定1件/本人/関連を再確認し欠けたらrollback。旧保存の銀本開始処理はこの新しい元付き分岐では呼ばない（新割当に銀本リンクはなく、別DB副作用を避ける）。機密は元と元案件の公開範囲を検証して新予定にも保持。
+
+二重送信: work_job_continuationsへ旧結果assignment_id nullable FK（削除時NULL）を追加するmigration1件。元entryID+本人UUIDとpayload hashで受付、同内容再送は同じPJA、変更再送は422、削除済み結果は410。entry結果とassignment結果を混同しない。既存FK/source/supersedesの意味を変えない。入力候補GETでは仕事/予定を作らない。一般公開なし。
+
+影響: 新LegacyWorkJobContinuation service、旧ProjectJobAssignmentController/既存EventController、WorkJobMutation、受付migration、QuickWorkEntryModal/旧AssignmentForm、合成テスト/Seeder/管理資料。既存の共通系列/時間/混在完了/親削除保護を逆方向でも検証。初回新分岐だけ追加し一般Userの旧保存を広く置換しない。検証はネットワークなし・明示SQLiteメモリ、元保持/数量非複製/1PJA1予定/別会社・本人・role拒否/型/再送/rollback/削除/完了/時刻引継ぎ、実Vue・旧フォーム送信/Ziggy・members build。SSHは正確なコマンドの別承認。今回まだ実装中・未検証/未配備/未画面確認。
+
+
+## 2026-11-06 工程1 コード検証・ビルド完了（未配備）
+
+中断後の利用者「続きをしましょう」を受け再開。作業ツリーと修正が残ることを確認して続行。一般公開や工程3のクライアント補完を先行しない。
+
+実装済み: entry由来の続き用QuickWorkEntryModalに「日時を引き継いで旧形式で続きを入力」。現在の日付・開始終了（0時を含む）をevents.create_jobのGETへ渡すだけで仕事は作らない。GETは本人INFO SA/contextで元entryを再認可し、他の案件/依頼/表経路との同時指定を拒否。旧作成ページに元の作業名/大中分類と続きである旨を表示し、元の具体案件又は既存「その他」を初期値にする。元の数量/完了/ファイル一覧/結果はコピーしない。旧フォームで元entryID/UUIDを保持して送信し、新経路だけ未入力数量を0へ変換しない。
+
+保存は新LegacyWorkJobContinuationが旧storeを包み、root順lockと系列全件認可後、PJA.source_personal_work_entry_idを使って旧仕事+予定を1件ずつ同じtransactionで登録。本人/会社部署固定と案件認可、元/依頼/流用の排他、未完了開始、元のprivate又は案件の機密条件を予定へ保持。旧modal保存は予定エラーを再throwすることを確認済みで、専用処理でも予定の存在/本人/時刻を検証し不完全ならrollback。新経路では旧銀本開始と直接parseの重複更新を呼ばず、CalculatesEventTimeによるJST/校正UTC対応の中断再計算を利用。一般User/新しい元のない旧保存は既存処理を維持。
+
+再送受付work_job_continuationsにassignment_id nullable FKを加える今回migration2026_11_06_120001のみ。受付と仕事は同一transaction、元/本人UUID/payload hashを照合し、同内容は同じPJA・変更は422・削除済み結果は410。既存entry結果との型混同を拒否。型付き系列/完了と親削除保護は既存共通処理を再利用。
+
+検証: Unit95件707断言+Integration40件539断言=135件1246断言成功。SQLite :memory:明示・ネットワークなし・実DB不使用。実候補GETの日時/分類/非作成/一般Userと競合案件拒否、具体案件なしのその他と会社NULLの本人旧案件、元保持/数量非複製/1PJA1予定/0時/private/異型再送/同内容・変更再送、予定INSERT失敗の全rollback、削除済み受付非復活、元削除拒否・旧続き完了で元entry完了/兄弟未完を確認。フルページ保存の旧詳細へのredirectも確認。既存nullable列の順序変更だけで失敗していた比較はkey sortにして値保存を検証。旧保存が期待する任意項目を新分岐でNULL初期化。PHP6構文/実Ziggy生成成功。
+
+実Vue script/SSRは、entryだけ旧形式入口表示/旧assignmentには非表示、router GET日時/移動中POST抑止、元の表示とエスケープ、実AssignmentFormの型付き元ID/UUID/空数量NULL/ドラッグ日時（00:00〜01:15）を含むPOSTを確認。解析器は未変更でstub利用、実業務ファイルは未収集。既存入力・詳細/ファイルUI回帰成功。対象ESLintエラー0（旧AssignmentForm既存未使用21警告のみ）。members最終build終了0（既存Browserslist通知のみ）、manifest497資産欠落0/members base・旧資産復元/削除なし・ソースdiff --check成功。ビルドからブラウザ確認を推定しない。
+
+状態: 実装/コード検証/ビルド完了、未配備/利用者画面未確認/上長レビュー未実施。次の一手は本番最終証拠27fba7502を固定元に今回だけの許可差分・migration1件/専用Seederの配備を準備し、正確なSSHコマンドの承認を得る。確認済みの簡易同士/旧→簡易/既存引用/ファイル説明は再試験不要。クライアント補完は工程3、一般公開は未承認のまま。

@@ -55,6 +55,7 @@ class UnifiedMyJobCreateTest extends TestCase
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_180001_support_legacy_work_continuation_sources.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_05_120001_create_work_job_completion_syncs.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_05_150001_add_personal_work_detail_fields.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_06_120001_support_legacy_continuation_results.php')->up();
         Schema::create('statuses', function (Blueprint $t) { $t->id(); $t->string('key'); $t->string('slug'); });
         DB::table('statuses')->insert(['id' => 1, 'key' => 'completed', 'slug' => 'completed']);
         Schema::create('progress_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
@@ -422,7 +423,7 @@ class UnifiedMyJobCreateTest extends TestCase
         $migration->down();
         self::assertFalse(Schema::hasColumn('work_job_continuations', 'source_assignment_id'));
         $migration->up();
-        self::assertSame($before, (array) DB::table('work_job_continuations')->first());
+        $after = (array) DB::table('work_job_continuations')->first(); ksort($before); ksort($after); self::assertSame($before, $after);
         self::assertSame(200, $this->continueWork($root, ['work_date' => '2099-12-02'])->getStatusCode());
         self::assertSame(2, DB::table('personal_work_entries')->count());
     }
@@ -843,5 +844,140 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(2, DB::table('events')->count());
         self::assertSame('2026-11-05 09:00:00', DB::table('events')->find(100)->starts_at);
         self::assertSame('2026-11-05 10:00:00', DB::table('events')->find(100)->ends_at);
+    }
+
+    private function legacyContinuationFixture(bool $private = false): int
+    {
+        Schema::table('project_job_assignments', function (Blueprint $t) {
+            foreach (['detail','difficulty_id','estimated_hours','desired_time','start_time','work_item_type_id','size_id','stage_id','amounts','file_info','read_at','scheduled_at'] as $field) $t->string($field)->nullable();
+            foreach (['assigned','accepted','scheduled'] as $field) $t->boolean($field)->default(false);
+        });
+        Schema::table('events', function (Blueprint $t) { $t->text('body')->nullable(); $t->dateTime('start')->nullable(); $t->dateTime('end')->nullable(); $t->date('date')->nullable(); $t->integer('interruption_minutes')->default(0); });
+        DB::table('statuses')->insert(['id' => 2, 'key' => 'in_progress', 'slug' => 'in_progress']);
+        DB::table('clients')->insert(['id' => 10, 'name' => 'その他', 'company_id' => null]);
+        DB::table('project_jobs')->insert(['id' => 10, 'title' => 'その他', 'company_id' => 1, 'client_id' => 10, 'show_on_department_schedule' => true]);
+        return $this->save($this->request($this->payload(['work_date' => '2099-12-01', 'actual_quantity' => 90, 'actual_unit' => '冊', 'entry_visibility' => $private ? 'private' : 'department'])))->getData(true)['id'];
+    }
+
+    private function legacyContinuation(int $source, array $slot = [], ?User $user = null, ?int $context = null)
+    {
+        $payload = ['myjob_modal' => 1, 'assignments' => [$slot + ['title' => '旧形式の続き', 'project_job_id' => 10,
+            'desired_start_date' => '2099-12-02', 'start_time' => '00:00', 'desired_time' => '01:00',
+            'amounts' => null, 'source_personal_work_entry_id' => $source, 'legacy_request_token' => 'c49be9ca-a214-4f5d-a47d-f5bbab801fd8']]];
+        return app(\App\Http\Controllers\User\ProjectJobAssignmentController::class)->store($this->request($payload, $user, $context), \App\Models\ProjectJob::findOrFail(10));
+    }
+
+    public function test_simple_to_legacy_continuation_preserves_parent_private_time_and_replays_without_duplicates(): void
+    {
+        $source = $this->legacyContinuationFixture(true);
+        $before = (array) DB::table('personal_work_entries')->find($source);
+        $seed = app(\App\Services\LegacyWorkJobContinuation::class)->prefill($this->user(), $source, null, 10);
+        self::assertSame(10, $seed['assignment']['project_job_id']); self::assertNull($seed['assignment']['amounts']);
+        self::assertNull($seed['assignment']['file_info']); self::assertNull($seed['assignment']['amounts_unit']);
+        self::assertSame(0, DB::table('project_job_assignments')->count());
+        $response = $this->legacyContinuation($source); self::assertSame(201, $response->status());
+        $id = $response->getData(true)['assignment_id'];
+        $assignment = DB::table('project_job_assignments')->find($id);
+        self::assertSame($source, $assignment->source_personal_work_entry_id); self::assertNull($assignment->source_assignment_id); self::assertNull($assignment->supersedes_assignment_id);
+        self::assertSame(1, $assignment->user_id); self::assertSame(1, $assignment->sender_id); self::assertSame(1, $assignment->company_id);
+        self::assertFalse((bool) $assignment->completed); self::assertNull($assignment->amounts); self::assertNull($assignment->file_info);
+        $event = DB::table('events')->where('project_job_assignment_id', $id)->first();
+        self::assertSame('2099-12-02 00:00:00', $event->starts_at); self::assertSame('2099-12-02 01:00:00', $event->ends_at); self::assertSame('private', $event->visibility);
+        self::assertSame($before, (array) DB::table('personal_work_entries')->find($source));
+        $again = $this->legacyContinuation($source); self::assertSame(200, $again->status()); self::assertSame($id, $again->getData(true)['assignment_id']);
+        self::assertSame(1, DB::table('project_job_assignments')->count()); self::assertSame(2, DB::table('events')->count()); self::assertSame(1, DB::table('work_job_continuations')->count());
+        $series = app(\App\Services\WorkJobReader::class)->series($this->user(), $id, null, true, 'assignment');
+        self::assertSame(['entry:'.$source, 'assignment:'.$id], array_column($series['items'], 'key')); self::assertSame(90, $series['totals']['afterLunch']);
+        self::assertSame(0, DB::table('job_notifications')->count());
+        try { $this->continueWork($source, ['request_token' => 'c49be9ca-a214-4f5d-a47d-f5bbab801fd8']); self::fail('Legacy result mistaken for an entry'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        self::assertSame(1, DB::table('personal_work_entries')->count());
+    }
+
+    public function test_simple_to_legacy_rejects_foreign_source_context_role_and_multiple_source_modes(): void
+    {
+        $source = $this->legacyContinuationFixture();
+        foreach ([[$this->user(['id' => 2]), null], [$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$actor, $context]) {
+            try { $this->legacyContinuation($source, [], $actor, $context); self::fail('Unauthorized legacy continuation'); }
+            catch (\Illuminate\Auth\Access\AuthorizationException|\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        }
+        foreach ([['source_assignment_id' => 1], ['supersedes_assignment_id' => 1], ['legacy_request_token' => 'bad'], ['desired_time' => '00:00'], ['_row_id' => 1], ['project_job_id' => 99]] as $invalid) {
+            try { $this->legacyContinuation($source, $invalid); self::fail('Invalid continuation accepted'); }
+            catch (ValidationException $e) { self::assertNotEmpty($e->errors()); }
+        }
+        self::assertSame(0, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('work_job_continuations')->count());
+    }
+
+    public function test_legacy_continuation_changed_replay_and_missing_event_roll_back_without_partial_work(): void
+    {
+        $source = $this->legacyContinuationFixture();
+        $id = $this->legacyContinuation($source)->getData(true)['assignment_id'];
+        try { $this->legacyContinuation($source, ['title' => '変更した再送']); self::fail('Changed retry accepted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        DB::statement("CREATE TRIGGER fail_new_legacy_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT, 'synthetic event save failure'); END");
+        try { $this->legacyContinuation($source, ['legacy_request_token' => 'e49be9ca-a214-4f5d-a47d-f5bbab801fd8']); self::fail('Partial legacy work accepted'); }
+        catch (ValidationException|\Illuminate\Database\QueryException $e) { self::assertTrue($e instanceof ValidationException || str_contains($e->getMessage(), 'synthetic event save failure')); }
+        self::assertSame(1, DB::table('project_job_assignments')->count()); self::assertSame(2, DB::table('events')->count()); self::assertSame(1, DB::table('work_job_continuations')->count());
+        self::assertSame($id, DB::table('work_job_continuations')->first()->assignment_id);
+    }
+
+    public function test_legacy_continuation_completes_mixed_ancestors_but_keeps_sibling_and_rejects_parent_deletion(): void
+    {
+        $source = $this->legacyContinuationFixture();
+        $id = $this->legacyContinuation($source)->getData(true)['assignment_id'];
+        $sibling = $this->legacyContinuation($source, ['legacy_request_token' => 'e49be9ca-a214-4f5d-a47d-f5bbab801fd8'])->getData(true)['assignment_id'];
+        try { app(\App\Http\Controllers\User\WorkJobDetailController::class)->destroy($this->request(), $source, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class)); self::fail('Parent deleted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        app(\App\Services\WorkJobMutation::class)->completeWork($this->user(), 'assignment', $id, null);
+        self::assertNotNull(DB::table('personal_work_entries')->find($source)->completed_at);
+        self::assertTrue((bool) DB::table('project_job_assignments')->find($id)->completed);
+        self::assertFalse((bool) DB::table('project_job_assignments')->find($sibling)->completed);
+    }
+
+    public function test_legacy_continuation_options_get_preserves_selected_time_without_creating_work(): void
+    {
+        $source = $this->legacyContinuationFixture();
+        $request = $this->request(['myjob_modal' => 1, 'continue_entry' => $source, 'date' => '2099-12-04', 'startHour' => 0, 'startMinute' => 0, 'endHour' => 1, 'endMinute' => 15], null, null, 'GET');
+        $data = app(\App\Http\Controllers\EventController::class)->createJob($request)->getData(true);
+        self::assertSame($source, $data['assignments'][0]['source_personal_work_entry_id']);
+        self::assertSame('00:00', $data['prefillEvent']['start_time']); self::assertSame('01:15', $data['prefillEvent']['desired_time']); self::assertSame('2099-12-04', $data['date']);
+        self::assertNull($data['assignments'][0]['amounts']); self::assertNull($data['assignments'][0]['file_info']);
+        self::assertSame('承認済み分類', $data['simpleContinuation']['classification']);
+        self::assertSame(1, DB::table('personal_work_entries')->count()); self::assertSame(0, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('events')->count());
+        try { app(\App\Http\Controllers\EventController::class)->createJob($this->request(['continue_entry' => $source, 'project_job_id' => 999], null, null, 'GET')); self::fail('Conflicting foreign project option accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('project_job_id', $e->errors()); }
+        try { app(\App\Http\Controllers\EventController::class)->createJob($this->request(['continue_entry' => $source], $this->user(['user_role' => 'user']), null, 'GET')); self::fail('General user got trial metadata'); }
+        catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
+    }
+
+    public function test_legacy_continuation_uses_explicit_historical_project_and_deleted_receipt_does_not_resurrect(): void
+    {
+        $source = $this->legacyContinuationFixture();
+        DB::table('project_jobs')->insert(['id' => 12, 'title' => '本人の旧案件', 'company_id' => null, 'show_on_department_schedule' => true]);
+        DB::table('personal_work_entries')->where('id', $source)->update(['project_job_id' => 12]);
+        $seed = app(\App\Services\LegacyWorkJobContinuation::class)->prefill($this->user(), $source, null, 10);
+        self::assertSame(12, $seed['assignment']['project_job_id']);
+        $body = ['myjob_modal' => 1, 'assignments' => [$seed['assignment'] + ['desired_start_date' => '2099-12-02', 'start_time' => '13:00', 'desired_time' => '14:00']]];
+        $controller = app(\App\Http\Controllers\User\ProjectJobAssignmentController::class); $project = \App\Models\ProjectJob::findOrFail(12);
+        $id = $controller->store($this->request($body), $project)->getData(true)['assignment_id'];
+        self::assertSame(12, DB::table('project_job_assignments')->find($id)->project_job_id);
+        // Synthetic leaf deletion exercises the receipt FK; source work remains intact.
+        DB::table('project_job_assignments')->where('id', $id)->delete();
+        self::assertNull(DB::table('work_job_continuations')->first()->assignment_id);
+        try { $controller->store($this->request($body), $project); self::fail('Deleted result recreated'); }
+        catch (HttpException $e) { self::assertSame(410, $e->getStatusCode()); }
+        self::assertSame(0, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('personal_work_entries')->count());
+    }
+
+    public function test_legacy_continuation_full_page_save_redirects_to_legacy_detail_and_keeps_confidential_project_private(): void
+    {
+        $source = $this->legacyContinuationFixture();
+        DB::table('personal_work_entries')->where('id', $source)->update(['project_job_id' => 10]);
+        DB::table('project_jobs')->where('id', 10)->update(['show_on_department_schedule' => false]);
+        $body = ['assignments' => [['title' => '旧式の続き', 'project_job_id' => 10, 'desired_start_date' => '2099-12-03', 'start_time' => '13:00', 'desired_time' => '14:00', 'source_personal_work_entry_id' => $source, 'legacy_request_token' => 'c49be9ca-a214-4f5d-a47d-f5bbab801fd8']]];
+        $response = app(\App\Http\Controllers\User\ProjectJobAssignmentController::class)->store($this->request($body), \App\Models\ProjectJob::findOrFail(10));
+        $id = DB::table('project_job_assignments')->first()->id;
+        self::assertSame(302, $response->status()); self::assertSame(route('user.myjobbox.show', ['assignment' => $id]), $response->getTargetUrl());
+        self::assertSame('private', DB::table('events')->where('project_job_assignment_id', $id)->first()->visibility);
     }
 }
