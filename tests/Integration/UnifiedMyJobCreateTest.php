@@ -985,4 +985,17 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(302, $response->status()); self::assertSame(route('user.myjobbox.show', ['assignment' => $id]), $response->getTargetUrl());
         self::assertSame('private', DB::table('events')->where('project_job_assignment_id', $id)->first()->visibility);
     }
+
+    public function test_trial_changelog_versions_fit_the_real_schema_and_seeding_is_idempotent(): void
+    {
+        (require dirname(__DIR__, 2).'/database/migrations/2026_05_23_155003_create_changelogs_table.php')->up();
+        $seeder = new \Database\Seeders\UnifiedMyJobBoxChangelogSeeder;
+        $seeder->run();
+        $first = DB::table('changelogs')->orderBy('id')->pluck('version')->all();
+        self::assertNotEmpty($first);
+        foreach ($first as $version) self::assertLessThanOrEqual(30, mb_strlen($version), 'changelogs.version varchar(30)');
+        $seeder->run();
+        self::assertSame($first, DB::table('changelogs')->orderBy('id')->pluck('version')->all());
+        self::assertSame(1, DB::table('changelogs')->where('version', 'myjob-entry-old-20261106')->count());
+    }
 }

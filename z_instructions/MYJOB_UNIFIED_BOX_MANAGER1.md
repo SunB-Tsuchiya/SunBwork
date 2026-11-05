@@ -640,3 +640,12 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 2026-11-06 UI最終補強: 旧画面で別の過去ジョブを選び直した場合、現在のsource_personal_work_entry_idと一致する時だけ元ジョブの案内を表示する。実SSRで選択変更後の案内非表示も確認。旧形式へ渡す時分は数値化して0時/先頭0付き分をinteger validationへ正しく渡す（Laravel validateIntegerの実装を照合）。既存実Vue/旧フォームPOST検査、対象ESLint成功。最終members build終了0/manifest497資産欠落0/members base/旧資産保持/削除なし。PHP/DB処理は直前の135件1247断言成功版から変更なし。未配備/利用者画面未確認。
 
 2026-11-06 配備固定版更新: 最終アプリbe63bd5fc6c65f33706ad8c6d5bc9460d644cb52。同じ/tmp/myjob-legacy-continuation-deploy-20261106.shのTARGETをこの版へ更新（最終SHA256 6766a8b8576ea6cf0d882c96de880f47018457783c5df3a34409719946caa0c0）。以前の315e8367固定を置換。元27fba7502、17ソース許可一覧・削除なしは再照合済み。migration1件/専用Seederのみ、一般公開・実業務試験・クライアント補完なし。次は正確なSSHコマンドの承認。今回まだ未配備/利用者画面未確認。
+
+
+## 2026-11-06 配備が履歴登録で停止・識別子の修正
+
+利用者が正確なSSHコマンドをyesで承認し、/tmp/myjob-legacy-continuation-deploy-20261106.shを実行。前提main/固定元27fba7502/追跡変更なし/未追跡5件/17ソース/PHP7構文を通過し、固定be63bd5fc6c65f33706ad8c6d5bc9460d644cb52へff-only。既定mysql・silverlamb759_sunbwork設定確認後、今回migration2026_11_06_120001は成功。manifest497資産欠落0/members base成功。独立Seederの今回新規versionが既存changelogs.version varchar(30)を超えSQLSTATE22001で停止（exit1）。機能本体/受付列は反映済みだが、履歴登録・後続cache clear・最終追跡/未追跡確認は未完了。配備完了や画面確認済みと扱わない。業務仕事の登録/完了/売上データ参照なし。
+
+修正: Seederの今回versionだけをmyjob-entry-old-20261106へ短縮。DBの列長や仕事データ/機能本体/ビルドは変更しない。実際の変更履歴migrationを使うSQLiteメモリの追加Integrationで、全専用Seeder版が30文字以内・2回実行して同じ行集合・今回版が1件を確認。1件27断言とSeeder PHP構文が成功。前回135件1247断言の業務機能検証とは分けて記録。新規の識別子長チェックが既存のSQLiteだけではvarchar長を強制できない差を補う。
+
+次の一手: 本番be63bd5fcを固定元として、このSeeder修正と資料/テストだけの差分を照合する完了用スクリプトを準備。migration/ビルドを再実行せず、専用Seeder --database=mysql --force、config/cache/route/view clear、manifestと既存未追跡保持を確認して配備を完了する。AGENTS.mdの正確なSSHコマンド事前提示・承認を得る。機能の画面確認は完了後に今回方向だけ依頼し、既確認画面を繰り返さない。一般公開未承認・クライアント補完工程3は維持。

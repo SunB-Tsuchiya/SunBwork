@@ -89,7 +89,7 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_DETAIL_HANDOFF_DESIGN1.md'],
             'claude_notes' => 'Codex。entryの任意説明/file_info/details_version、本人試用専用PUT、型/件数検証と合計再算定、楽観ロック・同内容再送対応。既存詳細のFileInfoDisplay/useFileAnalyzer再利用。旧説明は利用者が明示した両形式への修正として既存フォームに適用。ファイル本体なし。',
         ]);
-        Changelog::updateOrCreate(['version' => 'myjob-entry-legacy-continue-20261106'], [
+        Changelog::updateOrCreate(['version' => 'myjob-entry-old-20261106'], [
             'title' => '簡易マイジョブから旧形式の続きを登録',
             'released_at' => '2026-11-06',
             'summary' => '情報出版Super Admin限定で、続きの入力中に日時を引き継いで旧形式へ進めます。',
