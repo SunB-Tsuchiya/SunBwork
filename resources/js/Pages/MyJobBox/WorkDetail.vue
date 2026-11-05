@@ -1,5 +1,7 @@
 <script setup>
 import axios from 'axios';
+import WorkJobDetailsEditor from '@/Components/WorkJobDetailsEditor.vue';
+import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import { ref, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
@@ -11,6 +13,7 @@ import { workCategories, workActivities } from '@/Constants/personalWorkActiviti
 
 const props = defineProps({ work: Object, time: Object, ancestors: Array, back: Object, series: { type: Object, default: () => ({items:[],operationsEnabled:false,completionTargets:[]}) } });
 const editing = ref(false);
+const detailsOpen = ref(false);
 const continuing = ref(false);
 const completing = ref(false);
 const completeError = ref('');
@@ -25,6 +28,10 @@ const category = computed(() => workCategories.find(([key]) => key === props.wor
 const activity = computed(() => (workActivities[props.work.work_category] || []).find(([key]) => key === props.work.activity_type)?.[1] || '未指定');
 const quantity = computed(() => props.work.actual_quantity == null ? '未入力' : `${Number(props.work.actual_quantity)} ${props.work.actual_unit || ''}`.trim());
 const minutes = value => `${Number(Number(value || 0).toFixed(1))}分`;
+function detailsSaved() {
+    detailsOpen.value = false;
+    router.reload({ only: ['work'], preserveScroll: true });
+}
 function deleted() {
     editing.value = false;
     router.visit(backHref.value);
@@ -103,6 +110,12 @@ async function complete() {
                 </dl>
                 <p class="mt-4 text-xs leading-relaxed text-gray-500">記録時間は、作業分析の試用V3と同じ条件で、現在までの時間に昼休憩・重複・会議などの配分を反映します。未来の予定枠や完了状態とは別です。</p>
             </section>
+            <WorkJobDetailsEditor v-if="detailsOpen" :work="work" @saved="detailsSaved" @cancel="detailsOpen = false" />
+            <section v-else-if="work.detail_note || work.file_info" class="space-y-3 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                <h3 class="text-sm font-semibold text-gray-900">詳細情報</h3>
+                <p v-if="work.detail_note" class="whitespace-pre-wrap break-words text-sm text-gray-800">{{ work.detail_note }}</p>
+                <FileInfoDisplay v-if="work.file_info" :file-info="work.file_info" />
+            </section>
             <WorkJobSeries :series="series" />
             <section v-if="confirmationOpen" role="region" aria-labelledby="complete-heading" class="rounded-lg border border-yellow-300 bg-yellow-50 p-5">
                 <h3 id="complete-heading" class="font-semibold text-gray-900">次の仕事を完了にしますか？</h3>
@@ -112,6 +125,7 @@ async function complete() {
                 <div class="flex justify-end gap-2"><button type="button" :disabled="completing" class="rounded border px-3 py-2 text-sm" @click="confirmationOpen = false">キャンセル</button><button type="button" :disabled="completing" class="rounded bg-yellow-700 px-3 py-2 text-sm text-white disabled:opacity-50" @click="complete">{{ completing ? '処理中…' : '完了にする' }}</button></div>
             </section>
             <div class="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
+                <button type="button" :disabled="detailsOpen" class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" @click="detailsOpen = true">詳細入力</button>
                 <button v-if="series.canContinue ?? series.operationsEnabled" type="button" class="rounded border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700" @click="continuing = true">続きのマイジョブを作成</button>
                 <Link :href="route('calendar.index', { date: work.work_date, view: 'day' })" class="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">この日のカレンダー</Link>
                 <button type="button" class="rounded bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" @click="editing = true">予定を編集</button>

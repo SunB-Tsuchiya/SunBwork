@@ -54,6 +54,7 @@ class UnifiedMyJobCreateTest extends TestCase
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_150001_create_work_job_continuations_table.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_180001_support_legacy_work_continuation_sources.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_05_120001_create_work_job_completion_syncs.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_05_150001_add_personal_work_detail_fields.php')->up();
         Schema::create('statuses', function (Blueprint $t) { $t->id(); $t->string('key'); $t->string('slug'); });
         DB::table('statuses')->insert(['id' => 1, 'key' => 'completed', 'slug' => 'completed']);
         Schema::create('progress_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
@@ -734,5 +735,113 @@ class UnifiedMyJobCreateTest extends TestCase
         catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); self::assertStringContainsString('再試行待ち', $e->getMessage()); }
         self::assertSame(1, DB::table('project_job_assignments')->count());
         self::assertSame(1, DB::table('work_job_completion_syncs')->count());
+    }
+
+    private function detailPayload(array $data = []): array
+    {
+        return $data + ['details_version' => 0, 'detail_note' => '作業説明', 'file_info' => [
+            'total_pages' => 999, 'groups' => ['fake' => ['count' => 999]],
+            'files' => [['name' => '合成.pdf', 'ext' => 'pdf', 'type' => 'pdf', 'size' => 1024, 'pages' => 5, 'doc_size' => 'A4']],
+        ]];
+    }
+
+    public function test_details_keep_same_work_and_box_time_quantity_and_recalculate_file_totals(): void
+    {
+        $id = $this->save($this->request($this->payload()))->getData(true)['id'];
+        $before = (array) DB::table('personal_work_entries')->find($id);
+        $box = app(\App\Services\UnifiedMyJobBox::class)->rows($this->user());
+        $time = app(\App\Services\WorkJobReader::class)->detail($this->user(), $id)['time'];
+        $result = app(\App\Services\WorkJobDetails::class)->save($this->request($this->detailPayload()), $id, null);
+        self::assertSame($id, $result['id']); self::assertSame(1, $result['details_version']);
+        $after = (array) DB::table('personal_work_entries')->find($id);
+        foreach ($before as $key => $value) if (! in_array($key, ['detail_note', 'file_info', 'details_version', 'updated_at'])) self::assertSame($value, $after[$key], $key);
+        $info = json_decode($after['file_info'], true);
+        self::assertSame(5, $info['total_pages']); self::assertSame(1, $info['total_files']);
+        self::assertSame(1024, $info['total_size_bytes']); self::assertArrayNotHasKey('fake', $info['groups']);
+        self::assertSame(1, DB::table('personal_work_entries')->count()); self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('project_job_assignments')->count());
+        self::assertSame($box, app(\App\Services\UnifiedMyJobBox::class)->rows($this->user()));
+        self::assertSame($time, app(\App\Services\WorkJobReader::class)->detail($this->user(), $id)['time']);
+        $read = app(\App\Services\WorkJobReader::class)->detail($this->user(), $id)['work'];
+        self::assertSame('合成.pdf', $read['file_info']['files'][0]['name']);
+        $generic = \App\Models\PersonalWorkEntry::findOrFail($id)->toArray();
+        foreach (['detail_note', 'file_info', 'details_version'] as $field) self::assertArrayNotHasKey($field, $generic);
+    }
+
+    public function test_detail_retry_and_conflict_preserve_latest_and_quick_edit_does_not_erase_details(): void
+    {
+        $id = $this->save($this->request($this->payload()))->getData(true)['id'];
+        $details = app(\App\Services\WorkJobDetails::class);
+        $body = $this->detailPayload();
+        $details->save($this->request($body), $id, null);
+        self::assertSame(1, $details->save($this->request($body), $id, null)['details_version']);
+        try { $details->save($this->request($this->detailPayload(['detail_note' => '古い画面の変更'])), $id, null); self::fail('Lost update allowed'); }
+        catch (HttpException $e) { self::assertSame(409, $e->getStatusCode()); }
+        app(\App\Http\Controllers\User\WorkJobDetailController::class)->update($this->request($this->payload(['title' => '通常編集', 'detail_note' => '改ざん', 'file_info' => null, 'details_version' => 99])), $id, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class));
+        $row = \App\Models\PersonalWorkEntry::findOrFail($id);
+        self::assertSame('通常編集', $row->title); self::assertSame('作業説明', $row->detail_note); self::assertSame(1, $row->details_version); self::assertNotNull($row->file_info);
+        $child = $this->continueWork($id, ['work_date' => '2099-12-02'])->getData(true)['id'];
+        self::assertNull(\App\Models\PersonalWorkEntry::findOrFail($child)->file_info);
+        self::assertNull(\App\Models\PersonalWorkEntry::findOrFail($child)->detail_note);
+        $details->save($this->request(['details_version' => 1, 'detail_note' => null, 'file_info' => null]), $id, null);
+        self::assertSame(2, \App\Models\PersonalWorkEntry::findOrFail($id)->details_version);
+        self::assertSame(2, DB::table('personal_work_entries')->count());
+    }
+
+    public function test_detail_save_rejects_other_users_context_role_and_malformed_information_without_writes(): void
+    {
+        $id = $this->save($this->request($this->payload()))->getData(true)['id'];
+        $details = app(\App\Services\WorkJobDetails::class);
+        foreach ([[$this->user(['id' => 2]), null], [$this->user(), 2], [$this->user(['user_role' => 'user']), null]] as [$user, $context]) {
+            try { $details->save($this->request($this->detailPayload(), $user), $id, $context); self::fail('Unauthorized details'); }
+            catch (\Illuminate\Auth\Access\AuthorizationException|\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        }
+        $file = $this->detailPayload()['file_info']['files'][0];
+        foreach ([['files' => [$file + ['url' => '/secret']]], ['files' => [array_replace($file, ['pages' => -1])]], ['files' => ['named' => $file]], ['files' => array_fill(0, 201, $file)], ['files' => [array_replace($file, ['type' => '__proto__'])]]] as $invalid) {
+            try { $details->save($this->request($this->detailPayload(['file_info' => $invalid])), $id, null); self::fail('Malformed details accepted'); }
+            catch (ValidationException $e) { self::assertNotEmpty($e->errors()); }
+        }
+        self::assertNull(\App\Models\PersonalWorkEntry::findOrFail($id)->file_info);
+        self::assertSame(0, \App\Models\PersonalWorkEntry::findOrFail($id)->details_version);
+    }
+
+    public function test_details_on_completed_work_do_not_recomplete_or_change_core_state(): void
+    {
+        $id = $this->save($this->request($this->payload()))->getData(true)['id'];
+        app(\App\Services\WorkJobMutation::class)->completeEntry($this->user(), $id, null);
+        $at = DB::table('personal_work_entries')->find($id)->completed_at;
+        app(\App\Http\Controllers\User\WorkJobDetailController::class)->saveDetails($this->request($this->detailPayload() + ['actual_quantity' => 999, 'completed_at' => null, 'source_entry_id' => 999]), $id, app(\App\Services\WorkJobDetails::class));
+        $row = DB::table('personal_work_entries')->find($id);
+        self::assertSame($at, $row->completed_at); self::assertSame(2, (int) $row->actual_quantity); self::assertNull($row->source_entry_id);
+        self::assertSame(0, DB::table('job_notifications')->count()); self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+    }
+
+    public function test_legacy_user_edit_saves_reselected_file_information_and_preserves_it_when_omitted(): void
+    {
+        Schema::table('project_job_assignments', function (Blueprint $t) {
+            foreach (['detail', 'difficulty_id', 'desired_time', 'start_time', 'estimated_hours', 'work_item_type_id', 'size_id', 'stage_id', 'amounts', 'file_info'] as $column) $t->string($column)->nullable();
+        });
+        Schema::table('events', function (Blueprint $t) { $t->text('description')->nullable(); $t->text('body')->nullable(); $t->integer('interruption_minutes')->default(0); $t->dateTime('start')->nullable(); $t->dateTime('end')->nullable(); });
+        DB::table('project_jobs')->insert(['id' => 10, 'company_id' => 1]);
+        DB::table('project_job_assignments')->insert(['id' => 10, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 1, 'title' => '旧式', 'file_info' => json_encode(['files' => [['name' => '以前.pdf']]])]);
+        DB::table('events')->insert(['id' => 100, 'user_id' => 1, 'project_job_assignment_id' => 10, 'title' => '旧式', 'starts_at' => '2026-11-05 09:00:00', 'ends_at' => '2026-11-05 10:00:00', 'start' => '2026-11-05 09:00:00', 'end' => '2026-11-05 10:00:00']);
+        $controller = app(\App\Http\Controllers\User\ProjectJobAssignmentController::class);
+        $project = \App\Models\ProjectJob::findOrFail(10);
+        $body = ['title' => '旧式', 'desired_start_date' => '2026-11-05', 'start_time' => '09:00', 'desired_time' => '10:00'];
+        $info = $this->detailPayload()['file_info'];
+        $controller->update($this->request($body + ['file_info' => $info]), $project, \App\Models\ProjectJobAssignment::findOrFail(10));
+        self::assertSame($info, \App\Models\ProjectJobAssignment::findOrFail(10)->file_info);
+        $controller->update($this->request($body), $project, \App\Models\ProjectJobAssignment::findOrFail(10));
+        self::assertSame($info, \App\Models\ProjectJobAssignment::findOrFail(10)->file_info);
+        foreach ([[$this->user(['id' => 2]), $project], [$this->user(), (new \App\Models\ProjectJob)->forceFill(['id' => 99, 'company_id' => 1])]] as [$actor, $routeProject]) {
+            try { $controller->update($this->request($body + ['file_info' => null], $actor), $routeProject, \App\Models\ProjectJobAssignment::findOrFail(10)); self::fail('Foreign legacy file information changed'); }
+            catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+        }
+        self::assertSame($info, \App\Models\ProjectJobAssignment::findOrFail(10)->file_info);
+        $controller->update($this->request($body + ['file_info' => null]), $project, \App\Models\ProjectJobAssignment::findOrFail(10));
+        self::assertNull(\App\Models\ProjectJobAssignment::findOrFail(10)->file_info);
+        self::assertSame(1, DB::table('project_job_assignments')->count());
+        self::assertSame(2, DB::table('events')->count());
+        self::assertSame('2026-11-05 09:00:00', DB::table('events')->find(100)->starts_at);
+        self::assertSame('2026-11-05 10:00:00', DB::table('events')->find(100)->ends_at);
     }
 }

@@ -366,3 +366,8 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 
 
 2026-11-05 実装・未配備: INFO SuperAdmin本人試用の混在系列完了を共通WorkJobMutationへ接続。選択+祖先のみ、既定DBの予定/進行表/校正/厳格通知をtransaction化。銀本はwork_job_completion_syncsの永続受付をcommit後に処理、失敗は専用commandと既存scheduler毎分で再試行し詳細に反映待ちを表示。新migrationは2026_11_05_120001のみ。旧のみ/一般Userは従来経路維持。123件1074断言・実Vue/SSR・members build成功。限定配備/画面確認は未実施。最新状態はMYJOB_UNIFIED_BOX_MANAGER1末尾。簡易→旧詳細続き/M11/一般公開は未完。
+
+
+2026-11-05 実装チェックポイント・未配備: 同じentryの詳細説明/作業ファイル情報を追加する専用PUTと詳細入力部品を作成。旧新両形式のWorkFileInfoHelpは解析情報だけ保存し本体は保存/共有しないことと、旧数量自動反映/新実績維持を説明する。新式はINFO SuperAdmin本人試用のみ。新migration2026_11_05_150001。実Vue/SSRとmembers buildは成功、Docker/WSL起動エラーのためバックエンド合成検証/構文/route/Ziggyは待ち。配備/画面確認なし。最新はMYJOB_UNIFIED_BOX_MANAGER1末尾。旧ユーザー編集のfile_info未保存経路も後続検討として記録。
+
+2026-11-05 後続: Docker復帰後の新詳細保存/旧式ファイル再保存を128件1160断言・PHP7構文・専用route/Ziggy・実Vue/SSRで確認。旧User updateはfile_info送信時に本人/案件/会社部署を検証し、再選択保存/未送信保持/NULL除去を修正。以前の旧編集不整合はこの対象経路で解消。未配備/利用者画面未確認。最新状態はMANAGER末尾。

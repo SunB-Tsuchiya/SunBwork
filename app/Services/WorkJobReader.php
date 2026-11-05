@@ -227,6 +227,7 @@ class WorkJobReader
             'entry_visibility' => $entry->entry_visibility, 'result_note' => $entry->result_note,
             'actual_quantity' => $entry->actual_quantity, 'actual_unit' => $entry->actual_unit, 'diary_id' => $entry->diary_id,
             'completed' => (bool) $entry->completed_at,
+            'detail_note' => $entry->detail_note, 'file_info' => $entry->file_info, 'details_version' => (int) $entry->details_version,
         ], 'time' => ['planned' => $planned, 'lunch' => $lunch, 'afterLunch' => max(0, $planned - $lunch), 'recorded' => $recorded],
             'ancestors' => $withAncestors ? $this->ancestors($user, 'entry', $id, $context) : []];
     }

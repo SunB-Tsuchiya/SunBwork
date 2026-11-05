@@ -42,6 +42,12 @@ class WorkJobDetailController extends Controller
         return response()->json($jobs->completeEntry($request->user(), $entry, $context === null ? null : (int) $context));
     }
 
+    public function saveDetails(Request $request, int $entry, \App\Services\WorkJobDetails $details)
+    {
+        $context = $request->session()->get('superadmin_context.company_id');
+        return response()->json($details->save($request, $entry, $context === null ? null : (int) $context));
+    }
+
     public function destroy(Request $request, int $entry, WorkJobReader $jobs, DepartmentWorkController $entries)
     {
         $context = $request->session()->get('superadmin_context.company_id');

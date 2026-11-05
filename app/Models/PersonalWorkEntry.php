@@ -14,7 +14,11 @@ class PersonalWorkEntry extends Model
         'source_event_id', 'diary_id',
     ];
 
+    protected $hidden = ['detail_note', 'file_info', 'details_version'];
+
     protected $casts = [
+        'file_info' => 'array',
+        'details_version' => 'integer',
         'work_date' => 'date:Y-m-d',
         'completed_at' => 'datetime',
         'source_entry_id' => 'integer',

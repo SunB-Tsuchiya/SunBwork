@@ -80,6 +80,7 @@
             <template v-if="props.mode === 'coordinator' || props.mode === 'user'">
                 <div class="mt-3 rounded border border-blue-200 bg-blue-50 p-3">
                     <h3 class="mb-2 text-sm font-semibold text-blue-800">作業ファイル情報</h3>
+                    <WorkFileInfoHelp legacy-quantity />
 
                     <!-- 既存 file_info の表示（閲覧時） -->
                     <div v-if="!editMode && block.file_info" class="text-sm text-gray-700">
@@ -95,7 +96,7 @@
                         <div v-if="block.file_info && fa(idx).results.value.length === 0" class="mb-2 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
                             現在: {{ block.file_info.total_files }}ファイル
                             <template v-if="block.file_info.total_pages"> / {{ block.file_info.total_pages }}ページ</template>
-                            — 再アップロードすると更新されます
+                            — ファイルを選び直して保存すると情報が更新されます
                         </div>
 
                         <!-- 対応形式 -->
@@ -798,6 +799,7 @@
 import SelectionModal from '@/Components/SelectionModal.vue';
 import axios from 'axios';
 import useToasts from '@/Composables/useToasts';
+import WorkFileInfoHelp from '@/Components/WorkFileInfoHelp.vue';
 import { useFileAnalyzer, SUPPORTED_TYPES, UNSUPPORTED_NOTICE } from '@/composables/useFileAnalyzer';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, inject, onMounted, ref, watch } from 'vue';
@@ -2358,7 +2360,7 @@ async function onFileDrop(e, idx) {
     }
 
     if (hasNestedFolder) {
-        alert('フォルダ内にサブフォルダが含まれているためアップロードできません。\nフォルダ内のファイルのみを直接ドロップするか、「ファイルを選択」ボタンをご利用ください。');
+        alert('フォルダ内にサブフォルダが含まれているため読み取れません。\nフォルダ内のファイルのみを直接ドロップするか、「ファイルを選択」ボタンをご利用ください。');
         return;
     }
 

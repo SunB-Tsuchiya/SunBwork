@@ -81,5 +81,13 @@ class UnifiedMyJobBoxChangelogSeeder extends Seeder
             'design_files' => ['z_instructions/MYJOB_CORE_DESIGN1.md'],
             'claude_notes' => 'Codex。root順lock/全系列認可、既定DB更新と厳格通知のtransaction、銀本は明示祖先単位の永続受付と既存scheduler再試行。旧のみ/一般User経路は維持。簡易→旧詳細続き/M11は別の未完工程。',
         ]);
+        Changelog::updateOrCreate(['version' => 'myjob-file-details-20261105'], [
+            'title' => '試用マイジョブの詳細入力と作業ファイル情報の説明',
+            'released_at' => '2026-11-05',
+            'summary' => '同じ仕事に説明や作業ファイル情報を追加し、ファイル選択後の動きを旧新両形式で案内します。',
+            'body' => '<p>新式は情報出版Super Admin限定。同じ仕事の詳細入力から説明・ファイル名・ページ数・サイズなどを登録でき、予定・実績数量・完了・続きの関係は保ちます。ファイル本体は保存・共有しません。旧式にも同じ説明を追加し、既存の数量自動反映との違いを明記しました。新式の一般公開は行っていません。</p>',
+            'design_files' => ['z_instructions/MYJOB_DETAIL_HANDOFF_DESIGN1.md'],
+            'claude_notes' => 'Codex。entryの任意説明/file_info/details_version、本人試用専用PUT、型/件数検証と合計再算定、楽観ロック・同内容再送対応。既存詳細のFileInfoDisplay/useFileAnalyzer再利用。旧説明は利用者が明示した両形式への修正として既存フォームに適用。ファイル本体なし。',
+        ]);
     }
 }

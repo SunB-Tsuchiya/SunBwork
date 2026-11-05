@@ -458,7 +458,17 @@ class ProjectJobAssignmentController extends Controller
         // Instead, create or update a `ProjectJobAssignmentByMyself` record linked to the
         // canonical assignment and optionally update/create the Event linked to that by-myself record.
 
+        if ($request->exists('file_info')) {
+            $actor = $request->user();
+            abort_unless($actor && (int) $assignment->user_id === (int) $actor->id
+                && (int) $assignment->project_job_id === (int) $projectJob->id
+                && ($projectJob->company_id === null || (int) $projectJob->company_id === (int) $actor->company_id)
+                && ($assignment->company_id === null || (int) $assignment->company_id === (int) $actor->company_id)
+                && ($assignment->department_id === null || (int) $assignment->department_id === (int) $actor->department_id), 403);
+        }
         $data = $request->validate([
+            'file_info' => 'sometimes|nullable|array',
+
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
             'difficulty_id' => 'nullable|exists:difficulties,id',
@@ -515,6 +525,8 @@ class ProjectJobAssignmentController extends Controller
                 'amounts_unit' => $data['amounts_unit'] ?? $assignment->amounts_unit ?? null,
             ];
 
+            // Omitted information stays intact; explicit null removes only the file list.
+            if (array_key_exists('file_info', $data)) $payload['file_info'] = $data['file_info'];
             if ($by) {
                 $by->fill($payload);
                 $by->save();
