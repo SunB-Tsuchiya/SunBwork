@@ -638,3 +638,5 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 2026-11-06 配備準備完了: アプリ固定315e83672401490df2d8e35270062d7670736844。/tmp/myjob-legacy-continuation-deploy-20261106.sh（SHA256 57a6aa23a3595b16476c833c3729480961c4847409f9913d892470130f5ac9db）を作成。固定元27fba7502から今回だけの17ソース＋build、削除/依存/route定義変更なしを照合しff-only。今回migration2026_11_06_120001だけ--database=mysql --force、独立Seeder/manifest/cache/未追跡5件保持を確認する。業務仕事の試験登録/完了、クライアント補完、sales接続なし。次は正確なSSHコマンドの承認。未配備/利用者画面未確認、一般公開なし。
 
 2026-11-06 UI最終補強: 旧画面で別の過去ジョブを選び直した場合、現在のsource_personal_work_entry_idと一致する時だけ元ジョブの案内を表示する。実SSRで選択変更後の案内非表示も確認。旧形式へ渡す時分は数値化して0時/先頭0付き分をinteger validationへ正しく渡す（Laravel validateIntegerの実装を照合）。既存実Vue/旧フォームPOST検査、対象ESLint成功。最終members build終了0/manifest497資産欠落0/members base/旧資産保持/削除なし。PHP/DB処理は直前の135件1247断言成功版から変更なし。未配備/利用者画面未確認。
+
+2026-11-06 配備固定版更新: 最終アプリbe63bd5fc6c65f33706ad8c6d5bc9460d644cb52。同じ/tmp/myjob-legacy-continuation-deploy-20261106.shのTARGETをこの版へ更新（最終SHA256 6766a8b8576ea6cf0d882c96de880f47018457783c5df3a34409719946caa0c0）。以前の315e8367固定を置換。元27fba7502、17ソース許可一覧・削除なしは再照合済み。migration1件/専用Seederのみ、一般公開・実業務試験・クライアント補完なし。次は正確なSSHコマンドの承認。今回まだ未配備/利用者画面未確認。
