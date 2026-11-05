@@ -18,6 +18,7 @@ const renderer=createRenderer({patchProp(){},insert(){},remove(){},createElement
  const help=await component('resources/js/Components/WorkFileInfoHelp.vue');
  const old=await renderToString(createSSRApp(help,{legacyQuantity:true}));const fresh=await renderToString(createSSRApp(help));
  for(const html of [old,fresh])for(const text of ['ファイル本体はサーバーに保存・共有されません','ダウンロードすることはできません','100MB','保存するとジョブに登録'])assert.ok(html.includes(text),text);
+ assert.ok(old.includes('<details'));assert.ok(old.includes('<summary'));assert.ok(!/<details[^>]*\sopen[\s=>]/.test(old));assert.ok(!fresh.includes('<details'));
  assert.ok(old.includes('数量（ページ数またはファイル数）に自動反映'));assert.ok(fresh.includes('登録済みの実績数量・予定時刻は、自動で変更しません'));
  const oldForm=fs.readFileSync(path.join(root,'resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue'),'utf8');assert.ok(oldForm.includes('<WorkFileInfoHelp legacy-quantity />'));assert.ok(!oldForm.includes('再アップロードすると更新'));
  const editor=await component('resources/js/Components/WorkJobDetailsEditor.vue',true);let saved=0,cancelled=0;
