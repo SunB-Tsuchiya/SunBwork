@@ -1122,3 +1122,5 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 修正: Seederの今回versionだけをmyjob-entry-old-20261106へ短縮。DBの列長や仕事データ/機能本体/ビルドは変更しない。実際の変更履歴migrationを使うSQLiteメモリの追加Integrationで、全専用Seeder版が30文字以内・2回実行して同じ行集合・今回版が1件を確認。1件27断言とSeeder PHP構文が成功。前回135件1247断言の業務機能検証とは分けて記録。新規の識別子長チェックが既存のSQLiteだけではvarchar長を強制できない差を補う。
 
 次の一手: 本番be63bd5fcを固定元として、このSeeder修正と資料/テストだけの差分を照合する完了用スクリプトを準備。migration/ビルドを再実行せず、専用Seeder --database=mysql --force、config/cache/route/view clear、manifestと既存未追跡保持を確認して配備を完了する。AGENTS.mdの正確なSSHコマンド事前提示・承認を得る。機能の画面確認は完了後に今回方向だけ依頼し、既確認画面を繰り返さない。一般公開未承認・クライアント補完工程3は維持。
+
+2026-11-06 完了用配備準備: 固定元be63bd5fc、修正固定先0c9434f67988b8d8dc28988c2b0b37e193d70141。/tmp/myjob-legacy-continuation-finish-20261106.sh（SHA256 c62ee87e9b0a7fac573e9409fdc84dbd0630567858366ebbd045a979ec6a4bc4）。5ソースのみ、build/機能本体/API/route/migration/依存変更なしを照合。追加済みmigrationは再実行せず、専用Seeder/各cache clear/manifest/最終追跡・未追跡5件保持を確認する。次はこの正確なSSHコマンドの承認。現状は履歴登録以降が未完了、実画面未確認。
