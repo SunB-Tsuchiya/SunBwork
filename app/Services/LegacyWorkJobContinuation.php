@@ -47,6 +47,9 @@ class LegacyWorkJobContinuation
         $user = $request->user();
         $this->reader->resolve($user, 'entry', $source, $context);
         abort_unless($project->company_id === null || (int) $project->company_id === (int) $user->company_id, 403);
+        if ((int) $request->input('assignments.0.project_job_id') !== (int) $project->id) {
+            throw ValidationException::withMessages(['assignments.0.project_job_id' => '選択した案件を確認してください。']);
+        }
         $modal = $request->boolean('myjob_modal');
         $slot = Arr::only($request->input('assignments.0'), ['title','detail','project_job_id','desired_start_date','desired_end_date','start_time','desired_time',
             'difficulty_id','estimated_hours','work_item_type_id','size_id','stage_id','amounts','amounts_unit','file_info',

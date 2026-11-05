@@ -373,4 +373,4 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-11-05 後続: Docker復帰後の新詳細保存/旧式ファイル再保存を128件1160断言・PHP7構文・専用route/Ziggy・実Vue/SSRで確認。旧User updateはfile_info送信時に本人/案件/会社部署を検証し、再選択保存/未送信保持/NULL除去を修正。以前の旧編集不整合はこの対象経路で解消。未配備/利用者画面未確認。最新状態はMANAGER末尾。
 
 
-2026-11-06 実装・未配備: INFO SuperAdmin本人試用の簡易entryから旧形式PJAの続きへ、既存続きフォームの日時を保って進める入口を追加。元entryは保持し、新PJA.source_personal_work_entry_idで同系列化。work_job_continuations.assignment_id nullableを追加するmigration2026_11_06_120001のみ。旧保存のtransaction/排他/本人・会社context/型付き再送受付、機密保持とJST中断計算。新経路だけ空数量NULLを保持。135件1246断言・実Vue/旧フォームPOST・Ziggy・members build成功。利用者画面/配備は未確認、一般公開なし。クライアント補完は工程3。最新はMYJOB_UNIFIED_BOX_MANAGER1末尾。
+2026-11-06 実装・未配備: INFO SuperAdmin本人試用の簡易entryから旧形式PJAの続きへ、既存続きフォームの日時を保って進める入口を追加。元entryは保持し、新PJA.source_personal_work_entry_idで同系列化。work_job_continuations.assignment_id nullableを追加するmigration2026_11_06_120001のみ。旧保存のtransaction/排他/本人・会社context/型付き再送受付、機密保持とJST中断計算。新経路だけ空数量NULLを保持。135件1247断言・実Vue/旧フォームPOST・Ziggy・members build成功。利用者画面/配備は未確認、一般公開なし。クライアント補完は工程3。最新はMYJOB_UNIFIED_BOX_MANAGER1末尾。

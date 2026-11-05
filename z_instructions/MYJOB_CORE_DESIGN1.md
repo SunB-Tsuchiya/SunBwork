@@ -203,7 +203,7 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 
 再送受付work_job_continuationsにassignment_id nullable FKを加える今回migration2026_11_06_120001のみ。受付と仕事は同一transaction、元/本人UUID/payload hashを照合し、同内容は同じPJA・変更は422・削除済み結果は410。既存entry結果との型混同を拒否。型付き系列/完了と親削除保護は既存共通処理を再利用。
 
-検証: Unit95件707断言+Integration40件539断言=135件1246断言成功。SQLite :memory:明示・ネットワークなし・実DB不使用。実候補GETの日時/分類/非作成/一般Userと競合案件拒否、具体案件なしのその他と会社NULLの本人旧案件、元保持/数量非複製/1PJA1予定/0時/private/異型再送/同内容・変更再送、予定INSERT失敗の全rollback、削除済み受付非復活、元削除拒否・旧続き完了で元entry完了/兄弟未完を確認。フルページ保存の旧詳細へのredirectも確認。既存nullable列の順序変更だけで失敗していた比較はkey sortにして値保存を検証。旧保存が期待する任意項目を新分岐でNULL初期化。PHP6構文/実Ziggy生成成功。
+検証: Unit95件707断言+Integration40件540断言=135件1247断言成功。SQLite :memory:明示・ネットワークなし・実DB不使用。実候補GETの日時/分類/非作成/一般Userと競合案件拒否、具体案件なしのその他と会社NULLの本人旧案件、元保持/数量非複製/1PJA1予定/0時/private/異型再送/同内容・変更再送、予定INSERT失敗の全rollback、削除済み受付非復活、元削除拒否・旧続き完了で元entry完了/兄弟未完を確認。フルページ保存の旧詳細へのredirectも確認。既存nullable列の順序変更だけで失敗していた比較はkey sortにして値保存を検証。旧保存が期待する任意項目を新分岐でNULL初期化。PHP6構文/実Ziggy生成成功。
 
 実Vue script/SSRは、entryだけ旧形式入口表示/旧assignmentには非表示、router GET日時/移動中POST抑止、元の表示とエスケープ、実AssignmentFormの型付き元ID/UUID/空数量NULL/ドラッグ日時（00:00〜01:15）を含むPOSTを確認。解析器は未変更でstub利用、実業務ファイルは未収集。既存入力・詳細/ファイルUI回帰成功。対象ESLintエラー0（旧AssignmentForm既存未使用21警告のみ）。members最終build終了0（既存Browserslist通知のみ）、manifest497資産欠落0/members base・旧資産復元/削除なし・ソースdiff --check成功。ビルドからブラウザ確認を推定しない。
 

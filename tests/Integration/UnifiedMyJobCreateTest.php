@@ -892,6 +892,11 @@ class UnifiedMyJobCreateTest extends TestCase
         try { $this->continueWork($source, ['request_token' => 'c49be9ca-a214-4f5d-a47d-f5bbab801fd8']); self::fail('Legacy result mistaken for an entry'); }
         catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
         self::assertSame(1, DB::table('personal_work_entries')->count());
+        $seed = app(\App\Services\LegacyWorkJobContinuation::class)->prefill($this->user(), $source, null, 10)['assignment'];
+        $seed['legacy_request_token'] = 'c49be9ca-a214-4f5d-a47d-f5bbab801fd8';
+        $payload = ['myjob_modal' => 1, 'assignments' => [$seed + ['desired_start_date' => '2099-12-02', 'start_time' => '00:00', 'desired_time' => '01:00']]];
+        try { app(\App\Http\Controllers\User\ProjectJobAssignmentController::class)->store($this->request($payload), (new \App\Models\ProjectJob)->forceFill(['id' => 99, 'company_id' => 1])); self::fail('Retry with mismatched route project accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('assignments.0.project_job_id', $e->errors()); }
     }
 
     public function test_simple_to_legacy_rejects_foreign_source_context_role_and_multiple_source_modes(): void
