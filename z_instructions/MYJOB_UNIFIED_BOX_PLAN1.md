@@ -420,3 +420,12 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 最初の範囲はカレンダーのジョブ作成/旧作成モーダル/新式モーダル/流用選択/統合BOXの、表記と古い案内の修正。5Vueファイルの軽微な文言整備として既存PLAN/MANAGER/PROMPT内で管理し、新しい入力機能・保存処理・DB・レイアウト・権限は追加しない。方針: 受信を明確にする「受けた依頼から登録」、選択見出しは「受けた依頼を選択」。過去流用は従来使い慣れた「過去データから流用」に統一し、続き/独立引用の選択を維持。統合BOXの「詳細入力・依頼・添付は旧BOXへ」という古い一括案内を修正し、流用/受信登録は作成から、難易度/見積時間等は旧BOXからと案内する。
 
 一般Userに新式入口を追加しない。旧画面上の同機能の名称も合わせるが、新機能公開/旧導線撤去/日時引継ぎ変更とは別。上段タブの全面置換やボタンの削除はこの範囲へ含めない。既存実Vue検証の表示期待だけを変更に合わせ、従来の保存/引用/日時/役割による表示条件を検証し、対象lintとmembers build/旧資産保持を確認する。配備は正確なコマンドの確認後。次の一手は上記の文言修正と検証。
+
+
+## 2026-11-07 工程4 試用の既定入口を統合BOXへ（実装承認）
+
+利用者は「SuperAdminの試用範囲でマイジョブタブから統合BOXへ直接入る、従来BOXリンク保持、一般Userは変更しない」の具体案にyes。状態=確定。旧UserWorkHubTabsが常に従来BOXを指す状態を試用対象だけ置換する。上段の仕事・案件も同じ行先に揃え、デスクトップ/モバイルで一致させる。
+
+範囲: UserNavigationTabs/UserWorkHubTabsと共通の行先判定helper。共有propsの既存userWorkHub.enabled（INFOのサーバ試用guard）、auth.user.user_role=superadmin、companyType非general、company_idとsuperAdminContextIdが本人会社一致又は未指定であることを確認。条件不成立は旧user.myjobbox.indexへ。サーバのUnifiedMyJobBox.available/認可は変更しない。統合BOXの従来BOXリンク、従来BOXの試用リンク、旧入力/カレンダー/過去流用/受信入口は保持。DB/一般公開/権限拡大なし。
+
+基準6f2b7cc55、本番直前証拠f9821e4c3。追加SSHなし。検証は共通判定の役割/一般会社/会社context/欠けたprops、実Vue SSRの上段・内側・モバイル行先/受信badge/active保持、既存入力検証、lint、members buildと旧資産保持。次の一手は上記の小範囲実装と検証。

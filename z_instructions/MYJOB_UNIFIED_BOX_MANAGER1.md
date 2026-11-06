@@ -1,5 +1,7 @@
 # マイジョブ入力・BOX統合 管理
 
+> 最新: 本番8314c7ea4（ポートフォリオ配備済み）へ今回の試用タブ変更を統合中。作業branch feature/myjob-navigation-integrated-20261107、作業tree /tmp/sunbwork-myjob-navigation-integrated-20261107。旧配備はHEAD違いで書込前停止、一般公開未承認。
+
 > 2026-11-07 最新: 工程3の複数クライアントは配備・依頼3点の利用者確認まで成功。工程4の名称/案内整理に着手。保存基準8fd3905cc、本番証拠e856d0c5a。一般公開未承認。古い冒頭表の未実装/確認待ちは履歴として末尾を優先。
 
 > 2026-11-06 最新: 工程1「簡易→旧形式の続き」は依頼した3点の画面確認まで成功。工程2は利用者が難易度/見積時間/サイズ/詳細工程を当面旧式に残すと確定。次は工程3のクライアント補完に向けた読取調査の準備・SSH承認。新式の一般公開は未承認。下記の古い未実装/画面待ちの表は履歴で、末尾の最新記録を優先する。保存基準8ce72c32f、本番最終実行証拠0c9434f67、専用作業branch feature/myjob-client-plan-20261106。
@@ -806,3 +808,68 @@ Vue5ファイルのテンプレート文言だけを変更。QuickWorkEntryModal
 本番の現況は以前ユーザーが明示承認した同一の読み取りコマンドを再使用して確認。2026-11-07、HEAD=e856d0c5a207530c0934ac723e9bc69d50a1dab5、main、追跡変更なし、manifest変更なし、既知未追跡5件一致。売上DBやアプリDBの調査なし。一般公開未承認。共有Claude作業未編集。
 
 次の一手はこの5Vue+表示期待+資料+資産だけの固定差分配備スクリプトを作り、正確なSSHコマンドの承認を得る。DB更新/migration/seed/composer/npmの本番実行は不要。今回は工程4の最初の文言整備であり、メインナビ置換や全導線の最終レビュー完了とはしない。配備/今回文言の利用者確認は未実施。
+
+
+## 2026-11-07 名称整理の限定反映準備
+
+保存f9821e4c3368f2d50dbd76e524f3607484068a0dをpush済み。/tmp/myjob-buttons-deploy-20261107.sh（SHA256 ed151a94e2e1f5902aab40accc56467f3fac4fe216e3b236b5c892a4319af9a6）を作成しsh構文検証済み、private/codex-myjob-buttons-20261107にも復元用保存。未実行。
+
+固定元e856d0c5a/固定先f9821e4c3、main/追跡変更なし/既知未追跡5件/14ソース許可一覧/削除なしを検証。PHP/DB/routes/config/bootstrap/依存ファイルの差分0を明示検証し、固定先だけff-onlyで反映。manifestの固定hash/498資産/欠落0/members baseを照合しview:clearのみ。migration/seed/アプリDB読取更新/composer/npmは本番では実行しない。一般公開・ナビ置換なし。
+
+個々の名称はユーザーの工程4進行指示内での実装判断であり、ユーザーが各語句を画面確認済みと解釈しない。次の一手は正確なSSH配備コマンドを提示し承認後に同一スクリプトを実行する。画面では今回の2入口の表記と受信選択見出し/旧案内修正だけを確認し、既に成功した保存/続き/クライアント編集の再試験は求めない。
+
+
+## 2026-11-07 ボタン表記の本番反映成功（画面確認待ち）
+
+利用者が正確な/tmp/myjob-buttons-deploy-20261107.shのSSHにyesと回答。同一スクリプト実行exit0。固定元e856d0c5a/main/追跡変更なし/既知未追跡5件/14ソース許可一覧/削除なし/アプリPHP・DB・routes・config・依存差分0を通過し、固定先f9821e4c3368f2d50dbd76e524f3607484068a0dへff-only。manifest498資産/欠落0/members base/固定hash一致、view:clear成功、最終HEADと追跡変更なし・未追跡5件保持を確認。DB読取更新/migration/seedなし。一般公開なし、共有Claude作業未変更。
+
+利用者画面確認は未実施。今回依頼するのは保存を伴わない次の2点: (1) 統合BOXの案内が流用/受信登録は作成から・難易度等は従来BOXからになり、「マイジョブ作成」で「過去データから流用」「受けた依頼から登録」の2入口が表示される。(2) 「受けた依頼から登録」を開くと選択見出しが「受けた依頼を選択」で、閉じて戻れる。すべて問題なければ「成功」、違いがあれば番号と結果を依頼。実際の依頼保存/通知/完了や旧画面全入口の操作まで成功と拡張しない。
+
+実装/コード検証/配備は完了、今回2点の利用者画面確認待ち。次の一手は結果を記録し、工程4の残る入口配置・タブ名称の必要性を相談する。一般User向けメインナビ置換は未承認のまま。
+
+
+## 2026-11-07 ボタン名称・案内の画面確認成功
+
+利用者は直前に依頼した2点に「成功」と回答。確定: (1) 統合BOXの更新された案内と、マイジョブ作成内の「過去データから流用」「受けた依頼から登録」の表示、(2) 受信登録を開いた選択見出し「受けた依頼を選択」と閉じて戻る操作。2点は利用者画面確認済み。同じ試験を再要求しない。依頼の実保存/通知・旧画面全入口・一般User画面まで確認済みと拡張しない。本番証拠f9821e4c3、今回は追加SSHなし。
+
+工程4の最初の名称/案内整備は実装・コード検証・本番反映・依頼2点の画面確認まで完了。メインナビの全面置換/新機能一般公開とは別。
+
+次の相談案（提案、未確定）: 試用SuperAdminに限り「仕事・案件」の「マイジョブ」タブの既定先を統合BOXへ向ける。現在UserWorkHubTabsはuser.myjobbox.indexを指しており、統合BOXへ直接入る主導線になっていない。従来BOXへのリンクとカレンダードラッグ/旧入力/過去流用/受信依頼の既存操作は保持する。一般Userのタブ/routeを変更しない。対象guardと他画面から戻る動線を照合した具体案を相談してから実装判断する。一般公開と工程5の権限/実例/上長レビューは引き続き未承認・未完了事項を保持する。
+
+
+## 2026-11-07 工程4 試用の既定入口を統合BOXへ（実装承認）
+
+利用者は「SuperAdminの試用範囲でマイジョブタブから統合BOXへ直接入る、従来BOXリンク保持、一般Userは変更しない」の具体案にyes。状態=確定。旧UserWorkHubTabsが常に従来BOXを指す状態を試用対象だけ置換する。上段の仕事・案件も同じ行先に揃え、デスクトップ/モバイルで一致させる。
+
+範囲: UserNavigationTabs/UserWorkHubTabsと共通の行先判定helper。共有propsの既存userWorkHub.enabled（INFOのサーバ試用guard）、auth.user.user_role=superadmin、companyType非general、company_idとsuperAdminContextIdが本人会社一致又は未指定であることを確認。条件不成立は旧user.myjobbox.indexへ。サーバのUnifiedMyJobBox.available/認可は変更しない。統合BOXの従来BOXリンク、従来BOXの試用リンク、旧入力/カレンダー/過去流用/受信入口は保持。DB/一般公開/権限拡大なし。
+
+基準6f2b7cc55、本番直前証拠f9821e4c3。追加SSHなし。検証は共通判定の役割/一般会社/会社context/欠けたprops、実Vue SSRの上段・内側・モバイル行先/受信badge/active保持、既存入力検証、lint、members buildと旧資産保持。次の一手は上記の小範囲実装と検証。
+
+
+## 2026-11-07 試用マイジョブの既定入口変更 実装・検証完了
+
+UserNavigationTabsの上段「仕事・案件」とUserWorkHubTabsの内側「マイジョブ」の行先を共通workHubMyJobRouteで判定。既存server userWorkHub.enabled、SuperAdmin本人、companyType非generalかつ欠落なし、本人company_idが正整数、context未指定又は本人会社一致の場合だけuser.myjobbox.unified_previewへ。それ以外は従来index。既存共有propsにcompany_id/contextが含まれることを実コードで確認。部署判定は既存serverflagに依拠し、サーバ認可/データscopeは変更しない。
+
+共通判定と実Vue SSR検証成功: 上段/内側/モバイルの試用行先、本人context文字列ID、別会社切替、欠けたprops、各一般role、general会社、activeと受信件数表示、従来BOX戻りリンク保持。既存unifiedMyJobInputの日時/流用/保存/役割による入口表示の退行検証も成功。対象ESLint成功、members build終了0、manifest468/参照498/欠落0・既存sourceエントリ保持・members base、旧資産復元と削除差分なし。PHP/routes/DB/権限/旧ページの保存先は未変更。実ブラウザ確認はまだ。
+
+保存基準6f2b7cc55から隔離作業、共有Claude作業は未変更。追加SSHなし。今回は上段と内側の行先が一致する必要から両方を変更したが、一般Userのナビは従来のまま。実装/コード検証/build完了、配備/利用者画面確認は未実施。次の一手は本番元f9821e4c3からの固定差分配備スクリプトを提示し、承認後に限定反映する。一般公開未承認。
+
+
+## 2026-11-07 試用既定入口の限定反映準備（未実行）
+
+コード/資産/検証を7b2d6ef27bc2d6c8336ed06ac15e188f683cd481に保存・push済み。/tmp/myjob-navigation-deploy-20261107.shを作成しsh構文確認済み。SHA256 86b43e956f852bcf8cb20f345b2d774d923fb0a6265ac3414f6c90295252f2d2。private/codex-myjob-navigation-20261107にも復元用保存。
+
+固定元f9821e4c3/main/既知未追跡5件/追跡変更なし/9ソース許可一覧/削除なし/サーバアプリ・DB・routes・設定・依存差分0を検証して固定先7b2d6ef27へff-only。manifest固定hashと498資産/欠落0/members base、view:clear、最終作業状態保持を確認する。DB読取更新/migration/seedなし。実ブラウザ確認は未実施。
+
+次の一手は正確な `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-navigation-deploy-20261107.sh` の承認後に実行する。一般公開未承認。確認成功済みのボタン名や複数クライアント操作を再試験せず、今回の入口の行先と旧BOX往復だけを画面確認依頼する。
+
+
+## 2026-11-07 入口配備を事前停止・ポートフォリオ配備版へ統合
+
+利用者が旧/tmp/myjob-navigation-deploy-20261107.shにyes。同一コマンドを実行したが冒頭HEAD検査でexit1『STOP: production HEAD differs』。fetch/merge/cache/DB更新より前に停止し、本番へ今回変更なし。以前明示承認された同じ読み取りコマンドで現況を確認し、現在HEAD8314c7ea422cf8ff52072c389d143a3b98773b80/main/追跡変更なし/既知未追跡5件保持と判明。8314はf9821e4c3を親とする他作業のポートフォリオ配備。resetや旧build上書きは行っていない。
+
+origin mainをfetchして差分確認後、8314を基準に/tmp/sunbwork-myjob-navigation-integrated-20261107、feature/myjob-navigation-integrated-20261107を新設。既存featureの7c32abf4aを隔離merge。共通UserNavigationTabsは自動統合され、ポートフォリオ入口/表示条件を保持したうえでtrial helperとwork_hub行先だけ変更。CONSOLIDATED_01の末尾競合は両方の記述を残し、manifest競合は最新版ポートフォリオを含むソースから再buildして解消。共有Claudeワークツリー/CLAUDE.mdは未編集。
+
+再検証成功: 共通判定/実Vue SSRの試用desktop/mobile/内側・role/company/context/active/badge/旧BOX戻りに加え、ポートフォリオ入口が共存することを確認。既存入力の実Vue検証と対象ESLint成功。members build終了0、manifest473エントリ/参照504資産/欠落0、最新版の全resourcesエントリとPortfolio3画面保持、members base確認、旧資産保持。buildには既存のglob非推奨と大きなchunk通知があるがエラーなし。
+
+8314に対するソース差分は2ナビ/helper/test/本件資料の9ファイルのみ。app/database/routes/config/bootstrap/依存差分0、ポートフォリオ実装ファイルは変更なし。今回は試用入口コード自体を拡張せず、他の配備を保持する統合作業。現在の本番は8314のまま、今回入口の限定反映/画面確認は未実施。次の一手は8314固定元の新しい配備スクリプトを作成し、正確なSSHコマンドを再提示する。元版・対象が変わったので旧スクリプトのまま再実行しない。一般公開未承認。

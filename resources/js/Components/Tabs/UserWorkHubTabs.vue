@@ -1,12 +1,13 @@
 <script setup>
 import { computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
+import { workHubMyJobRoute } from '@/utils/workHubNavigation';
 
 defineProps({ active: { type: String, required: true } });
 const page = usePage();
 const count = computed(() => Math.max(0, Number(page.props.userWorkHub?.unregisteredRequests) || 0));
 const tabs = computed(() => [
-    { key: 'myjob', name: 'user.myjobbox.index', label: 'マイジョブ' },
+    { key: 'myjob', name: workHubMyJobRoute(page.props), label: 'マイジョブ' },
     { key: 'jobbox', name: 'user.jobbox.index', label: '依頼されたジョブ' },
     { key: 'broad_projects', name: 'user.work.broad_projects.index', label: '大まかな案件' },
     { key: 'project_jobs', name: 'user.project_jobs.index', label: '案件確認' },

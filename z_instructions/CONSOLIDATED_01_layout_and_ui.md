@@ -293,3 +293,9 @@ AppLayout 内にグローバル配置済み。各ページで重複させない�
 - **画像の拡大**は `ImageLightbox.vue`（全画面。クリックで等倍、複数ページは ← → で送る、Esc で閉じる）を共用する。
 - **`useToasts` が返すのは `showToast`**（`addToast` は存在しない。`const addToast = showToast;` と別名を付けて使う。`addToast` を分割代入すると実行時に「is not a function」で止まる）。
 - 並べ替えは `sortablejs`。DOM は Vue が管理するため、`onEnd` で移動を元に戻してからデータを並べ替える（`Manage.vue` の `revertDom`）。
+
+2026-11-07追記: ボタン名と案内文の変更は本番f9821e4c3へ反映済み。DB・機能・権限の変更なし。利用者による今回の画面確認待ち。
+
+2026-11-07利用者「成功」: 統合BOX案内と作成内の流用/受信ボタン表示、受信選択見出しと閉じる操作の2点を画面確認済み。実際の依頼保存・一般公開の確認には拡張しない。
+
+2026-11-07試用入口（未配備）: workHubMyJobRouteは既存server試用flag/本人SuperAdmin/非general/本人会社context一致を確認し、上段「仕事・案件」と内側「マイジョブ」を統合BOXへ揃える。条件外は従来index。デスクトップ/モバイル共通。統合BOXの従来BOXリンクと旧BOXの試用リンクは保持し、一般公開/サーバ認可は変更しない。
