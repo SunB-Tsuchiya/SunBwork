@@ -159,14 +159,14 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     }
     {
         const ctx={};await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'myjob'}),ctx);
-        assert.ok(ctx.teleports.body.includes('過去ジョブから引用'));assert.ok(ctx.teleports.body.includes('依頼ジョブから登録'));
+        assert.ok(ctx.teleports.body.includes('過去データから流用'));assert.ok(ctx.teleports.body.includes('受けた依頼から登録'));
         const savedPage=globalThis.__historyPage;
         globalThis.__historyPage={props:{userWorkHub:{enabled:false}}};const normalCtx={};
-        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),normalCtx);assert.ok(!normalCtx.teleports.body.includes('過去ジョブから引用'));
+        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),normalCtx);assert.ok(!normalCtx.teleports.body.includes('過去データから流用'));
         globalThis.__historyPage={props:{userWorkHub:{enabled:true}}};const trialCtx={};
-        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),trialCtx);assert.ok(trialCtx.teleports.body.includes('過去ジョブから引用'));globalThis.__historyPage=savedPage;
+        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),trialCtx);assert.ok(trialCtx.teleports.body.includes('過去データから流用'));globalThis.__historyPage=savedPage;
         const editCtx={};await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'myjob',entry:{id:7}}),editCtx);
-        assert.ok(!editCtx.teleports.body.includes('過去ジョブから引用'));assert.ok(!editCtx.teleports.body.includes('依頼ジョブから登録'));
+        assert.ok(!editCtx.teleports.body.includes('過去データから流用'));assert.ok(!editCtx.teleports.body.includes('受けた依頼から登録'));
     }
     const legacyEntryCtx={};await renderToString(createSSRApp(actualForm,{show:true,entryPoint:'myjob',date:'2026-12-04',continuationSource:{type:'entry',id:7}}),legacyEntryCtx);
     assert.ok(legacyEntryCtx.teleports.body.includes('日時を引き継いで旧形式で続きを入力'));
@@ -174,7 +174,7 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     assert.ok(!legacyAssignmentCtx.teleports.body.includes('日時を引き継いで旧形式で続きを入力'));
     const actualPage = await component(page);
     const html = await renderToString(createSSRApp(actualPage, pageProps));
-    for (const text of ['マイジョブ作成', '詳細入力・依頼からの登録・添付', '従来のマイジョブBOXへ']) assert.ok(html.includes(text));
+    for (const text of ['マイジョブ作成', '流用・受けた依頼からの登録', '従来のマイジョブBOXへ']) assert.ok(html.includes(text));
     const detailBehavior = await component('resources/js/Pages/MyJobBox/WorkDetail.vue', true);
     const detailProps = {work:{id:1,work_date:'2026-11-03'},time:{},ancestors:[],back:{from:'calendar'}};
     const detailApp = renderer.createApp({render:()=>h(detailBehavior,detailProps)}); detailApp.mount({});

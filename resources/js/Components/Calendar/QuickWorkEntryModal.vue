@@ -292,8 +292,8 @@ async function remove() {
                 <p class="mt-1 text-xs text-gray-500">{{ isMyJob ? '日付と開始・終了時刻を入力して作業を登録します。登録した作業は、このBOXとカレンダーに表示されます。' : 'カレンダーで選んだ時刻を、その日の作業予定として保存します。あとから時刻や内容を直せます。' }}</p>
                 <p v-if="error" class="mt-3 rounded bg-red-50 p-2 text-sm text-red-700" role="alert">{{ error }}</p>
                 <div v-if="canSelectSource && !sourcePickerOpen" class="mt-3 flex flex-wrap gap-2 border-b pb-3">
-                    <button type="button" :disabled="saving || handingOff" class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-700 disabled:opacity-50" @click="sourcePickerOpen = true">過去ジョブから引用</button>
-                    <button type="button" :disabled="saving || handingOff" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 disabled:opacity-50" @click="openRequests">{{ handingOff ? '移動中…' : '依頼ジョブから登録' }}</button>
+                    <button type="button" :disabled="saving || handingOff" class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-700 disabled:opacity-50" @click="sourcePickerOpen = true">過去データから流用</button>
+                    <button type="button" :disabled="saving || handingOff" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 disabled:opacity-50" @click="openRequests">{{ handingOff ? '移動中…' : '受けた依頼から登録' }}</button>
                 </div>
                 <MyJobSourcePicker v-if="sourcePickerOpen" mode="past" :simple-input="true" class="mt-4" @cancel="sourcePickerOpen = false" @selected="chooseHistory" />
                 <p v-if="historyChoice && !sourcePickerOpen" class="mt-3 rounded bg-indigo-50 p-2 text-sm text-indigo-800">{{ historyChoice.kind === 'continue' ? '選択した仕事の続きとして登録します。' : '元の仕事とは独立した仕事として登録します。' }}</p>

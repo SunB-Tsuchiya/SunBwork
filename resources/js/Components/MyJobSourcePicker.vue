@@ -18,7 +18,7 @@ const loading = ref(false);
 const error = ref('');
 let sequence = 0;
 
-const title = computed(() => props.mode === 'past' ? '過去データから流用' : '依頼ジョブを選択');
+const title = computed(() => props.mode === 'past' ? '過去データから流用' : '受けた依頼を選択');
 const queryKey = computed(() => JSON.stringify({
     mode: props.mode,
     searchMode: searchMode.value,

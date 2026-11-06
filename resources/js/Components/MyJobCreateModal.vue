@@ -137,7 +137,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
                 </div>
                 <div class="flex flex-wrap gap-2 border-b px-4 py-2 sm:px-6">
                     <button type="button" :disabled="!options" class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50" @click="picker = 'past'">過去データから流用</button>
-                    <button type="button" :disabled="!options" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-50" @click="picker = 'request'">依頼ジョブとして登録</button>
+                    <button type="button" :disabled="!options" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-50" @click="picker = 'request'">受けた依頼から登録</button>
                 </div>
                 <div class="overflow-y-auto px-4 py-4 sm:px-6">
                     <p v-if="loadError" role="alert" class="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{{ loadError }}</p>

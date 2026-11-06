@@ -274,7 +274,7 @@ onMounted(() => {
                     過去データから流用
                 </button>
                 <button @click="openRequestModal" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100">
-                    依頼ジョブとして登録
+                    受けた依頼から登録
                 </button>
             </div>
         </template>
@@ -461,11 +461,11 @@ onMounted(() => {
             <div v-if="showRequestModal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16" @click.self="showRequestModal = false">
                 <div class="mx-4 w-full max-w-2xl rounded-lg bg-white shadow-xl">
                     <div class="flex items-center justify-between border-b px-6 py-4">
-                        <h2 class="text-lg font-semibold text-indigo-800">依頼ジョブを選択</h2>
+                        <h2 class="text-lg font-semibold text-indigo-800">受けた依頼を選択</h2>
                         <button @click="showRequestModal = false" class="text-gray-400 hover:text-gray-700">✕</button>
                     </div>
                     <div class="p-5">
-                        <p class="mb-4 text-sm text-gray-600">自分宛に依頼されたジョブを選択すると、このマイジョブが「依頼ジョブの対応済み登録」として扱われます。依頼ジョブは案件詳細から非表示になります。</p>
+                        <p class="mb-4 text-sm text-gray-600">自分宛に届いた依頼を選び、マイジョブとして登録します。</p>
                         <div v-if="requestLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
                         <div v-else-if="requestRecords.length === 0" class="py-8 text-center text-sm text-gray-500">未対応の依頼ジョブはありません</div>
                         <div v-else class="max-h-80 overflow-y-auto rounded border border-gray-200">

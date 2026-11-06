@@ -47,7 +47,7 @@ function calendar(date) {
                     <Link :href="route('user.myjobbox.index')" class="rounded border px-3 py-2 text-sm text-blue-700">従来のマイジョブBOXへ</Link>
                 </div>
             </div>
-            <p class="mb-4 text-xs text-gray-500">詳細入力・依頼からの登録・添付は「従来のマイジョブBOXへ」から利用できます。</p>
+            <p class="mb-4 text-xs text-gray-500">流用・受けた依頼からの登録は「マイジョブ作成」から選べます。難易度・見積時間などの入力には、従来のマイジョブBOXを利用できます。</p>
             <form class="flex flex-wrap items-center gap-3" @submit.prevent="search()">
                 <label class="sr-only" for="unified-search">作業・案件・分類を検索</label>
                 <input id="unified-search" v-model="q" maxlength="200" placeholder="作業名・案件名・分類で検索" class="w-full rounded border px-3 py-2 text-sm sm:w-72" />
