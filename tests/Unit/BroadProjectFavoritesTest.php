@@ -41,11 +41,14 @@ class BroadProjectFavoritesTest extends TestCase
         $schema->create('companies', function (Blueprint $t) { $t->id(); $t->string('company_type'); });
         $schema->create('departments', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->string('code'); });
         $schema->create('users', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
+        $schema->create('clients', function (Blueprint $t) { $t->id(); $t->string('name'); $t->boolean('is_dormant')->default(false); });
+        $schema->create('company_clients', function (Blueprint $t) { $t->integer('company_id'); $t->integer('client_id'); });
         $schema->create('broad_projects', function (Blueprint $t) {
             $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->string('name');
             $t->integer('parent_id')->nullable(); $t->integer('client_id')->nullable(); $t->integer('fiscal_year')->nullable();
             $t->string('import_key')->nullable(); $t->integer('sort_order')->nullable(); $t->boolean('is_active'); $t->timestamps();
         });
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_06_150001_create_broad_project_clients_table.php')->up();
         $schema->create('project_jobs', function (Blueprint $t) {
             $t->id(); $t->integer('company_id')->nullable(); $t->integer('user_id'); $t->integer('created_by_user_id')->nullable();
             $t->string('title'); $t->timestamps();
@@ -191,4 +194,21 @@ class BroadProjectFavoritesTest extends TestCase
         self::assertCount(2, array_filter($editor['options'], fn ($option) => $option['is_favorite']));
         self::assertNull(ProjectJob::find(1)->broad_project_id);
     }
+    public function test_multiple_client_names_search_candidates_and_editor_without_changing_client_or_order(): void
+    {
+        $db = $this->db->getConnection();
+        $db->table('clients')->insert([['id' => 1, 'name' => 'Alpha'], ['id' => 2, 'name' => 'Beta']]);
+        $db->table('company_clients')->insert([['company_id' => 1, 'client_id' => 1], ['company_id' => 1, 'client_id' => 2]]);
+        $root = $this->node('Root'); $child = $this->node('Middle', ['parent_id' => $root->id]);
+        $child->clients()->attach([1, 2]);
+        $rows = $this->favorites->candidates($this->actor(), 'Ｂｅｔａ', 0, null);
+        self::assertSame([$root->id, $child->id], array_column($rows, 'id'));
+        self::assertSame('Alpha・Beta', $rows[1]['client_name']);
+        $options = $this->links->editor($this->actor(), 1)['options'];
+        self::assertSame([1, 2], array_column($options[1]['clients'], 'id'));
+        self::assertNull($child->fresh()->client_id);
+        $this->favorites->set($this->actor(), $child, true);
+        self::assertTrue(collect($this->favorites->candidates($this->actor(), 'Beta'))->firstWhere('id', $child->id)['is_favorite']);
+    }
+
 }

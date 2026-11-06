@@ -40,11 +40,14 @@ class ProjectBroadProjectLinkTest extends TestCase
         $schema->create('companies', function (Blueprint $t) { $t->id(); $t->string('company_type'); });
         $schema->create('departments', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->string('code'); });
         $schema->create('users', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
+        $schema->create('clients', function (Blueprint $t) { $t->id(); $t->string('name'); $t->boolean('is_dormant')->default(false); });
+        $schema->create('company_clients', function (Blueprint $t) { $t->integer('company_id'); $t->integer('client_id'); });
         $schema->create('broad_projects', function (Blueprint $t) {
             $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->string('name');
             $t->integer('parent_id')->nullable(); $t->integer('client_id')->nullable(); $t->integer('fiscal_year')->nullable();
             $t->string('import_key')->nullable(); $t->integer('sort_order')->nullable(); $t->boolean('is_active'); $t->timestamps();
         });
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_06_150001_create_broad_project_clients_table.php')->up();
         $schema->create('project_jobs', function (Blueprint $t) {
             $t->id(); $t->integer('company_id')->nullable(); $t->integer('user_id'); $t->integer('created_by_user_id')->nullable();
             $t->string('title'); $t->timestamps();

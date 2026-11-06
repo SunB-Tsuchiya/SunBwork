@@ -1,4 +1,5 @@
 <script setup>
+import BroadProjectClients from '@/Components/ProjectJobs/BroadProjectClients.vue';
 import { computed, ref, watch } from 'vue';
 import axios from 'axios';
 import { useForm } from '@inertiajs/vue3';
@@ -118,7 +119,8 @@ function toggle(id) {
                                 <span v-if="project.childCount" class="ml-2 text-xs text-gray-500">{{ project.childCount }}分類</span>
                                 <span v-if="!project.is_active" class="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">休止中</span>
                                 <span v-else-if="!project.selectable" class="ml-2 text-xs text-gray-500">親グループが休止中</span>
-                                <p v-if="project.client?.name || project.fiscal_year" class="mt-1 text-sm text-gray-500">{{ [project.client?.name, project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' ／ ') }}</p>
+                                <BroadProjectClients :clients="(showInactive ? project.all_display_clients : project.display_clients) || project.clients || []" />
+                                <p v-if="project.fiscal_year" class="mt-1 text-sm text-gray-500">{{ project.fiscal_year }}年度</p>
                             </div>
                         </div>
                     </div>

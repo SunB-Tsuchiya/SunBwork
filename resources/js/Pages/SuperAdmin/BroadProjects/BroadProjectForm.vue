@@ -13,7 +13,8 @@ const props = defineProps({
 });
 const emit = defineEmits(['saved', 'cancel']);
 const isEditing = computed(() => Boolean(props.project?.id));
-const clientSearch = ref(props.project?.client?.name || '');
+const clientSearch = ref('');
+const selectedClients = ref([...(props.project?.clients ?? (props.project?.client ? [props.project.client] : []))]);
 const clientOptions = ref([]);
 const clientLoading = ref(false);
 const clientPickerOpen = ref(false);
@@ -23,10 +24,11 @@ const clientOptionsId = `${clientInputId}-options`;
 const form = useForm({
     name: props.project?.name || '',
     ...(!props.project?.id ? {group_type: props.initialParentId ? 'middle' : 'large', parent_id: props.initialParentId} : {}),
-    client_id: props.project?.client_id ?? null,
+    client_ids: selectedClients.value.map(client => client.id),
     fiscal_year: props.project?.fiscal_year ?? null,
     is_active: props.project?.is_active ?? true,
 });
+const clientError = computed(() => Object.entries(form.errors).find(([key]) => key === 'client_ids' || key.startsWith('client_ids.'))?.[1]);
 const isPaused = computed({
     get: () => !form.is_active,
     set: (value) => { form.is_active = !value; },
@@ -83,19 +85,21 @@ async function searchClients() {
 }
 
 function focusClientSearch() {
-    if (clientSearch.value.trim() && !form.client_id) searchClients();
+    if (clientSearch.value.trim()) searchClients();
 }
 
 function chooseClient(client) {
     closeClientOptions();
-    form.client_id = client.id;
-    clientSearch.value = client.name;
+    if (!form.client_ids.includes(client.id)) {
+        selectedClients.value.push(client);
+        form.client_ids.push(client.id);
+    }
+    clientSearch.value = '';
 }
 
-function clearClient() {
-    closeClientOptions();
-    form.client_id = null;
-    clientSearch.value = '';
+function removeClient(id) {
+    selectedClients.value = selectedClients.value.filter(client => client.id !== id);
+    form.client_ids = form.client_ids.filter(clientId => clientId !== id);
 }
 
 function save() {
@@ -106,7 +110,9 @@ function save() {
             else {
                 form.reset();
                 form.clearErrors();
-                clearClient();
+                selectedClients.value = [];
+                clientSearch.value = '';
+                closeClientOptions();
                 emit('saved');
             }
         },
@@ -133,13 +139,19 @@ function save() {
             <span v-if="form.errors.fiscal_year" class="block text-red-700">{{ form.errors.fiscal_year }}</span>
         </label>
         <div ref="clientPickerRef" class="relative text-sm sm:col-span-2">
-            <label :for="clientInputId">取引先（任意）</label>
+            <label :for="clientInputId">クライアント（複数選択可・任意）</label>
             <div class="mt-1 flex gap-2">
-                <input :id="clientInputId" v-model="clientSearch" type="search" autocomplete="off" placeholder="名前で検索" :aria-expanded="clientPickerOpen" :aria-controls="clientOptionsId" class="w-full rounded border p-2" @input="form.client_id = null; searchClients()" @focus="focusClientSearch" />
-                <button v-if="form.client_id" type="button" class="shrink-0 text-sm text-blue-700 underline" @click="clearClient">解除</button>
+                <input :id="clientInputId" v-model="clientSearch" type="search" autocomplete="off" placeholder="名前で検索" :aria-expanded="clientPickerOpen" :aria-controls="clientOptionsId" class="w-full rounded border p-2" @input="searchClients" @focus="focusClientSearch" />
+
             </div>
-            <span v-if="form.errors.client_id" class="block text-red-700">{{ form.errors.client_id }}</span>
-            <p v-if="clientSearch && !form.client_id" class="mt-1 text-xs text-gray-500">取引先を登録する場合は候補から選択してください。</p>
+            <span v-if="clientError" class="block text-red-700">{{ clientError }}</span>
+            <p v-if="clientSearch" class="mt-1 text-xs text-gray-500">取引先を登録する場合は候補から選択してください。</p>
+            <ul v-if="selectedClients.length" class="mt-2 flex flex-wrap gap-2" aria-label="選択済みクライアント">
+                <li v-for="client in selectedClients" :key="client.id" class="flex items-center gap-2 rounded bg-blue-50 px-2 py-1">
+                    <span>{{ client.name }}</span><button type="button" class="text-blue-700 underline" :aria-label="`${client.name}を解除`" @click="removeClient(client.id)">解除</button>
+                </li>
+            </ul>
+            <p class="mt-1 text-xs text-gray-500">この分類に関連するクライアントです。仕事を記録する際のクライアントを一つに限定するものではありません。</p>
             <div v-if="clientPickerOpen" :id="clientOptionsId" class="mt-1 w-full rounded border bg-white shadow" :class="{ 'absolute z-10': !isEditing }">
                 <div class="flex items-center justify-between border-b px-3 py-2 text-xs text-gray-600">
                     <span>取引先の候補</span>

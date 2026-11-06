@@ -61,10 +61,10 @@ const titleSuggestions = computed(() => recentTitles.value
     .slice(0, 8));
 const time = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 const projectLabel = (project) => [project.title, project.jobcode, project.client_name].filter(Boolean).join(' / ');
-const broadProjectLabel = (project) => [project.path || project.name, project.client_name, !project.path && project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' / ');
+const broadProjectLabel = (project, full = false) => [project.path || project.name, project.display_clients?.length ? (full ? project.display_clients.map(client => client.name).join('・') : `${project.display_clients.slice(0, 2).map(client => client.name).join('・')}${project.display_clients.length > 2 ? `・ほか${project.display_clients.length - 2}社` : ''}`) : project.client_name, !project.path && project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' / ');
 const matchingBroadProjects = computed(() => broadProjects.value.filter(project => {
     const words = projectSearch.value.normalize('NFKC').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-    return words.every(word => broadProjectLabel(project).normalize('NFKC').toLocaleLowerCase().includes(word));
+    return words.every(word => broadProjectLabel(project, true).normalize('NFKC').toLocaleLowerCase().includes(word));
 }));
 const broadProjectGroups = computed(() => [
     {key: 'favorites', label: 'お気に入りの大まかな案件', items: matchingBroadProjects.value.filter(p => p.is_favorite)},

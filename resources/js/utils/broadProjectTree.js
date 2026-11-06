@@ -10,7 +10,8 @@ export function treeRows(projects, query = '', showInactive = false, expanded = 
     const terms = query.normalize('NFKC').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
     const included = new Set();
     for (const p of projects) {
-        const text = `${p.path || p.name} ${p.client?.name || ''}`.normalize('NFKC').toLocaleLowerCase();
+        const clients = (showInactive ? p.all_display_clients : p.display_clients) || p.clients || (p.client ? [p.client] : []);
+        const text = `${p.path || p.name} ${clients.map(client => client.name).join(' ')}`.normalize('NFKC').toLocaleLowerCase();
         if (favoritesOnly && !p.is_favorite) continue;
         if ((!showInactive && !p.selectable) || !terms.every(t => text.includes(t))) continue;
         let node = p;

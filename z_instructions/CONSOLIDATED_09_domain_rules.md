@@ -865,3 +865,10 @@ class MyNSystemTest extends TestCase
 - 旧 SuperAdmin 用の交通費画面・旧「請求データ」は削除済み。DB の `transport_billing_requests` と `transport_expenses.billing_request_id` は、データ保護のため残してある。
 - 本番反映: migrate（`--force`）8 本。ChangelogSeeder の反映。本番サーバーで GD が使えるか確認する。
 
+
+
+## 大まかな案件と複数クライアント（2026-11-06、限定試用・未配備）
+
+分類は大/中のまとまりを保ち、broad_project_clientsで複数取引先を関連付ける。旧client_idは互換のため保持し、複数候補の先頭を実クライアントへ自動変換しない。client_ids未指定は保持、空配列は解除、旧client_idだけの更新は他の複数関連を消さない。会社関連company_clientsで検証し、休眠は既存保持/解除のみ。親のdisplay_clientsは有効な子の集合を含む表示用で、直接編集するclientsとは別。実案件のclient_idと担当は分類編集では変わらず、新式で取引先指定を必須にしない。取引先を理由に同名同年度分類を増殖させないが、既存重複の強制統合もしない。詳細はBROAD_PROJECT_CLIENTS_PLAN1.md。
+
+初期補完はbroad-projects:import-clientsの確認済みJSON、会社/部署、対象mysql DB名一致、dry-runと--forceで行う追加専用。分類名/親が確認表と異なる場合や会社未関連/新規休眠候補は停止し、既存仕事/分類/担当を一括変更しない。実データの候補表はprivate保存しGitへ追加しない。一般User公開は未承認。

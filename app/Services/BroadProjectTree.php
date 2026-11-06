@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\BroadProject;
-use App\Models\Client;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -40,14 +39,30 @@ class BroadProjectTree
 
     public function rows(User $user): array
     {
-        $nodes = $this->scoped($user)->with(['client:id,name', 'parent'])->inDisplayOrder()->get();
-        return $nodes->map(fn ($node) => [
-            'id' => $node->id, 'parent_id' => $node->parent_id, 'name' => $node->name,
-            'client_id' => $node->client_id, 'client' => $node->client,
-            'fiscal_year' => $node->fiscal_year, 'is_active' => $node->is_active,
-            'sort_order' => $node->sort_order,
-            'path' => $node->pathLabel(), 'selectable' => $node->activePath(),
-        ])->all();
+        $nodes = $this->scoped($user)->with('parent')->inDisplayOrder()->get()
+            ->sortBy(fn ($node) => $node->displayOrderKey())->values();
+        $clients = new BroadProjectClients;
+        $clients->load($nodes, (int) $user->company_id);
+        return $nodes->map(function ($node) use ($nodes, $clients) {
+            $direct = $clients->direct($node);
+            $active = collect($direct); $all = collect($direct);
+            if (! $node->parent_id) {
+                foreach ($nodes->where('parent_id', $node->id) as $child) {
+                    $all = $all->concat($clients->direct($child));
+                    if ($child->activePath()) $active = $active->concat($clients->direct($child));
+                }
+            }
+            return [
+                'id' => $node->id, 'parent_id' => $node->parent_id, 'name' => $node->name,
+                'client_id' => $node->client_id, 'client' => $node->client ? ['id' => $node->client->id, 'name' => $node->client->name] : null,
+                'clients' => $direct,
+                'display_clients' => $active->unique('id')->sortBy('name')->values()->all(),
+                'all_display_clients' => $all->unique('id')->sortBy('name')->values()->all(),
+                'fiscal_year' => $node->fiscal_year, 'is_active' => $node->is_active,
+                'sort_order' => $node->sort_order,
+                'path' => $node->pathLabel(), 'selectable' => $node->activePath(),
+            ];
+        })->all();
     }
 
     private function lockDepartment(User $user): void
@@ -67,9 +82,9 @@ class BroadProjectTree
     private function checkDuplicate(User $user, array $data, ?int $except = null): void
     {
         if ($this->scoped($user)->where('parent_id', $data['parent_id'])->where('name', $data['name'])
-            ->where('client_id', $data['client_id'])->where('fiscal_year', $data['fiscal_year'])
+            ->where('fiscal_year', $data['fiscal_year'])
             ->when($except, fn ($q) => $q->whereKeyNot($except))->exists()) {
-            throw ValidationException::withMessages(['name' => '同じグループ内に同名・同取引先・同年度の分類があります。休止中も確認してください。']);
+            throw ValidationException::withMessages(['name' => '同じグループ内に同名・同年度の分類があります。休止中も確認してください。']);
         }
     }
 
@@ -98,21 +113,19 @@ class BroadProjectTree
         }
         $data = Validator::make($input, $rules)->validate();
         $data['name'] = trim(preg_replace('/[\s\x{3000}]+/u', ' ', $data['name']));
-        $data['client_id'] = $data['client_id'] ?? null;
+        $data['client_id'] = array_key_exists('client_id', $input) ? ($data['client_id'] ?? null) : $existing?->client_id;
         $data['fiscal_year'] = $data['fiscal_year'] ?? null;
         if ($data['name'] === '') throw ValidationException::withMessages(['name' => '名前を入力してください。']);
-        if ($data['client_id'] && ! Client::forCompany($user->company_id)->whereKey($data['client_id'])
-            ->where(fn ($q) => $q->where('is_dormant', false)->when($existing?->client_id, fn ($q) => $q->orWhere('id', $existing->client_id)))->exists()) {
-            throw ValidationException::withMessages(['client_id' => 'この取引先は選択できません。']);
-        }
 
-        return DB::transaction(function () use ($user, $data, $existing) {
+        return DB::transaction(function () use ($user, $data, $existing, $input) {
             $this->lockDepartment($user);
             $node = $existing ? $this->scoped($user)->findOrFail($existing->id) : new BroadProject;
             $parentId = $existing ? $node->parent_id : ($data['parent_id'] ?? null);
             if ($parentId !== null) $this->root($user, (int) $parentId);
-            $attributes = array_intersect_key($data, array_flip(['name', 'client_id', 'fiscal_year', 'is_active']));
-            $this->checkDuplicate($user, $attributes + ['parent_id' => $parentId], $node->id);
+            $attributes = array_intersect_key($data, array_flip(['name', 'fiscal_year', 'is_active']));
+            if (! $existing || $node->name !== $attributes['name'] || (string) $node->fiscal_year !== (string) $attributes['fiscal_year']) {
+                $this->checkDuplicate($user, $attributes + ['parent_id' => $parentId], $node->id);
+            }
             $node->fill($attributes);
             if (! $existing) {
                 $node->company_id = $user->company_id;
@@ -121,6 +134,7 @@ class BroadProjectTree
                 $node->sort_order = $this->nextOrder($user, $parentId);
             }
             $node->save();
+            (new BroadProjectClients)->update($node, $input);
             return $node;
         });
     }

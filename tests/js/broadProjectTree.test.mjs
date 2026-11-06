@@ -37,3 +37,16 @@ test('favorite filtering includes ancestors without implicitly selecting descend
     assert.deepEqual(treeRows(inactive,'',false,new Set(),true).map(n=>n.id),[]);
     assert.deepEqual(treeRows(inactive,'',true,new Set(),true).map(n=>n.id),[4,5]);
 });
+
+
+test('multiple client search includes parents and respects inactive aggregates', () => {
+    const data = [
+        {id: 1, name: 'Calendar', selectable: true, clients: [], display_clients: [{id: 1, name: 'Alpha'}], all_display_clients: [{id: 1, name: 'Alpha'}, {id: 2, name: 'Beta'}]},
+        {id: 2, parent_id: 1, name: 'Desk', path: 'Calendar ／ Desk', selectable: true, clients: [{id: 1, name: 'Alpha'}]},
+        {id: 3, parent_id: 1, name: 'Wall', path: 'Calendar ／ Wall', selectable: false, clients: [{id: 2, name: 'Beta'}]},
+    ];
+    assert.deepEqual(treeRows(data, 'ＡＬＰＨＡ').map(r => r.id), [1, 2]);
+    assert.deepEqual(treeRows(data, 'Beta').map(r => r.id), []);
+    assert.deepEqual(treeRows(data, 'Beta', true).map(r => r.id), [1, 3]);
+    assert.deepEqual(treeRows(data, 'Alpha Desk').map(r => r.id), [1, 2]);
+});

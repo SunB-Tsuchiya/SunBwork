@@ -56,8 +56,10 @@ class ProjectBroadProjectLink
             ->sortBy(fn ($node) => $node->displayOrderKey())
             ->filter(fn ($node) => $node->activePath() || (int) $node->id === (int) $job?->broad_project_id);
         $favoriteIds = array_fill_keys($this->favorites->ids($actor), true);
+        $clientRows = collect($this->tree->rows($actor))->keyBy('id');
         $options = $nodes->map(fn ($node) => [
             'id' => $node->id, 'parent_id' => $node->parent_id, 'label' => $node->pathLabel(),
+            'clients' => $clientRows->get($node->id)['display_clients'] ?? [],
             'active' => $node->activePath(), 'is_favorite' => isset($favoriteIds[$node->id]),
         ])->values()->all();
         return ['enabled' => true, 'options' => $options, 'suggestions' => $job && ! $job->broad_project_id

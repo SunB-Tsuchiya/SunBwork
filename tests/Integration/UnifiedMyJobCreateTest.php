@@ -32,6 +32,7 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('departments', function (Blueprint $t) { $t->id(); $t->integer('company_id'); $t->string('code'); });
         Schema::create('project_jobs', function (Blueprint $t) { $t->id(); $t->string('title')->nullable(); $t->integer('company_id')->nullable(); $t->integer('broad_project_id')->nullable(); $t->boolean('show_on_department_schedule')->default(true); $t->integer('user_id')->nullable(); $t->integer('client_id')->nullable(); });
         Schema::create('clients', function (Blueprint $t) { $t->id(); $t->string('name'); $t->integer('company_id')->nullable(); });
+        Schema::create('company_clients', function (Blueprint $t) { $t->integer('company_id'); $t->integer('client_id'); });
         Schema::create('users', function (Blueprint $t) { $t->id(); $t->string('name')->nullable(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
         Schema::create('project_job_coordinators', function (Blueprint $t) { $t->integer('project_job_id'); $t->integer('user_id'); });
         Schema::create('project_team_members', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); });
@@ -41,6 +42,7 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('broad_projects', function (Blueprint $t) {
             $t->id(); $t->integer('company_id'); $t->integer('department_id'); $t->string('name'); $t->boolean('is_active'); $t->integer('parent_id')->nullable(); $t->integer('fiscal_year')->nullable(); $t->integer('client_id')->nullable();
         });
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_06_150001_create_broad_project_clients_table.php')->up();
         Schema::create('personal_work_entries', function (Blueprint $t) {
             $t->id(); $t->integer('user_id'); $t->integer('company_id'); $t->integer('department_id'); $t->date('work_date');
             $t->string('work_category'); $t->string('activity_type')->nullable(); $t->string('plan_slot');
@@ -991,11 +993,36 @@ class UnifiedMyJobCreateTest extends TestCase
         (require dirname(__DIR__, 2).'/database/migrations/2026_05_23_155003_create_changelogs_table.php')->up();
         $seeder = new \Database\Seeders\UnifiedMyJobBoxChangelogSeeder;
         $seeder->run();
+        (new \Database\Seeders\BroadProjectClientsChangelogSeeder)->run();
         $first = DB::table('changelogs')->orderBy('id')->pluck('version')->all();
         self::assertNotEmpty($first);
         foreach ($first as $version) self::assertLessThanOrEqual(30, mb_strlen($version), 'changelogs.version varchar(30)');
         $seeder->run();
+        (new \Database\Seeders\BroadProjectClientsChangelogSeeder)->run();
         self::assertSame($first, DB::table('changelogs')->orderBy('id')->pluck('version')->all());
         self::assertSame(1, DB::table('changelogs')->where('version', 'myjob-entry-old-20261106')->count());
     }
+    public function test_simple_history_multiple_related_clients_filter_without_inventing_an_actual_client(): void
+    {
+        DB::table('clients')->insert([['id' => 1, 'name' => 'Alpha', 'company_id' => 1], ['id' => 2, 'name' => 'Beta', 'company_id' => 1], ['id' => 3, 'name' => 'Foreign', 'company_id' => 2]]);
+        DB::table('company_clients')->insert([['company_id' => 1, 'client_id' => 1], ['company_id' => 1, 'client_id' => 2], ['company_id' => 2, 'client_id' => 3]]);
+        $id = $this->save($this->request($this->payload()))->getData(true)['id'];
+        DB::table('broad_project_clients')->insert([['broad_project_id' => 1, 'client_id' => 1], ['broad_project_id' => 1, 'client_id' => 2], ['broad_project_id' => 1, 'client_id' => 3]]);
+        $history = fn ($client) => app(\App\Http\Controllers\User\MyProjectJobController::class)->pastData($this->request(['mode' => 'project', 'client_id' => $client], null, null, 'GET'))->getData(true);
+        foreach ([1, 2] as $client) {
+            $data = $history($client); self::assertCount(1, $data['records']);
+            self::assertNull($data['records'][0]['client_id']);
+            self::assertSame('Alpha・Beta', $data['records'][0]['client_name']);
+            self::assertCount(2, $data['clients']);
+        }
+        self::assertCount(0, $history(3)['records']);
+        self::assertNull(DB::table('personal_work_entries')->find($id)->project_job_id);
+        DB::table('project_jobs')->insert(['id' => 77, 'title' => 'Actual project', 'company_id' => 1, 'client_id' => 1]);
+        DB::table('personal_work_entries')->where('id', $id)->update(['project_job_id' => 77]);
+        self::assertCount(0, $history(2)['records']);
+        self::assertSame(1, $history(1)['records'][0]['client_id']);
+        self::assertSame('Alpha', $history(1)['records'][0]['client_name']);
+
+    }
+
 }

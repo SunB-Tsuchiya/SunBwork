@@ -54,18 +54,18 @@ class BroadProjectFavorites
         $ids = array_fill_keys($this->ids($user), true);
         $normalize = fn ($value) => mb_strtolower(mb_convert_kana($value, 'asKV', 'UTF-8'));
         $words = preg_split('/\s+/u', trim($normalize($term)), -1, PREG_SPLIT_NO_EMPTY);
-        $rows = $this->tree->scoped($user)->with(['client:id,name', 'parent'])->inDisplayOrder()->get()
-            ->sortBy(fn ($node) => $node->displayOrderKey())
-            ->filter(function ($node) use ($selectedId, $words, $normalize) {
-                if ((int) $node->id === $selectedId) return true;
-                if (! $node->activePath()) return false;
-                $label = $normalize($node->pathLabel().' '.($node->client?->name ?? ''));
+        $rows = collect($this->tree->rows($user))
+            ->filter(function ($row) use ($selectedId, $words, $normalize) {
+                if ((int) $row['id'] === $selectedId) return true;
+                if (! $row['selectable']) return false;
+                $label = $normalize($row['path'].' '.implode(' ', array_column($row['display_clients'], 'name')));
                 foreach ($words as $word) if (! str_contains($label, $word)) return false;
                 return true;
-            })->map(fn ($node) => [
-                'id' => $node->id, 'parent_id' => $node->parent_id, 'name' => $node->name, 'path' => $node->pathLabel(),
-                'client_name' => $node->client?->name, 'fiscal_year' => $node->fiscal_year,
-                'is_active' => $node->activePath(), 'is_favorite' => isset($ids[$node->id]),
+            })->map(fn ($row) => [
+                'id' => $row['id'], 'parent_id' => $row['parent_id'], 'name' => $row['name'], 'path' => $row['path'],
+                'clients' => $row['clients'], 'display_clients' => $row['display_clients'],
+                'client_name' => implode('・', array_column($row['display_clients'], 'name')), 'fiscal_year' => $row['fiscal_year'],
+                'is_active' => $row['selectable'], 'is_favorite' => isset($ids[$row['id']]),
             ])->values();
         if ($limit === null) return $rows->all();
         // All matching favorites survive the normal 30-row limit; the current selection survives too.

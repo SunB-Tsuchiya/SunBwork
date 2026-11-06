@@ -46,6 +46,7 @@ class BroadProjectTreeTest extends TestCase
         $container->bind('db.schema', fn () => $this->db->getConnection()->getSchemaBuilder());
         (require dirname(__DIR__, 2).'/database/migrations/2026_10_31_200001_add_tree_to_broad_projects.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_10_31_210001_add_sort_order_to_broad_projects.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_06_150001_create_broad_project_clients_table.php')->up();
         $schema->create('project_jobs', fn (Blueprint $t) => $t->id());
         $schema->create('project_job_assignments', function (Blueprint $t) {
             $t->id(); $t->integer('project_job_id')->default(1); $t->integer('user_id'); $t->integer('sender_id')->nullable();
@@ -254,6 +255,87 @@ class BroadProjectTreeTest extends TestCase
         $this->rejects(fn () => $order->run(1, 1, false, 'default'), \RuntimeException::class);
         self::assertEquals($middle->id, $third->fresh()->parent_id); self::assertNull($third->fresh()->sort_order);
         self::assertFalse($third->fresh()->activePath());
+    }
+
+    private function seedClients(): void
+    {
+        $this->db->getConnection()->table('clients')->insert([
+            ['id' => 1, 'name' => 'Client A', 'is_dormant' => false],
+            ['id' => 2, 'name' => 'Client B', 'is_dormant' => false],
+            ['id' => 3, 'name' => 'Foreign', 'is_dormant' => false],
+            ['id' => 4, 'name' => 'Dormant', 'is_dormant' => true],
+        ]);
+        $this->db->getConnection()->table('company_clients')->insert([
+            ['company_id' => 1, 'client_id' => 1], ['company_id' => 1, 'client_id' => 2],
+            ['company_id' => 2, 'client_id' => 3], ['company_id' => 1, 'client_id' => 4],
+        ]);
+    }
+
+    public function test_multiple_clients_preserve_legacy_and_omitted_fields_and_explicit_clear(): void
+    {
+        $this->seedClients();
+        $node = $this->tree->save($this->user(), ['name' => 'Calendar', 'group_type' => 'large', 'is_active' => true, 'client_id' => 1]);
+        $input = ['name' => 'Calendar', 'is_active' => true];
+        $this->tree->save($this->user(), $input + ['client_ids' => [1, 2]], $node);
+        self::assertEquals(1, $node->fresh()->client_id);
+        $this->tree->save($this->user(), $input, $node);
+        self::assertEqualsCanonicalizing([1, 2], $node->clients()->pluck('clients.id')->all());
+        $this->tree->save($this->user(), $input + ['client_id' => null], $node);
+        self::assertEquals([2], $node->clients()->pluck('clients.id')->all());
+        $this->tree->save($this->user(), $input + ['client_ids' => []], $node);
+        self::assertCount(0, $node->clients()->get());
+        self::assertNull($node->fresh()->client_id);
+    }
+
+    public function test_invalid_clients_roll_back_metadata_and_keep_existing_dormant(): void
+    {
+        $this->seedClients();
+        $node = $this->tree->save($this->user(), ['name' => 'Calendar', 'group_type' => 'large', 'is_active' => true, 'client_ids' => [1, 2]]);
+        foreach ([[1, 3], [1, 4], [1, 1], [999]] as $ids) {
+            $this->rejects(fn () => $this->tree->save($this->user(), ['name' => 'Changed', 'is_active' => true, 'client_ids' => $ids], $node));
+            self::assertEquals('Calendar', $node->fresh()->name);
+            self::assertEqualsCanonicalizing([1, 2], $node->clients()->pluck('clients.id')->all());
+        }
+        $this->db->getConnection()->table('clients')->where('id', 2)->update(['is_dormant' => true]);
+        $this->tree->save($this->user(), ['name' => 'Calendar', 'is_active' => true, 'client_ids' => [1, 2]], $node);
+        self::assertCount(2, $node->clients()->get());
+        $this->rejects(fn () => $this->tree->save($this->user(), ['name' => 'Calendar', 'is_active' => true, 'client_id' => 1, 'client_ids' => [2]], $node));
+    }
+
+    public function test_parent_clients_are_aggregated_without_copying_and_foreign_clients_are_hidden(): void
+    {
+        $this->seedClients();
+        $root = $this->save('Calendar'); $child = $this->save('Desk', $root->id);
+        $this->tree->save($this->user(), ['name' => 'Desk', 'is_active' => true, 'client_ids' => [1, 2]], $child);
+        $rows = collect($this->tree->rows($this->user()))->keyBy('id');
+        self::assertEquals([], $rows[$root->id]['clients']);
+        self::assertEquals([1, 2], array_column($rows[$root->id]['display_clients'], 'id'));
+        $this->tree->save($this->user(), ['name' => 'Desk', 'is_active' => false], $child);
+        $rows = collect($this->tree->rows($this->user()))->keyBy('id');
+        self::assertEquals([], $rows[$root->id]['display_clients']);
+        self::assertCount(2, $rows[$root->id]['all_display_clients']);
+        $child->clients()->attach(3);
+        $rows = collect($this->tree->rows($this->user()))->keyBy('id');
+        self::assertEquals([1, 2], array_column($rows[$child->id]['clients'], 'id'));
+    }
+
+    public function test_reviewed_import_is_add_only_idempotent_and_dry_run_is_read_only(): void
+    {
+        $this->seedClients(); $node = $this->save('Calendar'); $other = $this->save('Other');
+        $import = new \App\Services\BroadProjectClientImport;
+        $rows = [['broad_project_id' => $node->id, 'name' => 'Calendar', 'parent_id' => null, 'client_ids' => [1, 2]]];
+        $before = $node->fresh()->getAttributes();
+        self::assertEquals(2, $import->run(1, 1, $rows, true, 'default')['additions']);
+        self::assertEquals(0, $this->db->getConnection()->table('broad_project_clients')->count());
+        self::assertEquals(2, $import->run(1, 1, $rows, false, 'default')['additions']);
+        self::assertEquals(0, $import->run(1, 1, $rows, false, 'default')['additions']);
+        self::assertEquals($before, $node->fresh()->getAttributes());
+        $bad = [['broad_project_id' => $other->id, 'name' => 'Other', 'parent_id' => null, 'client_ids' => [1]],
+            ['broad_project_id' => $node->id, 'name' => 'Calendar', 'parent_id' => null, 'client_ids' => [3]]];
+        $this->rejects(fn () => $import->run(1, 1, $bad, false, 'default'), \RuntimeException::class);
+        self::assertCount(0, $other->clients()->get());
+        $rows[0]['name'] = 'Stale';
+        $this->rejects(fn () => $import->run(1, 1, $rows, false, 'default'), \RuntimeException::class);
     }
 
 }

@@ -23,9 +23,13 @@ class SimpleMyJobHistory
                 }
                 return true;
             });
+        $broadClients = new BroadProjectClients;
+        $broadClients->load($entries->map(fn ($entry) => $entry->broadProject)->filter()->unique('id')->values(), (int) $user->company_id);
         $clientId = $request->query('client_id'); $projectId = $request->query('project_job_id');
-        $entryClients = $entries->map(fn ($entry) => $entry->projectJob?->client ?? $entry->broadProject?->client)->filter()
-            ->map(fn ($client) => ['id' => $client->id, 'name' => $client->name]);
+        $related = fn ($entry) => $entry->project_job_id
+            ? ($entry->projectJob?->client ? [['id' => (int) $entry->projectJob->client->id, 'name' => $entry->projectJob->client->name]] : [])
+            : ($entry->broadProject ? $broadClients->direct($entry->broadProject) : []);
+        $entryClients = $entries->flatMap($related);
         $entryProjects = $clientId ? $entries->filter(fn ($entry) => (int) $entry->projectJob?->client_id === (int) $clientId)
             ->map(fn ($entry) => $entry->projectJob)->filter()->map(fn ($project) => ['id' => $project->id, 'title' => $project->title]) : collect();
         if ($request->query('mode', 'date') === 'date') {
@@ -35,18 +39,18 @@ class SimpleMyJobHistory
                 || $entry->created_at?->betweenIncluded($from, $to));
         } else {
             $entries = $entries->filter(fn ($entry) => $projectId ? (int) $entry->project_job_id === (int) $projectId
-                : (! $clientId || (int) ($entry->projectJob?->client_id ?? $entry->broadProject?->client_id) === (int) $clientId));
+                : (! $clientId || in_array((int) $clientId, array_column($related($entry), 'id'), true)));
         }
         if ($request->boolean('hide_completed')) $entries = $entries->filter(fn ($entry) => ! $entry->completed_at);
-        $simple = $entries->map(function ($entry) {
+        $simple = $entries->map(function ($entry) use ($related) {
             $work = $entry->only(['id', 'work_category', 'activity_type', 'project_job_id', 'broad_project_id', 'project_name_text', 'title', 'entry_visibility', 'actual_unit']);
             $work['project_label'] = $entry->projectJob?->title;
             return ['id' => (int) $entry->id, 'key' => 'entry:'.$entry->id, 'source_type' => 'entry',
                 'title' => $entry->title ?: app(PersonalWorkSchedule::class)->entryCalendarTitle($entry),
                 'project_job_id' => $entry->project_job_id,
                 'project_job_name' => $entry->projectJob?->title ?? $entry->broadProject?->pathLabel() ?? $entry->project_name_text ?? '-',
-                'client_id' => $entry->projectJob?->client_id ?? $entry->broadProject?->client_id,
-                'client_name' => $entry->projectJob?->client?->name ?? $entry->broadProject?->client?->name ?? '-',
+                'client_id' => $entry->projectJob?->client_id,
+                'client_name' => $entry->project_job_id ? ($entry->projectJob?->client?->name ?? '-') : (implode('・', array_column($related($entry), 'name')) ?: '-'),
                 'completed' => (bool) $entry->completed_at, 'created_at' => $entry->work_date->format('Y-m-d'),
                 'history_sort' => $entry->created_at?->format('Y-m-d H:i:s') ?? $entry->work_date->format('Y-m-d'),
                 'work_item_type' => '簡易入力', 'estimated_hours' => null, 'work_entry' => $work];

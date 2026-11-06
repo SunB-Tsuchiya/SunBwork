@@ -33,6 +33,11 @@ class BroadProject extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function clients()
+    {
+        return $this->belongsToMany(Client::class, 'broad_project_clients')->withTimestamps();
+    }
+
     public function parent()
     {
         return $this->belongsTo(self::class, 'parent_id');

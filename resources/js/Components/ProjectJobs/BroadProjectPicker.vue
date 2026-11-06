@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
+import BroadProjectClients from './BroadProjectClients.vue';
 const props = defineProps({
     modelValue: { type: Number, default: null },
     options: { type: Array, default: () => [] },
@@ -11,7 +12,7 @@ const query = ref('');
 const normalize = value => value.normalize('NFKC').toLocaleLowerCase();
 const filtered = computed(() => {
     const words = normalize(query.value).trim().split(/\s+/).filter(Boolean);
-    return props.options.filter(option => option.id === props.modelValue || words.every(word => normalize(option.label).includes(word)));
+    return props.options.filter(option => option.id === props.modelValue || words.every(word => normalize(`${option.label} ${(option.clients || []).map(client => client.name).join(' ')}`).includes(word)));
 });
 const selected = computed(() => props.options.find(option => option.id === props.modelValue));
 </script>
@@ -20,7 +21,7 @@ const selected = computed(() => props.options.find(option => option.id === props
     <div class="mb-4 rounded border border-gray-200 p-3">
         <label for="project-broad-classification" class="mb-1 block font-semibold">大まかな案件（任意）</label>
         <p class="mb-2 text-xs text-gray-500">案件名とは別に、大グループまたは中グループを選択します。未選択でも保存できます。</p>
-        <input v-model="query" type="search" maxlength="100" placeholder="グループ名・年度で絞り込み" aria-label="大まかな案件の候補を検索" class="mb-2 w-full rounded border px-3 py-2 text-sm" />
+        <input v-model="query" type="search" maxlength="100" placeholder="グループ名・クライアント名・年度で絞り込み" aria-label="大まかな案件の候補を検索" class="mb-2 w-full rounded border px-3 py-2 text-sm" />
         <select id="project-broad-classification" :value="modelValue" class="w-full rounded border px-3 py-2" @change="emit('update:modelValue', $event.target.value ? Number($event.target.value) : null)">
             <option value="">紐付けない</option>
             <optgroup v-if="filtered.some(option => option.is_favorite)" label="お気に入り">
@@ -32,6 +33,7 @@ const selected = computed(() => props.options.find(option => option.id === props
         </select>
         <p v-if="query.trim() && !filtered.length" class="mt-1 text-xs text-gray-500">一致する分類がありません。検索語を変えてください。</p>
         <p v-if="selected" class="mt-2 text-sm text-gray-600">選択中：{{ selected.label }}</p>
+        <BroadProjectClients v-if="selected" :clients="selected.clients || []" />
         <p v-if="error" class="mt-1 text-sm text-red-600">{{ error }}</p>
         <div v-if="suggestions.length" class="mt-3 border-t pt-3">
             <p class="text-sm font-medium">保存済みの案件名からの分類候補</p>
