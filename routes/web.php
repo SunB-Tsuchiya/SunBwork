@@ -61,6 +61,9 @@ $registerTransportManageRoutes = function () {
     Route::post('{expense}/items/{item}/fare', [$fares, 'fromItem'])->name('items.fare');
 };
 
+// デザイナー用ポートフォリオ（SB専用。z_instructions/PORTFOLIO_PLAN1.md）。各ロールのグループ内で呼ぶ
+$registerPortfolioRoutes = require __DIR__ . '/portfolio.php';
+
 $registerSalesAnalysisRoutes = function () {
     Route::middleware('sales_analysis')->prefix('sales-analysis')->name('sales_analysis.')->group(function () {
         // ホーム画面（2026-09-03 Codexレビュー2回目により、旧DashboardController相当を「データ登録状況」へ差し替え）
@@ -201,6 +204,14 @@ Route::get('/', function () {
 });
 // Temporary public debug route to send test completion mail (remove after testing)
 Route::get('/debug/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('debug.events.send_test_completion');
+
+// ポートフォリオ（ユーザーエリア。利用許可をもらったメンバーが自分の作品だけを管理する）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'ghost'])
+    ->prefix('user')
+    ->name('user.')
+    ->group(function () use ($registerPortfolioRoutes) {
+        $registerPortfolioRoutes();
+    });
 
 // User Dashboard (default authenticated users)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'ghost'])->group(function () use ($registerTransportApplicantRoutes) {
@@ -555,7 +566,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
-    ->group(function () use ($registerSalesAnalysisRoutes) {
+    ->group(function () use ($registerSalesAnalysisRoutes, $registerPortfolioRoutes) {
         // Ziggy用: 明示的にadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
@@ -691,6 +702,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             ])
             ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
+        // ポートフォリオ（SB の Admin が使う。SuperAdmin も admin エリア経由。利用メンバー設定のルートは SuperAdmin のみ操作可）
+        $registerPortfolioRoutes(true);
         $registerSalesAnalysisRoutes();
     });
 

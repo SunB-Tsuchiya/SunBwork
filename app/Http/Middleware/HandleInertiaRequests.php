@@ -235,6 +235,8 @@ class HandleInertiaRequests extends Middleware
                     return false;
                 })(),
                 'canManageBroadProjects' => app(\App\Services\BroadProjectTree::class)->canManage($request->user()),
+                // ポートフォリオ機能へのアクセス権（SB専用。SuperAdmin・SBのAdminは常時可、他は個人許可がオンの場合のみ。サンエー印刷は不可）
+                'canAccessPortfolio' => $request->user() ? \App\Services\Portfolio\PortfolioAccess::canUse($request->user()) : false,
                 'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()
                     && app(PersonalWorkSchedule::class)->available($request->user()),
                 // 校正チームメンバーフラグ

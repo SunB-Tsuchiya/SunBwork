@@ -29,6 +29,8 @@ const canAccessDepartmentWork = computed(() => usePage().props.auth?.user?.user_
 const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings', 'nencho', 'applications'];
 // 「年末調整」タブ: 自分が対象者になっている受付中の受付がある人にだけ表示（会社タイプ問わず。SunA/GeneralAffairs）
 const nenchoAvailable = computed(() => Boolean(usePage().props.auth?.nenchoAvailable));
+// ポートフォリオ（SB専用）: 利用許可をもらったメンバーにだけ表示。サンエー印刷は GENERAL_ALLOWED に含めないので出ない
+const canAccessPortfolio = computed(() => Boolean(usePage().props.auth?.canAccessPortfolio));
 const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
 
 // 「申請」タブ（交通費など）: 申請者管理（Admin が、ユーザーごとにスイッチで決める）で、使える申請が 1 つでもある人にだけ出す
@@ -59,6 +61,7 @@ const tabs = computed(() => [
     { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value && !hubEnabled.value },
     { key: 'nencho', href: tryRoute('user.general_affairs.nencho.index'), label: '年末調整', condition: nenchoAvailable.value },
     { key: 'applications', href: tryRoute('user.applications.index'), label: '申請', condition: showApply.value },
+    { key: 'portfolio', href: tryRoute('user.portfolio.manage'), label: 'ポートフォリオ', condition: canAccessPortfolio.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
 ].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
