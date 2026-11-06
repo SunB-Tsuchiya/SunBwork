@@ -739,3 +739,12 @@ origin mainをfetchして差分確認後、8314を基準に/tmp/sunbwork-myjob-n
 再検証成功: 共通判定/実Vue SSRの試用desktop/mobile/内側・role/company/context/active/badge/旧BOX戻りに加え、ポートフォリオ入口が共存することを確認。既存入力の実Vue検証と対象ESLint成功。members build終了0、manifest473エントリ/参照504資産/欠落0、最新版の全resourcesエントリとPortfolio3画面保持、members base確認、旧資産保持。buildには既存のglob非推奨と大きなchunk通知があるがエラーなし。
 
 8314に対するソース差分は2ナビ/helper/test/本件資料の9ファイルのみ。app/database/routes/config/bootstrap/依存差分0、ポートフォリオ実装ファイルは変更なし。今回は試用入口コード自体を拡張せず、他の配備を保持する統合作業。現在の本番は8314のまま、今回入口の限定反映/画面確認は未実施。次の一手は8314固定元の新しい配備スクリプトを作成し、正確なSSHコマンドを再提示する。元版・対象が変わったので旧スクリプトのまま再実行しない。一般公開未承認。
+
+
+## 2026-11-07 ポートフォリオ保持版の配備手順準備
+
+統合版1657a2ac12b2248e532b5ec56cff72b930c08714をfeature/myjob-navigation-integrated-20261107に保存・push済み。8314を第一親とするmergeで他作業を履歴ごと保持。8314からのソース9ファイル・削除なし・サーバ/DB/routes/設定/依存差分0を確認。生成済みの旧資産に含まれる末尾空白で全資産diff-checkが停止したため、生成物を手加工せずソースのみdiff-checkして保存。build/manifest/資産欠落の検証結果に問題なし。
+
+新/tmp/myjob-navigation-integrated-deploy-20261107.shを作成、SHA256 c5432e97ab56c3371e1607dca40cbf823d67145897bc66074cd6e106caf36def、sh構文成功。private/codex-myjob-navigation-20261107にも保存。固定元8314c7ea422cf8ff52072c389d143a3b98773b80、固定先1657a2ac12b2248e532b5ec56cff72b930c08714、取得branchも新統合branchへ変更。既知未追跡5件/追跡変更なし/9ソース許可一覧/削除なし/サーバ・DB・route・設定・依存差分0を確認しff-only、manifest固定hash/504資産/欠落0/members baseとview:clear、最終作業状態保持を確認する。DB操作・migration・seedなし。
+
+旧/tmp/myjob-navigation-deploy-20261107.shは想定元が古く、再使用しない。新スクリプトはまだ未承認・未実行。次の一手は本番の別更新を保持するため手順と対象が変わったことを説明し、正確な新SSHコマンドを提示して承認を得る。今回入口の画面確認待ち、一般公開未承認。旧のボタン名/複数クライアントの成功は維持し再試験不要。
