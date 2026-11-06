@@ -46,3 +46,14 @@ private/codex-client-review-20261106/分類クライアント対応_登録用_20
 同じID構造を合成名称へ置換したSQLiteメモリ検証で、63分類、dry-run94/書込0、本登録94、再実行0、全分類メタデータ不変を確認。実DBへは未登録。コードは4071c60b8に保存・push済み。
 
 次の一手は固定本番元0c9434f67から専用migration・限定コード・初期関連94組だけを扱う配備スクリプトを完成し、正確なSSHコマンドを提示して承認を得る。既存未追跡5件/共有Claude変更の保護、対象DB確認、privateバックアップ、manifest hash・dry-run期待件数・全分類メタデータ/既存参照保持・asset欠落0を検証する。一般公開未承認。配備/今回画面確認/上長照合は未実施。
+
+
+## 2026-11-06 限定配備スクリプト準備完了（承認待ち）
+
+/tmp/broad-project-clients-deploy-20261106.shを作成、sh構文成功、埋込事前事後PHP構文成功、JSON63分類のhash一致、Laravel artisan helpで専用コマンド認識を合成環境で確認。スクリプトSHA256 42e983063eea828644f201e90d019ba8eec22259bac42a5c43612475a6eec996。private/codex-client-review-20261106にも保存。実行は未承認・未実施。
+
+固定元0c9434f67988b8d8dc28988c2b0b37e193d70141、固定先e856d0c5a207530c0934ac723e9bc69d50a1dab5、取得ブランチfeature/myjob-client-plan-20261106。source34ファイルの許可一覧一致/削除なし/追跡変更なし/未追跡5件厳密一致を確認して進める。main全体をpullしない。
+
+事前に既定mysql/silverlamb759_sunbwork/INFO会社2部署1/63分類の現在状態と候補適格性を再確認し、privateに全分類の既存列と限定参照hashを保存する。追加migration1本のみ--database=mysql/--path/--realpath/--forceで適用、固定先へff-only。専用importのdry-run63分類94組、本登録94組、再dry-run0組を厳密確認。専用Seederだけ--database=mysql --force、config/cache/route/view clear。事後は全分類列・既存ProjectJob/簡易記録/星の分類参照hash保持、期待94組完全一致、資産498/欠落0/members base、既存未追跡5件保持を確認する。
+
+次の一手: 正確な `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/broad-project-clients-deploy-20261106.sh` の承認後に同じスクリプトを実行。元版/作業状態が違えば停止し、他作業へ合わせるため勝手にreset/pullしない。今回の画面確認は未実施、一般公開未承認。
