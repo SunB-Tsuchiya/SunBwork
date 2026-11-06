@@ -1,179 +1,173 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { Link } from '@inertiajs/vue3';
+import axios from 'axios';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router } from '@inertiajs/vue3';
-import useToasts from '@/Composables/useToasts';
+import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 
-// ポートフォリオ 利用メンバー設定（試用期間中は SuperAdmin のみ）
-// 売上分析の許可画面を踏襲し、雇用区分・ロール・部署で絞り込めるようにしている
+// ポートフォリオ 利用メンバー設定（SuperAdmin のみ）。
+// ⚠️ 画面の形は、申請者管理のメンバー設定（Pages/Admin/Applicants/Show.vue）と同じ「標準形」。
+//    ユーザーを選んで権限を与える画面は、この形に揃える（CONSOLIDATED_01「ユーザー選択（権限付与）画面の標準形」参照）。
+//    部署・区分のチップ → 件数と「表示中をすべて ON/OFF」→ 表 → スイッチを動かして、まとめて「保存する」。
+//    並び順は サーバー側（MemberList）で 雇用区分 → 役職 → 氏名。ここでは並べ替えない。
 const props = defineProps({
-    routePrefix: { type: String, required: true },
-    assignmentNames: { type: Array, default: () => [] },
-    candidates: { type: Array, default: () => [] },
-    departments: { type: Array, default: () => [] },
+    routePrefix:     { type: String, required: true },
+    users:           { type: Array, default: () => [] },
+    departments:     { type: Array, default: () => [] },
+    assignmentNames: { type: Array, default: () => [] },   // 担当（制作・営業など）。この機能だけの追加の絞り込み
 });
 
-// useToasts が返すのは showToast（addToast は存在しない）
-const { showToast } = useToasts();
-const addToast = showToast;
-const savingId = ref(null);
-const bulkSaving = ref(false);
+const EMPLOYMENT_LABELS = { regular: '正社員', contract: '契約社員', dispatch: '派遣社員', outsource: '業務委託' };
+const employmentLabel = (t) => EMPLOYMENT_LABELS[t] ?? t ?? '';
 
-const EMPLOYMENT_LABELS = {
-    regular: '正社員', contract: '契約社員', dispatch: '派遣社員', outsource: '業務委託',
-};
+// 申請者管理と同じ形: スイッチを動かして、まとめて「保存する」
+const local = ref(props.users.map((u) => ({ ...u })));
+const saved = ref(new Map(props.users.map((u) => [u.id, u.enabled])));   // 保存済みの状態
+const selectedDept = ref(null);
+const selectedEmployment = ref(null);
+const selectedAssignment = ref(null);
+const saving = ref(false);
+const justSaved = ref(false);
+const errorMessage = ref('');
 
-const rows = ref(props.candidates.map(c => ({ ...c })));
+// 区分の絞り込み: 「正社員・契約社員」は 1 つにまとめる（契約社員は、シニア社員の言い換え）。派遣・業務委託は、該当者がいるときだけ出す
+const STAFF_TYPES = ['regular', 'contract'];
+const employmentOptions = computed(() => {
+    const present = new Set(local.value.map((u) => u.employment_type));
+    return [
+        { key: 'staff', label: '正社員・契約社員', types: STAFF_TYPES },
+        ...['dispatch', 'outsource'].filter((t) => present.has(t)).map((t) => ({ key: t, label: EMPLOYMENT_LABELS[t], types: [t] })),
+    ];
+});
 
-const filterEmployment = ref('');
-const filterAssignment = ref('');
-const filterDept = ref('');
-const onlyEnabled = ref(false);
-const keyword = ref('');
+const visibleUsers = computed(() => {
+    const opt = employmentOptions.value.find((o) => o.key === selectedEmployment.value);
+    return local.value.filter((u) =>
+        (selectedDept.value === null || u.department_id === selectedDept.value)
+        && (!opt || opt.types.includes(u.employment_type))
+        && (selectedAssignment.value === null || u.assignment_name === selectedAssignment.value));
+});
 
-const filtered = computed(() => rows.value.filter(r => {
-    if (filterEmployment.value && r.employment_type !== filterEmployment.value) return false;
-    if (filterAssignment.value && r.assignment_name !== filterAssignment.value) return false;
-    if (filterDept.value && String(r.department_id) !== String(filterDept.value)) return false;
-    if (onlyEnabled.value && !r.enabled) return false;
-    const k = keyword.value.trim().toLowerCase();
-    if (k && !`${r.name} ${r.email}`.toLowerCase().includes(k)) return false;
-    return true;
-}));
+const enabledCount = computed(() => local.value.filter((u) => u.enabled).length);
+const dirty = computed(() => local.value.some((u) => saved.value.get(u.id) !== u.enabled));
+const changedCount = computed(() => local.value.filter((u) => saved.value.get(u.id) !== u.enabled).length);
 
-const enabledCount = computed(() => rows.value.filter(r => r.enabled).length);
-
-function toggle(row) {
-    savingId.value = row.id;
-    const next = !row.enabled;
-    router.put(
-        route(`${props.routePrefix}.portfolio.permissions.update`, { user: row.id }),
-        { enabled: next },
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                row.enabled = next;
-                addToast(next ? '利用を許可しました' : '利用許可を解除しました', 'success');
-            },
-            onError: () => addToast('保存に失敗しました', 'error'),
-            onFinish: () => { savingId.value = null; },
-        }
-    );
+function toggle(u) { u.enabled = !u.enabled; justSaved.value = false; }
+/** 表示中の人を、まとめて ON / OFF */
+function setVisible(value) {
+    visibleUsers.value.forEach((u) => { u.enabled = value; });
+    justSaved.value = false;
 }
 
-// 絞り込み結果の全員をまとめてオン/オフ
-function bulk(next) {
-    if (!filtered.value.length) return;
-    if (!window.confirm(`表示中の${filtered.value.length}人を${next ? '許可' : '解除'}します。よろしいですか？`)) return;
-    bulkSaving.value = true;
-    const ids = filtered.value.map(r => r.id);
-    router.put(
-        route(`${props.routePrefix}.portfolio.permissions.bulk`),
-        { user_ids: ids, enabled: next },
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                rows.value.forEach(r => { if (ids.includes(r.id)) r.enabled = next; });
-                addToast('一括で保存しました', 'success');
-            },
-            onError: () => addToast('保存に失敗しました', 'error'),
-            onFinish: () => { bulkSaving.value = false; },
-        }
-    );
+async function save() {
+    errorMessage.value = '';
+    saving.value = true;
+    try {
+        await axios.put(route(`${props.routePrefix}.portfolio.permissions.update`),
+            { items: local.value.map((u) => ({ user_id: u.id, enabled: u.enabled })) },
+            { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '', Accept: 'application/json' } });
+        saved.value = new Map(local.value.map((u) => [u.id, u.enabled]));
+        justSaved.value = true;
+    } catch (e) {
+        errorMessage.value = e.response?.data?.message ?? '保存できませんでした。もう一度お試しください。';
+    } finally {
+        saving.value = false;
+    }
 }
+
+// 保存していない変更があるまま、ページを離れようとしたら、確認する
+function onBeforeUnload(e) { if (dirty.value) { e.preventDefault(); e.returnValue = ''; } }
+onMounted(() => window.addEventListener('beforeunload', onBeforeUnload));
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload));
+
+const chip = (active) => ['rounded-full px-3 py-1 text-xs font-medium transition-colors', active ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'];
+const manageHref = () => route(`${props.routePrefix}.portfolio.manage`);
 </script>
 
 <template>
-    <AppLayout title="ポートフォリオ 利用メンバー設定">
+    <AppLayout title="ポートフォリオの利用メンバー設定">
         <template #header>
-            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ポートフォリオ 利用メンバー設定</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="manageHref()"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap">← ポートフォリオ管理に戻る</Link>
+                <h2 class="text-base font-semibold leading-tight text-gray-800 sm:text-xl">ポートフォリオの利用メンバー設定</h2>
+            </div>
+        </template>
+        <template #tabs>
+            <AdminNavigationTabs active="portfolio" />
         </template>
 
-        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <p class="text-sm text-gray-500">
-                    サン・ブレーンのメンバーが対象です（SuperAdmin は常に利用できます）。許可したメンバーは自分のポートフォリオを作成・閲覧できます。
-                </p>
-                <Link :href="route(`${props.routePrefix}.portfolio.manage`)" class="text-sm text-blue-600 hover:underline">← ポートフォリオ管理へ戻る</Link>
+        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+            <p class="mb-4 text-sm text-gray-500">
+                スイッチを ON にした人は、ユーザー用のタブ「ポートフォリオ」から、自分の作品（画像・PDF・動画）を追加・整理して、客先で見せられます。
+                Admin と SuperAdmin は、スイッチに関わらず使えます（自分の作品は持たず、メンバーの作品を閲覧するだけです）。
+                変更したら、「保存する」を押してください。
+            </p>
+
+            <!-- 部署の絞り込み -->
+            <div v-if="departments.length" class="mb-2 flex flex-wrap gap-2">
+                <button type="button" :class="chip(selectedDept === null)" @click="selectedDept = null">すべての部署</button>
+                <button v-for="d in departments" :key="d.id" type="button" :class="chip(selectedDept === d.id)" @click="selectedDept = d.id">{{ d.name }}</button>
+            </div>
+            <!-- 雇用形態の絞り込み（派遣・契約の人を、まとめて確認しやすくする） -->
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+                <button type="button" :class="chip(selectedEmployment === null)" @click="selectedEmployment = null">すべての区分</button>
+                <button v-for="o in employmentOptions" :key="o.key" type="button" :class="chip(selectedEmployment === o.key)" @click="selectedEmployment = o.key">{{ o.label }}</button>
+            </div>
+            <!-- 担当（制作・営業など）の絞り込み。デザイナーを選びやすくするための、この機能だけの追加 -->
+            <div v-if="assignmentNames.length" class="mb-3 flex flex-wrap items-center gap-2">
+                <button type="button" :class="chip(selectedAssignment === null)" @click="selectedAssignment = null">すべての担当</button>
+                <button v-for="a in assignmentNames" :key="a" type="button" :class="chip(selectedAssignment === a)" @click="selectedAssignment = a">{{ a }}</button>
             </div>
 
-            <!-- 絞り込み -->
-            <div class="mb-4 flex flex-wrap items-end gap-3 rounded border border-gray-200 bg-gray-50 p-3">
-                <label class="text-xs text-gray-600">
-                    雇用区分
-                    <select v-model="filterEmployment" class="mt-1 block rounded border-gray-300 text-sm">
-                        <option value="">すべて</option>
-                        <option v-for="(label, key) in EMPLOYMENT_LABELS" :key="key" :value="key">{{ label }}</option>
-                    </select>
-                </label>
-                <label class="text-xs text-gray-600">
-                    担当
-                    <select v-model="filterAssignment" class="mt-1 block rounded border-gray-300 text-sm">
-                        <option value="">すべて</option>
-                        <option v-for="a in assignmentNames" :key="a" :value="a">{{ a }}</option>
-                    </select>
-                </label>
-                <label class="text-xs text-gray-600">
-                    部署
-                    <select v-model="filterDept" class="mt-1 block rounded border-gray-300 text-sm">
-                        <option value="">すべて</option>
-                        <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-                    </select>
-                </label>
-                <label class="text-xs text-gray-600">
-                    氏名・メール
-                    <input v-model="keyword" type="search" class="mt-1 block rounded border-gray-300 text-sm" placeholder="検索" />
-                </label>
-                <label class="flex items-center gap-1 pb-1 text-sm text-gray-700">
-                    <input v-model="onlyEnabled" type="checkbox" class="rounded border-gray-300" />
-                    許可済みのみ
-                </label>
-            </div>
-
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
-                <span>{{ filtered.length }}人表示 / 許可 {{ enabledCount }}人</span>
-                <span class="flex gap-2">
-                    <button type="button" :disabled="bulkSaving || !filtered.length" class="rounded border border-green-600 px-3 py-1 text-green-700 hover:bg-green-50 disabled:opacity-40" @click="bulk(true)">表示中を全員許可</button>
-                    <button type="button" :disabled="bulkSaving || !filtered.length" class="rounded border border-gray-400 px-3 py-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40" @click="bulk(false)">表示中を全員解除</button>
+            <div class="mb-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                <span>使う人: <strong class="text-gray-800">{{ enabledCount }}</strong> / {{ local.length }}人（表示中: {{ visibleUsers.length }}人）</span>
+                <span class="ml-auto flex gap-2">
+                    <button type="button" class="rounded border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-50" @click="setVisible(true)">表示中をすべて ON</button>
+                    <button type="button" class="rounded border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-50" @click="setVisible(false)">表示中をすべて OFF</button>
                 </span>
             </div>
 
-            <div v-if="filtered.length === 0" class="py-8 text-center text-gray-500">該当するメンバーがいません。</div>
-
-            <div v-else class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">雇用区分</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">利用許可</th>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
+                            <th class="pb-2 pr-3">名前</th>
+                            <th class="pb-2 pr-3">部署</th>
+                            <th class="pb-2 pr-3">役職</th>
+                            <th class="pb-2 pr-3">担当</th>
+                            <th class="pb-2 pr-3">区分</th>
+                            <th class="pb-2 text-center">ポートフォリオを使う</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white">
-                        <tr v-for="row in filtered" :key="row.id" class="hover:bg-gray-50">
-                            <td class="whitespace-nowrap px-4 py-3">
-                                <div class="text-sm font-medium text-gray-900">{{ row.name }}</div>
-                                <div class="text-xs text-gray-500">{{ row.email }}</div>
-                            </td>
-                            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ row.department_name ?? '—' }}</td>
-                            <td class="whitespace-nowrap px-4 py-3 text-center text-sm text-gray-700">{{ EMPLOYMENT_LABELS[row.employment_type] ?? row.employment_type }}</td>
-                            <td class="whitespace-nowrap px-4 py-3 text-center text-sm text-gray-700">{{ row.assignment_name ?? '—' }}</td>
-                            <td class="whitespace-nowrap px-4 py-3 text-center">
-                                <button
-                                    type="button"
-                                    :disabled="savingId === row.id"
-                                    :class="row.enabled ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300 hover:bg-gray-400'"
-                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50"
-                                    @click="toggle(row)"
-                                >
-                                    <span :class="row.enabled ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+                    <tbody class="divide-y divide-gray-100">
+                        <tr v-for="u in visibleUsers" :key="u.id" :class="u.enabled ? '' : 'bg-gray-50'">
+                            <td class="py-1.5 pr-3 font-medium" :class="u.enabled ? 'text-gray-800' : 'text-gray-500'">{{ u.name }}</td>
+                            <td class="py-1.5 pr-3 text-xs text-gray-500">{{ u.department }}</td>
+                            <td class="py-1.5 pr-3 text-xs text-gray-500">{{ u.position_title ?? '―' }}</td>
+                            <td class="py-1.5 pr-3 text-xs text-gray-500">{{ u.assignment_name ?? '―' }}</td>
+                            <td class="py-1.5 pr-3 text-xs text-gray-500">{{ employmentLabel(u.employment_type) }}</td>
+                            <td class="py-1.5 text-center">
+                                <button type="button" role="switch" :aria-checked="u.enabled"
+                                    class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+                                    :class="u.enabled ? 'bg-red-500' : 'bg-gray-300'" @click="toggle(u)">
+                                    <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200" :class="u.enabled ? 'translate-x-4' : 'translate-x-0'" />
                                 </button>
                             </td>
                         </tr>
                     </tbody>
                 </table>
+                <p v-if="!visibleUsers.length" class="py-6 text-center text-sm text-gray-400">該当する人がいません。</p>
+            </div>
+
+            <p v-if="errorMessage" class="mt-4 rounded bg-red-50 p-3 text-sm text-red-600">{{ errorMessage }}</p>
+            <div class="mt-6 flex items-center justify-end gap-3">
+                <span v-if="justSaved" class="mr-auto text-sm text-green-600">✓ 保存しました</span>
+                <span v-else-if="dirty" class="mr-auto text-sm text-amber-700">未保存の変更があります（{{ changedCount }}人）</span>
+                <Link :href="manageHref()" class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200">キャンセル</Link>
+                <button type="button" class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50" :disabled="saving || !dirty" @click="save">
+                    {{ saving ? '保存中…' : '保存する' }}
+                </button>
             </div>
         </div>
     </AppLayout>

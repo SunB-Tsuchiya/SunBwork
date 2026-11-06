@@ -83,8 +83,8 @@ return function (bool $withPermissions = false) {
             if ($withPermissions) {
                 // 利用メンバー設定（コントローラー側でも SuperAdmin に限定）
                 Route::get('permissions', [PortfolioPermissionController::class, 'index'])->name('permissions.index');
-                Route::put('permissions/bulk', [PortfolioPermissionController::class, 'bulk'])->name('permissions.bulk');
-                Route::put('permissions/{user}', [PortfolioPermissionController::class, 'update'])->name('permissions.update');
+                // ユーザーごとのスイッチを、まとめて保存する（申請者管理と同じ形）
+                Route::put('permissions', [PortfolioPermissionController::class, 'update'])->name('permissions.update');
             }
         });
 };

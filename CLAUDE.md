@@ -171,6 +171,9 @@ AppLayout は `py-12 > max-w-7xl` を内部に提供済み。ページ側はデ�
 
 **ToastUnified は AppLayout 内にグローバル配置済み。各ページで重複させない。**
 
+**ユーザーを選んで権限を与える画面（「この機能を使える人」のスイッチ、利用許可、対象者の選択）は、必ず申請者管理のメンバー設定と同じ形にする。**
+見本: 本番 `https://sun-brain.co.jp/members/admin/applicants/transport`（実装は `Pages/Admin/Applicants/Show.vue`）。部署・区分のチップ、「表示中をすべて ON/OFF」、スイッチを動かして「保存する」でまとめて保存、並びは 雇用区分 → 役職 → 氏名。独自の形を作らない。詳細: `z_instructions/CONSOLIDATED_01_layout_and_ui.md`「ユーザー選択（権限付与）画面の標準形」。
+
 **ロール別カラー:** SuperAdmin=黄 / Admin=赤 / Leader=オレンジ / Coordinator=緑 / Clerk=紫 / User=青
 
 **Ziggy の route() 使用時はパラメータ名をオブジェクトで渡す:**

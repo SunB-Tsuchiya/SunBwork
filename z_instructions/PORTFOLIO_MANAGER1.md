@@ -102,6 +102,8 @@
 
 | 日付 | 内容 |
 |---|---|
+| 2026-11-07 | メンバー選択の改善: ①並び順を、申請者管理と同じ「雇用区分 → 役職（役員・次長・課長…の `position_titles.sort_order`）→ 氏名」に統一（`MemberList`）②利用メンバー設定画面を申請者管理のメンバー設定と同じ標準形に作り直し（部署・区分・担当のチップ／表示中をすべて ON/OFF／スイッチを動かしてまとめて「保存する」。保存は `PUT permissions` に一本化し旧 bulk・per-user ルートは廃止）③管理画面の「閲覧するメンバー」に部署のチップを追加し、役職つきの並びにした ④CONSOLIDATED_01 に「ユーザー選択（権限付与）画面の標準形」を追記、CLAUDE.md からも誘導。PHPUnit 60件成功 |
+| 2026-11-07 | **本番反映（Phase 7）**。①ルートの作業ツリーは別作業の未コミットが234ファイルあり、origin/main より226コミット遅れ→使わず、さくらの HEAD を土台にした隔離ツリー（`.deploy-wt-portfolio`）で、ポートフォリオ分だけを載せてビルド・コミット ②1回目は、事前確認から数時間でさくらの HEAD が `e856d0c5a`→`f9821e4c3`（MyJob の画面調整）へ進んでいたため、スクリプトのガードが**サーバー変更前に中止**。新しい土台で載せ直し・全テスト（897件成功）・ビルドをやり直した ③`feature/portfolio-20261107-r2`（`8314c7ea4`）を push し、さくらで `--ff-only` 反映。`migrate` は `--path` でポートフォリオの2本だけ（Ran 確認）、更新ログは `CHANGELOG_ONLY=portfolio-1` で1件のみ（117件）、キャッシュクリア済み。ルート24・テーブル7・定期掃除登録・保存先書き込み・アセット200 を確認 ④`public/build` は追加のみ（447件。直近のデプロイと同じ方針で古い資産は消さない） ⑤`origin/main` は動かしていない（さくらの main は MyJob 作業ブランチの先を指す運用）。ブラウザでの本番確認はユーザー |
 | 2026-11-06 | Codex レビュー（gpt-6.1-sol）対応: ①[P1] `new Quality(数値)` は「品質レベル」でビットレートではなかった→`new Quality({ bitrate })` に修正（映像2.5Mbps・音声128kbps）。以前 iPhone MOV が失敗した真因の一つで、再エンコード経路（HEVC・重い動画）が実質壊れていた ②[P2] PDF のページ画像化中に容量上限を再確認（超過したら作品ごと破棄・422）。`PortfolioStorage::quota()` を追加（テストは `filesystems.portfolio_quota` で差し替え）。PHPUnit 55件成功 |
 | 2026-11-06 | Phase 6: 定期掃除 `portfolio:prune-stale`（毎時）実装・テスト、ChangelogSeeder（portfolio-1）追記、CONSOLIDATED_01 / 09 更新。他ロールのナビは「今のまま」に決定 |
 | 2026-11-06 | Phase 5 完了（閲覧ページ: 表紙一覧・全画面スライドショー・PDF見開きページめくり・動画ポスター再生・スワイプ/キー。`ViewController`・`Viewer/{Slideshow,PdfSpread,VideoStage}.vue`・`Pages/Portfolio/View.vue`。PHPUnit 52件成功・npm run build 済み）。見た目・動きはブラウザでユーザー確認待ち |

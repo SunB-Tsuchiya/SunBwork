@@ -20,6 +20,8 @@ const props = defineProps({
     // 閲覧中のメンバー ID（閲覧専用モードで、閲覧できるメンバーがいなければ null）
     ownerId: { type: Number, default: null },
     owners: { type: Array, default: () => [] },
+    // 部署での絞り込み用（選択肢に含まれるメンバーがいる部署だけ）
+    ownerDepartments: { type: Array, default: () => [] },
 });
 
 // useToasts が返すのは showToast（addToast は存在しない）
@@ -38,6 +40,19 @@ const data = reactive({
 // ---- 閲覧するメンバー（閲覧専用モードのみ）----
 const currentOwnerId = ref(props.ownerId);
 const currentOwnerName = computed(() => props.owners.find((o) => o.id === currentOwnerId.value)?.name ?? '');
+// 部署で絞り込み（申請者管理のメンバー設定と同じチップ）。並び順はサーバー側で 雇用区分 → 役職 → 氏名
+const ownerDept = ref(null);
+const filteredOwners = computed(() => (ownerDept.value === null ? props.owners : props.owners.filter((o) => o.department_id === ownerDept.value)));
+const ownerLabel = (o) => (o.position_title ? `${o.label}（${o.position_title}）` : o.label);
+async function selectOwnerDept(id) {
+    ownerDept.value = id;
+    // 選んでいたメンバーが絞り込みから外れたら、絞り込み後の先頭のメンバーへ切り替える
+    if (filteredOwners.value.length && !filteredOwners.value.some((o) => o.id === currentOwnerId.value)) {
+        currentOwnerId.value = filteredOwners.value[0].id;
+        await switchOwner();
+    }
+}
+const chip = (active) => ['rounded-full px-3 py-1 text-xs font-medium transition-colors', active ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'];
 // 読み込みだけに owner_id を付ける。書き込みは常に本人分（サーバー側で本人以外は 403）
 const readParams = () => (props.readOnly && currentOwnerId.value ? { owner_id: currentOwnerId.value } : {});
 
@@ -270,14 +285,18 @@ onBeforeUnmount(() => {
         </template>
 
         <div class="rounded bg-white p-4 shadow sm:p-6">
-            <!-- 閲覧専用モード: 見るメンバーを選ぶ -->
+            <!-- 閲覧専用モード: 見るメンバーを選ぶ（部署で絞り込み → メンバー。並びは 雇用区分 → 役職 → 氏名） -->
             <div v-if="readOnly" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+                <div v-if="ownerDepartments.length > 1" class="mb-2 flex flex-wrap gap-2">
+                    <button type="button" :class="chip(ownerDept === null)" @click="selectOwnerDept(null)">すべての部署</button>
+                    <button v-for="d in ownerDepartments" :key="d.id" type="button" :class="chip(ownerDept === d.id)" @click="selectOwnerDept(d.id)">{{ d.name }}</button>
+                </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="text-amber-800">閲覧するメンバー:</span>
-                    <select v-if="owners.length" v-model="currentOwnerId" class="rounded border-amber-300 py-1 text-sm" @change="switchOwner">
-                        <option v-for="o in owners" :key="o.id" :value="o.id">{{ o.name }}</option>
+                    <select v-if="filteredOwners.length" v-model="currentOwnerId" class="rounded border-amber-300 py-1 text-sm" @change="switchOwner">
+                        <option v-for="o in filteredOwners" :key="o.id" :value="o.id">{{ ownerLabel(o) }}</option>
                     </select>
-                    <span v-else class="text-amber-700">ポートフォリオを使っているメンバーがまだいません</span>
+                    <span v-else class="text-amber-700">{{ owners.length ? 'この部署にはポートフォリオを使っているメンバーがいません' : 'ポートフォリオを使っているメンバーがまだいません' }}</span>
                 </div>
                 <p class="mt-1 text-xs text-amber-700">閲覧のみです。作品の追加・修正・削除はご本人が行います。問題のある作品があれば、本人に修正・削除を依頼してください。</p>
             </div>
