@@ -2387,7 +2387,15 @@ HTML,
             ],
         ];
 
+        // 一部の機能だけを本番へ反映するときは、そのバージョンだけを登録できる（他の登録済みエントリを上書きしない）。
+        // 例: CHANGELOG_ONLY=portfolio-1 php artisan db:seed --class=ChangelogSeeder --force
+        // 未指定なら従来どおり全エントリを登録する。
+        $only = getenv('CHANGELOG_ONLY') ?: null;
+
         foreach ($entries as $entry) {
+            if ($only !== null && $entry['version'] !== $only) {
+                continue;
+            }
             Changelog::updateOrCreate(
                 ['version' => $entry['version']],
                 $entry
