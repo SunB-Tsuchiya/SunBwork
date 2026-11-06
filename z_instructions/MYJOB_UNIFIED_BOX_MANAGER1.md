@@ -851,3 +851,12 @@ UserNavigationTabsの上段「仕事・案件」とUserWorkHubTabsの内側「�
 共通判定と実Vue SSR検証成功: 上段/内側/モバイルの試用行先、本人context文字列ID、別会社切替、欠けたprops、各一般role、general会社、activeと受信件数表示、従来BOX戻りリンク保持。既存unifiedMyJobInputの日時/流用/保存/役割による入口表示の退行検証も成功。対象ESLint成功、members build終了0、manifest468/参照498/欠落0・既存sourceエントリ保持・members base、旧資産復元と削除差分なし。PHP/routes/DB/権限/旧ページの保存先は未変更。実ブラウザ確認はまだ。
 
 保存基準6f2b7cc55から隔離作業、共有Claude作業は未変更。追加SSHなし。今回は上段と内側の行先が一致する必要から両方を変更したが、一般Userのナビは従来のまま。実装/コード検証/build完了、配備/利用者画面確認は未実施。次の一手は本番元f9821e4c3からの固定差分配備スクリプトを提示し、承認後に限定反映する。一般公開未承認。
+
+
+## 2026-11-07 試用既定入口の限定反映準備（未実行）
+
+コード/資産/検証を7b2d6ef27bc2d6c8336ed06ac15e188f683cd481に保存・push済み。/tmp/myjob-navigation-deploy-20261107.shを作成しsh構文確認済み。SHA256 86b43e956f852bcf8cb20f345b2d774d923fb0a6265ac3414f6c90295252f2d2。private/codex-myjob-navigation-20261107にも復元用保存。
+
+固定元f9821e4c3/main/既知未追跡5件/追跡変更なし/9ソース許可一覧/削除なし/サーバアプリ・DB・routes・設定・依存差分0を検証して固定先7b2d6ef27へff-only。manifest固定hashと498資産/欠落0/members base、view:clear、最終作業状態保持を確認する。DB読取更新/migration/seedなし。実ブラウザ確認は未実施。
+
+次の一手は正確な `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-navigation-deploy-20261107.sh` の承認後に実行する。一般公開未承認。確認成功済みのボタン名や複数クライアント操作を再試験せず、今回の入口の行先と旧BOX往復だけを画面確認依頼する。
