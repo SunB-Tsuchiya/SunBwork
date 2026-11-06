@@ -699,3 +699,21 @@ Vue5ファイルのテンプレート文言だけを変更。QuickWorkEntryModal
 工程4の最初の名称/案内整備は実装・コード検証・本番反映・依頼2点の画面確認まで完了。メインナビの全面置換/新機能一般公開とは別。
 
 次の相談案（提案、未確定）: 試用SuperAdminに限り「仕事・案件」の「マイジョブ」タブの既定先を統合BOXへ向ける。現在UserWorkHubTabsはuser.myjobbox.indexを指しており、統合BOXへ直接入る主導線になっていない。従来BOXへのリンクとカレンダードラッグ/旧入力/過去流用/受信依頼の既存操作は保持する。一般Userのタブ/routeを変更しない。対象guardと他画面から戻る動線を照合した具体案を相談してから実装判断する。一般公開と工程5の権限/実例/上長レビューは引き続き未承認・未完了事項を保持する。
+
+
+## 2026-11-07 工程4 試用の既定入口を統合BOXへ（実装承認）
+
+利用者は「SuperAdminの試用範囲でマイジョブタブから統合BOXへ直接入る、従来BOXリンク保持、一般Userは変更しない」の具体案にyes。状態=確定。旧UserWorkHubTabsが常に従来BOXを指す状態を試用対象だけ置換する。上段の仕事・案件も同じ行先に揃え、デスクトップ/モバイルで一致させる。
+
+範囲: UserNavigationTabs/UserWorkHubTabsと共通の行先判定helper。共有propsの既存userWorkHub.enabled（INFOのサーバ試用guard）、auth.user.user_role=superadmin、companyType非general、company_idとsuperAdminContextIdが本人会社一致又は未指定であることを確認。条件不成立は旧user.myjobbox.indexへ。サーバのUnifiedMyJobBox.available/認可は変更しない。統合BOXの従来BOXリンク、従来BOXの試用リンク、旧入力/カレンダー/過去流用/受信入口は保持。DB/一般公開/権限拡大なし。
+
+基準6f2b7cc55、本番直前証拠f9821e4c3。追加SSHなし。検証は共通判定の役割/一般会社/会社context/欠けたprops、実Vue SSRの上段・内側・モバイル行先/受信badge/active保持、既存入力検証、lint、members buildと旧資産保持。次の一手は上記の小範囲実装と検証。
+
+
+## 2026-11-07 試用マイジョブの既定入口変更 実装・検証完了
+
+UserNavigationTabsの上段「仕事・案件」とUserWorkHubTabsの内側「マイジョブ」の行先を共通workHubMyJobRouteで判定。既存server userWorkHub.enabled、SuperAdmin本人、companyType非generalかつ欠落なし、本人company_idが正整数、context未指定又は本人会社一致の場合だけuser.myjobbox.unified_previewへ。それ以外は従来index。既存共有propsにcompany_id/contextが含まれることを実コードで確認。部署判定は既存serverflagに依拠し、サーバ認可/データscopeは変更しない。
+
+共通判定と実Vue SSR検証成功: 上段/内側/モバイルの試用行先、本人context文字列ID、別会社切替、欠けたprops、各一般role、general会社、activeと受信件数表示、従来BOX戻りリンク保持。既存unifiedMyJobInputの日時/流用/保存/役割による入口表示の退行検証も成功。対象ESLint成功、members build終了0、manifest468/参照498/欠落0・既存sourceエントリ保持・members base、旧資産復元と削除差分なし。PHP/routes/DB/権限/旧ページの保存先は未変更。実ブラウザ確認はまだ。
+
+保存基準6f2b7cc55から隔離作業、共有Claude作業は未変更。追加SSHなし。今回は上段と内側の行先が一致する必要から両方を変更したが、一般Userのナビは従来のまま。実装/コード検証/build完了、配備/利用者画面確認は未実施。次の一手は本番元f9821e4c3からの固定差分配備スクリプトを提示し、承認後に限定反映する。一般公開未承認。

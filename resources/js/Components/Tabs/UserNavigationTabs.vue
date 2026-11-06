@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import UserWorkHubTabs from './UserWorkHubTabs.vue';
+import { workHubMyJobRoute } from '@/utils/workHubNavigation';
 
 const props = defineProps({
     active: { type: String, default: '' },
@@ -50,7 +51,7 @@ const tabs = computed(() => [
     { key: 'dashboard', href: tryRoute('user.dashboard'), label: 'ダッシュボード' },
     { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
     { key: 'department_work', href: tryRoute('schedule.index', { tab: 'work' }), label: '部署の作業', condition: canAccessDepartmentWork.value },
-    { key: 'work_hub', href: tryRoute('user.myjobbox.index'), label: '仕事・案件', condition: hubEnabled.value },
+    { key: 'work_hub', href: tryRoute(workHubMyJobRoute(usePage().props)), label: '仕事・案件', condition: hubEnabled.value },
     { key: 'project_jobs', href: tryRoute('user.project_jobs.index'), label: '案件確認', condition: !hubEnabled.value },
     { key: 'myjob', href: tryRoute('user.myjobbox.index'), label: 'マイジョブBOX', condition: !hubEnabled.value },
     { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ', condition: !hubEnabled.value },
