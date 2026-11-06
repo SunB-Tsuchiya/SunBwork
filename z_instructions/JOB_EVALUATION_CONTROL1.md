@@ -1234,3 +1234,14 @@ private/codex-client-review-20261106/分類クライアント対応_登録用_20
 事前に既定mysql/silverlamb759_sunbwork/INFO会社2部署1/63分類の現在状態と候補適格性を再確認し、privateに全分類の既存列と限定参照hashを保存する。追加migration1本のみ--database=mysql/--path/--realpath/--forceで適用、固定先へff-only。専用importのdry-run63分類94組、本登録94組、再dry-run0組を厳密確認。専用Seederだけ--database=mysql --force、config/cache/route/view clear。事後は全分類列・既存ProjectJob/簡易記録/星の分類参照hash保持、期待94組完全一致、資産498/欠落0/members base、既存未追跡5件保持を確認する。
 
 次の一手: 正確な `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/broad-project-clients-deploy-20261106.sh` の承認後に同じスクリプトを実行。元版/作業状態が違えば停止し、他作業へ合わせるため勝手にreset/pullしない。今回の画面確認は未実施、一般公開未承認。
+
+
+## 2026-11-06 限定配備・初期関連94組登録成功（利用者画面確認待ち）
+
+利用者が提示した正確な配備SSHコマンドにyesと回答。同じ/tmp/broad-project-clients-deploy-20261106.shを実行しexit0。固定元0c9434f67/main/追跡変更なし/既存未追跡5件一致、固定先e856d0c5a207530c0934ac723e9bc69d50a1dab5、source34ファイル許可一覧/削除なし/PHP16ファイル構文を確認。既定mysql/silverlamb759_sunbworkとINFO会社2部署1、現在63分類/取引先適格性を再確認しprivateスナップショット保存。今回migration2026_11_06_150001だけ--database=mysql/--path/--realpath/--forceで適用成功、固定先へff-only。
+
+専用importはdry-run63分類94組、本登録94組、再dry-run追加0組すべて期待どおり。専用BroadProjectClientsChangelogSeederだけ--database=mysql --force成功、config/cache/route/view clear成功。事後の期待94関連完全一致、分類63件全列と既存ProjectJob/簡易記録/星の分類参照hash不変、manifest資産498/欠落0/members base、追跡変更なし/未追跡5件保持を確認。本番最終証拠e856d0c5a。一般公開なし。共有Claude作業未変更。
+
+実装/コード検証/限定配備/初期登録は完了。利用者の今回画面確認・上長照合はまだ未実施で、exit0から推定しない。直前に依頼する画面確認は次の3項目のみ: (1) 既存「仕事・案件」→「大まかな案件」で複数クライアント表示と「ほかN社」展開が見える（例:テスト・模試）。(2) クライアント名（例:NTS）で検索でき、一致する中分類と親が見える。(3) 保存してよい1分類で編集モーダルの複数選択/個別解除を保存し、開き直して反映を確認。確認用変更は必要なら元へ戻す。すべて問題なければ「成功」、違いがあれば番号と結果を依頼する。
+
+これへの成功は3項目だけの確認とし、簡易入力/進行管理の全画面・別アカウント・権限全条件・担当変更・上長照合・一般公開まで拡張しない。既に成功した続き/完了/数量/ファイル情報の再試験は求めない。次の一手はこの3項目の利用者確認結果を記録する。

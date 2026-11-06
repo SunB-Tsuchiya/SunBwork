@@ -872,3 +872,5 @@ class MyNSystemTest extends TestCase
 分類は大/中のまとまりを保ち、broad_project_clientsで複数取引先を関連付ける。旧client_idは互換のため保持し、複数候補の先頭を実クライアントへ自動変換しない。client_ids未指定は保持、空配列は解除、旧client_idだけの更新は他の複数関連を消さない。会社関連company_clientsで検証し、休眠は既存保持/解除のみ。親のdisplay_clientsは有効な子の集合を含む表示用で、直接編集するclientsとは別。実案件のclient_idと担当は分類編集では変わらず、新式で取引先指定を必須にしない。取引先を理由に同名同年度分類を増殖させないが、既存重複の強制統合もしない。詳細はBROAD_PROJECT_CLIENTS_PLAN1.md。
 
 初期補完はbroad-projects:import-clientsの確認済みJSON、会社/部署、対象mysql DB名一致、dry-runと--forceで行う追加専用。分類名/親が確認表と異なる場合や会社未関連/新規休眠候補は停止し、既存仕事/分類/担当を一括変更しない。実データの候補表はprivate保存しGitへ追加しない。一般User公開は未承認。
+
+2026-11-06追記: 上記複数クライアント機能は本番e856d0c5aへ限定配備済み。専用migrationと初期関連94組登録、既存分類/参照保持を確認。利用者画面確認待ち、一般公開未承認。
