@@ -289,6 +289,12 @@ class User extends Authenticatable
         return $this->hasOne(\App\Models\AdminPermission::class);
     }
 
+    /** ポートフォリオの作品（オーナー選択肢の判定用） */
+    public function portfolioItems()
+    {
+        return $this->hasMany(\App\Models\Portfolio\PortfolioItem::class);
+    }
+
     /**
      * 売上分析機能の個人別利用許可
      */

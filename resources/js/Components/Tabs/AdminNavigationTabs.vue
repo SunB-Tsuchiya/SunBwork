@@ -19,6 +19,7 @@ const perm = computed(() => page.props.auth?.adminPermissions ?? null);
 const can = (key) => perm.value === null || perm.value[key] === true;
 const isRepresentative = computed(() => page.props.auth?.user?.isRepresentative ?? false);
 const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
+const canAccessPortfolio = computed(() => page.props.auth?.canAccessPortfolio ?? false);
 
 // 一般会社（サンエー印刷等）は表示するタブを許可リストで絞る。サン・ブレーンは従来どおり全タブ
 const isGeneral = computed(() => page.props.auth?.companyType === 'general');
@@ -56,6 +57,13 @@ const tabs = computed(() => [
         href: tryRoute('admin.sales_analysis.dashboard'),
         label: '売上分析',
         condition: canAccessSalesAnalysis.value && typeof route === 'function' && route().has('admin.sales_analysis.dashboard'),
+    },
+    // デザイナー用ポートフォリオ（SB専用・Adminは閲覧専用画面。サンエー印刷は GENERAL_ALLOWED に含めないので出ない）
+    {
+        key: 'portfolio',
+        href: tryRoute('admin.portfolio.manage'),
+        label: 'ポートフォリオ管理',
+        condition: canAccessPortfolio.value && typeof route === 'function' && route().has('admin.portfolio.manage'),
     },
     { key: 'admin_permissions', href: tryRoute('admin.admin_permissions.index'), label: 'Admin権限管理', condition: isRepresentative.value },
     { key: 'leader_permissions', href: tryRoute('admin.leader_permissions.index'), label: 'Leader権限管理' },
@@ -185,6 +193,13 @@ function onMobileSelect(e) {
                 :class="tab('sales_analysis')"
             >
                 売上分析
+            </Link>
+            <Link
+                v-if="showTab('portfolio') && canAccessPortfolio && typeof route === 'function' && route().has('admin.portfolio.manage')"
+                :href="route('admin.portfolio.manage')"
+                :class="tab('portfolio')"
+            >
+                ポートフォリオ管理
             </Link>
             <Link
                 v-if="showTab('admin_permissions') && isRepresentative"

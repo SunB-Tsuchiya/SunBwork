@@ -30,3 +30,6 @@ Schedule::command('clerk:generate-schedules')->dailyAt('00:15')->timezone('Asia/
 
 // Durable retry for the separate MGinbon DB after trial MyJob completion.
 Schedule::command('work-jobs:sync-completions')->everyMinute()->withoutOverlapping();
+
+// ポートフォリオ: アップ途中・変換途中・失敗のまま残った作品（24時間経過）を実体ファイルごと毎時削除
+Schedule::command('portfolio:prune-stale')->hourly()->withoutOverlapping();

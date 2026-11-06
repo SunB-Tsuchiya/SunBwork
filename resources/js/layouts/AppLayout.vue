@@ -201,6 +201,7 @@ const getTopTabActive = () => {
     try {
         const r = route().current();
         if (!r) return '';
+        if (r.includes('.portfolio.')) return 'portfolio';
         if (r.includes('broad_projects')) return 'broad_projects';
         if (r.includes('admin_permissions')) return 'admin_permissions';
         if (r.includes('position_titles')) return 'position_titles';

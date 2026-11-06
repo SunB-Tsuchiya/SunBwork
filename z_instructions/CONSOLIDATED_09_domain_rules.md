@@ -872,3 +872,27 @@ class MyNSystemTest extends TestCase
 分類は大/中のまとまりを保ち、broad_project_clientsで複数取引先を関連付ける。旧client_idは互換のため保持し、複数候補の先頭を実クライアントへ自動変換しない。client_ids未指定は保持、空配列は解除、旧client_idだけの更新は他の複数関連を消さない。会社関連company_clientsで検証し、休眠は既存保持/解除のみ。親のdisplay_clientsは有効な子の集合を含む表示用で、直接編集するclientsとは別。実案件のclient_idと担当は分類編集では変わらず、新式で取引先指定を必須にしない。取引先を理由に同名同年度分類を増殖させないが、既存重複の強制統合もしない。詳細はBROAD_PROJECT_CLIENTS_PLAN1.md。
 
 初期補完はbroad-projects:import-clientsの確認済みJSON、会社/部署、対象mysql DB名一致、dry-runと--forceで行う追加専用。分類名/親が確認表と異なる場合や会社未関連/新規休眠候補は停止し、既存仕事/分類/担当を一括変更しない。実データの候補表はprivate保存しGitへ追加しない。一般User公開は未承認。
+
+## ポートフォリオ（SB専用・2026-11-06）
+
+設計・経緯: `z_instructions/PORTFOLIO_PLAN1.md` / `PORTFOLIO_MANAGER1.md`。デザイナーが客先で作品（画像・PDF・動画）を見せる、個人専用の機能。
+
+**権限（`PortfolioAccess` に集約。判定を他で書かない）**
+- 作成・編集・削除は**本人のみ**（`canEdit`）。利用許可（`portfolio_permissions.enabled`）がオンのユーザー。試用中は SuperAdmin も自分の分だけ。**Admin ロールは自分のポートフォリオを持たず、一切書き込めない。**
+- 閲覧（`canView`）は本人に加え、SuperAdmin / SB の Admin が SB メンバー分を閲覧できる（Admin は同じ会社のみ・SuperAdmin は SB 全員）。問題のある作品は本人に修正・削除を依頼する運用。
+- サンエー印刷（`company_type = 'general'`）は誰も使えない（`deny_general` ミドルウェア＋ `canUse`）。
+- 見えない作品の ID 指定は 404、見えるが編集不可は 403、`owner_id` の不正指定は 403。利用許可のオン/オフ画面は SuperAdmin のみ（Admin・SuperAdmin は常時利用可のため一覧に出さない）。許可の対象は SB メンバー全ロール。絞り込みは雇用区分・**担当（`users.assignment_id`。制作・営業など）**・部署。
+- ルートは `admin.portfolio.*` / `user.portfolio.*`（画面）、`portfolio.api.*`（JSON・配信）、`portfolio.view`（閲覧ページ）。接頭辞の理由は CONSOLIDATED_01。
+
+**ファイルの扱い**
+- 保存先は `storage/app` の `portfolio/{user_id}/`（公開ディレクトリ外・`local` ディスク）。**配信は認証付きの `FileController` だけ**（`storage:link` は使わない。Range 対応で動画のシークも可）。テストでは `filesystems.portfolio_disk` を偽ディスクに差し替える。
+- 個人の容量上限は **10GB**（`PortfolioStorage::quota()`）。PDF は init で原本の2倍を確認し、**ページ画像化の書き込み前にも実際の増加分で再確認**する（超えたら作品ごと破棄）。削除は実体ファイルも即時に消す（ゴミ箱なし）。
+- 画像: JPG/PNG/WebP。ブラウザで長辺 2400px に縮小して送り、サーバー（Imagick）で再度 2400px・JPEG 82 に縮小＋サムネイル 600px。
+- PDF: **60 ページ・300MB まで**。2MB 分割アップ → `complete`（中身が `%PDF-` か・申告サイズ・ページ数を検証）→ `process` を繰り返して **4 ページずつ**画像化（150dpi・長辺 2000px。Imagick + Ghostscript）。実行時間上限対策のためキューは使わない。
+- 動画: MP4 / MOV。**ブラウザ側（mediabunny / WebCodecs）で MP4 に変換**してから 2MB 分割アップ（さくらに ffmpeg が無い）。軽い H.264（長辺 1280px・4Mbps 以下）は**再エンコードせず詰め替え**（moov を先頭へ）。それ以外は長辺 1280px・H.264 2.5Mbps に再エンコード。変換できなければ原本 300MB 以下のみそのまま送る。圧縮後の上限 1GB。サーバーは先頭の `ftyp` で検証し、ポスター（`poster_path`）とサムネイルを作る。
+- **mediabunny の `new Quality(数値)` は「品質レベル」でありビットレートではない。** ビットレートは `new Quality({ bitrate: 2500000 })` と明示する（数値だけを渡すと設定が無効になり、映像が捨てられる）。
+- **mediabunny は変換できないトラックを黙って捨てる**ため、変換後に映像が残ったか（`utilizedTracks`）を必ず確認する。
+- Web 側のアップロード上限（さくら: upload 5MB / post 8MB）対策として、分割は 2MB 固定。
+- 途中で失敗・離脱した作品（`status` が `uploading` / `processing` / `failed`）は、`portfolio:prune-stale` が**毎時**、更新から 24 時間経過分を実体ごと削除する。
+
+**未了（本番反映前）**: さくらでの PDF 変換・動画配信の実機確認（MANAGER D-6 / D-7）、HEVC 動画の確認（D-8。社用スマホ刷新後）。本番は `migrate --force` が 2 本必要。

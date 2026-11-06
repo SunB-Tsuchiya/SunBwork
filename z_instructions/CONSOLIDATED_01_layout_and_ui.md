@@ -276,3 +276,14 @@ AppLayout 内にグローバル配置済み。各ページで重複させない�
 
 
 2026-11-06 大まかな案件の複数クライアント（未配備）: 既存編集モーダルで複数選択/個別解除。一覧は2社までと「ほかN社」をnative detailsで展開する。中分類の一致は親も表示し、名称と関連取引先名で検索。親の集約関連は直接編集値とは分ける。既存AppLayout/role色/共通順/お気に入り/休止表示を維持。簡易入力・進行管理の分類選択も複数名で検索可能だが、選択だけで具体案件の取引先を変更しない。
+
+## ポートフォリオの画面（SB専用・2026-11-06）
+
+- **AppLayout はルート名の接頭辞でロール別ナビを決める**（`AppLayout.vue` の `currentRouteContext`）。接頭辞なし（`portfolio.manage` 等）だと、全員が「ユーザー」のナビになる（実際に発生）。画面を持つルートは `admin.portfolio.*` / `user.portfolio.*` のように**ロールごとに登録**する（`routes/portfolio.php` がクロージャを返し、`routes/web.php` の各ロールのグループ内で呼ぶ。売上分析の `$registerSalesAnalysisRoutes` と同じ方式）。画面内リンクはコントローラーが渡す `routePrefix` で組み立てる。画面のないルート（API・ファイル配信）と、独立レイアウトの閲覧ページは接頭辞なし（`portfolio.api.*` / `portfolio.view`）。
+- **ナビの「選択中」表示**は `getTopTabActive()` に `.portfolio.` を含むルートで `portfolio` を返す分岐を入れてある。タブのキーは `portfolio`。
+- **閲覧ページ（`Pages/Portfolio/View.vue`）は AppLayout を使わない独立レイアウト**で、管理画面の「客先で見せる ↗」から `<a target="_blank">` で別タブに開く。管理用の操作（追加・編集・削除）は置かない。白ベース＋モノトーン＋デザイナーが選ぶアクセント色（CSS はインライン style）。
+- **管理画面は「作る人」と「見る人」で分ける**: 本人（利用許可あり）は編集画面、Admin（と admin エリアの SuperAdmin）は `readOnly` の閲覧専用画面（「閲覧するメンバー」を選ぶだけ。編集ボタンは出さない）。サーバー側でも書き込みを拒否している。
+- **作品の追加は「＋ 作品を追加」ボタン → モーダル**（`ItemCreateModal.vue`）。入力順は ①タイトル → ②説明 → ③ファイル → 分類（任意）。常時表示のドロップ枠は置かない。動画用に「動画がアップできないとき」の折りたたみメモがある（エラー時は自動で開く）。
+- **画像の拡大**は `ImageLightbox.vue`（全画面。クリックで等倍、複数ページは ← → で送る、Esc で閉じる）を共用する。
+- **`useToasts` が返すのは `showToast`**（`addToast` は存在しない。`const addToast = showToast;` と別名を付けて使う。`addToast` を分割代入すると実行時に「is not a function」で止まる）。
+- 並べ替えは `sortablejs`。DOM は Vue が管理するため、`onEnd` で移動を元に戻してからデータを並べ替える（`Manage.vue` の `revertDom`）。

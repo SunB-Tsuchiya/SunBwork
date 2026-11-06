@@ -2363,6 +2363,28 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'portfolio-1',
+                'title' => 'ポートフォリオ機能を追加（サン・ブレーン・試用中）',
+                'released_at' => '2026-11-06',
+                'summary' => 'デザイナーが客先で作品（画像・PDF・動画）を見せるためのポートフォリオを追加しました。利用を許可されたメンバーが、自分の作品をコレクションとタグで整理でき、別タブの全画面ページでスライドショー表示できます。',
+                'design_files' => ['z_instructions/PORTFOLIO_PLAN1.md', 'z_instructions/PORTFOLIO_MANAGER1.md'],
+                'claude_notes' => 'テーブルは portfolio_ 接頭辞（permissions / profiles / collections / items / item_pages / tags / item_tag ＋ items.poster_path の migration 2 本）。ファイルは storage の portfolio/{user_id}/ 配下（公開ディレクトリ外）で、認証付きコントローラー（FileController）経由で配信。権限は PortfolioAccess に集約（作成・編集・削除は本人のみ、Admin/SuperAdmin は SB メンバー分を閲覧のみ、サンエー印刷は不可）。AppLayout はルート名の接頭辞でロール別ナビを決めるため、admin.portfolio.* / user.portfolio.* で登録（接頭辞なしだと全員がユーザーナビになる）。閲覧ページ portfolio.view は AppLayout を使わない独立レイアウトで別タブ表示。画像は Imagick で縮小、PDF は Imagick+Ghostscript で数ページずつ画像化（上限 60 ページ・300MB）、動画はブラウザ側（mediabunny）で MP4 に変換してから 2MB ずつ分割アップ（さくらに ffmpeg なし・Web 側アップロード上限 5MB 対策）。軽い H.264 は再エンコードせず詰め替え。未完了作品は portfolio:prune-stale を毎時実行して 24 時間後に削除。本番反映は migrate（--force）が 2 本必要。さくらでの PDF 変換・動画配信の実機確認が未了（PORTFOLIO_MANAGER1 D-6 / D-7）、HEVC 動画の確認は社用スマホ刷新後（D-8）。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>ポートフォリオ（試用中・サン・ブレーン）</h3><ul>
+<li>デザイナーが客先で自分の作品を見せるための機能です。利用を許可されたメンバーだけが使えます。</li>
+<li>画像（JPG・PNG・WebP）、PDF（60ページまで）、動画（MP4・MOV）をアップできます。大きなファイルは自動で軽くなります。</li>
+<li>作品はコレクション（フォルダ）とタグで整理できます。タイトルと説明を付けて、追加・修正・削除・並べ替えができます。</li>
+<li>「客先で見せる」を押すと、別タブで全画面のポートフォリオが開きます。コレクションの表紙一覧から選ぶとスライドショーになり、PDF は見開きでページをめくれます。スワイプや矢印キーで操作できます。</li>
+<li>表示の色（アクセント色）と名前・肩書きは、自分で設定できます。</li>
+<li>管理者は、メンバーの作品を閲覧できます（修正・削除は本人が行います）。</li>
+</ul></section>
+<section class="cl-feature"><h3>動画をアップするときの注意</h3><ul>
+<li>iPhone は「設定 → カメラ → フォーマット → 互換性優先」にして撮ると、確実にアップ・再生できます。</li>
+<li>アップ中は、画面を閉じたり別のページへ移動したりしないでください。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

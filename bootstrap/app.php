@@ -53,6 +53,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'deny_general'   => \App\Http\Middleware\DenyGeneralCompany::class,
             'suna_staff'     => \App\Http\Middleware\SunAStaffAbility::class,
             'sales_analysis' => \App\Http\Middleware\EnsureSalesAnalysisAccess::class,
+            'portfolio'      => \App\Http\Middleware\EnsurePortfolioAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
