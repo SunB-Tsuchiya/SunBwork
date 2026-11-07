@@ -1415,3 +1415,10 @@ origin mainをfetchして差分確認後、8314を基準に/tmp/sunbwork-myjob-n
 専用tree feature/myjob-legacy-create-20261107でb769をmergeし他作業を保持。競合したmanifestは統合済みソースから再build、資料は両方保持。実Vue入力（新ボタンの通常新規GET・日時/0時/空時刻・確認取消保持/移動中抑止/表示条件を含む）と試用ナビ/Portfolio共存、対象lintが成功。members build終了0、manifest473/参照504/欠落0/最新source全保持/members base、旧資産保持。b769に対してapp/database/routes/config/bootstrap/依存/CLAUDE.md差分0。今回一般公開/DB変更なし、共有Claude作業未編集。
 
 次の一手はb769固定元の新しい配備スクリプトを作成・正確なコマンドを提示し、承認後に実行する。元版が違う旧スクリプトは再利用しない。今回ボタンの画面確認は未実施、従来の成功確認は保持。
+
+
+## 2026-11-07 最新基準の旧形式ボタン配備準備（未実行）
+
+固定元b769cf38915fc9be08708332f10f23cb78ac1feb、固定先01f1074f3ea61ebf871b8b0d3f02cf0081b119feの/tmp/myjob-legacy-create-latest-deploy-20261107.shを作成。SHA256 65a281ad061d2fea8e98dc0be0ae3f783e5b35c4bd7db87c937fbb318ea63a8f、private/codex-myjob-legacy-create-20261107にも保存。取得branchはfeature/myjob-legacy-create-20261107。source許可一覧7ファイル、サーバ/DB/routes/設定/依存変更なし、削除なし、main/追跡変更なし/既知未追跡5件を確認後ff-only。manifest固定hash/504資産/members base/view:clear/最終状態保持を確認する。
+
+旧/tmp/myjob-legacy-create-deploy-20261107.shはce4基準なので使わない。新スクリプトは未承認・未実行。次の一手は対象本番版が変わったことを説明し、新しい正確なSSHコマンドを承認後に実行する。今回ボタンの利用者画面確認はまだ未実施。
