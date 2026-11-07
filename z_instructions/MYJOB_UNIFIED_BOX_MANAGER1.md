@@ -937,3 +937,12 @@ origin mainをfetchして差分確認後、8314を基準に/tmp/sunbwork-myjob-n
 最終検証: 実Vue script/SSRで通常新規GET/日付/00:00〜01:15/空時刻省略、POST非実行、非日時入力の取消保持と承諾、移動中保存抑止、右寄せ表示と編集/続き/通常calendarでの非表示、流用後の無効化を確認。既存入力/流用/受信/日時引継ぎの検証も成功。workHubNavigation検証でポートフォリオと試用タブ共存も退行なし。対象lint成功。members最終build終了0、manifest473/参照504資産/欠落0/全sourceエントリとmembers base保持、旧資産復元/削除なし。PHP/DB/認可/依存変更なし。ソースdiff-check成功。
 
 次の一手は新base ce4から本件の固定差分だけを反映する手順を準備し、正確なSSHコマンドを提示する。配備/今回の利用者画面確認は未実施、一般公開未承認。旧形式のボタン配置は承認済み、実画面はまだ未確認として分離する。
+
+
+## 2026-11-07 旧形式作成ボタンの限定配備手順準備
+
+実装/検証/buildをe02f4b607b6c7604609bc2dbd0ef0ad3535f0bc7へ保存・feature/myjob-legacy-create-20261107へpush済み。/tmp/myjob-legacy-create-deploy-20261107.shを準備、sh構文成功、SHA256 43bcdc08a35c47420e72c3587403fc2bf7c60c5a6bdd17ddab6d2ac56bf86c60。private/codex-myjob-legacy-create-20261107にも保存。
+
+固定元ce4e8d8701898e9fd48e3b63102cc2f20fcd3cfd、固定先e02f4b607b6c7604609bc2dbd0ef0ad3535f0bc7、取得branch feature/myjob-legacy-create-20261107。main/追跡変更なし/既知未追跡5件/7ソース許可一覧/削除なし/サーバ・DB・routes・設定・依存差分0を確認してff-only。manifest固定hash/504資産/欠落0/members base、view:clear、最終作業状態保持を確認する。CLAUDE.mdとポートフォリオ更新は本番基準のまま差分0。DB操作・migration・seedなし。
+
+まだ未実行。次の一手は正確な新SSHコマンドを提示し、承認後に実行する。今回の画面確認は新規モーダルの配置、日時だけで旧形式が開くこと（保存不要）、非日時入力がある場合の確認取消保持に絞る。成功済みの他機能は再試験しない。一般公開は未承認。
