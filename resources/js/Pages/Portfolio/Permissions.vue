@@ -52,10 +52,11 @@ const enabledCount = computed(() => local.value.filter((u) => u.enabled).length)
 const dirty = computed(() => local.value.some((u) => saved.value.get(u.id) !== u.enabled));
 const changedCount = computed(() => local.value.filter((u) => saved.value.get(u.id) !== u.enabled).length);
 
-function toggle(u) { u.enabled = !u.enabled; justSaved.value = false; }
+// SuperAdmin・Admin（always_on）は、許可に関わらず常に使えるので、スイッチは動かせない
+function toggle(u) { if (u.always_on) return; u.enabled = !u.enabled; justSaved.value = false; }
 /** 表示中の人を、まとめて ON / OFF */
 function setVisible(value) {
-    visibleUsers.value.forEach((u) => { u.enabled = value; });
+    visibleUsers.value.forEach((u) => { if (!u.always_on) u.enabled = value; });
     justSaved.value = false;
 }
 
@@ -64,7 +65,7 @@ async function save() {
     saving.value = true;
     try {
         await axios.put(route(`${props.routePrefix}.portfolio.permissions.update`),
-            { items: local.value.map((u) => ({ user_id: u.id, enabled: u.enabled })) },
+            { items: local.value.filter((u) => !u.always_on).map((u) => ({ user_id: u.id, enabled: u.enabled })) },
             { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '', Accept: 'application/json' } });
         saved.value = new Map(local.value.map((u) => [u.id, u.enabled]));
         justSaved.value = true;
@@ -100,7 +101,7 @@ const manageHref = () => route(`${props.routePrefix}.portfolio.manage`);
         <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
             <p class="mb-4 text-sm text-gray-500">
                 スイッチを ON にした人は、ユーザー用のタブ「ポートフォリオ」から、自分の作品（画像・PDF・動画）を追加・整理して、客先で見せられます。
-                Admin と SuperAdmin は、スイッチに関わらず使えます（自分の作品は持たず、メンバーの作品を閲覧するだけです）。
+                SuperAdmin と Admin（名前の横にバッジ）は、スイッチに関わらず常に使えるため、スイッチは ON のまま固定です（Admin は自分の作品は持たず、メンバーの作品を閲覧するだけです）。
                 変更したら、「保存する」を押してください。
             </p>
 
@@ -142,15 +143,20 @@ const manageHref = () => route(`${props.routePrefix}.portfolio.manage`);
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="u in visibleUsers" :key="u.id" :class="u.enabled ? '' : 'bg-gray-50'">
-                            <td class="py-1.5 pr-3 font-medium" :class="u.enabled ? 'text-gray-800' : 'text-gray-500'">{{ u.name }}</td>
+                            <td class="py-1.5 pr-3 font-medium" :class="u.enabled ? 'text-gray-800' : 'text-gray-500'">
+                                {{ u.name }}
+                                <span v-if="u.role_label" class="ml-1 rounded px-1.5 py-0.5 align-middle text-[10px] font-medium"
+                                    :class="u.role_label === 'SuperAdmin' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-700'">{{ u.role_label }}</span>
+                            </td>
                             <td class="py-1.5 pr-3 text-xs text-gray-500">{{ u.department }}</td>
                             <td class="py-1.5 pr-3 text-xs text-gray-500">{{ u.position_title ?? '―' }}</td>
                             <td class="py-1.5 pr-3 text-xs text-gray-500">{{ u.assignment_name ?? '―' }}</td>
                             <td class="py-1.5 pr-3 text-xs text-gray-500">{{ employmentLabel(u.employment_type) }}</td>
                             <td class="py-1.5 text-center">
-                                <button type="button" role="switch" :aria-checked="u.enabled"
-                                    class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-                                    :class="u.enabled ? 'bg-red-500' : 'bg-gray-300'" @click="toggle(u)">
+                                <button type="button" role="switch" :aria-checked="u.enabled" :disabled="u.always_on"
+                                    :title="u.always_on ? `${u.role_label} は、許可に関わらず常に使えます` : undefined"
+                                    class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200"
+                                    :class="[u.enabled ? 'bg-red-500' : 'bg-gray-300', u.always_on ? 'cursor-not-allowed opacity-50' : 'cursor-pointer']" @click="toggle(u)">
                                     <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200" :class="u.enabled ? 'translate-x-4' : 'translate-x-0'" />
                                 </button>
                             </td>
