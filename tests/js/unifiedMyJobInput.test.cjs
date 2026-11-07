@@ -33,7 +33,7 @@ async function component(file, behavior = false) {
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
-                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
+                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyCreate,canCreateLegacy,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
                 : file === 'resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue' ? '\nglobalThis.__legacyForm={assignments,save,workDate,startTimeHour,startTimeMin,endTimeHour,endTimeMin};' : file === 'resources/js/Pages/MyJobBox/Show.vue' ? '\nglobalThis.__legacyComplete={submitComplete,isSubmittingComplete};' : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection,showRequestModal,requestRecords,applyRequestJob,formAssignments,prefillEvent};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError,detailsOpen,detailsSaved};') + '\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
@@ -135,6 +135,17 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     assert.deepEqual(globalThis.__unifiedNavigation.slice(0,2),['events.create_job',{date:'2026-12-04',open:'request',startHour:'00',startMinute:'00',endHour:'01',endMinute:'00'}]);assert.equal(requests.length,beforeRequest);
     assert.equal(state.handingOff.value,true);await state.save();assert.equal(requests.length,beforeRequest);globalThis.__unifiedNavigation[2].onFinish();assert.equal(state.handingOff.value,false);
     props.show=false;await settle();props.show=true;await settle();assert.equal(state.historyChoice.value,null);assert.equal(state.activeContinuation.value,null);
+    assert.equal(state.canCreateLegacy.value,true);
+    const originalConfirm=globalThis.confirm;const beforeLegacy=requests.length;
+    state.form.planned_start_time='00:00';state.form.planned_end_time='01:15';
+    state.openLegacyCreate();assert.equal(requests.length,beforeLegacy);
+    assert.deepEqual(globalThis.__unifiedNavigation.slice(0,2),['events.create_job',{date:'2026-12-04',startHour:0,startMinute:0,endHour:1,endMinute:15}]);
+    assert.equal(state.handingOff.value,true);await state.save();assert.equal(requests.length,beforeLegacy);globalThis.__unifiedNavigation[2].onFinish();
+    state.form.title='未保存の作業';const previousNav=globalThis.__unifiedNavigation;let confirmation='';globalThis.confirm=message=>{confirmation=message;return false;};
+    state.openLegacyCreate();assert.equal(globalThis.__unifiedNavigation,previousNav);assert.equal(state.form.title,'未保存の作業');assert.equal(state.handingOff.value,false);assert.ok(confirmation.includes('引き継がれません'));
+    globalThis.confirm=()=>true;state.form.planned_start_time='';state.form.planned_end_time='';state.openLegacyCreate();
+    assert.deepEqual(globalThis.__unifiedNavigation.slice(0,2),['events.create_job',{date:'2026-12-04'}]);globalThis.__unifiedNavigation[2].onFinish();globalThis.confirm=originalConfirm;
+    await state.chooseHistory({record:oldHistory,kind:'new'});assert.equal(state.canCreateLegacy.value,false);const chosenNav=globalThis.__unifiedNavigation;state.openLegacyCreate();assert.equal(globalThis.__unifiedNavigation,chosenNav);
     app.unmount();
     const preview = await component(page, true);
     const pageProps = { rows: [], months: ['2026-11'], filters: { q: 'old search', period: '2026-11', hide_completed: true }, pagination: { total: 0, page: 1, last: 1 } };
@@ -159,17 +170,17 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     }
     {
         const ctx={};await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'myjob'}),ctx);
-        assert.ok(ctx.teleports.body.includes('過去データから流用'));assert.ok(ctx.teleports.body.includes('受けた依頼から登録'));
+        assert.ok(ctx.teleports.body.includes('過去データから流用'));assert.ok(ctx.teleports.body.includes('受けた依頼から登録'));assert.ok(ctx.teleports.body.includes('旧形式で作成'));assert.ok(ctx.teleports.body.includes('ml-auto'));
         const savedPage=globalThis.__historyPage;
         globalThis.__historyPage={props:{userWorkHub:{enabled:false}}};const normalCtx={};
-        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),normalCtx);assert.ok(!normalCtx.teleports.body.includes('過去データから流用'));
+        await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),normalCtx);assert.ok(!normalCtx.teleports.body.includes('過去データから流用'));assert.ok(!normalCtx.teleports.body.includes('旧形式で作成'));
         globalThis.__historyPage={props:{userWorkHub:{enabled:true}}};const trialCtx={};
         await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'calendar'}),trialCtx);assert.ok(trialCtx.teleports.body.includes('過去データから流用'));globalThis.__historyPage=savedPage;
         const editCtx={};await renderToString(createSSRApp(actualForm,{show:true,date:'2026-12-04',entryPoint:'myjob',entry:{id:7}}),editCtx);
-        assert.ok(!editCtx.teleports.body.includes('過去データから流用'));assert.ok(!editCtx.teleports.body.includes('受けた依頼から登録'));
+        assert.ok(!editCtx.teleports.body.includes('過去データから流用'));assert.ok(!editCtx.teleports.body.includes('受けた依頼から登録'));assert.ok(!editCtx.teleports.body.includes('旧形式で作成'));
     }
     const legacyEntryCtx={};await renderToString(createSSRApp(actualForm,{show:true,entryPoint:'myjob',date:'2026-12-04',continuationSource:{type:'entry',id:7}}),legacyEntryCtx);
-    assert.ok(legacyEntryCtx.teleports.body.includes('日時を引き継いで旧形式で続きを入力'));
+    assert.ok(legacyEntryCtx.teleports.body.includes('日時を引き継いで旧形式で続きを入力'));assert.ok(!legacyEntryCtx.teleports.body.includes('>旧形式で作成<'));
     const legacyAssignmentCtx={};await renderToString(createSSRApp(actualForm,{show:true,entryPoint:'myjob',date:'2026-12-04',continuationSource:{type:'assignment',id:7}}),legacyAssignmentCtx);
     assert.ok(!legacyAssignmentCtx.teleports.body.includes('日時を引き継いで旧形式で続きを入力'));
     const actualPage = await component(page);

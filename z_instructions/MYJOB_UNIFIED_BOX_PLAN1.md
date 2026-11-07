@@ -429,3 +429,12 @@ WorkJobMutation.completeWorkに本人試用の型付き選択+祖先完了を接
 範囲: UserNavigationTabs/UserWorkHubTabsと共通の行先判定helper。共有propsの既存userWorkHub.enabled（INFOのサーバ試用guard）、auth.user.user_role=superadmin、companyType非general、company_idとsuperAdminContextIdが本人会社一致又は未指定であることを確認。条件不成立は旧user.myjobbox.indexへ。サーバのUnifiedMyJobBox.available/認可は変更しない。統合BOXの従来BOXリンク、従来BOXの試用リンク、旧入力/カレンダー/過去流用/受信入口は保持。DB/一般公開/権限拡大なし。
 
 基準6f2b7cc55、本番直前証拠f9821e4c3。追加SSHなし。検証は共通判定の役割/一般会社/会社context/欠けたprops、実Vue SSRの上段・内側・モバイル行先/受信badge/active保持、既存入力検証、lint、members buildと旧資産保持。次の一手は上記の小範囲実装と検証。
+
+
+## 2026-11-07 旧形式で作成の配置承認・接続方針
+
+利用者は既存2入口と同列の右寄せ「旧形式で作成」、狭幅折返し、日付/開始終了時刻引継ぎの提案にyes。状態=確定。新規作成として既存events.create_jobへGETし、open=request/continue_entry/reuse/source系IDを付けない。切替だけではPOST/仕事作成しない。新規の既存試用条件内だけ表示し、編集中/続き/流用元選択後の仕事を通常新規へ誤変換しない。
+
+旧pageは既存のdate/startHour/startMinute/endHour/endMinuteをprefillEventへ変換でき、0時もnull/空との区別で保持することを実装確認。数量/作業区分/案件/作業名/結果など全項目の転記は今回行わない。入力済みの非日時情報がある場合は破棄になる項目を確認し、キャンセルではフォームを保持。初期状態で日時だけを入力した場合は追加確認を要求しない。依頼の受信登録と既存続き入口は別のまま。PHP/DB/権限/一般公開変更なし。
+
+影響はQuickWorkEntryModalと既存実Vue検証。新規ボタンの表示範囲/右寄せ折返し、通常GETの日時・0時・空時刻、非日時入力の確認と取消保持、移動中保存抑止、編集/続きでの非表示を検証する。次の一手はこの実装とmembers build。

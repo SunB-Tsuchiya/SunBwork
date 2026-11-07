@@ -23,10 +23,12 @@ const requestToken = ref('');
 const sourcePickerOpen = ref(false);
 const historyChoice = ref(null);
 const page = usePage();
+const initialWorkCategory = ref('other');
 const activeContinuation = computed(() => historyChoice.value?.kind === 'continue'
     ? { type: historyChoice.value.type, id: historyChoice.value.id } : props.continuationSource);
 const canSelectSource = computed(() => !props.entry?.id && !props.continuationSource
     && (isMyJob.value || page.props.userWorkHub?.enabled));
+const canCreateLegacy = computed(() => canSelectSource.value && !props.entry && !historyChoice.value && !props.reuseEntryId);
 const heading = computed(() => activeContinuation.value ? '続きのマイジョブを作成' : props.entry?.id ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
 const projects = ref([]);
 const broadProjects = ref([]);
@@ -102,7 +104,10 @@ async function loadProjects(applyDefaultCategory = false) {
         recentTitles.value = data.recent_titles || [];
         selectedProject.value = projects.value.find(project => String(project.id) === String(form.project_job_id)) || selectedProject.value;
         selectedBroadProject.value = broadProjects.value.find(project => String(project.id) === String(form.broad_project_id)) || selectedBroadProject.value;
-        if (applyDefaultCategory && !props.entry) form.work_category = data.default_category || 'other';
+        if (applyDefaultCategory && !props.entry) {
+            initialWorkCategory.value = data.default_category || 'other';
+            form.work_category = initialWorkCategory.value;
+        }
     } catch {
         if (request === searchRequest) error.value = '案件候補を読み込めませんでした。';
     } finally {
@@ -226,6 +231,22 @@ function openLegacyContinuation() {
     router.get(route('events.create_job'), params, { onFinish: () => { handingOff.value = false; } });
 }
 
+function openLegacyCreate() {
+    if (!canCreateLegacy.value || saving.value || handingOff.value) return;
+    const hasOtherInput = form.title.trim() || form.project_job_id || form.broad_project_id || form.project_name_text.trim()
+        || form.actual_quantity !== '' || form.actual_unit !== 'ページ' || form.result_note.trim() || form.activity_type
+        || form.entry_visibility !== 'department' || form.work_category !== initialWorkCategory.value;
+    if (hasOtherInput && !confirm('日付・開始終了時刻を引き継いで旧形式を開きます。案件・作業名・数量など、ほかの入力内容は引き継がれません。切り替えますか？')) return;
+    const params = { date: form.work_date || props.date || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) };
+    for (const [value, prefix] of [[form.planned_start_time, 'start'], [form.planned_end_time, 'end']]) {
+        if (/^\d{2}:\d{2}$/.test(value || '')) {
+            params[prefix + 'Hour'] = Number(value.slice(0, 2)); params[prefix + 'Minute'] = Number(value.slice(3));
+        }
+    }
+    handingOff.value = true;
+    router.get(route('events.create_job'), params, { onFinish: () => { handingOff.value = false; } });
+}
+
 function openRequests() {
     if (saving.value || handingOff.value) return;
     const params = { date: form.work_date, open: 'request' };
@@ -294,6 +315,7 @@ async function remove() {
                 <div v-if="canSelectSource && !sourcePickerOpen" class="mt-3 flex flex-wrap gap-2 border-b pb-3">
                     <button type="button" :disabled="saving || handingOff" class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-700 disabled:opacity-50" @click="sourcePickerOpen = true">過去データから流用</button>
                     <button type="button" :disabled="saving || handingOff" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 disabled:opacity-50" @click="openRequests">{{ handingOff ? '移動中…' : '受けた依頼から登録' }}</button>
+                    <button v-if="canCreateLegacy" type="button" :disabled="saving || handingOff" class="ml-auto rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50" title="日付・開始終了時刻を引き継いで旧形式を開きます" @click="openLegacyCreate">旧形式で作成</button>
                 </div>
                 <MyJobSourcePicker v-if="sourcePickerOpen" mode="past" :simple-input="true" class="mt-4" @cancel="sourcePickerOpen = false" @selected="chooseHistory" />
                 <p v-if="historyChoice && !sourcePickerOpen" class="mt-3 rounded bg-indigo-50 p-2 text-sm text-indigo-800">{{ historyChoice.kind === 'continue' ? '選択した仕事の続きとして登録します。' : '元の仕事とは独立した仕事として登録します。' }}</p>
