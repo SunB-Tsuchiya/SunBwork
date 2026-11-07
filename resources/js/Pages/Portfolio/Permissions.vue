@@ -52,7 +52,7 @@ const enabledCount = computed(() => local.value.filter((u) => u.enabled).length)
 const dirty = computed(() => local.value.some((u) => saved.value.get(u.id) !== u.enabled));
 const changedCount = computed(() => local.value.filter((u) => saved.value.get(u.id) !== u.enabled).length);
 
-// SuperAdmin・Admin（always_on）は、許可に関わらず常に使えるので、スイッチは動かせない
+// SuperAdmin（always_on）は、許可に関わらず常に使えるので、スイッチは動かせない（Admin は、他のメンバーと同じく動かせる）
 function toggle(u) { if (u.always_on) return; u.enabled = !u.enabled; justSaved.value = false; }
 /** 表示中の人を、まとめて ON / OFF */
 function setVisible(value) {
@@ -101,7 +101,8 @@ const manageHref = () => route(`${props.routePrefix}.portfolio.manage`);
         <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
             <p class="mb-4 text-sm text-gray-500">
                 スイッチを ON にした人は、ユーザー用のタブ「ポートフォリオ」から、自分の作品（画像・PDF・動画）を追加・整理して、客先で見せられます。
-                SuperAdmin と Admin（名前の横にバッジ）は、スイッチに関わらず常に使えるため、スイッチは ON のまま固定です（Admin は自分の作品は持たず、メンバーの作品を閲覧するだけです）。
+                Admin（名前の横にバッジ）は、何も設定しなくても自動で ON（自分の作品を作れます）です。OFF にした Admin は、メンバーの作品を閲覧するだけになります。
+                SuperAdmin は、スイッチに関わらず常に使えるため、ON のまま固定です。
                 変更したら、「保存する」を押してください。
             </p>
 

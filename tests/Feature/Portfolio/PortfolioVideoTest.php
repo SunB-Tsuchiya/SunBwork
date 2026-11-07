@@ -178,12 +178,13 @@ class PortfolioVideoTest extends TestCase
         }
     }
 
-    public function test_Adminは動画を作れず他人の動画は閲覧のみ(): void
+    public function test_スイッチをOFFにしたAdminは動画を作れず他人の動画は閲覧のみ(): void
     {
         $this->fakeDisk();
         $company = Company::create(['name' => 'T-' . uniqid(), 'code' => 'T' . uniqid(), 'company_type' => 'sunbrain']);
         $designer = $this->designer($company);
         $admin = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id]);
+        PortfolioPermission::create(['user_id' => $admin->id, 'enabled' => false]); // OFF にした Admin
         $bin = $this->fakeVideo();
 
         $this->init($admin, strlen($bin))->assertForbidden();

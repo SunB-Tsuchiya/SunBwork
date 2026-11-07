@@ -197,12 +197,13 @@ class PortfolioItemTest extends TestCase
         $this->assertSame('作品1', PortfolioItem::find($id)->title);
     }
 
-    public function test_Adminは自分のポートフォリオも他メンバー宛も作れない(): void
+    public function test_スイッチをOFFにしたAdminは自分のポートフォリオも他メンバー宛も作れない(): void
     {
         $this->fakeDisk();
         $company = $this->company();
         $designer = $this->designer($company);
         $admin = $this->manager('admin', $company);
+        PortfolioPermission::create(['user_id' => $admin->id, 'enabled' => false]); // OFF にした Admin
 
         // 自分宛のアップ・コレクション作成・設定変更は不可
         $this->upload($admin)->assertForbidden();
@@ -212,6 +213,20 @@ class PortfolioItemTest extends TestCase
         $this->upload($admin, ['owner_id' => $designer->id])->assertForbidden();
         $this->actingAs($admin)->postJson(route('portfolio.api.collections.store'), ['name' => 'A', 'owner_id' => $designer->id])->assertForbidden();
         $this->assertSame(0, PortfolioItem::count());
+    }
+
+    public function test_Adminはスイッチが未設定でも自動でONで自分のポートフォリオを作れる(): void
+    {
+        $this->fakeDisk();
+        $company = $this->company();
+        $designer = $this->designer($company);
+        $admin = $this->manager('admin', $company);
+        $this->assertDatabaseMissing('portfolio_permissions', ['user_id' => $admin->id]); // 行は無い
+
+        $this->actingAs($admin)->postJson(route('portfolio.api.collections.store'), ['name' => '客先用'])->assertCreated();
+        $this->upload($admin)->assertCreated();
+        // 他メンバー宛は、自動 ON でも不可
+        $this->upload($admin, ['owner_id' => $designer->id])->assertForbidden();
     }
 
     public function test_Adminは別会社のメンバーの作品は閲覧もできない(): void
@@ -273,4 +288,60 @@ class PortfolioItemTest extends TestCase
         $this->actingAs($designer)->get(route('user.portfolio.manage'))
             ->assertInertia(fn ($page) => $page->where('readOnly', false)->where('owners', []));
     }
+
+    public function test_スイッチONのAdminは自分のポートフォリオを作れるが他メンバーの分は触れない(): void
+    {
+        $this->fakeDisk();
+        $company = $this->company();
+        $designer = $this->designer($company);
+        $admin = $this->manager('admin', $company);
+        PortfolioPermission::create(['user_id' => $admin->id, 'enabled' => true]);
+        $others = $this->upload($designer)->json('id');
+
+        // 自分の分: コレクション作成・作品追加・編集・削除ができる
+        $cid = $this->actingAs($admin)->postJson(route('portfolio.api.collections.store'), ['name' => '客先用'])->assertCreated()->json('id');
+        $mine = $this->upload($admin, ['collection_id' => $cid])->assertCreated()->json('id');
+        $this->assertSame($admin->id, PortfolioItem::find($mine)->user_id);
+        $this->actingAs($admin)->putJson(route('portfolio.api.items.update', ['item' => $mine]), ['title' => '修正'])->assertOk();
+
+        // 他メンバーの分: 見える（閲覧）が、追加・編集・削除はできない
+        $this->actingAs($admin)->getJson(route('portfolio.api.data', ['owner_id' => $designer->id]))->assertOk();
+        $this->upload($admin, ['owner_id' => $designer->id])->assertForbidden();
+        $this->actingAs($admin)->putJson(route('portfolio.api.items.update', ['item' => $others]), ['title' => '勝手に修正'])->assertForbidden();
+        $this->actingAs($admin)->deleteJson(route('portfolio.api.items.destroy', ['item' => $others]))->assertForbidden();
+        $this->assertSame('作品1', PortfolioItem::find($others)->title);
+
+        $this->actingAs($admin)->deleteJson(route('portfolio.api.items.destroy', ['item' => $mine]))->assertOk();
+    }
+
+    public function test_スイッチをOFFに戻したAdminは自分の分も書き込めなくなる(): void
+    {
+        $this->fakeDisk();
+        $company = $this->company();
+        $admin = $this->manager('admin', $company);
+        $perm = PortfolioPermission::create(['user_id' => $admin->id, 'enabled' => true]);
+        $this->upload($admin)->assertCreated();
+
+        $perm->update(['enabled' => false]);
+
+        $this->upload($admin)->assertForbidden();
+        $this->actingAs($admin)->postJson(route('portfolio.api.collections.store'), ['name' => 'A'])->assertForbidden();
+    }
+
+    public function test_作品を持つAdminは閲覧するメンバーの選択肢に自分と並んで出る(): void
+    {
+        $this->fakeDisk();
+        $company = $this->company();
+        $viewer = $this->manager('admin', $company);
+        $adminOwner = $this->manager('admin', $company);
+        PortfolioPermission::create(['user_id' => $adminOwner->id, 'enabled' => true]);
+        $this->upload($adminOwner)->assertCreated();
+
+        $this->actingAs($viewer)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page->has('owners', 1)->where('owners.0.id', $adminOwner->id));
+        // 本人は、自分も選択肢に出る（作品があるため）。ラベルに「（自分）」が付く
+        $this->actingAs($adminOwner)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page->has('owners', 1)->where('owners.0.id', $adminOwner->id)->where('owners.0.label', fn ($l) => str_contains($l, '（自分）')));
+    }
 }
+

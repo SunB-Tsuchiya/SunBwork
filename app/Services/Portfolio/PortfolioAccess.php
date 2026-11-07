@@ -11,8 +11,9 @@ use Illuminate\Http\Request;
 /**
  * ポートフォリオの権限判定（2026-11-06 ユーザー確定。役割を「作る人」と「見る人」に分ける）。
  *
- *  - 作成・編集・削除: **本人だけ**（利用許可がオンのユーザー。試用中は SuperAdmin も自分の分だけ）。
- *    Admin ロールは自分のポートフォリオを持たない＝一切書き込めない。
+ *  - 作成・編集・削除: **本人だけ**。利用許可（利用メンバー設定のスイッチ）が ON の人。**Admin は、スイッチが未設定なら自動で ON**
+ *    （2026-11-07 変更。客先へ成果物を見せる Admin がいるため）。スイッチを OFF にした Admin だけが閲覧専用。
+ *    SuperAdmin は、試用のためスイッチに関わらず自分の分だけ作れる。他メンバーの分は、誰も書き込めない。
  *  - 閲覧: 本人に加え、SuperAdmin / SB の Admin は SB のメンバー分を閲覧できる
  *    （Admin は同じ会社のメンバーのみ。SuperAdmin は SB 全員）。問題のある作品は本人に修正・削除を依頼する運用。
  *  - サンエー印刷（general）は誰も使えない（ルート側の deny_general でも弾く）。
@@ -56,10 +57,28 @@ class PortfolioAccess
         return $actor->isSuperAdmin() || $actor->company_id === $owner->company_id;
     }
 
-    /** $actor が $ownerId のポートフォリオを作成・編集・削除してよいか（本人のみ。Admin ロールは不可） */
+    /**
+     * 利用メンバー設定のスイッチが ON か。保存された値があればそれに従う。
+     * **Admin は、スイッチが未設定（行がない）なら自動で ON**（OFF にした Admin だけ OFF）。それ以外は、行がなければ OFF。
+     */
+    public static function switchedOn(User $user): bool
+    {
+        $enabled = PortfolioPermission::where('user_id', $user->id)->value('enabled');
+
+        return $enabled === null ? $user->isAdmin() : (bool) $enabled;
+    }
+
+    /**
+     * $actor が $ownerId のポートフォリオを作成・編集・削除してよいか（本人のみ）。
+     * SuperAdmin は常に可。Admin を含むそれ以外は、スイッチが ON の人だけ（Admin は未設定なら自動で ON。OFF の Admin は閲覧専用）。
+     */
     public static function canEdit(User $actor, int $ownerId): bool
     {
-        return $actor->id === $ownerId && ! $actor->isAdmin() && self::canUse($actor);
+        if ($actor->id !== $ownerId || ! self::canUse($actor)) {
+            return false;
+        }
+
+        return $actor->isSuperAdmin() || self::switchedOn($actor);
     }
 
     /** 閲覧用: リクエストの対象オーナー（owner_id 未指定なら本人）。閲覧権限がなければ 403 */
@@ -75,7 +94,7 @@ class PortfolioAccess
     public static function editOwnerId(Request $request): int
     {
         $ownerId = (int) ($request->input('owner_id') ?: $request->user()->id);
-        abort_unless(self::canEdit($request->user(), $ownerId), 403, '作品の追加・編集・削除はご本人のみ可能です。修正が必要な場合は本人に依頼してください。');
+        abort_unless(self::canEdit($request->user(), $ownerId), 403, '作品の追加・編集・削除は、利用を許可されたご本人のみ可能です。修正が必要な場合は本人に依頼してください。');
 
         return $ownerId;
     }
@@ -108,7 +127,7 @@ class PortfolioAccess
     }
 
     /**
-     * 管理画面の「閲覧するメンバー」選択肢（Admin / SuperAdmin のみ。作品か利用許可を持つ SB メンバー。自分は作品がある場合のみ）。
+     * 管理画面の「閲覧するメンバー」選択肢（Admin / SuperAdmin のみ。作品か利用許可を持つ SB メンバー。自分も、作品か許可があれば含む）。
      * 並び順と項目は、申請者管理のメンバー設定と同じ（MemberList）。部署での絞り込み用に department_id も返す。
      */
     public static function ownerChoices(User $actor): array
@@ -119,7 +138,6 @@ class PortfolioAccess
 
         $query = User::with(['department:id,name', 'positionTitle:id,name,sort_order'])
             ->whereHas('company', fn ($q) => $q->where('company_type', 'sunbrain'))
-            ->where('id', '!=', $actor->isAdmin() ? $actor->id : 0) // Admin ロールは自分のポートフォリオを持たない
             ->where(function ($q) {
                 $q->whereHas('portfolioItems')
                     ->orWhereIn('id', PortfolioPermission::where('enabled', true)->pluck('user_id'));

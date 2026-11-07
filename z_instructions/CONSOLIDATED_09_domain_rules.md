@@ -882,10 +882,10 @@ class MyNSystemTest extends TestCase
 設計・経緯: `z_instructions/PORTFOLIO_PLAN1.md` / `PORTFOLIO_MANAGER1.md`。デザイナーが客先で作品（画像・PDF・動画）を見せる、個人専用の機能。
 
 **権限（`PortfolioAccess` に集約。判定を他で書かない）**
-- 作成・編集・削除は**本人のみ**（`canEdit`）。利用許可（`portfolio_permissions.enabled`）がオンのユーザー。試用中は SuperAdmin も自分の分だけ。**Admin ロールは自分のポートフォリオを持たず、一切書き込めない。**
+- 作成・編集・削除は**本人のみ**（`canEdit`）。利用許可（`portfolio_permissions.enabled`）がオンのユーザー。**Admin は、利用メンバー設定のスイッチが未設定（行がない）なら自動で ON**で、自分のポートフォリオを作れる（2026-11-08 変更。客先へ成果物を見せる Admin がいるため。判定は `PortfolioAccess::switchedOn`）。**スイッチを OFF にした Admin だけが閲覧専用**で、書き込めない。試用中の SuperAdmin は、スイッチに関わらず自分の分だけ作れる。他メンバーの分は誰も書き込めない。
 - 閲覧（`canView`）は本人に加え、SuperAdmin / SB の Admin が SB メンバー分を閲覧できる（Admin は同じ会社のみ・SuperAdmin は SB 全員）。問題のある作品は本人に修正・削除を依頼する運用。
 - サンエー印刷（`company_type = 'general'`）は誰も使えない（`deny_general` ミドルウェア＋ `canUse`）。
-- 見えない作品の ID 指定は 404、見えるが編集不可は 403、`owner_id` の不正指定は 403。利用許可のオン/オフ画面は SuperAdmin のみ（Admin・SuperAdmin は常時利用可のため一覧に出さない）。許可の対象は SB メンバー全ロール。絞り込みは雇用区分・**担当（`users.assignment_id`。制作・営業など）**・部署。
+- 見えない作品の ID 指定は 404、見えるが編集不可は 403、`owner_id` の不正指定は 403。利用許可のオン/オフ画面は SuperAdmin のみ。一覧には SB の全メンバーと **Admin（部署が未設定でも）**を出し、スイッチで決める（Admin は行がなければ自動で ON。それ以外は行がなければ OFF）。SuperAdmin だけは常に使えるため、会社と部署が設定されていれば名前を出し、スイッチは ON 固定。許可の対象は SB メンバー全ロール。絞り込みは雇用区分・**担当（`users.assignment_id`。制作・営業など）**・部署。
 - ルートは `admin.portfolio.*` / `user.portfolio.*`（画面）、`portfolio.api.*`（JSON・配信）、`portfolio.view`（閲覧ページ）。接頭辞の理由は CONSOLIDATED_01。
 
 **ファイルの扱い**

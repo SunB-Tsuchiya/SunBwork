@@ -174,15 +174,16 @@ class PortfolioPdfTest extends TestCase
         $this->assertDatabaseMissing('portfolio_items', ['id' => $id]);
     }
 
-    public function test_Adminは閲覧のみでPDFを作れず他人のPDFを操作できない(): void
+    public function test_スイッチをOFFにしたAdminは閲覧のみでPDFを作れず他人のPDFも操作できない(): void
     {
         $this->fakeDisk();
         $company = Company::create(['name' => 'T-' . uniqid(), 'code' => 'T' . uniqid(), 'company_type' => 'sunbrain']);
         $designer = $this->designer($company);
         $admin = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id]);
+        PortfolioPermission::create(['user_id' => $admin->id, 'enabled' => false]); // OFF にした Admin
         $bin = $this->makePdf(2);
 
-        // Admin は init できない
+        // OFF の Admin は init できない
         $this->init($admin, strlen($bin))->assertForbidden();
 
         // 本人が作った PDF: Admin はページ画像を閲覧できるが、chunk / process は 403

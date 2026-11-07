@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\PositionTitle;
 use App\Models\Portfolio\PortfolioPermission;
 use App\Models\User;
+use App\Services\Portfolio\PortfolioAccess;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -102,19 +103,23 @@ class PortfolioAccessTest extends TestCase
         $sb2 = $this->makeUser('user', 'sunbrain');
         $suna = $this->makeUser('user', 'general');
         $admin = $this->makeUser('admin', 'sunbrain');
+        $other = $this->makeUser('superadmin', 'sunbrain');
 
         $res = $this->actingAs($super)->putJson(route('admin.portfolio.permissions.update'), ['items' => [
             ['user_id' => $sb->id, 'enabled' => true],
             ['user_id' => $sb2->id, 'enabled' => false],   // 行が無く OFF のまま = 変更なし
             ['user_id' => $suna->id, 'enabled' => true],   // サンエー印刷は対象外
-            ['user_id' => $admin->id, 'enabled' => true],  // Admin は常時利用可のため対象外
+            ['user_id' => $admin->id, 'enabled' => true],  // Admin は、行がなければ自動で ON。すでに ON なので、変更なし
+            ['user_id' => $other->id, 'enabled' => false], // SuperAdmin は常に使えるので、スイッチは対象外
         ]])->assertOk();
 
         $res->assertJsonPath('ok', true)->assertJsonPath('changed', 1);
         $this->assertTrue(PortfolioPermission::isEnabledFor($sb->id));
+        $this->assertDatabaseMissing('portfolio_permissions', ['user_id' => $admin->id]); // 無駄な行を作らない
+        $this->assertTrue(PortfolioAccess::switchedOn($admin));
         $this->assertFalse(PortfolioPermission::isEnabledFor($suna->id));
-        $this->assertFalse(PortfolioPermission::isEnabledFor($admin->id));
         $this->assertDatabaseMissing('portfolio_permissions', ['user_id' => $sb2->id]); // 無駄な行を作らない
+        $this->assertDatabaseMissing('portfolio_permissions', ['user_id' => $other->id]);
         // 誰が・いつ許可したかを残す
         $row = PortfolioPermission::where('user_id', $sb->id)->first();
         $this->assertSame($super->id, $row->granted_by);
@@ -216,54 +221,78 @@ class PortfolioAccessTest extends TestCase
                 ->where('ownerId', fn ($id) => $id === User::where('name', 'い役員')->value('id')));
     }
 
-    public function test_SuperAdminとAdminも会社と部署があれば一覧に出てスイッチはON固定(): void
+    public function test_Adminは部署が未設定でも一覧に出てスイッチを操作できSuperAdminはON固定(): void
     {
         $company = Company::create(['name' => 'T-' . uniqid(), 'code' => 'T' . uniqid(), 'company_type' => 'sunbrain']);
         $dept = Department::create(['company_id' => $company->id, 'name' => '情報出版', 'code' => 'D' . uniqid(), 'sort_order' => 1]);
         $exec = PositionTitle::create(['name' => '役員', 'sort_order' => 1]);
         $viewer = User::factory()->create(['user_role' => 'superadmin', 'company_id' => $company->id]); // 画面を開く人（部署なし＝一覧に出ない）
 
-        // 会社と部署がある SuperAdmin・Admin は出る
+        // Admin: 部署ありでも未設定でも出る（スイッチで決めるため）
+        $adminWith = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id, 'department_id' => $dept->id, 'name' => '白須', 'position_title_id' => $exec->id]);
+        $adminWithout = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id, 'name' => '伊藤', 'position_title_id' => $exec->id]);
+        PortfolioPermission::create(['user_id' => $adminWith->id, 'enabled' => true]);
+        // SuperAdmin: 会社と部署があれば出て、常に ON（固定）。部署が無い管理用アカウントは出ない
         $super = User::factory()->create(['user_role' => 'superadmin', 'company_id' => $company->id, 'department_id' => $dept->id, 'name' => '土屋', 'position_title_id' => $exec->id]);
-        $admin = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id, 'department_id' => $dept->id, 'name' => '伊藤', 'position_title_id' => $exec->id]);
-        // 部署が無い Admin・SuperAdmin は出ない（会社・部署が未設定の管理用アカウント）
-        User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id, 'name' => '部署なしAdmin']);
-        // サンエー印刷の Admin（部署あり）も出ない
+        // サンエー印刷の Admin（部署あり）は出ない
         $suna = Company::create(['name' => 'S-' . uniqid(), 'code' => 'S' . uniqid(), 'company_type' => 'general']);
         $sunaDept = Department::create(['company_id' => $suna->id, 'name' => '総務', 'code' => 'G' . uniqid(), 'sort_order' => 1]);
         User::factory()->create(['user_role' => 'admin', 'company_id' => $suna->id, 'department_id' => $sunaDept->id, 'name' => 'サンエーAdmin']);
-        // 一般メンバー（許可は OFF のまま）
         $member = $this->memberIn($company, 'あ一般', 'regular', null, $dept);
 
         $this->actingAs($viewer)->get(route('admin.portfolio.permissions.index'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('users', 3) // 土屋・伊藤・あ一般
-                // 役職「役員」の 2 人が先頭（氏名順）、役職なしの一般メンバーが最後
-                ->where('users.0.name', '伊藤')->where('users.0.role_label', 'Admin')->where('users.0.always_on', true)->where('users.0.enabled', true)
+                ->has('users', 4) // 役員の 3 人（氏名は申請者管理と同じ文字コード順＝伊藤・土屋・白須）、役職なしの あ一般
+                ->where('users.0.name', '伊藤')->where('users.0.role_label', 'Admin')->where('users.0.always_on', false)->where('users.0.enabled', true)->where('users.0.department', '未所属') // 行がなくても Admin は自動で ON
                 ->where('users.1.name', '土屋')->where('users.1.role_label', 'SuperAdmin')->where('users.1.always_on', true)->where('users.1.enabled', true)
-                ->where('users.2.name', 'あ一般')->where('users.2.always_on', false)->where('users.2.enabled', false)->where('users.2.role_label', null)
-                ->where('users.0.department', '情報出版'));
+                ->where('users.2.name', '白須')->where('users.2.role_label', 'Admin')->where('users.2.always_on', false)->where('users.2.enabled', true)
+                ->where('users.3.name', 'あ一般')->where('users.3.always_on', false)->where('users.3.role_label', null));
     }
 
-    public function test_保存してもSuperAdminとAdminの許可は変更されず行も作られない(): void
+    public function test_保存でAdminをOFFにでき戻せてSuperAdminの許可は行も作られない(): void
     {
         $company = Company::create(['name' => 'T-' . uniqid(), 'code' => 'T' . uniqid(), 'company_type' => 'sunbrain']);
         $dept = Department::create(['company_id' => $company->id, 'name' => '情報出版', 'code' => 'D' . uniqid(), 'sort_order' => 1]);
         $viewer = User::factory()->create(['user_role' => 'superadmin', 'company_id' => $company->id]);
+        $super = User::factory()->create(['user_role' => 'superadmin', 'company_id' => $company->id, 'department_id' => $dept->id]);
         $admin = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id, 'department_id' => $dept->id]);
-        $member = $this->memberIn($company, '一般', 'regular', null, $dept);
+        $put = fn (array $items) => $this->actingAs($viewer)->putJson(route('admin.portfolio.permissions.update'), ['items' => $items])->assertOk();
 
-        // 画面は固定のスイッチを送らないが、送られてきても無視する（OFF を指定しても Admin の利用は止まらない）
-        $res = $this->actingAs($viewer)->putJson(route('admin.portfolio.permissions.update'), ['items' => [
-            ['user_id' => $admin->id, 'enabled' => false],
-            ['user_id' => $member->id, 'enabled' => true],
-        ]])->assertOk();
+        // 何も設定しなくても、Admin は自動で ON（自分のポートフォリオを作れる）
+        $this->assertTrue(PortfolioAccess::switchedOn($admin));
+        $this->assertTrue(PortfolioAccess::canEdit($admin, $admin->id));
 
-        $res->assertJsonPath('changed', 1);
-        $this->assertDatabaseMissing('portfolio_permissions', ['user_id' => $admin->id]);
-        $this->assertTrue(PortfolioPermission::isEnabledFor($member->id));
-        // Admin は、許可の行が無くても、引き続き画面に入れる
+        // OFF にすると、閲覧専用になる（画面には引き続き入れる）。SuperAdmin を OFF にしようとしても無視される（常に使える）
+        $put([['user_id' => $super->id, 'enabled' => false], ['user_id' => $admin->id, 'enabled' => false]])->assertJsonPath('changed', 1);
+        $this->assertDatabaseMissing('portfolio_permissions', ['user_id' => $super->id]);
+        $this->assertFalse(PortfolioAccess::switchedOn($admin));
+        $this->assertFalse(PortfolioAccess::canEdit($admin, $admin->id));
         $this->actingAs($admin)->get(route('admin.portfolio.manage'))->assertOk();
+
+        // ON に戻すと、また作れる。すでに ON の状態で ON を送っても変更なし
+        $put([['user_id' => $admin->id, 'enabled' => true]])->assertJsonPath('changed', 1);
+        $this->assertTrue(PortfolioAccess::canEdit($admin, $admin->id));
+        $put([['user_id' => $admin->id, 'enabled' => true]])->assertJsonPath('changed', 0);
+    }
+
+    public function test_Adminは自動でONで編集画面を開けOFFにしたAdminは閲覧専用(): void
+    {
+        $company = Company::create(['name' => 'T-' . uniqid(), 'code' => 'T' . uniqid(), 'company_type' => 'sunbrain']);
+        $on = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id]);   // スイッチ未設定＝自動で ON
+        $off = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id]);
+        PortfolioPermission::create(['user_id' => $off->id, 'enabled' => false]);
+
+        // ON: user エリア（自分の編集画面）は編集可。admin エリアは、メンバーを閲覧する画面だが、自分の編集画面への案内が出る
+        $this->actingAs($on)->get(route('user.portfolio.manage'))
+            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', false)->where('canEditOwn', true)->where('ownerId', $on->id));
+        $this->actingAs($on)->get(route('admin.portfolio.manage'))
+            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', true)->where('canEditOwn', true));
+
+        // OFF: どちらのエリアでも閲覧専用（自分の編集への案内は出ない）
+        $this->actingAs($off)->get(route('user.portfolio.manage'))
+            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', true)->where('canEditOwn', false));
+        $this->actingAs($off)->get(route('admin.portfolio.manage'))
+            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', true)->where('canEditOwn', false));
     }
 }

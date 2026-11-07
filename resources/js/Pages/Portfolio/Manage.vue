@@ -17,6 +17,8 @@ const props = defineProps({
     canManagePermissions: { type: Boolean, default: false },
     routePrefix: { type: String, required: true },
     readOnly: { type: Boolean, default: false },
+    // 自分の作品を作れる人か（SuperAdmin・スイッチ ON の Admin など）。閲覧専用画面から、自分の編集画面へ案内する
+    canEditOwn: { type: Boolean, default: false },
     // 閲覧中のメンバー ID（閲覧専用モードで、閲覧できるメンバーがいなければ null）
     ownerId: { type: Number, default: null },
     owners: { type: Array, default: () => [] },
@@ -299,6 +301,10 @@ onBeforeUnmount(() => {
                     <span v-else class="text-amber-700">{{ owners.length ? 'この部署にはポートフォリオを使っているメンバーがいません' : 'ポートフォリオを使っているメンバーがまだいません' }}</span>
                 </div>
                 <p class="mt-1 text-xs text-amber-700">閲覧のみです。作品の追加・修正・削除はご本人が行います。問題のある作品があれば、本人に修正・削除を依頼してください。</p>
+                <!-- 自分の作品を作れる人（スイッチ ON の Admin・SuperAdmin）には、自分の編集画面（ユーザーのタブ）への入口を出す -->
+                <p v-if="canEditOwn && routePrefix === 'admin'" class="mt-2">
+                    <Link :href="route('user.portfolio.manage')" class="inline-flex items-center rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700">自分のポートフォリオを編集する →</Link>
+                </p>
             </div>
 
             <!-- 上部バー -->
