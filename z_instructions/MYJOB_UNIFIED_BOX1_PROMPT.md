@@ -1,5 +1,7 @@
 # マイジョブ入力・BOX統合 再開用
 
+> 2026-11-07最新: 旧形式で作成ボタンを本番01f1074f3へ反映済み。今回の配置/日時引継ぎ/取消保持の3点は利用者画面確認待ち。作業branch feature/myjob-legacy-create-20261107。一般公開未承認。
+
 > 最新: 新規モーダル右側の「旧形式で作成」を実装・検証済み、未配備。作業branch feature/myjob-legacy-create-20261107、tree /tmp/sunbwork-myjob-legacy-create-20261107。本番基準ce4e8d870（他作業Portfolio調整を保持）、一般公開未承認。
 
 > 2026-11-07現在: 試用入口の2点は利用者「成功」で確認済み。今回の工程4は完了。次は工程5の未確認例・権限・上長照合の最小範囲整理。一般公開未承認。本番1657a2ac1、保存branch feature/myjob-navigation-integrated-20261107。
@@ -828,3 +830,12 @@ origin mainをfetchして差分確認後、8314を基準に/tmp/sunbwork-myjob-n
 固定元b769cf38915fc9be08708332f10f23cb78ac1feb、固定先01f1074f3ea61ebf871b8b0d3f02cf0081b119feの/tmp/myjob-legacy-create-latest-deploy-20261107.shを作成。SHA256 65a281ad061d2fea8e98dc0be0ae3f783e5b35c4bd7db87c937fbb318ea63a8f、private/codex-myjob-legacy-create-20261107にも保存。取得branchはfeature/myjob-legacy-create-20261107。source許可一覧7ファイル、サーバ/DB/routes/設定/依存変更なし、削除なし、main/追跡変更なし/既知未追跡5件を確認後ff-only。manifest固定hash/504資産/members base/view:clear/最終状態保持を確認する。
 
 旧/tmp/myjob-legacy-create-deploy-20261107.shはce4基準なので使わない。新スクリプトは未承認・未実行。次の一手は対象本番版が変わったことを説明し、新しい正確なSSHコマンドを承認後に実行する。今回ボタンの利用者画面確認はまだ未実施。
+
+
+## 2026-11-07 旧形式で作成ボタンの限定配備成功（画面確認待ち）
+
+利用者が正確な新/tmp/myjob-legacy-create-latest-deploy-20261107.shのSSHにyesと回答。同一スクリプトを実行しexit0。固定元b769cf389/main/追跡変更なし/既知未追跡5件、固定先01f1074f3ea61ebf871b8b0d3f02cf0081b119fe、7ソース許可一覧/削除なし/サーバ・DB・routes・設定・依存差分0を確認しff-only。manifest固定hash/504資産/欠落0/members base、view:clear、最終追跡変更なし/未追跡5件保持を確認。本番最終証拠01f1074f3。最新のポートフォリオ権限設定を保持し、共有Claude作業未編集。DB操作/migration/seedなし、一般公開なし。
+
+利用者へ今回依頼する3点（保存不要）: (1) 新規のマイジョブ作成で既存2入口の右側に「旧形式で作成」が出る。(2) 日付・開始終了時刻を指定して旧形式を開くと、それらが旧入力に引継がれる。(3) 新式で作業名などを入力後に旧形式への切替を選び、確認でキャンセルすると新式の入力が残る。すべて問題なければ「成功」、違いがあれば番号と結果を依頼。実際の旧形式の保存/モバイル全幅/全項目転記/他roleの画面確認まで拡張しない。
+
+実装/コード検証/build/限定配備は完了。今回3点の利用者画面確認はまだ未実施。次の一手は結果を記録する。元からの旧形式保存・続き・複数クライアント・タブ入口の成功試験は繰り返さない。
