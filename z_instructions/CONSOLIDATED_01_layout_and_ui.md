@@ -331,6 +331,7 @@ AppLayout 内にグローバル配置済み。各ページで重複させない�
 - 保存は `PUT/POST` ＋ JSON: リクエスト `items: [{ user_id, enabled }, ...]` → レスポンス `{ ok: true, changed: n }`。CSRF は meta タグから取る（`XSRF-TOKEN` クッキーは使わない）
 - **サーバー側で、対象のユーザーだけを受け付ける**（会社・ロールの範囲外の `user_id` は無視する）。**変更のない行は触らない**（誰が・いつ変えたか＝`changed_by` / `granted_by` を残すため）
 - 「OFF にすると困る人」（途中の申請がある人など）がいれば、保存前に `confirm` で名前を挙げて確認する
+- **ロールの力で、スイッチに関わらず常に使える人（SuperAdmin・Admin など）も、会社と部署が設定されていれば、一覧に名前を出す**（誰がいるか分かるように）。スイッチは **ON のまま固定（`disabled`・`cursor-not-allowed opacity-50`）**にし、名前の横にロールのバッジ（SuperAdmin=黄 / Admin=赤）を付ける。「表示中をすべて ON/OFF」・保存のリクエストには含めず、サーバー側でも無視する。会社・部署が未設定の管理用アカウントは出さない。実装例: `PortfolioPermissionController`（`ALWAYS_ON_ROLES` / `listedUsers()` / `switchableUsers()`）
 
 ### 並び順（メンバー一覧・メンバーを選ぶドロップダウン、すべて共通）
 **雇用区分（正社員 → 契約社員 → 派遣社員 → 業務委託）→ 役職（役員・次長・課長…の `position_titles.sort_order`。役職称号管理で決めた任意の順番。役職なしは最後）→ 氏名。**

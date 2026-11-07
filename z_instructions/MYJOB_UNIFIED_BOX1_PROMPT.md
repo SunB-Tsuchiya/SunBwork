@@ -812,3 +812,12 @@ origin mainをfetchして差分確認後、8314を基準に/tmp/sunbwork-myjob-n
 固定元ce4e8d8701898e9fd48e3b63102cc2f20fcd3cfd、固定先e02f4b607b6c7604609bc2dbd0ef0ad3535f0bc7、取得branch feature/myjob-legacy-create-20261107。main/追跡変更なし/既知未追跡5件/7ソース許可一覧/削除なし/サーバ・DB・routes・設定・依存差分0を確認してff-only。manifest固定hash/504資産/欠落0/members base、view:clear、最終作業状態保持を確認する。CLAUDE.mdとポートフォリオ更新は本番基準のまま差分0。DB操作・migration・seedなし。
 
 まだ未実行。次の一手は正確な新SSHコマンドを提示し、承認後に実行する。今回の画面確認は新規モーダルの配置、日時だけで旧形式が開くこと（保存不要）、非日時入力がある場合の確認取消保持に絞る。成功済みの他機能は再試験しない。一般公開は未承認。
+
+
+## 2026-11-07 旧形式ボタン配備の事前停止と追加ポートフォリオ更新の保持
+
+利用者yesで承認された旧/tmp/myjob-legacy-create-deploy-20261107.shを実行したが、冒頭HEAD違いでexit1。本番へ変更する前に停止し、今回ボタンはまだ未配備。既承認の同一読取コマンドで本番b769cf38915fc9be08708332f10f23cb78ac1feb/main/追跡変更なし/既知未追跡5件を確認。b769はce4から0023を経て、ポートフォリオの権限設定に管理者を表示する追加配備。今回モーダルとの重複なし。手元リモートmain/FETCH_HEADはb1d57e1ddという古い参照なので、本番の実SHAを基準として使い、古いmainへ合わせない。
+
+専用tree feature/myjob-legacy-create-20261107でb769をmergeし他作業を保持。競合したmanifestは統合済みソースから再build、資料は両方保持。実Vue入力（新ボタンの通常新規GET・日時/0時/空時刻・確認取消保持/移動中抑止/表示条件を含む）と試用ナビ/Portfolio共存、対象lintが成功。members build終了0、manifest473/参照504/欠落0/最新source全保持/members base、旧資産保持。b769に対してapp/database/routes/config/bootstrap/依存/CLAUDE.md差分0。今回一般公開/DB変更なし、共有Claude作業未編集。
+
+次の一手はb769固定元の新しい配備スクリプトを作成・正確なコマンドを提示し、承認後に実行する。元版が違う旧スクリプトは再利用しない。今回ボタンの画面確認は未実施、従来の成功確認は保持。
