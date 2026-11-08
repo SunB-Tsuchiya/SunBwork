@@ -127,29 +127,21 @@ class PortfolioAccess
     }
 
     /**
-     * 管理画面の「閲覧するメンバー」選択肢（Admin / SuperAdmin のみ。作品か利用許可を持つ SB メンバー。自分も、作品か許可があれば含む）。
-     * 並び順と項目は、申請者管理のメンバー設定と同じ（MemberList）。部署での絞り込み用に department_id も返す。
+     * 閲覧できる SB メンバーの範囲（Admin / SuperAdmin のみ。それ以外は null）。
+     * Admin は同じ会社のメンバー、SuperAdmin は SB 全員。サンエー印刷は含まない。ゴーストは User のグローバルスコープで除外。
+     * 管理画面の「メンバーのポートフォリオ」一覧が、この範囲から表示する人を決める。
      */
-    public static function ownerChoices(User $actor): array
+    public static function viewableMembersQuery(User $actor)
     {
         if (! self::isViewer($actor)) {
-            return [];
+            return null;
         }
 
-        $query = User::with(['department:id,name', 'positionTitle:id,name,sort_order'])
-            ->whereHas('company', fn ($q) => $q->where('company_type', 'sunbrain'))
-            ->where(function ($q) {
-                $q->whereHas('portfolioItems')
-                    ->orWhereIn('id', PortfolioPermission::where('enabled', true)->pluck('user_id'));
-            });
+        $query = User::query()->whereHas('company', fn ($q) => $q->where('company_type', 'sunbrain'));
         if (! $actor->isSuperAdmin()) {
             $query->where('company_id', $actor->company_id);
         }
 
-        return MemberList::sort($query->get())
-            ->map(fn (User $u) => MemberList::row($u) + [
-                'label' => $u->name . ($u->id === $actor->id ? '（自分）' : ''),
-            ])
-            ->all();
+        return $query;
     }
 }

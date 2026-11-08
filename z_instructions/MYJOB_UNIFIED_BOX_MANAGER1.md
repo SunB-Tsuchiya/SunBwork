@@ -1055,3 +1055,12 @@ UnifiedPreviewの行クリックで既存詳細URLへrouter.visit。新式のfro
 検証済み実装f493c1542441f06b45e879695f9125a847acea60をfeature/myjob-category-default-20261108へ保存・push済み。/tmp/myjob-box-row-deploy-20261108.shを準備、SHA256 bfead59a4aad1940ecd7312b0585299d5c59d9d80c1c64de322eaf04dd284868、private/codex-myjob-box-row-20261108にも保存。固定元65df587cd48b939bef06e4d3153767203fb6bb7a、固定先f493c1542441f06b45e879695f9125a847acea60。source許可一覧8ファイル、サーバ/DB/routes/設定/依存差分0、削除なし、main/追跡変更なし/既知未追跡5件を確認してff-only。manifest固定hash/504資産/欠落0/members base、view:clearと最終作業状態保持を確認する。DB操作/migration/seedなし。
 
 未承認・未実行。次の一手はこの正確なSSHコマンドを提示して承認後に反映する。利用者画面確認は行内の文字/余白で詳細が開くことと個別のカレンダーLinkが保たれることに絞り、成功済みの初期値/旧形式/分類の再確認は求めない。一般公開未承認。
+
+
+## 2026-11-08 セルクリック反映の事前停止・Portfolio追加画面を保持
+
+利用者yesで承認された旧/tmp/myjob-box-row-deploy-20261108.shを実行したが、冒頭のHEAD検査でexit1。fetch/merge/cacheやDB操作の前に停止し、今回セルクリックは本番へ未反映。既承認の同一readで本番ca3de12af15ba94aa39956ccf4bbbc3a98b2ce69/main/追跡変更なし/既知未追跡5件を確認。ca3は65dfを親としPortfolio管理画面のタブ・メンバーカード・Overview画面を追加した別作業。今回の一覧とは重複なし。作業中の利用者yesはこの確認と進行への回答として受け、新規未提示のSSHへの承認には拡張しない。
+
+feature/myjob-category-default-20261108でca3をmerge。資料末尾競合は両方の記述を残し、manifestは統合ソースで再build。Portfolio追加画面/設定/実装とCLAUDE.mdは保持。実Vue入力・行クリック/個別操作保護とナビ/Portfolio共存の検証、対象lint成功。members build終了0、manifest475/参照506/欠落0/最新版source全保持/members base、旧資産保持。ca3からapp/database/routes/config/bootstrap/依存/CLAUDE.md差分0。共有Claude作業は未編集、DB変更/一般公開なし。
+
+次の一手はca3固定元の新しい配備スクリプトを準備して正確なSSHコマンドを提示する。今回の実画面確認はまだ未実施。旧スクリプトを基準版だけ見ずに再実行しない。

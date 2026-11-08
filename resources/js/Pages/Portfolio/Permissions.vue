@@ -4,6 +4,7 @@ import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
+import PortfolioAdminTabs from '@/Components/Portfolio/PortfolioAdminTabs.vue';
 
 // ポートフォリオ 利用メンバー設定（SuperAdmin のみ）。
 // ⚠️ 画面の形は、申請者管理のメンバー設定（Pages/Admin/Applicants/Show.vue）と同じ「標準形」。
@@ -82,23 +83,21 @@ onMounted(() => window.addEventListener('beforeunload', onBeforeUnload));
 onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload));
 
 const chip = (active) => ['rounded-full px-3 py-1 text-xs font-medium transition-colors', active ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'];
-const manageHref = () => route(`${props.routePrefix}.portfolio.manage`);
+const manageHref = () => route(`${props.routePrefix}.portfolio.manage`); // タブ1（メンバーのポートフォリオ）
 </script>
 
 <template>
     <AppLayout title="ポートフォリオの利用メンバー設定">
         <template #header>
-            <div class="flex items-center gap-3">
-                <Link :href="manageHref()"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap">← ポートフォリオ管理に戻る</Link>
-                <h2 class="text-base font-semibold leading-tight text-gray-800 sm:text-xl">ポートフォリオの利用メンバー設定</h2>
-            </div>
+            <h2 class="text-base font-semibold leading-tight text-gray-800 sm:text-xl">ポートフォリオ管理</h2>
         </template>
         <template #tabs>
             <AdminNavigationTabs active="portfolio" />
         </template>
 
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-5xl">
+            <PortfolioAdminTabs active="permissions" :can-manage-permissions="true" />
+            <div class="rounded-b bg-white px-6 pb-6 pt-5 shadow-md">
             <p class="mb-4 text-sm text-gray-500">
                 スイッチを ON にした人は、ユーザー用のタブ「ポートフォリオ」から、自分の作品（画像・PDF・動画）を追加・整理して、客先で見せられます。
                 Admin（名前の横にバッジ）は、何も設定しなくても自動で ON（自分の作品を作れます）です。OFF にした Admin は、メンバーの作品を閲覧するだけになります。
@@ -175,6 +174,7 @@ const manageHref = () => route(`${props.routePrefix}.portfolio.manage`);
                 <button type="button" class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50" :disabled="saving || !dirty" @click="save">
                     {{ saving ? '保存中…' : '保存する' }}
                 </button>
+            </div>
             </div>
         </div>
     </AppLayout>
