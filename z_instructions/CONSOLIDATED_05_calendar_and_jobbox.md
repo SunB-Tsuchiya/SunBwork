@@ -374,3 +374,8 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 
 
 2026-11-06 実装・未配備: INFO SuperAdmin本人試用の簡易entryから旧形式PJAの続きへ、既存続きフォームの日時を保って進める入口を追加。元entryは保持し、新PJA.source_personal_work_entry_idで同系列化。work_job_continuations.assignment_id nullableを追加するmigration2026_11_06_120001のみ。旧保存のtransaction/排他/本人・会社context/型付き再送受付、機密保持とJST中断計算。新経路だけ空数量NULLを保持。135件1247断言・実Vue/旧フォームPOST・Ziggy・members build成功。利用者画面/配備は未確認、一般公開なし。クライアント補完は工程3。最新はMYJOB_UNIFIED_BOX_MANAGER1末尾。
+
+
+## 作業区分の新規初期値（2026-11-08、未配備）
+
+新式の通常新規作成は、本人・同じ会社部署の独立PersonalWorkEntryのうちcreated_at/idが最新の有効な区分を初期選択する。未来の作業日やupdated_atで順位を変えない。履歴なしは従来の担当code（operator/seisaku=DTP、shinko/eigyo/kousei）又はClerk=事務、不明ならその他。編集/流用/続きは元の値を維持する。候補応答が遅くても手動で選んだ区分を上書きしない。取消を新しい保存履歴にせず、毎回手動変更可能。DB追加/権限変更/一般公開は含まない。詳細と証拠はMYJOB_UNIFIED_BOX_PLAN1/MANAGER1。

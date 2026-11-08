@@ -24,6 +24,11 @@ const sourcePickerOpen = ref(false);
 const historyChoice = ref(null);
 const page = usePage();
 const initialWorkCategory = ref('other');
+const categoryTouched = ref(false);
+function changeWorkCategory() {
+    categoryTouched.value = true;
+    form.activity_type = '';
+}
 const activeContinuation = computed(() => historyChoice.value?.kind === 'continue'
     ? { type: historyChoice.value.type, id: historyChoice.value.id } : props.continuationSource);
 const canSelectSource = computed(() => !props.entry?.id && !props.continuationSource
@@ -104,7 +109,7 @@ async function loadProjects(applyDefaultCategory = false) {
         recentTitles.value = data.recent_titles || [];
         selectedProject.value = projects.value.find(project => String(project.id) === String(form.project_job_id)) || selectedProject.value;
         selectedBroadProject.value = broadProjects.value.find(project => String(project.id) === String(form.broad_project_id)) || selectedBroadProject.value;
-        if (applyDefaultCategory && !props.entry) {
+        if (applyDefaultCategory && !props.entry && !props.continuationSource && !props.reuseEntryId && !historyChoice.value && !categoryTouched.value) {
             initialWorkCategory.value = data.default_category || 'other';
             form.work_category = initialWorkCategory.value;
         }
@@ -170,6 +175,8 @@ watch(() => props.show, async (show) => {
     selectedBroadProject.value = null;
     projectPickerOpen.value = false;
     includeCompleted.value = false;
+    categoryTouched.value = false;
+    initialWorkCategory.value = 'other';
     form.work_date = props.entry?.work_date || props.date;
     form.work_category = props.entry?.work_category || 'other';
     form.activity_type = props.entry?.activity_type || '';
@@ -330,7 +337,7 @@ async function remove() {
                         <label class="text-sm">終了時刻<input v-model="form.planned_end_time" type="time" step="60" required class="mt-1 w-full rounded border p-2" /></label>
                     </div>
                     <label class="block text-sm">大まかな作業区分
-                        <select v-model="form.work_category" required class="mt-1 w-full rounded border p-2" @change="form.activity_type = ''"><option v-for="[key, label] in categories" :key="key" :value="key">{{ label }}</option></select>
+                        <select v-model="form.work_category" required class="mt-1 w-full rounded border p-2" @change="changeWorkCategory"><option v-for="[key, label] in categories" :key="key" :value="key">{{ label }}</option></select>
                     </label>
                     <div class="text-sm">
                         <span class="block">案件（任意）</span>

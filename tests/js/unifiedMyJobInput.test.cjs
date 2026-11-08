@@ -14,7 +14,7 @@ const page = 'resources/js/Pages/MyJobBox/UnifiedPreview.vue';
 let requests = [];
 let failSave = false;
 globalThis.__unifiedAxios = {
-    get: async (...args) => { requests.push(['get', ...args]); return { data: { default_category: 'other', broad_projects: globalThis.__pickerFixture || [] } }; },
+    get: async (...args) => { requests.push(['get', ...args]); if(globalThis.__deferOptions) return globalThis.__deferOptions; return { data: { default_category: globalThis.__defaultCategory || 'other', broad_projects: globalThis.__pickerFixture || [] } }; },
     post: async (...args) => { requests.push(['post', ...args]); if (failSave) throw { response: { data: { errors: { title: ['保存の検証エラー'] } } } }; return { data: { id: 1 } }; },
     delete: async (...args) => { requests.push(['delete', ...args]); return { data: {} }; },
     put: async (...args) => { requests.push(['put', ...args]); return { data: { id: 1 } }; },
@@ -33,7 +33,7 @@ async function component(file, behavior = false) {
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
-                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyCreate,canCreateLegacy,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
+                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyCreate,canCreateLegacy,changeWorkCategory,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
                 : file === 'resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue' ? '\nglobalThis.__legacyForm={assignments,save,workDate,startTimeHour,startTimeMin,endTimeHour,endTimeMin};' : file === 'resources/js/Pages/MyJobBox/Show.vue' ? '\nglobalThis.__legacyComplete={submitComplete,isSubmittingComplete};' : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection,showRequestModal,requestRecords,applyRequestJob,formAssignments,prefillEvent};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError,detailsOpen,detailsSaved};') + '\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
@@ -147,6 +147,21 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     assert.deepEqual(globalThis.__unifiedNavigation.slice(0,2),['events.create_job',{date:'2026-12-04'}]);globalThis.__unifiedNavigation[2].onFinish();globalThis.confirm=originalConfirm;
     await state.chooseHistory({record:oldHistory,kind:'new'});assert.equal(state.canCreateLegacy.value,false);const chosenNav=globalThis.__unifiedNavigation;state.openLegacyCreate();assert.equal(globalThis.__unifiedNavigation,chosenNav);
     app.unmount();
+    {
+        globalThis.__defaultCategory='dtp';
+        const defaultProps=reactive({show:false,date:'2026-12-05',entryPoint:'myjob',entry:null,continuationSource:null,reuseEntryId:null});
+        const defaultApp=renderer.createApp({render:()=>h(formComponent,defaultProps)});defaultApp.mount({});defaultProps.show=true;await settle();
+        let defaults=globalThis.__unifiedModal;assert.equal(defaults.form.work_category,'dtp');
+        defaultProps.show=false;await settle();defaultProps.entry={id:90,work_category:'kousei'};defaultProps.show=true;await settle();assert.equal(defaults.form.work_category,'kousei');
+        defaultProps.show=false;await settle();defaultProps.entry={work_category:'eigyo'};defaultProps.continuationSource={type:'entry',id:90};defaultProps.show=true;await settle();assert.equal(defaults.form.work_category,'eigyo');
+        defaultProps.show=false;await settle();defaultProps.continuationSource=null;defaultProps.entry={work_category:'jimu'};defaultProps.reuseEntryId=90;defaultProps.show=true;await settle();assert.equal(defaults.form.work_category,'jimu');
+        defaultProps.show=false;await settle();defaultProps.entry=null;defaultProps.reuseEntryId=null;
+        let resolveOptions;globalThis.__deferOptions=new Promise(resolve=>{resolveOptions=resolve;});
+        const beforeCancel=requests.length;defaultProps.show=true;await settle();defaults.form.work_category='kousei';defaults.form.activity_type='proof_first';defaults.changeWorkCategory();assert.equal(defaults.form.activity_type,'');
+        resolveOptions({data:{default_category:'dtp'}});await settle();assert.equal(defaults.form.work_category,'kousei');
+        delete globalThis.__deferOptions;defaultProps.show=false;await settle();defaultProps.show=true;await settle();assert.equal(defaults.form.work_category,'dtp');
+        assert.ok(!requests.slice(beforeCancel).some(call=>call[0]==='post'||call[0]==='put'));defaultApp.unmount();delete globalThis.__defaultCategory;
+    }
     const preview = await component(page, true);
     const pageProps = { rows: [], months: ['2026-11'], filters: { q: 'old search', period: '2026-11', hide_completed: true }, pagination: { total: 0, page: 1, last: 1 } };
     const box = renderer.createApp({ render: () => h(preview, pageProps) }); box.mount({});

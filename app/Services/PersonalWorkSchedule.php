@@ -28,6 +28,19 @@ class PersonalWorkSchedule
             ->exists();
     }
 
+    /** New-entry defaults follow registration order, never the planned work date or later edits. */
+    public function defaultCategory(User $user): string
+    {
+        return PersonalWorkEntry::where('user_id', $user->id)
+            ->where('company_id', $user->company_id)->where('department_id', $user->department_id)
+            ->whereNull('source_event_id')->whereIn('work_category', self::CATEGORIES)
+            ->orderByDesc('created_at')->orderByDesc('id')->value('work_category')
+            ?? ($user->isClerk() ? 'jimu' : match ($user->assignment?->code) {
+                'shinko' => 'shinko', 'eigyo' => 'eigyo', 'kousei' => 'kousei',
+                'operator', 'seisaku' => 'dtp', default => 'other',
+            });
+    }
+
     public function ownCandidates(User $user, string $date): array
     {
         if (! $this->available($user)) return ['entries' => [], 'events' => []];

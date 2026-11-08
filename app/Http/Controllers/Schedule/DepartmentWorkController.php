@@ -235,12 +235,7 @@ class DepartmentWorkController extends Controller
                 ->whereNotNull('actual_unit')->orderByDesc('updated_at')->orderByDesc('id')
                 ->limit(100)->pluck('actual_unit')->map(fn ($unit) => trim($unit))
                 ->filter()->unique()->take(10)->values(),
-            'default_category' => PersonalWorkEntry::where('user_id', $viewer->id)
-                ->orderByDesc('work_date')->orderByDesc('id')->value('work_category')
-                ?? ($viewer->isClerk() ? 'jimu' : match ($viewer->assignment?->code) {
-                'shinko' => 'shinko', 'eigyo' => 'eigyo', 'kousei' => 'kousei',
-                'operator', 'seisaku' => 'dtp', default => 'other',
-            }),
+            'default_category' => $this->schedule->defaultCategory($viewer),
         ]);
     }
 
