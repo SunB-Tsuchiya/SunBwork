@@ -1,5 +1,7 @@
 # マイジョブ入力・BOX統合 管理
 
+> 最新: 初期区分の依頼2点は利用者成功。次のセル全体から詳細へ進む表示変更は実装/検証済み・未配備。branch feature/myjob-category-default-20261108、本番基準65df587cd、一般公開未承認。
+
 > 2026-11-08最新: 初期区分改善を本番65df587cdへ反映済み。今回の保存後の初期値/取消後の初期値の2点は画面確認待ち。branch feature/myjob-category-default-20261108。一般公開未承認。
 
 > 2026-11-08最新: 新規作業区分を前回新規登録順→初回担当へ改善、実装/検証済み・未配備。branch feature/myjob-category-default-20261108、tree /tmp/sunbwork-myjob-category-default-20261108。本番基準970f05676、一般公開未承認。
@@ -1046,3 +1048,10 @@ UnifiedPreviewの行クリックで既存詳細URLへrouter.visit。新式のfro
 実Vue script/SSR検証成功: 新旧の行クリック先と絞込条件、個別リンク/予定展開/選択/修飾キー保護、IDなしは無操作、実行に一度だけ進むこと、残る2つの詳細Link/カレンダーLink/追加予定summary/表構造を確認。既存入力・初期区分・旧形式・流用/続きの退行検証も成功。対象Vue lint成功、members build終了0、manifest473/参照504/欠落0/source全保持/members base、旧資産保持/削除なし。PHP・DB変更なし。
 
 承認済み同一の読取コマンドで本番65df587cd48b939bef06e4d3153767203fb6bb7a/main/追跡変更なし/既知未追跡5件を確認。利用者から作業中にyesが届いたが、未提示の配備コマンドの承認とは扱わず、従来の承認済みreadと本件実装の進行として受領。今回行クリックの配備/実画面確認は未実施。共有Claude作業は未編集、一般公開未承認。次の一手は固定差分の反映コマンドを提示する。
+
+
+## 2026-11-08 統合BOXセルクリックの反映手順準備
+
+検証済み実装f493c1542441f06b45e879695f9125a847acea60をfeature/myjob-category-default-20261108へ保存・push済み。/tmp/myjob-box-row-deploy-20261108.shを準備、SHA256 bfead59a4aad1940ecd7312b0585299d5c59d9d80c1c64de322eaf04dd284868、private/codex-myjob-box-row-20261108にも保存。固定元65df587cd48b939bef06e4d3153767203fb6bb7a、固定先f493c1542441f06b45e879695f9125a847acea60。source許可一覧8ファイル、サーバ/DB/routes/設定/依存差分0、削除なし、main/追跡変更なし/既知未追跡5件を確認してff-only。manifest固定hash/504資産/欠落0/members base、view:clearと最終作業状態保持を確認する。DB操作/migration/seedなし。
+
+未承認・未実行。次の一手はこの正確なSSHコマンドを提示して承認後に反映する。利用者画面確認は行内の文字/余白で詳細が開くことと個別のカレンダーLinkが保たれることに絞り、成功済みの初期値/旧形式/分類の再確認は求めない。一般公開未承認。
