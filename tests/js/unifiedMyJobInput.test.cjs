@@ -34,7 +34,7 @@ async function component(file, behavior = false) {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
                 ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyCreate,canCreateLegacy,changeWorkCategory,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
-                : file === 'resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue' ? '\nglobalThis.__legacyForm={assignments,save,workDate,startTimeHour,startTimeMin,endTimeHour,endTimeMin};' : file === 'resources/js/Pages/MyJobBox/Show.vue' ? '\nglobalThis.__legacyComplete={submitComplete,isSubmittingComplete};' : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection,showRequestModal,requestRecords,applyRequestJob,formAssignments,prefillEvent};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError,detailsOpen,detailsSaved};') + '\n</script>');
+                : file === 'resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue' ? '\nglobalThis.__legacyForm={assignments,save,workDate,startTimeHour,startTimeMin,endTimeHour,endTimeMin};' : file === 'resources/js/Pages/MyJobBox/Show.vue' ? '\nglobalThis.__legacyComplete={submitComplete,isSubmittingComplete};' : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection,showRequestModal,requestRecords,applyRequestJob,formAssignments,prefillEvent};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate,detailHref,openDetails};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError,detailsOpen,detailsSaved};') + '\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
             return { loader: 'js', contents: compileScript(descriptor, { id: 'unified-input', inlineTemplate: !behavior, templateOptions: { ssr: !behavior } }).content, resolveDir: path.dirname(a.path) };
@@ -165,6 +165,16 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     const preview = await component(page, true);
     const pageProps = { rows: [], months: ['2026-11'], filters: { q: 'old search', period: '2026-11', hide_completed: true }, pagination: { total: 0, page: 1, last: 1 } };
     const box = renderer.createApp({ render: () => h(preview, pageProps) }); box.mount({});
+    {
+        const linkState=globalThis.__unifiedPage;const normalClick={button:0,target:{closest:()=>null}};
+        const entryRow={entryId:71};linkState.openDetails(entryRow,normalClick);
+        assert.equal(globalThis.__detailVisit[0],route('user.myjobbox.entries.show',{entry:71,from:'box',period:'2026-11',q:'old search',page:1,hide_completed:1}));
+        linkState.openDetails({assignmentId:81},normalClick);assert.equal(globalThis.__detailVisit[0],route('user.myjobbox.show',{assignment:81}));
+        const priorVisit=globalThis.__detailVisit;
+        for(const event of [{...normalClick,defaultPrevented:true},{...normalClick,ctrlKey:true},{...normalClick,button:1},{...normalClick,target:{closest:()=>({tagName:'A'})}},{...normalClick,target:{closest:()=>({tagName:'SUMMARY'})}}]){linkState.openDetails(entryRow,event);assert.equal(globalThis.__detailVisit,priorVisit);}
+        const previousSelection=globalThis.getSelection;globalThis.getSelection=()=>({toString:()=> 'selected text'});linkState.openDetails(entryRow,normalClick);assert.equal(globalThis.__detailVisit,priorVisit);globalThis.getSelection=previousSelection;
+        linkState.openDetails({},normalClick);assert.equal(globalThis.__detailVisit,priorVisit);
+    }
     const RealDate = Date; global.Date = class extends RealDate { constructor(...args) { super(...(args.length ? args : ['2026-11-01T15:30:00Z'])); } };
     globalThis.__unifiedPage.openCreate(); global.Date = RealDate;
     assert.equal(globalThis.__unifiedPage.createDate.value, '2026-11-02'); assert.equal(globalThis.__unifiedPage.showCreate.value, true);
@@ -201,6 +211,11 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     const actualPage = await component(page);
     const html = await renderToString(createSSRApp(actualPage, pageProps));
     for (const text of ['マイジョブ作成', '流用・受けた依頼からの登録', '従来のマイジョブBOXへ']) assert.ok(html.includes(text));
+    const rowHtml=await renderToString(createSSRApp(actualPage,{...pageProps,rows:[
+        {key:'entry:71',entryId:71,title:'New work',slots:[{date:'2026-11-08',start:'09:00',end:'10:00',endDate:'2026-11-08'},{date:'2026-11-09',start:'09:00',end:'10:00',endDate:'2026-11-09'},{date:'2026-11-10',start:'09:00',end:'10:00',endDate:'2026-11-10'}],kind:'新式',status:'未完了'},
+        {key:'assignment:81',assignmentId:81,title:'Legacy work',slots:[],kind:'旧形式',status:'未完了'},
+    ]}));
+    assert.equal((rowHtml.match(/>詳細<\/a>/g)||[]).length,2);assert.ok(rowHtml.includes('calendar.index'));assert.ok(rowHtml.includes('<summary'));assert.ok(rowHtml.includes('cursor-pointer'));assert.ok(!rowHtml.includes('role="link"'));
     const detailBehavior = await component('resources/js/Pages/MyJobBox/WorkDetail.vue', true);
     const detailProps = {work:{id:1,work_date:'2026-11-03'},time:{},ancestors:[],back:{from:'calendar'}};
     const detailApp = renderer.createApp({render:()=>h(detailBehavior,detailProps)}); detailApp.mount({});

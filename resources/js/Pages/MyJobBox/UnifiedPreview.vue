@@ -30,6 +30,21 @@ function clear() {
     q.value = '';
     search();
 }
+function detailHref(row) {
+    if (row.entryId) return route('user.myjobbox.entries.show', {
+        entry: row.entryId, from: 'box', period: props.filters.period, q: props.filters.q || undefined,
+        page: props.pagination.page, hide_completed: props.filters.hide_completed ? 1 : 0,
+    });
+    if (row.assignmentId) return route('user.myjobbox.show', { assignment: row.assignmentId });
+    return null;
+}
+function openDetails(row, event) {
+    if (event.defaultPrevented || event.button > 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if (event.target?.closest?.('a, button, input, select, textarea, details, summary, [role="button"], [role="link"], [contenteditable="true"]')) return;
+    if (globalThis.getSelection?.()?.toString()) return;
+    const href = detailHref(row);
+    if (href) router.visit(href);
+}
 function calendar(date) {
     return route('calendar.index', { date, view: 'day' });
 }
@@ -67,7 +82,7 @@ function calendar(date) {
                 <table class="min-w-full text-left text-sm">
                     <thead class="border-y bg-gray-50 text-gray-600"><tr><th class="p-3">作業日・時刻</th><th class="p-3">作業名 / 案件・分類</th><th class="p-3">由来</th><th class="p-3">状態</th><th class="p-3">確認</th></tr></thead>
                     <tbody class="divide-y">
-                        <tr v-for="row in rows" :key="row.key" :class="{ 'bg-blue-50': row.key === createdKey }">
+                        <tr v-for="row in rows" :key="row.key" :class="{ 'bg-blue-50': row.key === createdKey, 'cursor-pointer hover:bg-blue-50': Boolean(detailHref(row)) }" @click="openDetails(row, $event)">
                             <td class="p-3 align-top">
                                 <span v-if="!row.slots.length" class="text-gray-500">未予定</span>
                                 <div v-for="(slot, index) in row.slots.slice(0, 2)" :key="index" class="whitespace-nowrap">{{ slot.date }} {{ slot.start }}<span v-if="slot.end">〜{{ slot.endDate !== slot.date ? slot.endDate + ' ' : '' }}{{ slot.end }}</span></div>
@@ -75,7 +90,7 @@ function calendar(date) {
                             </td>
                             <td class="p-3 align-top"><div class="font-medium text-gray-900">{{ row.title || '（作業名なし）' }}<span v-if="row.key === createdKey" class="ml-2 text-xs font-normal text-blue-700">今回登録</span></div><div v-if="row.project" class="mt-1 text-gray-600">{{ row.project }}</div><div v-if="row.classification" class="mt-1 text-xs text-gray-500">{{ row.classification }}</div><div v-if="row.quantity" class="mt-1 text-xs text-gray-500">数量: {{ row.quantity }}</div><div v-if="!row.slots.length && row.fallbackDate" class="mt-1 text-xs text-gray-500">締切 / 登録日: {{ row.fallbackDate }}</div></td>
                             <td class="whitespace-nowrap p-3 align-top">{{ row.kind }}</td><td class="whitespace-nowrap p-3 align-top">{{ row.status }}</td>
-                            <td class="p-3 align-top"><Link v-if="row.entryId" :href="route('user.myjobbox.entries.show', { entry: row.entryId, from: 'box', period: filters.period, q: filters.q || undefined, page: pagination.page, hide_completed: filters.hide_completed ? 1 : 0 })" class="whitespace-nowrap text-blue-700 underline">詳細</Link><Link v-if="row.assignmentId" :href="route('user.myjobbox.show', { assignment: row.assignmentId })" class="whitespace-nowrap text-blue-700 underline">詳細</Link><Link v-if="row.slots.length" :href="calendar(row.slots[0].date)" class="mt-1 block whitespace-nowrap text-blue-700 underline">カレンダー</Link></td>
+                            <td class="p-3 align-top"><Link v-if="detailHref(row)" :href="detailHref(row)" class="whitespace-nowrap text-blue-700 underline">詳細</Link><Link v-if="row.slots.length" :href="calendar(row.slots[0].date)" class="mt-1 block whitespace-nowrap text-blue-700 underline">カレンダー</Link></td>
                         </tr>
                         <tr v-if="!rows.length"><td colspan="5" class="p-8 text-center text-gray-500">該当する作業はありません。</td></tr>
                     </tbody>
