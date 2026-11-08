@@ -379,3 +379,5 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 ## 作業区分の新規初期値（2026-11-08、未配備）
 
 新式の通常新規作成は、本人・同じ会社部署の独立PersonalWorkEntryのうちcreated_at/idが最新の有効な区分を初期選択する。未来の作業日やupdated_atで順位を変えない。履歴なしは従来の担当code（operator/seisaku=DTP、shinko/eigyo/kousei）又はClerk=事務、不明ならその他。編集/流用/続きは元の値を維持する。候補応答が遅くても手動で選んだ区分を上書きしない。取消を新しい保存履歴にせず、毎回手動変更可能。DB追加/権限変更/一般公開は含まない。詳細と証拠はMYJOB_UNIFIED_BOX_PLAN1/MANAGER1。
+
+2026-11-08追記: 作業区分の新規初期値改善は本番65df587cdへ限定配備済み。既存データ/DB構造/権限は変更なし。利用者の今回2点の画面確認待ち、一般公開未承認。
