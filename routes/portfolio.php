@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Route;
 | deny_general でサンエー印刷を除外し、portfolio ミドルウェアで個人許可を確認する。
 | SunA ではなく SB 側の機能なので routes/suna.php には置かない。
 |
-| @param bool $withPermissions 利用メンバー設定のルートも登録するか（SuperAdmin グループのみ true）
+| @param bool $adminArea admin エリアか（true: タブ付きの管理画面と利用メンバー設定。false: 自分の編集画面）
 */
 // ----------------------------------------------------------------------
 // JSON API・ファイル配信（画面なし＝ロール接頭辞は不要。require 時に1回だけ登録する）
@@ -73,18 +73,24 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 // ----------------------------------------------------------------------
 // AppLayout を使う画面（ロール別接頭辞で登録。web.php の各ロールのグループ内で呼ぶ）
 // ----------------------------------------------------------------------
-return function (bool $withPermissions = false) {
+return function (bool $adminArea = false) {
     Route::middleware(['deny_general', 'portfolio'])
         ->prefix('portfolio')
         ->name('portfolio.')
-        ->group(function () use ($withPermissions) {
-            Route::get('manage', [PortfolioController::class, 'manage'])->name('manage');
+        ->group(function () use ($adminArea) {
+            if ($adminArea) {
+                // admin エリア（Admin / SuperAdmin）: タブ付きの管理画面
+                //   メンバーのポートフォリオ（登録者のカード一覧）→ 1 人のページ（閲覧専用）／ 利用メンバー設定（SuperAdmin のみ）
+                Route::get('manage', [PortfolioController::class, 'overview'])->name('manage');
+                Route::get('members/{member}', [PortfolioController::class, 'member'])->name('members.show');
 
-            if ($withPermissions) {
                 // 利用メンバー設定（コントローラー側でも SuperAdmin に限定）
                 Route::get('permissions', [PortfolioPermissionController::class, 'index'])->name('permissions.index');
                 // ユーザーごとのスイッチを、まとめて保存する（申請者管理と同じ形）
                 Route::put('permissions', [PortfolioPermissionController::class, 'update'])->name('permissions.update');
+            } else {
+                // user エリア: 自分のポートフォリオの編集画面
+                Route::get('manage', [PortfolioController::class, 'manage'])->name('manage');
             }
         });
 };

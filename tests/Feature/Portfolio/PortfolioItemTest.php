@@ -42,6 +42,15 @@ class PortfolioItemTest extends TestCase
         return $user;
     }
 
+    /** 完成済み（ready）の作品を、ファイルなしで直接作る（一覧のカードのテスト用） */
+    private function readyItem(User $owner, array $attrs = []): PortfolioItem
+    {
+        return PortfolioItem::create($attrs + [
+            'user_id' => $owner->id, 'type' => 'image', 'title' => '作品', 'original_name' => 'a.jpg', 'mime' => 'image/jpeg',
+            'size_bytes' => 1, 'file_path' => 'x.jpg', 'thumb_path' => 'x_t.jpg', 'status' => 'ready',
+        ]);
+    }
+
     private function manager(string $role, ?Company $company = null): User
     {
         return User::factory()->create(['user_role' => $role, 'company_id' => ($company ?? $this->company())->id]);
@@ -277,16 +286,17 @@ class PortfolioItemTest extends TestCase
         $this->actingAs($super)->getJson(route('portfolio.api.data', ['owner_id' => $sunaUser->id]))->assertForbidden();
     }
 
-    public function test_管理画面は閲覧専用でメンバー選択肢が出る(): void
+    public function test_1人分のページは閲覧専用で持ち主の情報を渡し自分の編集画面はユーザーエリア(): void
     {
         $company = $this->company();
         $designer = $this->designer($company);
         $admin = $this->manager('admin', $company);
 
-        $this->actingAs($admin)->get(route('admin.portfolio.manage'))
-            ->assertInertia(fn ($page) => $page->where('readOnly', true)->has('owners', 1)->where('ownerId', $designer->id));
+        $this->actingAs($admin)->get(route('admin.portfolio.members.show', ['member' => $designer->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Portfolio/Manage', false)->where('readOnly', true)->where('ownerId', $designer->id)->where('ownerName', $designer->name)->where('canEditOwn', false));
         $this->actingAs($designer)->get(route('user.portfolio.manage'))
-            ->assertInertia(fn ($page) => $page->where('readOnly', false)->where('owners', []));
+            ->assertInertia(fn ($page) => $page->where('readOnly', false)->where('ownerId', $designer->id));
     }
 
     public function test_スイッチONのAdminは自分のポートフォリオを作れるが他メンバーの分は触れない(): void
@@ -328,7 +338,7 @@ class PortfolioItemTest extends TestCase
         $this->actingAs($admin)->postJson(route('portfolio.api.collections.store'), ['name' => 'A'])->assertForbidden();
     }
 
-    public function test_作品を持つAdminは閲覧するメンバーの選択肢に自分と並んで出る(): void
+    public function test_作品を持つAdminは一覧に出て自分のカードには編集への入口が付く(): void
     {
         $this->fakeDisk();
         $company = $this->company();
@@ -336,12 +346,124 @@ class PortfolioItemTest extends TestCase
         $adminOwner = $this->manager('admin', $company);
         PortfolioPermission::create(['user_id' => $adminOwner->id, 'enabled' => true]);
         $this->upload($adminOwner)->assertCreated();
+        PortfolioPermission::create(['user_id' => $viewer->id, 'enabled' => false]); // 閲覧する Admin は、作品なし・OFF
+
+        // 他の Admin のカード（編集への入口は出ない）
+        $this->actingAs($viewer)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page->has('members', 1)->where('members.0.id', $adminOwner->id)->where('members.0.can_edit', false)->where('members.0.is_self', false));
+        // 本人の一覧では、自分のカードに「編集する」の入口が付く
+        $this->actingAs($adminOwner)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page->has('members', 1)->where('members.0.is_self', true)->where('members.0.can_edit', true));
+    }
+
+    // ---- 管理画面「メンバーのポートフォリオ」のカード ----
+
+    public function test_カードは作品数の内訳とサムネイル最大4点と表紙優先と最終更新を持つ(): void
+    {
+        $company = $this->company();
+        $viewer = $this->manager('admin', $company);
+        PortfolioPermission::create(['user_id' => $viewer->id, 'enabled' => false]);
+        $designer = $this->designer($company);
+
+        $first = $this->readyItem($designer, ['title' => '1', 'sort_order' => 1]);
+        $this->readyItem($designer, ['title' => '2', 'sort_order' => 2]);
+        $this->readyItem($designer, ['title' => '3', 'sort_order' => 3, 'type' => 'pdf']);
+        $this->readyItem($designer, ['title' => '4', 'sort_order' => 4, 'type' => 'video']);
+        $cover = $this->readyItem($designer, ['title' => '表紙の作品', 'sort_order' => 5]);
+        $this->readyItem($designer, ['title' => '6', 'sort_order' => 6]);
+        $noThumb = $this->readyItem($designer, ['title' => 'サムネ無し', 'sort_order' => 0, 'thumb_path' => null]);
+        // コレクションの表紙に指定された作品は、並び順が後ろでも、先頭のサムネイルになる
+        $collection = \App\Models\Portfolio\PortfolioCollection::create(['user_id' => $designer->id, 'name' => 'カタログ', 'cover_item_id' => $cover->id]);
+        $cover->update(['collection_id' => $collection->id]);
 
         $this->actingAs($viewer)->get(route('admin.portfolio.manage'))
-            ->assertInertia(fn ($page) => $page->has('owners', 1)->where('owners.0.id', $adminOwner->id));
-        // 本人は、自分も選択肢に出る（作品があるため）。ラベルに「（自分）」が付く
-        $this->actingAs($adminOwner)->get(route('admin.portfolio.manage'))
-            ->assertInertia(fn ($page) => $page->has('owners', 1)->where('owners.0.id', $adminOwner->id)->where('owners.0.label', fn ($l) => str_contains($l, '（自分）')));
+            ->assertInertia(fn ($page) => $page
+                ->has('members', 1)
+                ->where('members.0.total', 7)
+                ->where('members.0.counts', ['image' => 5, 'pdf' => 1, 'video' => 1])
+                ->has('members.0.previews', 4) // 最大 4 点
+                ->where('members.0.previews.0.id', $cover->id) // 表紙が先頭
+                ->where('members.0.more', 2) // サムネイルのある 6 点のうち、4 点を出して、残り 2
+                ->where('members.0.problem', ['uploading' => 0, 'failed' => 0])
+                ->where('members.0.updated_at', fn ($v) => ! empty($v)));
+        $this->assertNotNull($noThumb->id);
+        $this->assertNotNull($first->id);
+    }
+
+    public function test_問題のある作品は要確認として数えサムネイルには出さない(): void
+    {
+        $company = $this->company();
+        $viewer = $this->manager('admin', $company);
+        PortfolioPermission::create(['user_id' => $viewer->id, 'enabled' => false]);
+        $designer = $this->designer($company);
+        $this->readyItem($designer);
+        $this->readyItem($designer, ['status' => 'failed']);
+        $this->readyItem($designer, ['status' => 'uploading']);
+        $this->readyItem($designer, ['status' => 'processing']);
+
+        $this->actingAs($viewer)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page
+                ->where('members.0.total', 1)                       // 完成した作品だけを数える
+                ->where('members.0.problem', ['uploading' => 2, 'failed' => 1])
+                ->has('members.0.previews', 1));                    // 問題のある作品は、サムネイルに出さない
+    }
+
+    public function test_作品が無い人は名前だけの欄に出てスイッチOFFで作品の無い人は出ない(): void
+    {
+        $company = $this->company();
+        $viewer = $this->manager('admin', $company);
+        PortfolioPermission::create(['user_id' => $viewer->id, 'enabled' => false]);
+        $withWorks = $this->designer($company);
+        $this->readyItem($withWorks);
+        $noWorks = $this->designer($company); // スイッチ ON・作品なし
+        $off = User::factory()->create(['user_role' => 'user', 'company_id' => $company->id]); // 許可なし・作品なし
+        $offWithWorks = User::factory()->create(['user_role' => 'user', 'company_id' => $company->id]); // 許可は無いが、作品がある
+        $this->readyItem($offWithWorks);
+
+        $this->actingAs($viewer)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page
+                ->has('members', 2) // 作品のある 2 人（許可が外れていても、作品があれば出す）
+                ->has('withoutWorks', 1)
+                ->where('withoutWorks.0.id', $noWorks->id));
+        $this->assertNotNull($off->id);
+    }
+
+    public function test_カードの範囲は閲覧できる人だけでAdminは自社SuperAdminはSB全員_サンエー印刷は出ない(): void
+    {
+        $company = $this->company();
+        $otherSb = $this->company();
+        $suna = $this->company('general');
+        $admin = $this->manager('admin', $company);
+        PortfolioPermission::create(['user_id' => $admin->id, 'enabled' => false]);
+        $super = $this->manager('superadmin', $company);
+
+        $mine = $this->designer($company);
+        $theirs = $this->designer($otherSb);
+        $sunaUser = User::factory()->create(['user_role' => 'user', 'company_id' => $suna->id]);
+        PortfolioPermission::create(['user_id' => $sunaUser->id, 'enabled' => true]);
+        foreach ([$mine, $theirs, $sunaUser] as $u) {
+            $this->readyItem($u);
+        }
+
+        $this->actingAs($admin)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page->has('members', 1)->where('members.0.id', $mine->id));
+        $this->actingAs($super)->get(route('admin.portfolio.manage'))
+            ->assertInertia(fn ($page) => $page->has('members', 2)); // SB の全員（自社＋他社）。サンエー印刷は出ない
+    }
+
+    public function test_1人分のページは同じ会社のAdminだけが開けユーザーや他社のAdminは開けない(): void
+    {
+        $company = $this->company();
+        $designer = $this->designer($company);
+        $sameAdmin = $this->manager('admin', $company);
+        $otherAdmin = $this->manager('admin');
+        $super = $this->manager('superadmin');
+
+        $url = route('admin.portfolio.members.show', ['member' => $designer->id]);
+        $this->actingAs($sameAdmin)->get($url)->assertOk();
+        $this->actingAs($super)->get($url)->assertOk();
+        $this->actingAs($otherAdmin)->get($url)->assertForbidden();
+        $this->actingAs($designer)->get($url)->assertForbidden(); // 一般メンバーは admin エリアに入れない
     }
 }
 

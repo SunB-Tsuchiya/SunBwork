@@ -9,21 +9,19 @@ import ItemCreateModal from '@/Components/Portfolio/ItemCreateModal.vue';
 import ItemEditModal from '@/Components/Portfolio/ItemEditModal.vue';
 
 // ポートフォリオ管理画面（AppLayout・ヘッダーあり）。
-// 役割: 作る人（利用許可をもらったユーザー）は自分の作品を追加・整理・削除する。
-//       見る人（Admin / admin エリアの SuperAdmin）はメンバーを選んで閲覧するだけ（readOnly）。
+// 2 つの使い方:
+//   ・user エリア（readOnly=false）: 作る人（スイッチ ON の人）が、自分の作品を追加・整理・削除する編集画面。
+//   ・admin エリア（readOnly=true）: 「メンバーのポートフォリオ」一覧（Overview.vue）から開く、1 人分のページ。閲覧するだけ。
 // お客様に見せる閲覧ページは別タブの独立レイアウト（Phase 5）。
 const props = defineProps({
     initial: { type: Object, required: true },
-    canManagePermissions: { type: Boolean, default: false },
     routePrefix: { type: String, required: true },
     readOnly: { type: Boolean, default: false },
-    // 自分の作品を作れる人か（SuperAdmin・スイッチ ON の Admin など）。閲覧専用画面から、自分の編集画面へ案内する
+    // 自分のページを閲覧専用で開いたとき、自分の編集画面（user エリア）へ案内する
     canEditOwn: { type: Boolean, default: false },
-    // 閲覧中のメンバー ID（閲覧専用モードで、閲覧できるメンバーがいなければ null）
+    // このページのポートフォリオの持ち主（user エリアでは自分）
     ownerId: { type: Number, default: null },
-    owners: { type: Array, default: () => [] },
-    // 部署での絞り込み用（選択肢に含まれるメンバーがいる部署だけ）
-    ownerDepartments: { type: Array, default: () => [] },
+    ownerName: { type: String, default: '' },
 });
 
 // useToasts が返すのは showToast（addToast は存在しない）
@@ -39,23 +37,8 @@ const data = reactive({
     usage: { ...props.initial.usage },
 });
 
-// ---- 閲覧するメンバー（閲覧専用モードのみ）----
+// ---- 持ち主（閲覧専用モードでは、読み込みだけに owner_id を付ける。書き込みは常に本人分で、本人以外はサーバーが 403）----
 const currentOwnerId = ref(props.ownerId);
-const currentOwnerName = computed(() => props.owners.find((o) => o.id === currentOwnerId.value)?.name ?? '');
-// 部署で絞り込み（申請者管理のメンバー設定と同じチップ）。並び順はサーバー側で 雇用区分 → 役職 → 氏名
-const ownerDept = ref(null);
-const filteredOwners = computed(() => (ownerDept.value === null ? props.owners : props.owners.filter((o) => o.department_id === ownerDept.value)));
-const ownerLabel = (o) => (o.position_title ? `${o.label}（${o.position_title}）` : o.label);
-async function selectOwnerDept(id) {
-    ownerDept.value = id;
-    // 選んでいたメンバーが絞り込みから外れたら、絞り込み後の先頭のメンバーへ切り替える
-    if (filteredOwners.value.length && !filteredOwners.value.some((o) => o.id === currentOwnerId.value)) {
-        currentOwnerId.value = filteredOwners.value[0].id;
-        await switchOwner();
-    }
-}
-const chip = (active) => ['rounded-full px-3 py-1 text-xs font-medium transition-colors', active ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'];
-// 読み込みだけに owner_id を付ける。書き込みは常に本人分（サーバー側で本人以外は 403）
 const readParams = () => (props.readOnly && currentOwnerId.value ? { owner_id: currentOwnerId.value } : {});
 
 // ---- 表示スコープ（すべて / 未分類 / コレクション）とタグ絞り込み ----
@@ -128,13 +111,6 @@ async function run(fn, okMessage = null) {
         addToast(errorText(e), 'error');
         return false;
     }
-}
-
-async function switchOwner() {
-    scope.value = 'all';
-    tagFilter.value = '';
-    editing.value = null;
-    await run(reload);
 }
 
 // ---- コレクション（本人のみ）----
@@ -281,36 +257,26 @@ onBeforeUnmount(() => {
 <template>
     <AppLayout :title="readOnly ? 'ポートフォリオ（閲覧）' : 'ポートフォリオ管理'">
         <template #header>
-            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
-                {{ readOnly ? 'ポートフォリオ（閲覧）' : 'ポートフォリオ管理' }}
-            </h2>
+            <div class="flex items-center gap-3">
+                <!-- 閲覧専用（1 人分のページ）: 一覧（タブ1）へ戻る -->
+                <Link v-if="readOnly" :href="route(`${routePrefix}.portfolio.manage`)"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap">← メンバー一覧へ</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
+                    {{ readOnly ? `${ownerName} さんのポートフォリオ` : 'ポートフォリオ管理' }}
+                </h2>
+            </div>
         </template>
 
         <div class="rounded bg-white p-4 shadow sm:p-6">
-            <!-- 閲覧専用モード: 見るメンバーを選ぶ（部署で絞り込み → メンバー。並びは 雇用区分 → 役職 → 氏名） -->
-            <div v-if="readOnly" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-                <div v-if="ownerDepartments.length > 1" class="mb-2 flex flex-wrap gap-2">
-                    <button type="button" :class="chip(ownerDept === null)" @click="selectOwnerDept(null)">すべての部署</button>
-                    <button v-for="d in ownerDepartments" :key="d.id" type="button" :class="chip(ownerDept === d.id)" @click="selectOwnerDept(d.id)">{{ d.name }}</button>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-amber-800">閲覧するメンバー:</span>
-                    <select v-if="filteredOwners.length" v-model="currentOwnerId" class="rounded border-amber-300 py-1 text-sm" @change="switchOwner">
-                        <option v-for="o in filteredOwners" :key="o.id" :value="o.id">{{ ownerLabel(o) }}</option>
-                    </select>
-                    <span v-else class="text-amber-700">{{ owners.length ? 'この部署にはポートフォリオを使っているメンバーがいません' : 'ポートフォリオを使っているメンバーがまだいません' }}</span>
-                </div>
-                <p class="mt-1 text-xs text-amber-700">閲覧のみです。作品の追加・修正・削除はご本人が行います。問題のある作品があれば、本人に修正・削除を依頼してください。</p>
-                <!-- 自分の作品を作れる人（スイッチ ON の Admin・SuperAdmin）には、自分の編集画面（ユーザーのタブ）への入口を出す -->
-                <p v-if="canEditOwn && routePrefix === 'admin'" class="mt-2">
-                    <Link :href="route('user.portfolio.manage')" class="inline-flex items-center rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700">自分のポートフォリオを編集する →</Link>
-                </p>
+            <!-- 閲覧専用（1 人分のページ）: 説明。自分のページなら、自分の編集画面への入口も出す -->
+            <div v-if="readOnly" class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+                <p class="text-xs text-amber-800">閲覧のみです。作品の追加・修正・削除はご本人が行います。問題のある作品があれば、本人に修正・削除を依頼してください。</p>
+                <Link v-if="canEditOwn" :href="route('user.portfolio.manage')" class="inline-flex shrink-0 items-center rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700">編集する →</Link>
             </div>
 
             <!-- 上部バー -->
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div class="min-w-[12rem] text-xs text-gray-500">
-                    <div v-if="readOnly && currentOwnerName" class="mb-1 font-medium text-gray-700">{{ currentOwnerName }} さんのポートフォリオ</div>
                     <div class="mb-1">使用量 {{ formatBytes(data.usage.used_bytes) }} / {{ formatBytes(data.usage.quota_bytes) }}</div>
                     <div class="h-1.5 w-48 overflow-hidden rounded-full bg-gray-200">
                         <div class="h-full rounded-full" :style="{ width: usagePercent + '%', backgroundColor: data.profile.accent_color }" />
@@ -327,20 +293,12 @@ onBeforeUnmount(() => {
                     <button v-if="!readOnly" type="button" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50" @click="showProfile = !showProfile">
                         表示設定（色・名前）
                     </button>
-                    <Link
-                        v-if="canManagePermissions"
-                        :href="route(`${routePrefix}.portfolio.permissions.index`)"
-                        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                        利用メンバー設定
-                    </Link>
                     <!-- お客様に見せる閲覧ページ（別タブ・ヘッダーなしの全画面）。閲覧専用モードでは見ているメンバーの分を開く -->
                     <a
                         :href="route('portfolio.view', readOnly && currentOwnerId ? { owner_id: currentOwnerId } : {})"
                         target="_blank"
                         rel="noopener noreferrer"
                         class="inline-flex items-center rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700"
-                        :class="readOnly && !currentOwnerId ? 'pointer-events-none opacity-40' : ''"
                     >客先で見せる ↗</a>
                 </div>
             </div>

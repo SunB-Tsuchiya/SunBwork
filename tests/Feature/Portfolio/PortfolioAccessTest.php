@@ -32,7 +32,8 @@ class PortfolioAccessTest extends TestCase
         $admin = $this->makeUser('admin');
         $this->actingAs($admin)->get(route('admin.portfolio.manage'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->component('Portfolio/Manage', false)->where('routePrefix', 'admin')->where('readOnly', true));
+            // admin エリアのポートフォリオ管理は、タブ1「メンバーのポートフォリオ」（登録者のカード一覧）
+            ->assertInertia(fn ($page) => $page->component('Portfolio/Overview', false)->where('routePrefix', 'admin')->where('canManagePermissions', false));
     }
 
     public function test_サンエー印刷のAdminは入れない(): void
@@ -53,7 +54,7 @@ class PortfolioAccessTest extends TestCase
         PortfolioPermission::create(['user_id' => $user->id, 'enabled' => true]);
         $this->actingAs($user)->get(route('user.portfolio.manage'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('routePrefix', 'user')->where('readOnly', false)->where('ownerId', $user->id)->where('canManagePermissions', false)->where('owners', []));
+            ->assertInertia(fn ($page) => $page->where('routePrefix', 'user')->where('readOnly', false)->where('ownerId', $user->id)->where('ownerName', $user->name));
     }
 
     public function test_許可オフは403(): void
@@ -88,11 +89,10 @@ class PortfolioAccessTest extends TestCase
         $this->actingAs($super)->get(route('admin.portfolio.permissions.index'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page->component('Portfolio/Permissions', false)->where('routePrefix', 'admin'));
-        // SuperAdmin が管理画面を開いたとき、権限画面のボタンが出る（ルートが存在するため）
+        // タブ「利用メンバー設定」は SuperAdmin だけに出る（タブ1の画面が受け取るフラグ）
         $this->actingAs($super)->get(route('admin.portfolio.manage'))
             ->assertInertia(fn ($page) => $page->where('canManagePermissions', true));
-        // ユーザーエリアには権限画面のルートが無いので、ボタンは出さない（Ziggy エラー防止）
-        $this->actingAs($super)->get(route('user.portfolio.manage'))
+        $this->actingAs($admin)->get(route('admin.portfolio.manage'))
             ->assertInertia(fn ($page) => $page->where('canManagePermissions', false));
     }
 
@@ -152,6 +152,15 @@ class PortfolioAccessTest extends TestCase
         $this->assertFalse(PortfolioPermission::isEnabledFor($sb->id));
     }
 
+    /** 完成済み（ready）の作品を、ファイルなしで直接作る（一覧のカードのテスト用） */
+    private function readyItem(User $owner, array $attrs = []): \App\Models\Portfolio\PortfolioItem
+    {
+        return \App\Models\Portfolio\PortfolioItem::create($attrs + [
+            'user_id' => $owner->id, 'type' => 'image', 'title' => '作品', 'original_name' => 'a.jpg', 'mime' => 'image/jpeg',
+            'size_bytes' => 1, 'file_path' => 'x.jpg', 'thumb_path' => 'x_t.jpg', 'status' => 'ready',
+        ]);
+    }
+
     private function memberIn(Company $company, string $name, string $employment, ?PositionTitle $title, ?Department $dept = null): User
     {
         return User::factory()->create([
@@ -195,10 +204,11 @@ class PortfolioAccessTest extends TestCase
                 ->where('departments.1.name', '制作部'));
     }
 
-    public function test_閲覧するメンバーの選択肢も同じ並びで役職と部署を持つ(): void
+    public function test_メンバーのカードは同じ並びで役職と部署を持ち部署の絞り込みも渡る(): void
     {
         $company = Company::create(['name' => 'T-' . uniqid(), 'code' => 'T' . uniqid(), 'company_type' => 'sunbrain']);
         $admin = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id]);
+        PortfolioPermission::create(['user_id' => $admin->id, 'enabled' => false]); // 閲覧する Admin 自身は、一覧に出さない
         $exec = PositionTitle::create(['name' => '役員', 'sort_order' => 1]);
         $chief = PositionTitle::create(['name' => '課長', 'sort_order' => 3]);
         $deptA = Department::create(['company_id' => $company->id, 'name' => '制作部', 'code' => 'A' . uniqid(), 'sort_order' => 2]);
@@ -206,19 +216,17 @@ class PortfolioAccessTest extends TestCase
         foreach ([['あ課長', $chief, $deptA], ['い役員', $exec, $deptB]] as [$name, $title, $dept]) {
             $u = $this->memberIn($company, $name, 'regular', $title, $dept);
             PortfolioPermission::create(['user_id' => $u->id, 'enabled' => true]);
+            $this->readyItem($u);
         }
 
         $this->actingAs($admin)->get(route('admin.portfolio.manage'))
             ->assertInertia(fn ($page) => $page
-                ->has('owners', 2)
-                ->where('owners.0.name', 'い役員')
-                ->where('owners.0.label', 'い役員')
-                ->where('owners.0.position_title', '役員')
-                ->where('owners.0.department_id', $deptB->id)
-                ->where('owners.1.name', 'あ課長')
-                ->where('ownerDepartments.0.name', '営業部')
-                ->where('ownerDepartments.1.name', '制作部')
-                ->where('ownerId', fn ($id) => $id === User::where('name', 'い役員')->value('id')));
+                ->has('members', 2)
+                // 役職の設定順（役員 → 課長）。氏名順ではない
+                ->where('members.0.name', 'い役員')->where('members.0.position_title', '役員')->where('members.0.department', '営業部')
+                ->where('members.1.name', 'あ課長')
+                ->where('departments.0.name', '営業部')
+                ->where('departments.1.name', '制作部'));
     }
 
     public function test_Adminは部署が未設定でも一覧に出てスイッチを操作できSuperAdminはON固定(): void
@@ -276,23 +284,22 @@ class PortfolioAccessTest extends TestCase
         $put([['user_id' => $admin->id, 'enabled' => true]])->assertJsonPath('changed', 0);
     }
 
-    public function test_Adminは自動でONで編集画面を開けOFFにしたAdminは閲覧専用(): void
+    public function test_Adminは自動でONで編集画面を開けOFFにしたAdminは閲覧一覧へ案内される(): void
     {
         $company = Company::create(['name' => 'T-' . uniqid(), 'code' => 'T' . uniqid(), 'company_type' => 'sunbrain']);
         $on = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id]);   // スイッチ未設定＝自動で ON
         $off = User::factory()->create(['user_role' => 'admin', 'company_id' => $company->id]);
         PortfolioPermission::create(['user_id' => $off->id, 'enabled' => false]);
 
-        // ON: user エリア（自分の編集画面）は編集可。admin エリアは、メンバーを閲覧する画面だが、自分の編集画面への案内が出る
+        // ON: user エリア（自分の編集画面）は編集可。admin エリアの一覧は、自分のカードから編集画面へ案内できる
         $this->actingAs($on)->get(route('user.portfolio.manage'))
-            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', false)->where('canEditOwn', true)->where('ownerId', $on->id));
+            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', false)->where('ownerId', $on->id));
         $this->actingAs($on)->get(route('admin.portfolio.manage'))
-            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', true)->where('canEditOwn', true));
+            ->assertOk()->assertInertia(fn ($page) => $page->where('canEditOwn', true));
 
-        // OFF: どちらのエリアでも閲覧専用（自分の編集への案内は出ない）
-        $this->actingAs($off)->get(route('user.portfolio.manage'))
-            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', true)->where('canEditOwn', false));
+        // OFF: 自分の編集画面は開けず、メンバーを閲覧する画面（admin エリア）へ案内される。編集への案内は出ない
+        $this->actingAs($off)->get(route('user.portfolio.manage'))->assertRedirect(route('admin.portfolio.manage'));
         $this->actingAs($off)->get(route('admin.portfolio.manage'))
-            ->assertOk()->assertInertia(fn ($page) => $page->where('readOnly', true)->where('canEditOwn', false));
+            ->assertOk()->assertInertia(fn ($page) => $page->where('canEditOwn', false));
     }
 }

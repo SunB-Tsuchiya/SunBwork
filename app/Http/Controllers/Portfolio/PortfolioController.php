@@ -3,45 +3,71 @@
 namespace App\Http\Controllers\Portfolio;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
 use App\Models\User;
 use App\Services\Portfolio\PortfolioAccess;
 use App\Services\Portfolio\PortfolioData;
+use App\Services\Portfolio\PortfolioOverview;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
-/** ポートフォリオ管理画面（ヘッダー付き） */
+/**
+ * ポートフォリオの管理画面（ヘッダー付き）。
+ *  - admin エリア（Admin / SuperAdmin）: タブ付き。「メンバーのポートフォリオ」（登録者のカード一覧）→ 1 人のページ（閲覧専用）、
+ *    と、「利用メンバー設定」（SuperAdmin のみ。PortfolioPermissionController）。
+ *  - user エリア: 自分のポートフォリオの編集画面（スイッチ ON の人）。
+ */
 class PortfolioController extends Controller
 {
+    /** user エリア: 自分のポートフォリオの編集画面 */
     public function manage(Request $request)
     {
         $user = $request->user();
-        // ルート名の接頭辞（admin / user）。画面内リンクをロール別ルートで作るために使う
         $prefix = Str::before($request->route()->getName(), '.portfolio.');
 
-        // 閲覧専用モード: admin エリアで開いたとき（メンバーを選んで見るだけ）と、自分の分を作れない人（スイッチ OFF の Admin）。
-        // 作成・編集・削除は本人のみ（サーバー側でも拒否する）。問題のある作品は本人に修正・削除を依頼する
-        $canEditOwn = PortfolioAccess::canEdit($user, $user->id);
-        $readOnly = $prefix === 'admin' || ! $canEditOwn;
-        $owners = $readOnly ? PortfolioAccess::ownerChoices($user) : [];
-        $viewId = $readOnly ? ($owners[0]['id'] ?? null) : $user->id;
+        // 自分の分を作れない Admin（スイッチ OFF）は、メンバーを閲覧する画面（admin エリア）へ案内する
+        if (! PortfolioAccess::canEdit($user, $user->id)) {
+            return redirect()->route('admin.portfolio.manage');
+        }
 
         return Inertia::render('Portfolio/Manage', [
-            'initial' => PortfolioData::for($viewId ? User::findOrFail($viewId) : $user),
+            'initial' => PortfolioData::for($user),
             'routePrefix' => $prefix,
-            'readOnly' => $readOnly,
-            // 自分の作品を作れる人（SuperAdmin・スイッチ ON の Admin・一般メンバー）。閲覧専用画面から、自分の編集画面（user エリア）へ案内する
-            'canEditOwn' => $canEditOwn,
-            'ownerId' => $viewId,
-            'owners' => $owners,
-            // 部署での絞り込み用（選択肢に含まれるメンバーがいる部署だけ。並びは部署の設定順）
-            'ownerDepartments' => $owners
-                ? Department::whereIn('id', collect($owners)->pluck('department_id')->filter()->unique())->orderBy('sort_order')->orderBy('id')->get(['id', 'name'])
-                : [],
-            // 利用メンバー設定は SuperAdmin のみ。そのロール接頭辞にルートがある場合だけ出す（無いルートを呼ぶと Ziggy エラーになる）
-            'canManagePermissions' => $user->isSuperAdmin() && Route::has("{$prefix}.portfolio.permissions.index"),
+            'readOnly' => false,
+            'ownerId' => $user->id,
+            'ownerName' => $user->name,
+        ]);
+    }
+
+    /** admin エリア: タブ1「メンバーのポートフォリオ」（登録者のカード一覧） */
+    public function overview(Request $request)
+    {
+        $user = $request->user();
+
+        return Inertia::render('Portfolio/Overview', PortfolioOverview::build($user) + [
+            'routePrefix' => 'admin',
+            // 利用メンバー設定のタブは SuperAdmin のみ
+            'canManagePermissions' => (bool) $user->isSuperAdmin(),
+            // 自分の作品を作れる人（SuperAdmin・スイッチ ON の Admin）には、自分のカードから編集画面へ案内する
+            'canEditOwn' => PortfolioAccess::canEdit($user, $user->id),
+        ]);
+    }
+
+    /** admin エリア: 1 人のポートフォリオ（閲覧専用）。コレクションと作品の一覧。作成・編集・削除は本人のみ */
+    public function member(Request $request, User $member)
+    {
+        $user = $request->user();
+        abort_unless(PortfolioAccess::canView($user, $member->id), 403, 'このポートフォリオは閲覧できません。');
+
+        return Inertia::render('Portfolio/Manage', [
+            'initial' => PortfolioData::for($member),
+            'routePrefix' => 'admin',
+            'readOnly' => true,
+            'ownerId' => $member->id,
+            'ownerName' => $member->name,
+            // 自分自身のページなら、編集画面（ユーザーのタブ）への入口を出す
+            'canEditOwn' => $member->id === $user->id && PortfolioAccess::canEdit($user, $user->id),
+            'canManagePermissions' => (bool) $user->isSuperAdmin(),
         ]);
     }
 }
