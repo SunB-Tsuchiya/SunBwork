@@ -1461,6 +1461,13 @@ PersonalWorkSchedule.defaultCategoryで本人/同じ会社部署/独立entry/既
 
 承認済み同一の読取コマンドで本番970f05676a5edc28e8d96e9c3a5f73b7461c0047/main/追跡変更なし/既知未追跡5件を確認。970fは01fを親とする、他作業Portfolio管理者の利用切替の配備。今回の3実装ファイル/2検証/本件管理4資料と重複しないため、970f基準の/tmp/sunbwork-myjob-category-default-20261108、feature/myjob-category-default-20261108に移して検証・build。最新版Portfolio実装/CLAUDE.md/route/依存は保持、共有Claude作業は未編集。
 
-最終PHP検証23テスト72断言成功（新規4テスト13断言＋既存Schedule/Role）。SQLite :memory:のみ、network none、開発DB更新なし。未来のwork_date/古い行のupdated_at/同一作成日時のid順/NULL作成日時/他人会社部署/旧イベント結果/未知区分/初回担当fallback、読取不変を確認。変更PHP2ファイル構文成功。実Vue検証で初期dtp・既存kousei/続きeigyo/流用jimu保持、遅延候補への手動優先・取消後再表示・非保存を確認し、既存日時/旧形式/受信/流用とナビ/Portfolio共存の退行なし。対象lint成功。members build終了0、manifest473/参照504/欠落0/最新source全保持/members base、旧資産保持/削除なし。既存glob非推奨・chunk通知のみ。
+最終PHP検証23テスト72断言成功（新規4テスト12断言＋既存Schedule/Role）。SQLite :memory:のみ、network none、開発DB更新なし。未来のwork_date/古い行のupdated_at/同一作成日時のid順/NULL作成日時/他人会社部署/旧イベント結果/未知区分/初回担当fallback、読取不変を確認。変更PHP2ファイル構文成功。実Vue検証で初期dtp・既存kousei/続きeigyo/流用jimu保持、遅延候補への手動優先・取消後再表示・非保存を確認し、既存日時/旧形式/受信/流用とナビ/Portfolio共存の退行なし。対象lint成功。members build終了0、manifest473/参照504/欠落0/最新source全保持/members base、旧資産保持/削除なし。既存glob非推奨・chunk通知のみ。
 
 実装/コード検証/build完了、配備と今回の利用者画面確認は未実施。次の一手は970fから今回の既定値だけを反映する固定手順を提示し、正確なSSH承認を得る。DB操作/migration/seed/一般公開なし。
+
+
+## 2026-11-08 作業区分初期値の限定配備準備（未実行）
+
+実装版65df587cd48b939bef06e4d3153767203fb6bb7aをfeature/myjob-category-default-20261108に保存・push済み。/tmp/myjob-category-default-deploy-20261108.shを準備、SHA256 ba2319ea5937e032c86a85c2b4a0c5d565cbeb63d75377174158b3dc4c7ef916、private/codex-myjob-category-default-20261108にも保存。固定元970f05676a5edc28e8d96e9c3a5f73b7461c0047、固定先65df587cd48b939bef06e4d3153767203fb6bb7a。source許可一覧10ファイルを厳密照合し、PHPは対象Controller/Service/Testの3ファイルを構文確認。DB/routes/設定/依存差分0、削除なし、main/追跡変更なし/既知未追跡5件を確認してff-only。manifest固定hash/504資産/欠落0/members base、view:clear、最終作業状態保持を確認する。DB操作/migration/seedは行わない。
+
+次の一手は正確なSSHコマンドを提示し承認後に同一スクリプトを実行する。今回の画面確認は、通常新規保存後の次回初期値と、未保存で閉じた変更が次回に残らないことを中心にする。初回担当fallback/別会社部署等の合成成功を実ブラウザ確認済みへ拡張しない。一般公開未承認。
