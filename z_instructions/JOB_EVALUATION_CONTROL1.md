@@ -1521,3 +1521,12 @@ feature/myjob-category-default-20261108でca3をmerge。資料末尾競合は両
 統合実装428250c09b1cc3fdc3572f7d5fc6193a3db415c0をfeature/myjob-category-default-20261108へpush済み。新/tmp/myjob-box-row-integrated-deploy-20261108.shを作成、SHA256 7803423127d0c161c846685e02ff2504d8e570d360fbdb1ab26c066ee1ecf5fd、private/codex-myjob-box-row-20261108にも保存。固定元ca3de12af15ba94aa39956ccf4bbbc3a98b2ce69、固定先428250c09b1cc3fdc3572f7d5fc6193a3db415c0。source8許可一覧/削除なし/サーバ・DB・routes・設定・依存差分0、main/追跡変更なし/既知未追跡5件を確認してff-only。manifest固定hash/506資産/欠落0/members base、view:clearと最終状態保持を確認する。DB操作/migration/seedなし。
 
 旧/tmp/myjob-box-row-deploy-20261108.shは65df基準なので再利用しない。新スクリプトはまだ未承認・未実行。次の一手は本番基準が変わったため新しい正確なコマンドの確認を得て反映する。実画面確認は未実施、一般公開未承認。
+
+
+## 2026-11-08 統合BOXセルクリックの限定反映成功（画面確認待ち）
+
+利用者が正確な新/tmp/myjob-box-row-integrated-deploy-20261108.shのSSHにyesと回答。同一スクリプト実行exit0。固定元ca3de12af/main/追跡変更なし/既知未追跡5件、固定先428250c09b1cc3fdc3572f7d5fc6193a3db415c0、8ソース許可一覧/削除なし/サーバ・DB・routes・設定・依存差分0を確認しff-only。manifest固定hash/506資産/欠落0/members base、view:clear、最終作業状態保持を確認。本番最終証拠428250c09。Portfolio追加画面/タブ/カードを保持。DB操作/migration/seedなし、共有Claude作業未編集、一般公開なし。
+
+今回依頼する利用者画面確認は2点: (1) 新しいマイジョブBOXで作業名やセルの余白をクリックすると対応する詳細へ進める。(2) 行内の「カレンダー」は詳細へ飛ばず従来どおりカレンダーを開く。すべて問題なければ「成功」、違いがあれば番号と結果を依頼。両sourceの全例/文字選択/追加予定展開/修飾キー/モバイル全条件を実ブラウザ確認済みと拡張しない。初期区分・旧形式・タブ・分類の成功済み試験は再要求しない。
+
+状態: 実装/コード検証/build/限定反映完了、今回2点の利用者画面確認待ち。次の一手は結果を記録する。一般公開と残る権限/実例/上長照合は別判断。
