@@ -1064,3 +1064,10 @@ UnifiedPreviewの行クリックで既存詳細URLへrouter.visit。新式のfro
 feature/myjob-category-default-20261108でca3をmerge。資料末尾競合は両方の記述を残し、manifestは統合ソースで再build。Portfolio追加画面/設定/実装とCLAUDE.mdは保持。実Vue入力・行クリック/個別操作保護とナビ/Portfolio共存の検証、対象lint成功。members build終了0、manifest475/参照506/欠落0/最新版source全保持/members base、旧資産保持。ca3からapp/database/routes/config/bootstrap/依存/CLAUDE.md差分0。共有Claude作業は未編集、DB変更/一般公開なし。
 
 次の一手はca3固定元の新しい配備スクリプトを準備して正確なSSHコマンドを提示する。今回の実画面確認はまだ未実施。旧スクリプトを基準版だけ見ずに再実行しない。
+
+
+## 2026-11-08 最新Portfolioを保持したセル操作の配備準備
+
+統合実装428250c09b1cc3fdc3572f7d5fc6193a3db415c0をfeature/myjob-category-default-20261108へpush済み。新/tmp/myjob-box-row-integrated-deploy-20261108.shを作成、SHA256 7803423127d0c161c846685e02ff2504d8e570d360fbdb1ab26c066ee1ecf5fd、private/codex-myjob-box-row-20261108にも保存。固定元ca3de12af15ba94aa39956ccf4bbbc3a98b2ce69、固定先428250c09b1cc3fdc3572f7d5fc6193a3db415c0。source8許可一覧/削除なし/サーバ・DB・routes・設定・依存差分0、main/追跡変更なし/既知未追跡5件を確認してff-only。manifest固定hash/506資産/欠落0/members base、view:clearと最終状態保持を確認する。DB操作/migration/seedなし。
+
+旧/tmp/myjob-box-row-deploy-20261108.shは65df基準なので再利用しない。新スクリプトはまだ未承認・未実行。次の一手は本番基準が変わったため新しい正確なコマンドの確認を得て反映する。実画面確認は未実施、一般公開未承認。
