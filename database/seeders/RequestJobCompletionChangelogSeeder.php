@@ -9,7 +9,7 @@ class RequestJobCompletionChangelogSeeder extends Seeder
 {
     public function run(): void
     {
-        Changelog::updateOrCreate(['version' => 'myjob-received-completion-20261109'], [
+        Changelog::updateOrCreate(['version' => 'myjob-received-done-20261109'], [
             'title' => '試用マイジョブから元依頼への完了反映を改善',
             'released_at' => '2026-11-09',
             'summary' => '依頼から登録した仕事の完了を元依頼にも反映し、依頼主・案件リーダーへ重複せず通知します。',

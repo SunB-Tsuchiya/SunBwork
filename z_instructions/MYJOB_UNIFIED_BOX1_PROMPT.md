@@ -1,5 +1,7 @@
 # マイジョブ入力・BOX統合 再開用
 
+> 2026-11-09最新: アプリ/buildはacedfef53へ反映済み、変更履歴version長超過でSeeder停止。versionを30文字以内へ修正し復旧準備中。view:clear/最終状態照合/画面確認は未実施。元スクリプト再実行不可。REQUEST_JOB_COMPLETION_MANAGER1末尾参照。一般公開未承認。
+
 > 2026-11-09最新優先: 具体設計は利用者yesで承認、完了連動を実装・Integration54件692断言/実Vue/PHP10構文/members build検証済み。限定配備・完了連動画面確認は未実施。次は本番428250c09固定の配備コマンド提示と承認。REQUEST_JOB_COMPLETION_MANAGER1末尾を参照。一般公開未承認、受信登録の3点を再試験しない。
 
 > 2026-11-09最新優先: 受信依頼の完了連動方針は利用者yesで確定。具体設計はREQUEST_JOB_COMPLETION_PLAN1.md / MANAGER1.md / REQUEST_JOB_COMPLETION1_PROMPT.md。3資料作成、実装前確認待ち。コード/配備未変更、一般公開未承認。

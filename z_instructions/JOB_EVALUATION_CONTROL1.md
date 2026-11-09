@@ -1609,3 +1609,10 @@ members build終了0、manifest475/参照資産506/欠落0/source entry全保持
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-received-completion-deploy-20261109.sh
 
 HEADが異なれば書込み前停止し最新他作業を保持して再準備する。画面確認は配備後に今回の完了連動だけ依頼し、受信登録等の成功済み試験を反復しない。通知の実宛先確認は権限・適切な業務例がある範囲で分け、本人画面だけで依頼主の受信まで成功と断定しない。
+
+
+## 2026-11-09 限定配備の一部反映・変更履歴Seeder停止
+
+利用者yesで承認済みの同一/tmp/myjob-received-completion-deploy-20261109.shを実行。source21/PHP10構文/元428250c09/main/追跡変更なし/既知未追跡5件を照合してacedfef53へff-only済み。manifest475/506資産/欠落0/members baseと既定mysql・DB名の確認も成功。その後、専用Seederがversion列の上限30文字を超える識別子でSQLSTATE22001となりexit1。view:clear/最終未追跡照合は未実行。『配備全体成功』や画面成功とは扱わない。業務完了・通知試験・migrationなし。
+
+原因はCodexのversion長の事前確認不足。repository migration 2026_05_23_155003_create_changelogs_table.phpでversion varchar(30)を確認し、識別子だけmyjob-received-done-20261109（26文字）へ短縮。schema変更なし、アプリ処理/buildは検証済み版を保持。変更履歴insertは失敗し成功していない。次の一手は短縮版を保存し、acedfef53を固定元とする修復用の正確なSSHコマンドを提示して承認後に実行する。元のスクリプトは基準版が異なるため再実行しない。一般公開未承認、利用者画面確認は未依頼。
