@@ -1202,3 +1202,9 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-received-co
 保存5e93d9337（配備証拠5ef950b77と実装同じ）から旧/tmp消失を受け隔離feature/myjob-request-handoff-audit-20261109、/tmp/sunbwork-request-handoff-audit-20261109を復元。共有Claude変更未編集。調査正本MYJOB_REQUEST_HANDOFF_AUDIT1.mdを作成。通常詳細はサーバで元依頼+案件を読込むが、Events/Create_JobとCreate_userのapplyRequestJobは案件ID/名称/締切/supersedesの4項目だけを渡す。client_idを_client_idへ代入せずprojectJobも更新しないため、案件sizeの補完/固定表示、作業詳細/file_info/数量等が不足。旧モーダルもclient補完はあるが詳細一式は不足。保存側にも元依頼の全項目を補完する処理がなく、新自己割当の値に影響する可能性あり。
 
 提案: 本人宛元依頼IDから認可してサーバで共通prefillを構成し、既存旧入力の補完/固定・作業日時・supersedes・業務専用関係を各入口で揃える。具体的な実装方式は未承認・未実装。調査だけで一般公開/コード変更/配備/既存確認の再試験はしない。次の一手は共通引継ぎの具体設計と入口別の最小検証の準備。
+
+
+## 2026-11-09 依頼登録の共通引継ぎ方針を承認・3資料作成
+
+確定: 利用者『あなたの案でOKです。修正しましょう』で、元依頼IDから認可して旧形式の初期値/案件固定/作業日時/関連を各入口で揃える方針と修正着手を承認。調査時の『提案』をこの高位方針について置換。
+具体設計をMYJOB_REQUEST_HANDOFF_PLAN1.md / MYJOB_REQUEST_HANDOFF_MANAGER1.md / MYJOB_REQUEST_HANDOFF1_PROMPT.mdに作成。statusは既存入口差を維持、数量算定変更/サイズ矛盾の自動補正は保留と明記。本人試用の共通読取GET、各入口の一括受渡し、保存時の関係/更新/競合検証、ドラッグ日時と業務専用参照の保持を計画。具体設計は実装前確認待ち、コード/検証/build/配備は未着手。共有Claude変更未編集、一般公開未承認、前回完了連動画面2点は未確認。次の一手は具体設計を提示して実装前確認。
