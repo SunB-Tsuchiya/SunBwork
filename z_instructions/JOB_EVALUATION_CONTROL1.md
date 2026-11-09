@@ -1597,3 +1597,15 @@ members build終了0、manifest475/参照資産506/欠落0/source entry全保持
 以前承認済みの同一読取SSHで本番428250c09b1cc3fdc3572f7d5fc6193a3db415c0/main/追跡変更なし/既知未追跡5件/manifest差分なしを確認。他Claude変更は保持。保存資料・本セッションを根拠とし、過去チャット全文を新規取得したとは扱わない。
 
 状態: 設計承認/実装/コード検証/build完了。今回限定配備/利用者完了連動画面確認/上長照合は未実施。受信登録の3点等の既成功チェックは反復不要。一般公開未承認。次の一手は本番428250c09からの固定差分配備スクリプトを準備し、正確なSSHコマンドの承認を得る。
+
+
+## 2026-11-09 完了連動の限定配備手順を準備（未実行）
+
+検証済み実装acedfef53c2692001d0853b17d30649008c8b1f3をfeature/myjob-category-default-20261108へ保存・push済み。/tmp/myjob-received-completion-deploy-20261109.shを作成、sh -n成功。SHA256 3794ccfef47c2d7bec21dbb6ad65c2f2efb3e40d7af7bbdc40ac39893161ef35、共有storage/app/private/codex-myjob-received-completion-20261109にも同じスクリプトを保存。
+
+固定元428250c09b1cc3fdc3572f7d5fc6193a3db415c0→固定先acedfef53c2692001d0853b17d30649008c8b1f3。main/追跡変更なし/既知未追跡5件、source21許可一覧、削除なし、migration/routes/設定/依存/CLAUDE.md差分0、PHP10構文を照合してff-only。manifest固定hash/475 entry/506資産/members base、既定mysqlとDB名silverlamb759_sunbworkを確認し、専用RequestJobCompletionChangelogSeederだけ--database=mysql --force、view:clearと最終作業状態保持を確認する。業務レコード調査/完了/通知試験、一括migration/補正、sales接続、一般公開は行わない。
+
+配備はまだ未承認・未実行。次の一手は次の正確なコマンドを提示し承認後に同じスクリプトを実行する:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-received-completion-deploy-20261109.sh
+
+HEADが異なれば書込み前停止し最新他作業を保持して再準備する。画面確認は配備後に今回の完了連動だけ依頼し、受信登録等の成功済み試験を反復しない。通知の実宛先確認は権限・適切な業務例がある範囲で分け、本人画面だけで依頼主の受信まで成功と断定しない。

@@ -11,3 +11,5 @@ AGENTS.md → JOB_EVALUATION_CONTROL1.md → REQUEST_JOB_COMPLETION_PLAN1.md / M
 次の一手はPLAN1の具体設計を利用者へ示し実装前確認。承認後は通常旧式のみ依頼取り込みも試用限定で共通完了へ。明示supersedes元の本人/案件/所属を検証し、状態とDB通知をdefault DBで原子的に確定。再操作重複なし、子兄弟非更新、校正/進行専用処理保持、MGinbonはoutboxでcommit後。NULL依頼主は推測せず既知リーダーのみ。詳細はPLAN1。
 
 受信登録のBOX/カレンダー一致・元登録済・候補除外は利用者成功済み。再試験しない。完了/通知まで成功扱いにしない。共有Claude作業/CLAUDE.mdは未編集。一般公開未承認、sales DB禁止、業務完了や実通知を試験のため勝手に作らない。
+
+配備準備済み: /tmp/myjob-received-completion-deploy-20261109.sh。SHA256 3794ccfef47c2d7bec21dbb6ad65c2f2efb3e40d7af7bbdc40ac39893161ef35。固定元428250c09→固定先acedfef53。正確なSSHへの利用者承認待ち。MANAGER末尾を読む。
