@@ -1,5 +1,7 @@
 # マイジョブ入力・BOX統合 再開用
 
+> 2026-11-09最新: 依頼登録入口別の初期値不足を調査。MYJOB_REQUEST_HANDOFF_AUDIT1.mdが正本。4項目だけの選択代入でclient/案件固定size/作業詳細等が不足。旧形式への移動は可、共通prefillで踏襲する案。コード未修正、完了連動2点は引き続き未確認。調査branch feature/myjob-request-handoff-audit-20261109、保存基準5e93d9337。一般公開未承認。
+
 > 2026-11-09最新優先: 変更履歴version超過は修復済み、限定配備5ef950b77までexit0で完了。今回の利用者確認は元依頼連動の2点（完了案内/マイジョブ完了、元依頼完了）の回答待ち。『成功』はこの2点だけ。依頼主実通知/上長照合は未確認。一般公開未承認。REQUEST_JOB_COMPLETION_MANAGER1末尾参照。
 
 > 2026-11-09最新: アプリ/buildはacedfef53へ反映済み、変更履歴version長超過でSeeder停止。versionを30文字以内へ修正し復旧準備中。view:clear/最終状態照合/画面確認は未実施。元スクリプト再実行不可。REQUEST_JOB_COMPLETION_MANAGER1末尾参照。一般公開未承認。
