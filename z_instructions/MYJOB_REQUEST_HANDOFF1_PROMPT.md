@@ -11,3 +11,5 @@ AGENTS.md→JOB_EVALUATION_CONTROL1.md→MYJOB_REQUEST_HANDOFF_PLAN1.md/MANAGER1
 問題はCreate_Job/Create_userが依頼選択で4項目だけを代入し_client_idとprojectJob等を更新しないこと。旧modalも詳細不足。サーバ認可つき共通prefill→元依頼/案件/候補/固定をまとめて受渡し、ドラッグ日時保持、保存時はロックして認可/登録競合/更新を再検証。元入力を一律上書きせず、supersedes/続き/校正/セル参照を区別。statusは入口別既存挙動を維持。詳細はPLAN。
 
 試用限定・一般公開未承認、共有Claude変更/CLAUDE.md未編集、sales禁止。実DBで試験しない。前回完了連動2点と依頼主通知の実確認は未完。既成功の登録済・候補除外等を再試験しない。
+
+固定配備手順準備済み（未承認・未実行）: /tmp/myjob-request-prefill-deploy-20261109.sh、SHA256 4e001bd97cfe401e2820c3df843feff4e7380b6bd9b82e7c8d883a24674d052a。固定元5ef950b77→固定先b4f585ba6。正確なコマンドと条件はMANAGER末尾。次は利用者のSSH承認。

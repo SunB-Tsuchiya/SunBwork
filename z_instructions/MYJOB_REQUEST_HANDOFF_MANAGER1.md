@@ -37,3 +37,14 @@ ReceivedJobPrefillを追加し、試用本人宛の未完了・未取り込み�
 以前承認済み同一read SSHで本番5ef950b7738d558f9e0b062509b712bfac442c83/main/追跡変更なし/既知未追跡5件/manifest差分なしを確認。他Claude変更を保持し共有treeは未編集。新migration/設定/依存変更なし。
 
 状態: 具体設計承認・実装・コード検証/build完了、今回配備/利用者画面/上長照合は未実施。一般公開未承認。前回完了連動2点や実通知も未確認のまま、入力登録の既成功チェックを繰り返さない。次の一手は本番5ef950b77からの固定差分を保存して配備スクリプトを準備し、正確なSSH承認を得る。
+
+
+## 2026-11-09 共通引継ぎの固定配備手順準備（未承認・未実行）
+
+検証済み実装b4f585ba66256b9e13971bf5f243d82d3870ae18をfeature/myjob-request-handoff-audit-20261109へ保存・push済み。/tmp/myjob-request-prefill-deploy-20261109.shを作成しsh -n成功。SHA256 4e001bd97cfe401e2820c3df843feff4e7380b6bd9b82e7c8d883a24674d052a。同一スクリプトをstorage/app/private/codex-myjob-request-prefill-20261109にも保存。
+
+固定元5ef950b7738d558f9e0b062509b712bfac442c83→固定先b4f585ba66256b9e13971bf5f243d82d3870ae18。main/追跡変更なし/既知未追跡5件、source27許可一覧、削除なし/migration・設定・依存・CLAUDE/AGENTS差分0、PHP9構文を照合してff-only。manifest固定hash/476 entry/507資産/members base、既定mysqlとDB名、changelog version27文字を確認し、ReceivedJobPrefillChangelogSeederだけ--database=mysql --force、route:clear/view:clearと新GET登録/最終作業状態保持を確認する。業務データの調査や登録・完了・通知の試験、一括migration/補正、sales接続、一般公開は行わない。
+
+次の一手は正確なSSHを提示し承認後に同一スクリプトを実行する:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-request-prefill-deploy-20261109.sh
+本番HEADが違えば変更前停止し、他Claude作業を保持して再準備する。今回の画面確認は未実施。配備後は報告の入口差の初期値/固定サイズ/ドラッグ日時を中心に確認項目と返答方法を明示し、以前の成功済み全試験を繰り返さない。前回完了連動2点と実通知は別の未確認状態を維持。
