@@ -1747,3 +1747,13 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-request-pre
 未実行。次の一手はAGENTSの正確なSSH事前確認を得て、以下を実行し保存版と本番SHAも照合する:
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /tmp/sunbwork-notification-9684-audit-20261110.php
 今回は資料とローカル診断スクリプトのみ。共有Claude変更未編集、一般公開未承認。結果に基づく修正や既存通知の補正/再送はまだ決定していない。
+
+
+## 2026-11-10 割当9684の限定読取結果・旧完了経路の通知漏れ修正案
+
+承認済みの正確なPHP stdin SSHを同一スクリプトhash cc0d987d7f92ebc2abfbea5cfb063d9f57e01838c90ee815ae526319bd1c43c3で実行、READ ONLY transaction/rollbackでexit0。更新0・通知送信0。本番b4f585ba6。確認事実: project406の9684は元9683をsupersedesする担当本人の自己割当。元9683も9684も完了・status3、元は登録済み。担当はUser、依頼主は案件リーダー兼任、副リーダー0、進行/管理セル0。関連通知は元依頼のnew_job1件のみで完了通知0。表示だけで隠れているのではなく、対象IDの完了通知未保存を確認。個人名/本文/ファイル/評価/売上は取得しない。
+
+コード根拠: EventController.completeは取り込み後の自己割当でnotifyCompletedを呼び抑止、その後でsupersedes元を完了更新しても元への通知を作らない。HTTP経路を取得したわけではないが、今回の状態と一致する通知欠落箇所を確認。他の旧完了入口にも同じ自己割当通知抑止がある。SuperAdmin試用の共通完了だけの対応では一般Userの旧経路に届かない。従来の担当本人には内部Messageを作らずToastを出す抑制は別処理として保持する。
+
+提案・未承認: 新式を一般公開せず、既存所有者の旧カレンダー/旧詳細/JobBoxの通常依頼取り込み完了だけを元依頼基準の共通処理へ接続し、状態と通知を同一transaction、元依頼の完了遷移ごと宛先1件、銀本はoutboxでcommit後同期に揃える。既存の自己完了抑止と専用校正/進行/Toastを保護。LEGACY_RECEIVED_COMPLETION_PLAN1.md / MANAGER1.md / LEGACY_RECEIVED_COMPLETION1_PROMPT.mdを具体設計として作成。次の一手はこの修正案の承認。
+今回は診断と資料のみ、コード/build/配備変更なし。元9683の過去未送信分の補正/再送は別承認なしに行わない。一般公開未承認、共有Claude作業未編集。
