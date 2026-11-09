@@ -62,7 +62,8 @@ class WorkJobReader
             $seen[$key] = true;
             $job = $this->resolve($user, $type, $id, $context);
             $items[] = ['type' => $type, 'id' => $id, 'title' => $job->title,
-                'completed' => $job instanceof PersonalWorkEntry ? (bool) $job->completed_at : (bool) $job->completed];
+                'completed' => $job instanceof PersonalWorkEntry ? (bool) $job->completed_at : (bool) $job->completed,
+                'receivedRequest' => $job instanceof ProjectJobAssignment && (bool) $job->supersedes_assignment_id];
             $parent = $this->parent($job);
             if (! $parent) return array_reverse($items);
             ['type' => $type, 'id' => $id] = $parent;
@@ -128,11 +129,18 @@ class WorkJobReader
         return ['items' => $items, 'totals' => $totals, 'allCompleted' => ! in_array(false, array_column($items, 'completed'), true),
             'operationsEnabled' => true, 'canContinue' => true, 'mixed' => $mixed,
             'syncPending' => \Illuminate\Support\Facades\DB::table('work_job_completion_syncs')->whereNull('synced_at')
-                ->where('user_id', $user->id)->whereIn('assignment_id', array_column(array_filter($items, fn ($item) => $item['type'] === 'assignment'), 'id'))->exists(),
+                ->where('user_id', $user->id)->whereIn('assignment_id', $this->syncAssignmentIds($items))->exists(),
             'completionTargets' => array_map(function ($ancestor) use ($items) {
                 $item = collect($items)->firstWhere('key', $ancestor['type'].':'.$ancestor['id']);
                 return $ancestor + ['date' => $item['date'], 'start' => $item['start'], 'end' => $item['end']];
             }, $ancestors)];
+    }
+
+    private function syncAssignmentIds(array $items): array
+    {
+        $ids = array_column(array_filter($items, fn ($item) => $item['type'] === 'assignment'), 'id');
+        $originals = ProjectJobAssignment::whereIn('id', $ids)->whereNotNull('supersedes_assignment_id')->pluck('supersedes_assignment_id')->all();
+        return array_values(array_unique(array_merge($ids, $originals)));
     }
 
     private function recordsForDay(User $user, string $date, array &$days): array

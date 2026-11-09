@@ -1582,3 +1582,18 @@ feature/myjob-category-default-20261108でca3をmerge。資料末尾競合は両
 具体設計の正本をREQUEST_JOB_COMPLETION_PLAN1.md / REQUEST_JOB_COMPLETION_MANAGER1.md / REQUEST_JOB_COMPLETION1_PROMPT.mdに作成。明示supersedes元の本人/同案件/所属認可、状態と通知の原子的確定、再操作の重複防止、祖先のみ完了、校正/進行専用処理保持、MGinbon outboxを定める。NULL依頼主は推測せず既知リーダーのみとする具体案も記載。
 設計状態=実装前確認待ち。コード変更/今回の検証/build/配備/画面確認/上長確認は未実施。受信登録の3点成功は維持し再試験不要。一般公開は未承認。
 根拠は保存1174f8ef7と実装・引継ぎ記録・利用者発言。隔離treeを使用、共有Claude変更は未編集。次の一手は3資料の具体設計を提示して実装前確認を得る。
+
+
+## 2026-11-09 完了連動の設計承認・実装と検証完了（未配備）
+
+確定: 利用者yesでREQUEST_JOB_COMPLETION_PLAN1の具体設計を承認。従来の『実装前確認待ち』を置換。現行試用の本人旧式のみ依頼取り込みも共通完了へ接続し、明示supersedesの通常元依頼を本人/案件/所属/単一取り込みで認可する。複数取り込みは推測せず拒否。元依頼の完了遷移時だけ依頼主/リーダーへ元IDで宛先重複なしの通知を保存する。NULL依頼主は既知リーダーのみ。進行表があればリーダーの進行通知を維持し、依頼主には完了通知を1件、兼任は1件。異なる元依頼は同案件でも個別に通知し、校正専用通知は保持する。
+
+default DBの状態/予定タイトル/進行セル・元workflowセル/通知/outboxを同一transactionで確定。子・兄弟は未更新、過去一括補正なし。銀本は元依頼もoutboxへ記録してcommit後同期し、元だけ同期失敗しても詳細の反映待ち表示/取り込み削除保護/既存command再試行が働く。完了確認文は元依頼と通知への影響を示す。登録時通知・一般公開・通常roleの経路変更なし。
+
+検証: 外部通信なし・明示SQLite :memory:のIntegration54件692断言成功（今回追加12件を含む）。通常旧式のみ/旧新混在祖先/子兄弟非更新/再操作/元完了済/NULL sender/兼任宛先/別依頼同案件/不正・欠落・曖昧な関連/通知失敗rollback/元側銀本同期失敗と再試行/試用外role・会社context拒否を検証。既存校正・進行・銀本合成の退行も成功。実Vue script/SSRとworkHubナビ検証成功。PHP10ファイル構文成功。対象Vue lintエラー0、旧Showの未使用変数warning3件は既存のまま。初回試験のworkflow試験表timestamps不足は実schemaに合わせ修正し、最終全件成功。実DBを試験で変更せず、実通知・業務完了なし。
+
+members build終了0、manifest475/参照資産506/欠落0/source entry全保持/依存参照整合/members base確認、旧資産保持・削除なし。manifest SHA256 fcfc3447dd1508f55125ff5c932cb1730f50b1e7ed8599f866deafb9ccf7e888。既存glob非推奨/chunk通知のみ。hash付き内部chunk名の変化は欠落と混同せずsource entryと参照ファイルで照合。ChangelogSeederに専用RequestJobCompletionChangelogSeederの呼出しを追加し、限定配備時は専用Seederだけを実行する予定。
+
+以前承認済みの同一読取SSHで本番428250c09b1cc3fdc3572f7d5fc6193a3db415c0/main/追跡変更なし/既知未追跡5件/manifest差分なしを確認。他Claude変更は保持。保存資料・本セッションを根拠とし、過去チャット全文を新規取得したとは扱わない。
+
+状態: 設計承認/実装/コード検証/build完了。今回限定配備/利用者完了連動画面確認/上長照合は未実施。受信登録の3点等の既成功チェックは反復不要。一般公開未承認。次の一手は本番428250c09からの固定差分配備スクリプトを準備し、正確なSSHコマンドの承認を得る。

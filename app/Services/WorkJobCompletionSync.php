@@ -19,8 +19,10 @@ class WorkJobCompletionSync
                 if ($receipt->synced_at) return true;
                 $assignment = ProjectJobAssignment::with('projectJob')->findOrFail($receipt->assignment_id);
                 $user = User::findOrFail($receipt->user_id);
+                if ((int) $assignment->sender_id !== (int) $user->id) {
+                    app(WorkJobReceivedCompletion::class)->validateSync($user, $assignment);
+                }
                 abort_unless($assignment->completed && (int) $assignment->user_id === (int) $user->id
-                    && (int) $assignment->sender_id === (int) $user->id
                     && (int) $user->company_id === (int) $receipt->company_id
                     && (int) $user->department_id === (int) $receipt->department_id
                     && ($assignment->company_id === null || (int) $assignment->company_id === (int) $receipt->company_id)

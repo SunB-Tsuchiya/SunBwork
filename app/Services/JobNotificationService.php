@@ -120,6 +120,25 @@ class JobNotificationService
         }
     }
 
+    /** Trial received-request completion: one notification per original/recipient, transaction owned by caller. */
+    public static function notifyReceivedCompleted(User $user, ProjectJobAssignment $original, ProjectJob $projectJob, bool $progress): void
+    {
+        $recipients = array_map('intval', self::getLeaderIds($projectJob, (int) $user->id));
+        if ($original->sender_id) $recipients[] = (int) $original->sender_id;
+        foreach (array_unique($recipients) as $recipient) {
+            if ($recipient === (int) $user->id) continue;
+            $requester = $recipient === (int) $original->sender_id;
+            JobNotification::create([
+                'type' => $requester ? 'completed' : ($progress ? 'progress_completed' : 'completed_info'),
+                'sender_id' => $user->id, 'recipient_id' => $recipient,
+                'project_job_id' => $projectJob->id, 'assignment_id' => $original->id,
+                'message' => $progress && ! $requester
+                    ? "{$user->name}さんが「{$projectJob->title}」の進行管理表のジョブを完了しました"
+                    : "{$user->name}さんが「{$original->title}」を完了しました",
+            ]);
+        }
+    }
+
     /**
      * ③ 進行管理表からのジョブ登録通知
      * リーダー・副リーダー（自分以外）へ:

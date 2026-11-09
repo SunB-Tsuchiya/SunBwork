@@ -209,7 +209,9 @@ class MyProjectJobController extends Controller
         if (app(\App\Services\UnifiedMyJobBox::class)->available($user, $context)
             && (int) $assignment->sender_id === (int) $user->id) {
             $series = app(\App\Services\WorkJobReader::class)->series($user, (int) $assignment->id, $context, false, 'assignment');
-            if (collect($series['items'])->contains('type', 'entry')) {
+            if (collect($series['items'])->contains('type', 'entry')
+                || collect($series['completionTargets'])->contains(fn ($node) => $node['type'] === 'assignment'
+                    && \App\Models\ProjectJobAssignment::whereKey($node['id'])->whereNotNull('supersedes_assignment_id')->exists())) {
                 return response()->json(['success' => true, 'assignment_id' => $assignment->id]
                     + app(\App\Services\WorkJobMutation::class)->completeWork($user, 'assignment', (int) $assignment->id, $context));
             }
@@ -536,7 +538,7 @@ class MyProjectJobController extends Controller
                 || \App\Models\ProjectJobAssignment::where('source_assignment_id', $assignment->id)->exists(),
                 422, '続きがあるため、この仕事は削除できません。');
             if (\Illuminate\Support\Facades\Schema::hasTable('work_job_completion_syncs')) {
-                abort_if(DB::table('work_job_completion_syncs')->where('assignment_id', $assignment->id)->whereNull('synced_at')->exists(),
+                abort_if(DB::table('work_job_completion_syncs')->whereIn('assignment_id', array_filter([$assignment->id, $assignment->supersedes_assignment_id]))->whereNull('synced_at')->exists(),
                     422, '銀本への完了反映が再試行待ちのため、まだ削除できません。');
             }
             // 銀本専用進行表を先に未登録へ戻す（別DBなので明示的な同期が必要）。

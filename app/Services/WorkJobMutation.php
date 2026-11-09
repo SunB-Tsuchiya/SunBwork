@@ -90,12 +90,12 @@ class WorkJobMutation
                 if ($node['type'] === 'entry') $entryIds[] = $node['id'];
                 else $assignments[] = $this->reader->resolve($user, 'assignment', $node['id'], $context);
             }
-            app(WorkJobLegacyCompletion::class)->complete($user, $assignments);
+            $syncAssignments = app(WorkJobLegacyCompletion::class)->complete($user, $assignments);
             PersonalWorkEntry::whereIn('id', $entryIds)->whereNull('completed_at')->update(['completed_at' => now()]);
             return ['id' => $id, 'type' => $type, 'completed_ids' => $entryIds,
                 'completed_targets' => array_map(fn ($node) => ['type' => $node['type'], 'id' => $node['id']], $ancestors),
-                'sync_ids' => $assignments ? DB::table('work_job_completion_syncs')
-                    ->whereIn('assignment_id', array_map(fn ($a) => $a->id, $assignments))->whereNull('synced_at')->pluck('id')->all() : []];
+                'sync_ids' => $syncAssignments ? DB::table('work_job_completion_syncs')
+                    ->whereIn('assignment_id', $syncAssignments)->whereNull('synced_at')->pluck('id')->all() : []];
         }, 3);
         // This method owns the transaction. Do not issue a cross-DB write before its commit.
         $pending = 0;

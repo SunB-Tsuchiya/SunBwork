@@ -121,6 +121,7 @@ async function complete() {
                 <h3 id="complete-heading" class="font-semibold text-gray-900">次の仕事を完了にしますか？</h3>
                 <ul class="my-3 list-inside list-disc text-sm"><li v-for="item in series.completionTargets" :key="item.type + ':' + item.id">{{ item.title || '（作業名なし）' }} {{ item.date }} {{ item.start }}〜{{ item.end }}{{ item.completed ? '（完了済み）' : '' }}</li></ul>
                 <p class="mb-3 text-sm text-gray-600">この仕事と続き元を完了にします。ほかの続きの状態や、予定・数量は変わりません。</p>
+                <p v-if="series.completionTargets?.some(item => item.receivedRequest)" class="mb-3 text-sm text-gray-600">依頼から登録した仕事は、元依頼の完了状態と依頼主・案件リーダーへの通知にも反映します。</p>
                 <p v-if="completeError" role="alert" class="mb-3 text-sm text-red-700">{{ completeError }}</p>
                 <div class="flex justify-end gap-2"><button type="button" :disabled="completing" class="rounded border px-3 py-2 text-sm" @click="confirmationOpen = false">キャンセル</button><button type="button" :disabled="completing" class="rounded bg-yellow-700 px-3 py-2 text-sm text-white disabled:opacity-50" @click="complete">{{ completing ? '処理中…' : '完了にする' }}</button></div>
             </section>

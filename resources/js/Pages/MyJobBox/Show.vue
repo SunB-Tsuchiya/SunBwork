@@ -534,9 +534,12 @@ function goChainItem(item) {
 async function submitComplete() {
     try {
         const targets = workJobContinuation?.series?.completionTargets;
-        const message = workJobContinuation?.series?.mixed && targets
+        let message = workJobContinuation?.series?.mixed && targets
             ? `次の仕事を完了にします。\n${targets.map(item => item.title || '（作業名なし）').join('\n')}\nほかの続きの状態や、予定・数量は変わりません。`
             : 'このジョブを完了としてマークしますか？';
+        if (targets?.some(item => item.receivedRequest)) {
+            message += '\n依頼から登録した仕事は、元依頼の完了状態と依頼主・案件リーダーへの通知にも反映します。';
+        }
         if (!confirm(message)) return;
         if (!assignment || !assignment.id) {
             alert('割当情報が見つかりません。');

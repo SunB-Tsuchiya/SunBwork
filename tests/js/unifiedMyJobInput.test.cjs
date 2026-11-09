@@ -292,9 +292,9 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     const confirmations=[]; const previousConfirm=global.confirm; const previousRoute=global.route; const previousSession=global.sessionStorage;
     global.confirm=message=>{confirmations.push(message);return true;};global.route=route;global.sessionStorage={getItem:()=>null};
     global.fetch=async(url,options)=>({ok:true,json:async()=>options?.method==='POST'?{pending_syncs:1}:{chain:[]}});
-    const legacyShowApp=renderer.createApp({render:()=>h(legacyShow,{assignment:{id:7},workJobContinuation:{series:{mixed:true,completionTargets:[{title:'旧元'},{title:'簡易続き'}]}}})});
+    const legacyShowApp=renderer.createApp({render:()=>h(legacyShow,{assignment:{id:7},workJobContinuation:{series:{mixed:true,completionTargets:[{title:'旧元',receivedRequest:true},{title:'簡易続き'}]}}})});
     legacyShowApp.mount({});await settle();await globalThis.__legacyComplete.submitComplete();
-    assert.ok(confirmations[0].includes('旧元\n簡易続き'));assert.ok(confirmations[0].includes('ほかの続きの状態'));
+    assert.ok(confirmations[0].includes('旧元\n簡易続き'));assert.ok(confirmations[0].includes('ほかの続きの状態'));assert.ok(confirmations[0].includes('元依頼の完了状態と依頼主・案件リーダーへの通知'));
     assert.deepEqual(globalThis.__detailReload,[{preserveScroll:true}]);assert.equal(globalThis.__legacyComplete.isSubmittingComplete.value,false);
     legacyShowApp.unmount();global.confirm=previousConfirm;global.route=previousRoute;global.sessionStorage=previousSession;
     global.fetch=originalFetch;global.document=realDocument;global.window=realWindow;
