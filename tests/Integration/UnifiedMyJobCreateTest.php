@@ -918,6 +918,186 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(0, DB::table('job_notifications')->count());
     }
 
+    private function receivedPrefillFixture(): void
+    {
+        $this->legacyContinuationFixture();
+        Schema::table('project_jobs', function (Blueprint $t) { $t->integer('size_id')->nullable(); $t->integer('page_count')->nullable(); $t->timestamps(); });
+        Schema::table('project_job_assignments', function (Blueprint $t) { $t->boolean('is_registered')->default(false); $t->integer('coordinator_assignment_id')->nullable(); });
+        foreach (['sizes', 'stages', 'work_item_types', 'difficulties'] as $name) Schema::create($name, function (Blueprint $t) { $t->id(); $t->string('name'); $t->integer('sort_order')->default(0); $t->integer('order_index')->default(0); $t->string('group')->nullable(); $t->string('width')->nullable(); $t->string('height')->nullable(); $t->string('unit')->nullable(); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); });
+        DB::table('sizes')->insert([['id' => 5, 'name' => 'A5'], ['id' => 6, 'name' => 'B5']]);
+        foreach (['stages', 'work_item_types', 'difficulties'] as $name) DB::table($name)->insert(['id' => 1, 'name' => '合成候補']);
+        DB::table('project_jobs')->where('id', 10)->update(['title' => '合成案件', 'size_id' => 5, 'page_count' => 90]);
+        $info = ['total_pages' => 12, 'total_files' => 2, 'files' => [['name' => '合成.pdf', 'ext' => 'pdf', 'doc_size' => 'B5']]];
+        DB::table('project_job_assignments')->insert(['id' => 200, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 2, 'title' => '合成受信', 'job_type' => 'work',
+            'detail' => '合成概要', 'work_item_type_id' => 1, 'stage_id' => 1, 'difficulty_id' => 1, 'estimated_hours' => '2', 'desired_time' => '17:30',
+            'desired_end_date' => '2099-12-20', 'file_info' => json_encode($info), 'amounts' => 33, 'amounts_unit' => 'file']);
+        foreach (['progress', 'workflow'] as $prefix) {
+            Schema::table($prefix.'_cells', function (Blueprint $t) use ($prefix) { $t->integer('row_id')->nullable(); $t->string($prefix === 'progress' ? 'col_key' : 'stage_key')->nullable(); $t->integer('value_user_id')->nullable(); if ($prefix === 'workflow') $t->integer('assigned_user_id')->nullable(); });
+            Schema::create($prefix.'_rows', function (Blueprint $t) { $t->id(); $t->integer('sheet_id'); });
+            Schema::create($prefix.'_sheets', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); });
+        }
+    }
+
+    private function receivedSeed(): array
+    {
+        return app(\App\Services\ReceivedJobPrefill::class)->seed($this->request([], null, null, 'GET'), 200);
+    }
+
+    private function saveReceived(array $changes = [], ?array $seed = null)
+    {
+        $seed ??= $this->receivedSeed();
+        $slot = $changes + $seed['assignment'] + ['title' => '受信の作業', 'desired_start_date' => '2099-12-02', 'start_time' => '00:00'];
+        // Simulate the form's work time, independent of the request deadline.
+        $slot['desired_time'] = $changes['desired_time'] ?? '01:00';
+        return app(\App\Http\Controllers\User\ProjectJobAssignmentController::class)->store($this->request(['myjob_modal' => 1, 'assignments' => [$slot]]), \App\Models\ProjectJob::findOrFail(10));
+    }
+
+    public function test_received_prefill_read_returns_complete_defaults_candidates_and_makes_no_changes(): void
+    {
+        $this->receivedPrefillFixture();
+        $seed = app(\App\Http\Controllers\User\MyProjectJobController::class)->receivedPrefill($this->request([], null, null, 'GET'), 200)->getData(true);
+        $a = $seed['assignment'];
+        self::assertSame(10, $a['_client_id']); self::assertSame(6, $a['size_id']);
+        self::assertSame(5, $seed['project']['size_id']); self::assertSame('その他', $seed['client']['name']);
+        self::assertSame(12, $a['amounts']); self::assertSame('page', $a['amounts_unit']);
+        foreach (['work_item_type_id', 'stage_id', 'difficulty_id'] as $field) self::assertSame(1, (int) $a[$field]);
+        self::assertSame('合成概要', $a['detail']); self::assertSame('2099-12-20', $a['desired_end_date']);
+        self::assertSame('合成.pdf', $a['file_info']['files'][0]['name']);
+        self::assertSame(64, strlen($a['_request_revision'])); self::assertSame(200, $a['supersedes_assignment_id']);
+        $props = app(\App\Services\ReceivedJobPrefill::class)->mergeProps(['userClients' => [], 'userProjects' => []], $seed);
+        self::assertSame([$seed['project']], $props['userProjects']); self::assertSame([$seed['client']], $props['userClients']);
+        self::assertSame(1, DB::table('project_job_assignments')->count()); self::assertFalse((bool) DB::table('project_job_assignments')->find(200)->is_registered);
+        self::assertSame(1, DB::table('events')->count()); self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_received_prefill_size_quantity_fallbacks_keep_zero_and_explicit_values(): void
+    {
+        $this->receivedPrefillFixture();
+        DB::table('project_job_assignments')->where('id', 200)->update(['size_id' => 5, 'file_info' => null, 'amounts' => 0]);
+        $a = $this->receivedSeed()['assignment']; self::assertSame(5, (int) $a['size_id']); self::assertSame(0, $a['amounts']); self::assertSame('file', $a['amounts_unit']);
+        DB::table('project_job_assignments')->where('id', 200)->update(['size_id' => null, 'amounts' => null]);
+        $a = $this->receivedSeed()['assignment']; self::assertSame(5, (int) $a['size_id']); self::assertSame(90, $a['amounts']); self::assertSame('page', $a['amounts_unit']);
+        DB::table('project_jobs')->where('id', 10)->update(['size_id' => null, 'page_count' => null]);
+        $a = $this->receivedSeed()['assignment']; self::assertNull($a['size_id']); self::assertNull($a['amounts']);
+    }
+
+    public function test_received_prefill_and_save_reject_foreign_context_owner_scope_registered_or_completed(): void
+    {
+        $this->receivedPrefillFixture();
+        foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2], [$this->user(['id' => 2]), null]] as [$actor, $context]) {
+            try { app(\App\Services\ReceivedJobPrefill::class)->seed($this->request([], $actor, $context, 'GET'), 200); self::fail('Foreign prefill'); }
+            catch (HttpException|\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
+        }
+        foreach ([['company_id' => 2], ['department_id' => 2]] as $change) {
+            DB::table('project_job_assignments')->where('id', 200)->update($change);
+            try { $this->receivedSeed(); self::fail('Foreign scope'); } catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+            DB::table('project_job_assignments')->where('id', 200)->update(['company_id' => null, 'department_id' => null]);
+        }
+        foreach (['is_registered', 'completed'] as $field) {
+            DB::table('project_job_assignments')->where('id', 200)->update([$field => true]);
+            try { $this->receivedSeed(); self::fail('Registered/completed accepted'); } catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+            DB::table('project_job_assignments')->where('id', 200)->update([$field => false]);
+        }
+        self::assertSame(1, DB::table('project_job_assignments')->count());
+    }
+
+    public function test_received_save_preserves_details_editable_values_and_dragged_work_time_and_rejects_replay(): void
+    {
+        $this->receivedPrefillFixture(); $seed = $this->receivedSeed();
+        $response = $this->saveReceived(['detail' => '本人の追記', 'amounts' => 7], $seed);
+        self::assertSame(201, $response->getStatusCode());
+        $id = $response->getData(true)['assignment_id']; $a = \App\Models\ProjectJobAssignment::findOrFail($id);
+        self::assertSame('本人の追記', $a->detail); self::assertSame(7, (int) $a->amounts);
+        self::assertSame(6, (int) $a->size_id); self::assertSame(200, $a->supersedes_assignment_id); self::assertNull($a->source_assignment_id);
+        self::assertSame($seed['assignment']['file_info'], $a->file_info);
+        $event = DB::table('events')->where('project_job_assignment_id', $id)->first();
+        self::assertSame('2099-12-02 00:00:00', $event->starts_at); self::assertSame('2099-12-02 01:00:00', $event->ends_at);
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(200)->is_registered);
+        try { $this->saveReceived([], $seed); self::fail('Replay accepted'); } catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertSame(2, DB::table('project_job_assignments')->count()); self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_received_save_detects_changed_original_project_or_missing_revision_before_writing(): void
+    {
+        $this->receivedPrefillFixture(); $seed = $this->receivedSeed();
+        DB::table('project_job_assignments')->where('id', 200)->update(['detail' => '依頼主が変更']);
+        try { $this->saveReceived([], $seed); self::fail('Stale source'); } catch (ValidationException $e) { self::assertArrayHasKey('assignments.0._request_revision', $e->errors()); }
+        $seed = $this->receivedSeed(); DB::table('project_jobs')->where('id', 10)->update(['size_id' => 6]);
+        try { $this->saveReceived([], $seed); self::fail('Stale project'); } catch (ValidationException $e) { self::assertArrayHasKey('assignments.0._request_revision', $e->errors()); }
+        try { $this->saveReceived(['_request_revision' => null]); self::fail('Missing revision'); } catch (ValidationException $e) { self::assertArrayHasKey('assignments.0._request_revision', $e->errors()); }
+        self::assertSame(1, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('events')->count());
+    }
+
+    public function test_received_cell_links_are_authoritative_and_ambiguous_or_foreign_links_fail(): void
+    {
+        $this->receivedPrefillFixture();
+        DB::table('progress_sheets')->insert(['id' => 1, 'project_job_id' => 10]);
+        DB::table('progress_rows')->insert(['id' => 1, 'sheet_id' => 1]);
+        DB::table('progress_cells')->insert(['id' => 1, 'assignment_id' => 200, 'row_id' => 1, 'col_key' => 'worker']);
+        $a = $this->receivedSeed()['assignment']; self::assertSame(1, $a['_progress_sheet_id']); self::assertSame('worker', $a['_col_key']);
+        DB::table('progress_cells')->insert(['id' => 2, 'assignment_id' => 200, 'row_id' => 1, 'col_key' => 'worker2']);
+        try { $this->receivedSeed(); self::fail('Ambiguous link'); } catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        DB::table('progress_cells')->where('id', 2)->update(['assignment_id' => 999]);
+        DB::table('progress_sheets')->where('id', 1)->update(['project_job_id' => 99]);
+        try { $this->receivedSeed(); self::fail('Foreign sheet'); } catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+    }
+
+    public function test_received_event_save_failure_rolls_back_registration_and_created_job(): void
+    {
+        $this->receivedPrefillFixture();
+        DB::statement("CREATE TRIGGER fail_received_prefill_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT, 'received event failure'); END");
+        try { $this->saveReceived(); self::fail('Event failure swallowed'); } catch (\Illuminate\Database\QueryException $e) { self::assertStringContainsString('received event failure', $e->getMessage()); }
+        self::assertSame(1, DB::table('project_job_assignments')->count()); self::assertFalse((bool) DB::table('project_job_assignments')->find(200)->is_registered);
+        self::assertSame(1, DB::table('events')->count());
+    }
+
+    public function test_received_legacy_detail_and_selection_endpoint_share_the_same_canonical_seed(): void
+    {
+        $this->receivedPrefillFixture();
+        $request = $this->request(['source_job_assignment_id' => 200], null, null, 'GET');
+        $request->headers->set('X-Inertia', 'true');
+        $response = app(\App\Http\Controllers\ProjectJobs\ProjectJobAssignmentUserController::class)->create($request)->toResponse($request);
+        $props = $response->getData(true)['props'];
+        $seed = $this->receivedSeed();
+        self::assertSame(json_decode(json_encode([$seed['assignment']]), true), $props['assignments']);
+        self::assertSame($seed['project'], $props['projectJob']);
+        self::assertTrue($props['receivedRequestPrefillEnabled']);
+        self::assertSame(10, $props['userClients'][0]['id']);
+        $eventRequest = $this->request(['source_job_assignment_id' => 200, 'date' => '2099-12-02', 'startHour' => 0, 'startMinute' => 0, 'endHour' => 1, 'endMinute' => 0], null, null, 'GET');
+        $eventRequest->headers->set('X-Inertia', 'true');
+        $eventProps = app(\App\Http\Controllers\EventController::class)->createJob($eventRequest)->toResponse($eventRequest)->getData(true)['props'];
+        self::assertSame($props['assignments'], $eventProps['assignments']); self::assertSame($props['projectJob'], $eventProps['projectJob']);
+        self::assertSame('00:00', $eventProps['prefillEvent']['start_time']); self::assertSame('01:00', $eventProps['prefillEvent']['desired_time']);
+    }
+
+    public function test_received_workflow_and_proof_reference_are_preserved_and_untrusted_cell_ids_are_ignored(): void
+    {
+        $this->receivedPrefillFixture();
+        DB::table('project_job_assignments')->insert(['id' => 201, 'project_job_id' => 10, 'user_id' => 2, 'sender_id' => 2]);
+        DB::table('project_job_assignments')->where('id', 200)->update(['job_type' => 'proof', 'coordinator_assignment_id' => 201]);
+        DB::table('workflow_sheets')->insert(['id' => 1, 'project_job_id' => 10]);
+        DB::table('workflow_rows')->insert(['id' => 1, 'sheet_id' => 1]);
+        DB::table('workflow_cells')->insert(['id' => 1, 'assignment_id' => 200, 'row_id' => 1, 'stage_key' => 'proof']);
+        $seed = $this->receivedSeed();
+        self::assertSame(1, $seed['assignment']['_workflow_sheet_id']); self::assertSame(201, $seed['assignment']['coordinator_assignment_id']);
+        $response = $this->saveReceived(['_row_id' => 999, '_col_key' => 'fake', '_workflow_sheet_id' => 999, 'coordinator_assignment_id' => 999], $seed);
+        $id = $response->getData(true)['assignment_id'];
+        self::assertSame($id, DB::table('workflow_cells')->find(1)->assignment_id);
+        self::assertSame(1, DB::table('workflow_cells')->count());
+        self::assertSame(201, DB::table('project_job_assignments')->find($id)->coordinator_assignment_id);
+        self::assertSame(200, DB::table('project_job_assignments')->find($id)->supersedes_assignment_id);
+    }
+
+    public function test_received_new_token_cannot_bypass_trial_scope_when_company_context_changes(): void
+    {
+        $this->receivedPrefillFixture(); $seed = $this->receivedSeed();
+        $slot = $seed['assignment'] + ['title' => '受信作業', 'desired_start_date' => '2099-12-02', 'start_time' => '00:00'];
+        $slot['desired_time'] = '01:00';
+        try { app(\App\Http\Controllers\User\ProjectJobAssignmentController::class)->store($this->request(['assignments' => [$slot]], null, 2), \App\Models\ProjectJob::findOrFail(10)); self::fail('Changed context accepted'); }
+        catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+        self::assertSame(1, DB::table('project_job_assignments')->count());
+    }
+
     private function detailPayload(array $data = []): array
     {
         return $data + ['details_version' => 0, 'detail_note' => '作業説明', 'file_info' => [

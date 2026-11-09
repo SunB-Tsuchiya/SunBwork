@@ -390,7 +390,6 @@ const myJobBoxHref = computed(() => {
     // 元の Coordinator 割当 ID を渡す（独立ジョブ作成時のリンク用）
     params.set('source_job_assignment_id', String(assignment.id));
 
-    const query = params.toString();
 
     if (assignment.progress_cell_id) {
         // 進行表から依頼されたジョブ → events.create_job へ（日付なし、カレンダーで選択）
@@ -399,11 +398,11 @@ const myJobBoxHref = computed(() => {
         if (assignment.progress_col_key) params.set('col_key', assignment.progress_col_key);
         if (assignment.progress_sheet_id) params.set('progress_sheet_id', String(assignment.progress_sheet_id));
         const base = safeRoute('events.create_job', {}, '/events/create-job');
-        return base + '?' + query;
+        return base + '?' + params.toString();
     } else {
         // 独立の自己割当ジョブ → マイジョブ作成フォームへ
         const base = safeRoute('user.project_jobs.assignments.create', {}, '/project_jobs/assignments/create-user');
-        return base + '?' + query;
+        return base + '?' + params.toString();
     }
 });
 

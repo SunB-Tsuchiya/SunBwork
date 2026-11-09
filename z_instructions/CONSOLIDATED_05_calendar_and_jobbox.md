@@ -390,3 +390,10 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 情報出版・非一般会社のSuperAdmin本人に限り、supersedes_assignment_id付きの旧形式のみ系列も共通完了経路へ接続する。本人/同案件/会社部署/一意な取り込みを検証した通常元依頼へ完了を反映し、元依頼の未完了→完了の遷移時だけ依頼主と案件リーダーへ宛先重複なしで通知する。NULL依頼主は推測せず既知リーダーのみ。登録時通知は追加しない。選択+祖先だけが対象で子兄弟は維持。校正専用処理と進行通知を保ち、一般通知との二重送信を避ける。状態とDB通知は同一transaction、銀本は元依頼もoutboxでcommit後同期し、元側の反映待ち表示と取り込み側削除保護を含む。過去の一括補正なし。
 
 具体仕様はREQUEST_JOB_COMPLETION_PLAN1.md、配備/利用者画面/上長確認の状態は同MANAGER1.md。一般公開は未承認。実装成功を実画面成功と扱わない。
+
+
+## 依頼登録の共通初期値（2026-11-09、実装・検証段階）
+
+情報出版・非一般会社のSuperAdmin本人だけ、ReceivedJobPrefillが元依頼を認可して案件client/固定sizeと作業詳細・数量単位・file_infoを組み立てる。依頼詳細の旧create、Events/Create_Job、旧Create_user内の選択、MyJobCreateModalが同じseedを使用。簡易から依頼へ進んだ作業日時は既存prefillEventを保持する。選択失敗は入力を保持し、閉じる/切替/遅延で古い依頼情報を反映しない。保存時は元依頼/案件をロックしてrevisionと未取り込みを再照合し、セルや校正参照は元データを正本にする。一般role・入口別status・数量算定の方式は維持し、過去データの一括補正や一般公開はしない。
+
+詳細はMYJOB_REQUEST_HANDOFF_PLAN1.md、実装/検証/配備/利用者画面の各状態は同MANAGER1.mdで区別する。

@@ -17,6 +17,11 @@ class ProjectJobAssignmentUserController extends Controller
         // source_job_assignment_id に Coordinator 割当の ID が渡される
         $sourceJobAssignmentId = $request->query('source_job_assignment_id');
 
+        $context = $request->session()->get('superadmin_context.company_id');
+        $trial = app(\App\Services\UnifiedMyJobBox::class)->available($user, $context === null ? null : (int) $context);
+        $receivedSeed = $trial && $sourceJobAssignmentId && ! $jobId
+            ? app(\App\Services\ReceivedJobPrefill::class)->seed($request, (int) $sourceJobAssignmentId) : null;
+
         // If no prefill params, keep existing behaviour and redirect to the job create flow
         if (!$jobId && !$sourceJobAssignmentId && !$request->query('sender_id') && !$request->query('desired_end_date') && !$request->query('desired_time') && !$request->query('project_job_id')) {
             return redirect()->route('events.create_job');
@@ -131,8 +136,10 @@ class ProjectJobAssignmentUserController extends Controller
             $difficulties = [];
         }
 
-        // Build a single prefill assignment object for the form using query params and optional job source
-        if ($sourceAssignment) {
+        // Trial received requests use the canonical seed; preserve the legacy branch for other users.
+        if ($receivedSeed) {
+            $prefill = $receivedSeed['assignment'];
+        } elseif ($sourceAssignment) {
             // Coordinator 割当から prefill を構築（JobBox/Show からの「マイジョブとして登録」）
             // 複合ジョブの場合は file_info からページ数・ファイル数を amounts に自動設定
             $sourceAmounts = null;
@@ -253,6 +260,9 @@ class ProjectJobAssignmentUserController extends Controller
             'source_job_type' => $sourceAssignment?->job_type ?? null,
             'source_file_info' => $sourceAssignment?->file_info ?? null,
         ];
+
+        $props['receivedRequestPrefillEnabled'] = $trial;
+        if ($receivedSeed) $props = app(\App\Services\ReceivedJobPrefill::class)->mergeProps($props, $receivedSeed);
 
         // source_job_assignment_id がある場合（JobBox/Show からの独立ジョブ作成）→ MyJobBox/Create_user
         // それ以外（従来の coordinator 割当経由）→ JobBox/create_user

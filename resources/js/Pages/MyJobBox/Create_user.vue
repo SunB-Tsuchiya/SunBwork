@@ -15,6 +15,8 @@
             </div>
 
             <div>
+                <p v-if="receivedPrefill.error.value" role="alert" class="mb-3 text-sm text-red-700">{{ receivedPrefill.error.value }}</p>
+                <fieldset :disabled="receivedPrefill.busy.value" class="min-w-0">
                 <AssignmentFormUser
                     mode="user"
                     :key="formKey"
@@ -28,6 +30,7 @@
                     :user-clients="userClients"
                     :user-projects="userProjects"
                 />
+                </fieldset>
             </div>
 
             <!-- 依頼ジョブ由来: ファイル一覧（file_info があれば常に表示） -->
@@ -187,6 +190,8 @@
                     </div>
                     <div class="p-5">
                         <p class="mb-4 text-sm text-gray-600">自分宛に依頼されたジョブを選択すると、このマイジョブが「依頼ジョブの対応済み登録」として扱われます。依頼ジョブは案件詳細から非表示になります。</p>
+                        <p v-if="receivedPrefill.error.value" role="alert" class="mb-3 text-sm text-red-700">{{ receivedPrefill.error.value }}</p>
+                        <p v-if="receivedPrefill.busy.value" role="status" class="mb-3 text-sm text-gray-600">依頼の詳細を読み込み中…</p>
                         <div v-if="requestLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
                         <div v-else-if="requestRecords.length === 0" class="py-8 text-center text-sm text-gray-500">未対応の依頼ジョブはありません</div>
                         <div v-else class="max-h-80 overflow-y-auto rounded border border-gray-200">
@@ -219,6 +224,7 @@
 </template>
 
 <script setup>
+import { useReceivedJobPrefill, mergeReceivedCandidates } from '@/Composables/useReceivedJobPrefill';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
@@ -228,13 +234,13 @@ import { computed, ref, watch } from 'vue';
 const page = usePage();
 const projectJob = ref(page.props.projectJob || null);
 const members = page.props.members || [];
-const userClients = page.props.userClients || [];
-const userProjects = page.props.userProjects || [];
+const userClients = ref(page.props.userClients || []);
+const userProjects = ref(page.props.userProjects || []);
 const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.user.id : null;
 
 // 依頼ジョブ由来かどうか（source_file_info または source_job_type があれば）
 const hasSourceJob = !!(page.props.source_file_info || page.props.source_job_type);
-const sourceFileInfo = page.props.source_file_info ?? null;
+const sourceFileInfo = computed(() => formAssignments.value.length ? formAssignments.value[0].file_info ?? null : page.props.source_file_info ?? null);
 
 const formAssignments = ref(page.props.assignments || []);
 const formKey = ref(0);
@@ -327,6 +333,8 @@ function selectRecord(rec) {
 function applyContinuation() {
     const rec = pendingRecord.value;
     if (!rec) return;
+    receivedPrefill.cancel();
+    if (formAssignments.value[0]?._request_revision) projectJob.value = null;
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,
@@ -353,6 +361,8 @@ function applyContinuation() {
 function applyAsNew() {
     const rec = pendingRecord.value;
     if (!rec) return;
+    receivedPrefill.cancel();
+    if (formAssignments.value[0]?._request_revision) projectJob.value = null;
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,
@@ -407,7 +417,20 @@ async function fetchPendingRequests() {
     }
 }
 
-function applyRequestJob(rec) {
+const receivedPrefill = useReceivedJobPrefill();
+watch(showRequestModal, visible => { if (!visible) receivedPrefill.cancel(); });
+async function applyRequestJob(rec) {
+    if (page.props.receivedRequestPrefillEnabled) {
+        await receivedPrefill.select(rec.id, seed => {
+            projectJob.value = seed.project;
+            userClients.value = mergeReceivedCandidates(userClients.value, seed.client);
+            userProjects.value = mergeReceivedCandidates(userProjects.value, seed.project);
+            formAssignments.value = [seed.assignment];
+            formKey.value += 1;
+            showRequestModal.value = false;
+        });
+        return;
+    }
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,

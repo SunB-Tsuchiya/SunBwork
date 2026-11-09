@@ -1,5 +1,6 @@
 <script setup>
 import axios from 'axios';
+import { useReceivedJobPrefill, mergeReceivedCandidates } from '@/Composables/useReceivedJobPrefill';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import AssignmentForm from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
@@ -21,6 +22,8 @@ const historySelection = ref(null);
 const formAssignments = ref([]);
 const formKey = ref(0);
 const reuseAssignmentId = ref(null);
+const receivedPrefill = useReceivedJobPrefill();
+watch(picker, () => receivedPrefill.cancel());
 let requestSequence = 0;
 
 async function loadOptions() {
@@ -60,11 +63,13 @@ watch(() => props.show, visible => {
         reuseAssignmentId.value = null;
         loadOptions();
     } else {
+        receivedPrefill.cancel();
         requestSequence += 1;
     }
 });
 
 function close() {
+    receivedPrefill.cancel();
     picker.value = null;
     emit('close');
 }
@@ -77,13 +82,27 @@ function onKeydown(event) {
     }
 }
 
-function onSourceSelected({ record, kind }) {
+async function onSourceSelected({ record, kind }) {
+    if (kind === 'request' && options.value?.receivedRequestPrefillEnabled) {
+        await receivedPrefill.select(record.id, seed => {
+            options.value = { ...options.value, projectJob: seed.project,
+                userClients: mergeReceivedCandidates(options.value.userClients || [], seed.client),
+                userProjects: mergeReceivedCandidates(options.value.userProjects || [], seed.project) };
+            formAssignments.value = [seed.assignment];
+            reuseAssignmentId.value = null;
+            formKey.value += 1;
+            picker.value = null;
+        });
+        return;
+    }
     if (!options.value) return;
+    receivedPrefill.cancel();
     if (record?.source_type === 'entry') {
         historySelection.value = { record, kind, date: props.date || new Date().toLocaleDateString('sv-SE'), startMin: props.startMin, endMin: props.endMin };
         return;
     }
     if (!record?.project_job_id) return;
+    if (formAssignments.value[0]?._request_revision) options.value = { ...options.value, projectJob: null };
     const clientId = record.client_id ?? null;
     if (clientId && !options.value.userClients?.some(client => String(client.id) === String(clientId))) {
         options.value.userClients = [...(options.value.userClients || []), { id: clientId, name: record.client_name || '取引先' }];
@@ -142,9 +161,12 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
                 <div class="overflow-y-auto px-4 py-4 sm:px-6">
                     <p v-if="loadError" role="alert" class="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{{ loadError }}</p>
                     <p v-if="loading" class="py-8 text-center text-sm text-gray-500">入力候補を読み込み中…</p>
+                    <p v-if="receivedPrefill.error.value" role="alert" class="mb-3 text-sm text-red-700">{{ receivedPrefill.error.value }}</p>
+                    <p v-if="receivedPrefill.busy.value" role="status" class="mb-3 text-sm text-gray-600">依頼の詳細を読み込み中…</p>
                     <MyJobSourcePicker v-if="options && picker" :key="picker" :mode="picker" @cancel="picker = null" @selected="onSourceSelected" />
                     <div v-if="options" v-show="!picker" class="rounded border border-gray-100 p-4 shadow-sm">
                         <h3 class="mb-4 text-lg font-medium text-gray-700">割当内容</h3>
+                        <fieldset :disabled="receivedPrefill.busy.value" class="min-w-0">
                         <AssignmentForm
                             :key="formKey"
                             mode="user"
@@ -163,6 +185,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
                             :modal-reuse-assignment-id="reuseAssignmentId"
                             @saved="date => emit('saved', date)"
                         />
+                        </fieldset>
                     </div>
                 </div>
             </div>

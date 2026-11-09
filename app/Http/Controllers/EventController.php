@@ -2024,6 +2024,9 @@ class EventController extends Controller
         $jobId = $request->query('job');
         // JobBox/Show から「予定をセット（カレンダー）」で来た場合、Coordinator割当IDが渡される
         $sourceJobAssignmentId = $request->query('source_job_assignment_id');
+        $receivedTrial = app(\App\Services\UnifiedMyJobBox::class)->available($request->user(), $continuationContext);
+        $receivedSeed = $receivedTrial && $sourceJobAssignmentId
+            ? app(\App\Services\ReceivedJobPrefill::class)->seed($request, (int) $sourceJobAssignmentId) : null;
         if (!$jobId && $sourceJobAssignmentId) {
             $jobId = $sourceJobAssignmentId;
         }
@@ -2043,7 +2046,7 @@ class EventController extends Controller
         $endMinute = $request->query('endMinute');
         $jobData = null;
         $jobAssignments = null; // prefill data for AssignmentForm_user
-        if ($jobId) {
+        if ($jobId && ! $receivedSeed) {
             $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'projectJob', 'user', 'size', 'stage', 'workItemType', 'statusModel'])->find($jobId);
             if ($assignment) {
                 $jobData = $assignment->toEventPrefill();
@@ -2318,6 +2321,9 @@ class EventController extends Controller
             'difficulties' => $difficulties,
             'prefillEvent' => $prefillEvent,
         ];
+
+        $props['receivedRequestPrefillEnabled'] = $receivedTrial;
+        if ($receivedSeed) $props = app(\App\Services\ReceivedJobPrefill::class)->mergeProps($props, $receivedSeed);
 
         if ($entryContinuation !== null) {
             $seed = app(\App\Services\LegacyWorkJobContinuation::class)->prefill($request->user(), (int) $entryContinuation, $continuationContext, $otherProjectId ? (int) $otherProjectId : null);

@@ -982,6 +982,11 @@ class MyProjectJobController extends Controller
      *
      * GET /myjobbox/pending-requests?project_job_id=X（省略可）
      */
+    public function receivedPrefill(Request $request, int $assignment): \Illuminate\Http\JsonResponse
+    {
+        return response()->json(app(\App\Services\ReceivedJobPrefill::class)->seed($request, $assignment));
+    }
+
     public function pendingRequests(Request $request): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();

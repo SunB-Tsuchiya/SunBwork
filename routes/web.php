@@ -413,6 +413,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::put('/myjobbox/work-entries/{entry}', [\App\Http\Controllers\User\WorkJobDetailController::class, 'update'])->whereNumber('entry')->name('user.myjobbox.entries.update');
     Route::delete('/myjobbox/work-entries/{entry}', [\App\Http\Controllers\User\WorkJobDetailController::class, 'destroy'])->whereNumber('entry')->name('user.myjobbox.entries.destroy');
     Route::get('/myjobbox/past-data', [\App\Http\Controllers\User\MyProjectJobController::class, 'pastData'])->name('user.myjobbox.past_data');
+    Route::get('/myjobbox/requests/{assignment}/prefill', [\App\Http\Controllers\User\MyProjectJobController::class, 'receivedPrefill'])->whereNumber('assignment')->name('user.myjobbox.received_prefill');
     Route::get('/myjobbox/pending-requests', [\App\Http\Controllers\User\MyProjectJobController::class, 'pendingRequests'])->name('user.myjobbox.pending_requests');
     Route::post('/myjobbox/assignments/{assignment}/complete', [\App\Http\Controllers\User\MyProjectJobController::class, 'completeAssignment'])->name('myjobbox.assignments.complete');
     Route::get('/myjobbox/assignments/{assignment}/chain', [\App\Http\Controllers\User\MyProjectJobController::class, 'chainAssignments'])->name('user.myjobbox.assignments.chain');

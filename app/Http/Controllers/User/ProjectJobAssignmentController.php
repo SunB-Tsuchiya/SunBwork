@@ -30,10 +30,36 @@ class ProjectJobAssignmentController extends Controller
         if (collect($request->input('assignments', []))->contains(fn ($slot) => is_array($slot) && isset($slot['source_personal_work_entry_id']) && $slot['source_personal_work_entry_id'] !== '')) {
             return app(\App\Services\LegacyWorkJobContinuation::class)->store($request, $projectJob, fn () => $this->storeAssignments($request, $projectJob));
         }
+        $context = $request->session()->get('superadmin_context.company_id');
+        $trial = app(\App\Services\UnifiedMyJobBox::class)->available($request->user(), $context === null ? null : (int) $context);
+        if (collect($request->input('assignments', []))->contains(fn ($slot) => is_array($slot) && ! empty($slot['_request_revision']))) abort_unless($trial, 403);
+        if ($trial && collect($request->input('assignments', []))->contains(fn ($slot) => is_array($slot) && ! empty($slot['supersedes_assignment_id']))) {
+            return DB::transaction(function () use ($request, $projectJob) {
+                $slots = $request->validate(['assignments' => ['required', 'array', 'size:1'],
+                    'assignments.0.supersedes_assignment_id' => ['required', 'integer', 'min:1'],
+                    'assignments.0._request_revision' => ['required', 'string', 'size:64'],
+                    'assignments.0.desired_start_date' => ['required', 'date_format:Y-m-d'],
+                    'assignments.0.start_time' => ['required', 'date_format:H:i'],
+                    'assignments.0.desired_time' => ['required', 'date_format:H:i', 'after:assignments.0.start_time'],
+                    'assignments.0.source_assignment_id' => ['nullable', 'prohibited'],
+                    'assignments.0.source_personal_work_entry_id' => ['nullable', 'prohibited'],
+                ])['assignments'];
+                $seed = app(\App\Services\ReceivedJobPrefill::class)->seed($request, (int) $slots[0]['supersedes_assignment_id'], true);
+                if ((int) $projectJob->id !== (int) $seed['project']['id']
+                    || (int) $request->input('assignments.0.project_job_id') !== (int) $projectJob->id
+                    || ! hash_equals($seed['assignment']['_request_revision'], $slots[0]['_request_revision'])) {
+                    throw ValidationException::withMessages(['assignments.0._request_revision' => '元の依頼または案件が更新されました。入力内容を確認し、依頼を選び直してください。']);
+                }
+                $slot = $request->input('assignments.0');
+                foreach (['_progress_sheet_id', '_workflow_sheet_id', '_row_id', '_col_key', 'coordinator_assignment_id'] as $key) $slot[$key] = $seed['assignment'][$key] ?? null;
+                $request->merge(['assignments' => [$slot]]);
+                return $this->storeAssignments($request, $projectJob, true);
+            }, 3);
+        }
         return $this->storeAssignments($request, $projectJob);
     }
 
-    private function storeAssignments(Request $request, ProjectJob $projectJob)
+    private function storeAssignments(Request $request, ProjectJob $projectJob, bool $strictReceived = false)
     {
         $myJobModal = $request->boolean('myjob_modal');
         if ($myJobModal) {
@@ -45,10 +71,10 @@ class ProjectJobAssignmentController extends Controller
                 'assignments.0.desired_time' => ['required', 'date_format:H:i'],
                 'assignments.0.id' => ['prohibited'],
                 'reuse_assignment_id' => ['nullable', 'integer', 'exists:project_job_assignments,id'],
-                'assignments.0._progress_sheet_id' => ['prohibited'],
-                'assignments.0._workflow_sheet_id' => ['prohibited'],
-                'assignments.0._row_id' => ['prohibited'],
-                'assignments.0._col_key' => ['prohibited'],
+                'assignments.0._progress_sheet_id' => $strictReceived ? ['nullable', 'integer'] : ['prohibited'],
+                'assignments.0._workflow_sheet_id' => $strictReceived ? ['nullable', 'integer'] : ['prohibited'],
+                'assignments.0._row_id' => $strictReceived ? ['nullable', 'integer'] : ['prohibited'],
+                'assignments.0._col_key' => $strictReceived ? ['nullable', 'string', 'max:64'] : ['prohibited'],
             ]);
             $user = $request->user();
             $isOther = $projectJob->title === 'その他'
@@ -123,6 +149,8 @@ class ProjectJobAssignmentController extends Controller
             'assignments.*.source_assignment_id' => 'nullable|exists:project_job_assignments,id',
             'assignments.*.supersedes_assignment_id' => 'nullable|exists:project_job_assignments,id',
             'assignments.*.file_info' => 'nullable',
+            'assignments.*._request_revision' => 'nullable|string|size:64',
+            'assignments.*.coordinator_assignment_id' => 'nullable|integer',
             'assignments.*._progress_sheet_id' => 'nullable|integer',
             'assignments.*._workflow_sheet_id' => 'nullable|integer',
             'assignments.*._row_id' => 'nullable|integer',
@@ -152,7 +180,7 @@ class ProjectJobAssignmentController extends Controller
                 }
             }
 
-            DB::transaction(function () use ($projectJob, $a, $user, $myJobModal, &$createdAssignmentIds, $request) {
+            DB::transaction(function () use ($projectJob, $a, $user, $myJobModal, &$createdAssignmentIds, $request, $strictReceived) {
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
@@ -160,6 +188,7 @@ class ProjectJobAssignmentController extends Controller
                     'project_job_id' => $projectJob->id,
                     'source_assignment_id' => isset($a['source_assignment_id']) ? (int) $a['source_assignment_id'] : null,
                     'supersedes_assignment_id' => isset($a['supersedes_assignment_id']) ? (int) $a['supersedes_assignment_id'] : null,
+                    ...($strictReceived ? ['coordinator_assignment_id' => $a['coordinator_assignment_id'] ?? null] : []),
                     'user_id' => $user ? $user->id : null,
                     'sender_id' => $user ? $user->id : null,
                     'title' => $a['title'],
@@ -229,6 +258,7 @@ class ProjectJobAssignmentController extends Controller
                             ['assignment_id' => $assignment->id, 'value_user_id' => $assignment->user_id]
                         );
                     } catch (\Throwable $__eCellLink) {
+                        if ($strictReceived) throw $__eCellLink;
                         \Illuminate\Support\Facades\Log::warning('Failed to link ProgressCell after user assignment', [
                             'error' => $__eCellLink->getMessage(),
                             'row_id' => $a['_row_id'],
@@ -260,6 +290,7 @@ class ProjectJobAssignmentController extends Controller
                             ]
                         );
                     } catch (\Throwable $__eWfCellLink) {
+                        if ($strictReceived) throw $__eWfCellLink;
                         \Illuminate\Support\Facades\Log::warning('Failed to link WorkflowCell after user assignment', [
                             'error' => $__eWfCellLink->getMessage(),
                             'row_id' => $a['_row_id'],
@@ -416,11 +447,11 @@ class ProjectJobAssignmentController extends Controller
                             }
                         }
                         // ──────────────────────────────────────────────────────────────
-                    } elseif ($myJobModal) {
+                    } elseif ($myJobModal || $strictReceived) {
                         throw new \RuntimeException('予定テーブルを利用できません。');
                     }
                 } catch (\Throwable $__e) {
-                    if ($myJobModal) {
+                    if ($myJobModal || $strictReceived) {
                         throw $__e;
                     }
                     // ignore event creation errors to avoid failing the assignment creation

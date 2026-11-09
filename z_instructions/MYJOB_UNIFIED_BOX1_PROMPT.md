@@ -1,5 +1,7 @@
 # マイジョブ入力・BOX統合 再開用
 
+> 2026-11-09最新優先: 具体設計を利用者yesで承認。共通初期値の実装とIntegration64件790断言/実Vue/ナビ/PHP9構文/実Ziggy/members buildが成功。配備・画面確認は未実施。次は本番5ef950b77からの固定差分を保存し正確なSSH承認。MYJOB_REQUEST_HANDOFF_MANAGER1末尾参照。一般公開未承認、既成功試験は反復しない。
+
 > 2026-11-09最新: 共通prefill修正方針は利用者OK。MYJOB_REQUEST_HANDOFF_PLAN1.md/MANAGER1.md/1_PROMPT.mdを作成、具体設計の実装前確認待ち。コード/配備未変更、一般公開未承認。
 
 > 2026-11-09最新: 依頼登録入口別の初期値不足を調査。MYJOB_REQUEST_HANDOFF_AUDIT1.mdが正本。4項目だけの選択代入でclient/案件固定size/作業詳細等が不足。旧形式への移動は可、共通prefillで踏襲する案。コード未修正、完了連動2点は引き続き未確認。調査branch feature/myjob-request-handoff-audit-20261109、保存基準5e93d9337。一般公開未承認。

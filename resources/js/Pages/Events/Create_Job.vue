@@ -1,4 +1,5 @@
 <script setup>
+import { useReceivedJobPrefill, mergeReceivedCandidates } from '@/Composables/useReceivedJobPrefill';
 import MyJobHistoryInput from '@/Components/MyJobHistoryInput.vue';
 import { router } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
@@ -12,8 +13,8 @@ function goBack() { window.history.back(); }
 const page = usePage();
 const projectJob = ref(page.props.projectJob || null);
 const members = page.props.members || [];
-const userClients = page.props.userClients || [];
-const userProjects = page.props.userProjects || [];
+const userClients = ref(page.props.userClients || []);
+const userProjects = ref(page.props.userProjects || []);
 const otherClientId = page.props.other_client_id ?? null;
 const otherProjectId = page.props.other_project_id ?? null;
 const inProgressStatusId = page.props.in_progress_status_id ?? null;
@@ -68,7 +69,9 @@ function selectRecord(rec) {
 function applyContinuation() {
     const rec = pendingRecord.value;
     if (!rec) return;
+    receivedPrefill.cancel();
     if (reuseSimple(rec, 'continue')) return;
+    if (formAssignments.value[0]?._request_revision) projectJob.value = null;
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,
@@ -95,7 +98,9 @@ function applyContinuation() {
 function applyAsNew() {
     const rec = pendingRecord.value;
     if (!rec) return;
+    receivedPrefill.cancel();
     if (reuseSimple(rec, 'new')) return;
+    if (formAssignments.value[0]?._request_revision) projectJob.value = null;
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,
@@ -237,7 +242,20 @@ async function fetchPendingRequests() {
     }
 }
 
-function applyRequestJob(rec) {
+const receivedPrefill = useReceivedJobPrefill();
+watch(showRequestModal, visible => { if (!visible) receivedPrefill.cancel(); });
+async function applyRequestJob(rec) {
+    if (page.props.receivedRequestPrefillEnabled) {
+        await receivedPrefill.select(rec.id, seed => {
+            projectJob.value = seed.project;
+            userClients.value = mergeReceivedCandidates(userClients.value, seed.client);
+            userProjects.value = mergeReceivedCandidates(userProjects.value, seed.project);
+            formAssignments.value = [seed.assignment];
+            formKey.value += 1;
+            showRequestModal.value = false;
+        });
+        return;
+    }
     formAssignments.value = [
         {
             project_job_id: rec.project_job_id,
@@ -288,6 +306,8 @@ onMounted(() => {
                     <p class="mt-1">{{ simpleContinuation.title || '（作業名なし）' }}<span v-if="simpleContinuation.classification"> ／ {{ simpleContinuation.classification }}</span></p>
                     <p class="mt-1 text-xs">元の仕事を残し、保存後も同じ系列になります。数量・ファイル情報は新しい作業の分を入力してください。具体案件が未指定の場合は「その他」を初期値にしています。</p>
                 </div>
+                <p v-if="receivedPrefill.error.value" role="alert" class="mb-3 text-sm text-red-700">{{ receivedPrefill.error.value }}</p>
+                <fieldset :disabled="receivedPrefill.busy.value" class="min-w-0">
                 <AssignmentFormUser
                     mode="user"
                     :key="formKey"
@@ -303,6 +323,7 @@ onMounted(() => {
                     :other-project-id="otherProjectId"
                     :default-status-id="inProgressStatusId"
                 />
+                </fieldset>
             </div>
         </div>
 
@@ -466,6 +487,8 @@ onMounted(() => {
                     </div>
                     <div class="p-5">
                         <p class="mb-4 text-sm text-gray-600">自分宛に届いた依頼を選び、マイジョブとして登録します。</p>
+                        <p v-if="receivedPrefill.error.value" role="alert" class="mb-3 text-sm text-red-700">{{ receivedPrefill.error.value }}</p>
+                        <p v-if="receivedPrefill.busy.value" role="status" class="mb-3 text-sm text-gray-600">依頼の詳細を読み込み中…</p>
                         <div v-if="requestLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
                         <div v-else-if="requestRecords.length === 0" class="py-8 text-center text-sm text-gray-500">未対応の依頼ジョブはありません</div>
                         <div v-else class="max-h-80 overflow-y-auto rounded border border-gray-200">
