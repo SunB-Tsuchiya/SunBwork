@@ -54,3 +54,11 @@ HEADが異なれば書込み前停止し最新他作業を保持して再準備�
 利用者yesで承認済みの同一/tmp/myjob-received-completion-deploy-20261109.shを実行。source21/PHP10構文/元428250c09/main/追跡変更なし/既知未追跡5件を照合してacedfef53へff-only済み。manifest475/506資産/欠落0/members baseと既定mysql・DB名の確認も成功。その後、専用Seederがversion列の上限30文字を超える識別子でSQLSTATE22001となりexit1。view:clear/最終未追跡照合は未実行。『配備全体成功』や画面成功とは扱わない。業務完了・通知試験・migrationなし。
 
 原因はCodexのversion長の事前確認不足。repository migration 2026_05_23_155003_create_changelogs_table.phpでversion varchar(30)を確認し、識別子だけmyjob-received-done-20261109（26文字）へ短縮。schema変更なし、アプリ処理/buildは検証済み版を保持。変更履歴insertは失敗し成功していない。次の一手は短縮版を保存し、acedfef53を固定元とする修復用の正確なSSHコマンドを提示して承認後に実行する。元のスクリプトは基準版が異なるため再実行しない。一般公開未承認、利用者画面確認は未依頼。
+
+
+### 変更履歴登録の復旧手順（未承認・未実行）
+
+識別子短縮版5ef950b7738d558f9e0b062509b712bfac442c83を保存・push済み。PHP構文成功、versionは26文字でmigrationの上限30以内。アプリ/表示/buildの追加差分0。新スクリプト/tmp/myjob-received-completion-repair-20261109.sh（SHA256 c9d986f9a2b08c567db0916f295654822a9578377e9a36fa14d5e57b030cc186）を準備しsh -n成功、同privateに保存。
+固定元acedfef53→固定先5ef950b77。source6許可一覧（Seeder1と資料5）/app・resources・build差分0/既知未追跡保持を照合し、Seederの構文、ff-only、既存manifest、既定DB名を確認、専用Seederとview:clear/最終作業状態照合を行う。次の一手は次の正確なSSHへの承認を得て実行:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-received-completion-repair-20261109.sh
+配備の最終完了と利用者画面確認はまだ未実施。一般公開未承認。

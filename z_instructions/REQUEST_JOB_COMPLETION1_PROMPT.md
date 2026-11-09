@@ -15,3 +15,11 @@ AGENTS.md → JOB_EVALUATION_CONTROL1.md → REQUEST_JOB_COMPLETION_PLAN1.md / M
 受信登録のBOX/カレンダー一致・元登録済・候補除外は利用者成功済み。再試験しない。完了/通知まで成功扱いにしない。共有Claude作業/CLAUDE.mdは未編集。一般公開未承認、sales DB禁止、業務完了や実通知を試験のため勝手に作らない。
 
 配備準備済み: /tmp/myjob-received-completion-deploy-20261109.sh。SHA256 3794ccfef47c2d7bec21dbb6ad65c2f2efb3e40d7af7bbdc40ac39893161ef35。固定元428250c09→固定先acedfef53。正確なSSHへの利用者承認待ち。MANAGER末尾を読む。
+
+
+### 変更履歴登録の復旧手順（未承認・未実行）
+
+識別子短縮版5ef950b7738d558f9e0b062509b712bfac442c83を保存・push済み。PHP構文成功、versionは26文字でmigrationの上限30以内。アプリ/表示/buildの追加差分0。新スクリプト/tmp/myjob-received-completion-repair-20261109.sh（SHA256 c9d986f9a2b08c567db0916f295654822a9578377e9a36fa14d5e57b030cc186）を準備しsh -n成功、同privateに保存。
+固定元acedfef53→固定先5ef950b77。source6許可一覧（Seeder1と資料5）/app・resources・build差分0/既知未追跡保持を照合し、Seederの構文、ff-only、既存manifest、既定DB名を確認、専用Seederとview:clear/最終作業状態照合を行う。次の一手は次の正確なSSHへの承認を得て実行:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/myjob-received-completion-repair-20261109.sh
+配備の最終完了と利用者画面確認はまだ未実施。一般公開未承認。
