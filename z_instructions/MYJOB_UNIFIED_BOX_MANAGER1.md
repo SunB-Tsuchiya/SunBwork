@@ -1657,3 +1657,17 @@ Changelogは専用ProofCompletionNoticeChangelogSeeder（version proof-notify-20
 
 次の一手: 最新の本番版と作業状態だけを以下の読み取り専用SSHで取得する承認。19dを現在も本番最新と決めつけない。結果を保持した固定元/先/許可差分の配備スクリプトを準備して別途正確なSSH承認を得る。
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && git branch --show-current && git status --short --untracked-files=all -- . ":!public/build" && git diff --name-only -- public/build/manifest.json'
+
+
+## 2026-11-10 最新本番状態照合・固定配備手順準備（未配備）
+
+以前承認済みと同じread-only状態SSHを再提示して実行。利用者の追加yesも受領。exit0、本番は19d6c07da7a7cee072c59daf75cc8fc78ea7a3df/main、追跡変更なし/既知未追跡5件のみ/manifest差分なし。したがって直前の「read承認待ち」は置換。追加yesを未提示の配備コマンドの承認とは扱わない。
+
+専用ブランチへ4ec6f0bb6c734252dc0c0084054cb6e27c8d86f1を保存・push。最終106件1133断言/PHP10構文/493entry524資産保持済み。固定配備スクリプト/tmp/proof-completion-notice-deploy-20261110.sh、SHA256 212a4b68e7bd1deb56b74e4b07612042bce70a3470cf29d15172ad7f0eba29de。sh -n成功。同一コピーstorage/app/private/codex-proof-completion-notice-20261110/。
+
+固定元19d6→固定先4ec6。main/HEAD/追跡変更なし/既知未追跡5件/manifest hashを照合。専用branchをfetchし両ancestor・許可20ファイル・削除なし・資産/JS/routes/config/依存/migration/AGENTS/CLAUDE不変を確認。親Changelog差分は追加1行のみ、PHP10ファイルを配備前lint。ff-only後HEAD/493entry524資産/欠落0/manifest一致・既定mysqlを検証し、専用ProofCompletionNoticeChangelogSeeder --forceだけを実行、最終作業状態を再照合する。他作業の営業分析・出力を保持。migrationなし/業務データの変更・試験完了・過去通知再送なし。
+
+次の一手（配備はまだ未承認・未実行）:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/proof-completion-notice-deploy-20261110.sh
+
+配備後に新たに完了する校正の依頼者通知1件の実受信だけを確認する。既に成功した依頼送信/窓口受信/レイアウト等を繰り返させない。過去162へは再送しない。一般公開未承認。
