@@ -98,3 +98,14 @@ members build成功。manifest484 entry/515参照/欠落0、既存ソースentry
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-deploy-20261110.sh
 
 次の一手はこの正確なSSHの承認。配備後には、仕事・案件の限定統合メニュー、簡易詳細上部の日時/操作、校正モーダルを開いてキャンセルできることの今回表示確認を依頼する。校正送信/実受信2点はまだ未確認の別確認として保持。一般公開未承認、共有Claude作業未編集。
+
+
+## 2026-11-10 表示修正の旧固定配備を変更前停止・最新e279を統合
+
+利用者yesで旧/tmp/quick-work-ui-deploy-20261110.sh（d1b96ea...）を承認。同一hashで実行したが最初のHEAD照合でSTOP: production HEAD differs、exit1。fetch/merge/cache clear/アプリ/DB更新より前に停止し、表示修正はまだ未配備。この旧固定手順は現在の再開先から除外し、繰り返さない。
+
+以前承認済みの同一read-only SSHを再提示して実行し、HEAD e27916cbc58b520874d30e553dac3d0437861175/main/追跡変更なし/既知未追跡5件/manifest未変更を確認。別作業のSunA営業分析画面（段階2）が追加済み。ローカル同SHA objectを照合し隔離ブランチへ統合。競合はmanifestのみ、統合後ソースからmembers再buildで解消。営業分析controller/service/画面/部品・ChangelogSeeder・Ziggy・routes.suna・依存・設定等はe279比差分0。営業分析の実データ/本番sales DBは照会しない。
+
+統合後Integration92件1056断言と実Vue入力/詳細上部配置/校正新旧/ナビ/ファイル説明の検証を再成功。members buildも成功、manifest488 entry/519参照/欠落0、最新e279のsource entryと旧hash資産保持、tracked資産削除0。manifest SHA256 b83a47754f4dbc1d29f7060a4623db59c280f4aade052f56970611251c6dffc4。
+
+次の一手: この最新版保持版を保存し、固定元e279の別名/tmp/quick-work-ui-deploy-20261110-v2.shを準備。今回も実行コード差分は共有Middlewareと簡易詳細の2件だけ、DB/migration/seedなし。旧手順の承認を新版へ拡張せず、正確な新SSHを提示して承認を得る。表示修正/校正試用実受信は未確認、一般公開未承認、共有Claude作業は未編集。
