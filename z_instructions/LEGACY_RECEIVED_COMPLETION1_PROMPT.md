@@ -1,5 +1,7 @@
 # 従来の依頼取り込み完了通知 再開1
 
+> 2026-11-10最新優先: 利用者yesで既存一般User完了通知の修正を承認。ac363の別作業を保持した統合版で実装/Integration81件932断言/実Vue/ナビ/PHP11構文が成功。資産・JS・route等はac363から差分0、manifest481/512資産。次は固定PHP差分のSSH承認。配備・実通知確認は未実施。新式一般公開と過去9683通知再送は行わない。LEGACY_RECEIVED_COMPLETION_MANAGER1末尾参照。
+
 更新: 2026-11-10 JST。
 AGENTS.md→JOB_EVALUATION_CONTROL1.md→LEGACY_RECEIVED_COMPLETION_PLAN1.md/MANAGER1.md→親REQUEST_JOB_COMPLETION資料を読む。
 

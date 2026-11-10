@@ -1,5 +1,7 @@
 # マイジョブ入力・BOX統合 再開用
 
+> 2026-11-10最新優先: 利用者yesで既存一般User完了通知の修正を承認。ac363の別作業を保持した統合版で実装/Integration81件932断言/実Vue/ナビ/PHP11構文が成功。資産・JS・route等はac363から差分0、manifest481/512資産。次は固定PHP差分のSSH承認。配備・実通知確認は未実施。新式一般公開と過去9683通知再送は行わない。LEGACY_RECEIVED_COMPLETION_MANAGER1末尾参照。
+
 > 2026-11-10最新優先: 承認済みREAD ONLYで元9683/取り込み9684とも完了・完了通知0を確認。一般Userの旧完了通知経路を修正する具体設計LEGACY_RECEIVED_COMPLETION_PLAN1/MANAGER1/1_PROMPTを作成、承認待ち。新式一般公開/過去通知再送はしない。コード未変更。
 
 > 2026-11-10最新優先: 自己宛でない実例project406/assignment9684の完了通知未受信を調査中。対象限定READ ONLYスクリプトを準備し正確なSSH承認待ち。REQUEST_JOB_COMPLETION_MANAGER1末尾が現在地。コード/本番未変更、通知再送なし。

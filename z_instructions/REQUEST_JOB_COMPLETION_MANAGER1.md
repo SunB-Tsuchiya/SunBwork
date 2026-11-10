@@ -150,3 +150,16 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 
 承認済み同一read SSHで本番ac36333cc4d699d2e362fb47a36edc82a9c74dc4/main/追跡変更なし/既知未追跡5件を確認。b4後の別作業の売上報告基盤（source/route/layout/build）更新が入っている。ローカルgit objectで同じSHAを確認。新しい業務データや売上DBは読まない。この最新版を統合し、今回修正だけをac363から反映できるようにする。共有Claude作業とCLAUDE.mdは未編集。
 次の一手は今回版を保存してac363を統合し、最終合成検証・資産不変を確認する。配備と利用者実受信はまだ未実施。一般公開未承認。
+
+
+## 2026-11-10 ac363保持版の実装・最終検証成功（未配備）
+
+本番ac36333cc4d699d2e362fb47a36edc82a9c74dc4をmergeした保存147b9ad2cで、Integration81件932断言が全成功。新規17件を既存64件へ追加。一般Userのカレンダー/旧MyJob/JobBoxをまたぐ再操作でも元依頼のcompleted通知1件、兼任宛先の重複なし・操作本人除外を確認。通知の2人目保存が失敗した場合の状態/元メッセージ/予定/進行・管理セル/outboxの全rollback、循環/複数supersedes/所属・本人・案件不一致、旧祖先だけ完了/子兄弟維持を確認。直接依頼/単独自己割当/校正/代理操作/対象外の旧直接依頼からの継続は既存専用経路を維持。typed親は一般Userに開かず、試用許可者だけ既存WorkJobMutationへ委譲し、イベント参照もtransaction内で再照合する。
+
+銀本syncは元依頼と自己割当のdefault DB確定後にoutboxから実行し、カレンダーのJST作業日を保持。失敗→既存command再試行で通知重複なし。担当本人Toastはcommit後のみ（dispatch時のtransactionLevel=0を合成で確認）、再操作では再放送せず、内部Message0件を維持。反映待ち時には二重Toastを避けてflash1つにする。fixtureのflash取得先をRedirectResponseのsessionへ修正した対象1件6断言も成功し、その後上記81件全体を成功確認。実Vue入力/ナビ退行も統合後に成功。
+
+PHP11ファイル構文成功。ChangelogSeederの自動merge差分はLegacyReceivedCompletionChangelogSeeder呼出し1行だけで他の登録を保持。専用version legacy-job-notify-20261110は26文字、30上限以内。Vue/JS/routes/設定/依存/migration/CLAUDE/AGENTSの差分0。今回PHPのみなので再build不要、ac363の本番資産を完全保持（manifest481/参照512/欠落0/members base、SHA256 2f75a6555a102c294858e81844594728c2f34064fc070128f572e16580b8f133）。別作業の売上報告の実装/画面/layout/routes/buildは保持し、売上DBを調べたりそのmigrationを再実行したりしない。
+
+元9683/9684は既に両方完了済みなので修正後の再操作でも過去未送信を送らない。今回分の補正・再送は未承認。一般Userの既存完了経路のバグ修正であり、新式入力/BOXの公開制限は保持。共有Claude作業を変更せず、実DBでのテスト登録/完了/通知もしていない。
+
+状態: 設計承認・再現・実装・最終コード検証完了、今回配備/修正後の実通知受信は未実施。次の一手はac363から今回PHP差分だけの固定配備手順を用意し、正確なSSH承認を得る。
