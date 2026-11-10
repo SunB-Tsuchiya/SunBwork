@@ -1894,3 +1894,14 @@ proof_requests.source_personal_work_entry_idのnullable/index migration1件を�
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-proof-deploy-20261110.sh
 
 次の一手: 同じスクリプトを利用者へ示し、この正確なSSHの承認を得る。一般公開はせず、本番校正依頼/試験通知は作らない。配備後は新たな校正入口/窓口への受け渡しの確認だけを依頼する。既に成功したモバイルBOX/旧未予定・複数日/通常依頼の登録・完了・通知を再試験しない。
+
+
+## 2026-11-10 簡易ジョブ校正依頼の限定配備成功・利用者試用待ち
+
+確定: 利用者yesで提示済みSSHと固定スクリプトを承認。同一SHA256 3a0527484c3e47b778b4aaebca064b336de7a594fc9d73e6cf4dbb0d0ee81108の/tmp/quick-work-proof-deploy-20261110.shを実行しexit0。固定元54d/main/追跡変更なし/既知未追跡5件/旧manifest、祖先とsource33許可一覧/削除なし/営業・Clerk等ソース保持/追加migration1件/PHP10構文を照合。既定mysqlとsilverlamb759_sunbworkを確認後、2026_11_10_180001だけを--database=mysql --path=<固定抽出ファイル> --realpath --forceで先行適用成功。4e83575c97cd216124ee46def506f3d8cb317406へff-only、route:clear、manifest484/515資産/欠落0/members base、QuickWorkProofChangelogSeederだけ--database=mysql --force、view:clear成功。最終追跡変更なし・既知未追跡5件維持。実行scratch /tmp/sb-quick-proof.ApsURGを配備証拠として残す。
+
+実装/合成検証/本番限定配備は完了。実画面/実受信/窓口レビューは未確認。新式一般公開は未承認のまま。既存営業カレンダーのmigration・その他seed、本番sales DB、仕事の作成/完了、校正依頼の試験送信、過去通知の再送は行っていない。
+
+次の一手: 情報出版SuperAdmin本人の仕事・案件→新しいマイジョブBOX→未完了の簡易形式ジョブ詳細を再読込し、「校正依頼」で試用と分かる件名を確認して利用者自身で送信してもらう。送信すると同会社・部署の校正窓口へ実際の通知が届くことを先に明示する。今回依頼する確認は(1) 元詳細が校正依頼済みとなり、元ジョブは未完了のまま、本人の「校正状況」に依頼1件がある、(2) 校正窓口の受信BOXに同じ依頼1件と元作業名・案件/分類が表示される、の2点。両方問題なければ「成功」、違えば番号と結果、窓口画面が見られなければ「2は確認不可」と回答を依頼。窓口未登録エラーならその文言を報告してもらい、勝手に別部署へ送信先を広げない。まだ依頼2点の成功と記録しない。
+
+元ジョブや校正依頼を完了する試験、旧進行表/銀本の再試験、成功済みのモバイル/旧未予定・複数日/通常依頼の登録・完了・通知は依頼しない。
