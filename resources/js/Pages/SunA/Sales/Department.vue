@@ -12,7 +12,7 @@ const { yen, pct, pctClass } = useSalesChart();
 
 const basis = ref('same_month'); // 'same_month' | 'year'
 const splitChart = ref(false);   // グラフで、第三部を課・直轄に分けて表示する
-const expanded = ref({});        // 開いている部（キー => true）
+const collapsed = ref({}); // 閉じている部（既定は空 = 営業第三部も開いた状態）
 const shareYear = ref(null);     // 構成比・前年比を見る年
 const loading = ref(false);
 const errorMessage = ref('');
@@ -26,8 +26,8 @@ const rows = computed(() => summary.value?.rows ?? []);
 const yearInfo = (y) => years.value.find((i) => i.year === y);
 
 // 表に出す行: 部は常に、課は親の部が開いているときだけ
-const visibleRows = computed(() => rows.value.filter((r) => r.level === 0 || expanded.value[r.parent]));
-const toggle = (key) => { expanded.value = { ...expanded.value, [key]: !expanded.value[key] }; };
+const visibleRows = computed(() => rows.value.filter((r) => r.level === 0 || !collapsed.value[r.parent]));
+const toggle = (key) => { collapsed.value = { ...collapsed.value, [key]: !collapsed.value[key] }; };
 
 // 色: 部ごとに固定（第三部の課は、第三部の色の濃淡）
 const PALETTE = { dept1: '#4F46E5', dept2: '#10B981', dept3: '#F59E0B', dept3_sec1: '#F97316', dept3_sec2: '#FACC15', dept3_direct: '#B45309' };
@@ -150,9 +150,9 @@ const cell = (r, y) => r.amounts[y];
                             </thead>
                             <tbody>
                                 <tr v-for="r in visibleRows" :key="r.key" class="border-t" :class="r.key === 'total' ? 'bg-gray-50 font-semibold' : r.level === 1 ? 'bg-amber-50/40 text-gray-600' : ''">
-                                    <td class="py-1" :class="r.level === 1 ? 'pl-6' : ''">
-                                        <button v-if="r.has_children" type="button" class="mr-1 inline-block w-4 text-indigo-600" :title="expanded[r.key] ? '課・直轄を閉じる' : '課・直轄を開く'" @click="toggle(r.key)">{{ expanded[r.key] ? '▼' : '▶' }}</button>
-                                        {{ r.level === 1 ? `└ ${r.label}` : r.label }}<span v-if="r.has_children && !expanded[r.key]" class="ml-1 text-[10px] text-gray-400">（全体）</span>
+                                    <td class="min-w-[11rem] whitespace-nowrap py-1" :class="r.level === 1 ? 'pl-6' : ''">
+                                        {{ r.level === 1 ? `└ ${r.label}` : r.label }}<span v-if="r.has_children" class="ml-1 text-[10px] text-gray-400">（全体）</span>
+                                        <button v-if="r.has_children" type="button" class="ml-1 inline-block w-4 text-indigo-600" :title="collapsed[r.key] ? '課・直轄を開く' : '課・直轄を閉じる'" @click="toggle(r.key)">{{ collapsed[r.key] ? '▶' : '▼' }}</button>
                                     </td>
                                     <td v-for="y in years" :key="y.year" class="py-1 text-right">{{ cell(r, y.year) === null ? '—' : yen(cell(r, y.year)) }}</td>
                                     <td class="py-1 text-right">{{ r.shares[shareYear] !== null && r.shares[shareYear] !== undefined ? `${r.shares[shareYear]}%` : '—' }}</td>

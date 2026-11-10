@@ -15,6 +15,7 @@ class AnnualAnalysisService
         private PeriodResolver $periods,
         private DepartmentFilter $departments,
         private PeriodAggregator $aggregator,
+        private DepartmentTree $tree,
     ) {
     }
 
@@ -171,50 +172,56 @@ class AnnualAnalysisService
     }
 
     /**
-     * 部門別（課のある部は課まで）。部門の絞り込みの影響は受けない（全部門の内訳を見せる）。
+     * 部門別。部の行の直後に、課のある部は課・直轄の行が並ぶ（画面で開閉）。「第三部（全体）」は課・直轄の合計。
+     * 部門の絞り込みの影響は受けない（全部門の内訳を見せる）。社数は名寄せ後。
      *
      * @return array<int, array<string,mixed>>
      */
     private function byDepartment(int $year, array $months, bool $priorAvailable): array
     {
-        $labels = $this->departments->rowLabels();
-        $order = $this->departments->order();
-        $collect = function (int $y) use ($months) {
-            $out = [];
-            foreach (EffectiveClient::join(Fact::query())->where('sales_year', $y)->whereIn('sales_month', $months)
-                ->selectRaw('department_key, section_key, SUM(suna_sl_facts.amount) as amount, COUNT(DISTINCT ' . EffectiveClient::KEY . ') as clients')
-                ->groupBy('department_key', 'section_key')->get() as $r) {
-                $out[$r->section_key ?? $r->department_key] = ['amount' => (float) $r->amount, 'clients' => (int) $r->clients];
+        $nodes = $this->tree->nodes();
+        $collect = function (int $y) use ($months): array {
+            $amounts = $this->tree->amounts($this->aggregator->departmentAmounts($y, $months));
+            $base = EffectiveClient::join(Fact::query())->where('sales_year', $y)->whereIn('sales_month', $months);
+            $clients = [];
+            // 部 = その部の全行、課 = その課の行の取引社数（名寄せ後）
+            foreach ((clone $base)->selectRaw('department_key as k, COUNT(DISTINCT ' . EffectiveClient::KEY . ') as n')->groupBy('department_key')->get() as $r) {
+                $clients[$r->k] = (int) $r->n;
+            }
+            foreach ((clone $base)->whereNotNull('section_key')->selectRaw('section_key as k, COUNT(DISTINCT ' . EffectiveClient::KEY . ') as n')->groupBy('section_key')->get() as $r) {
+                $clients[$r->k] = (int) $r->n;
             }
 
-            return $out;
+            return [$amounts, $clients];
         };
-        $cur = $collect($year);
-        $pri = $priorAvailable ? $collect($year - 1) : [];
-        $total = array_sum(array_column($cur, 'amount'));
+        [$curAmounts, $curClients] = $collect($year);
+        [$priAmounts] = $priorAvailable ? $collect($year - 1) : [[], []];
+        // 構成比の分母 = 部（level 0）の合計（課は部に含まれるので、二重に数えない）
+        $total = 0.0;
+        foreach ($nodes as $n) {
+            if ($n['level'] === 0) {
+                $total += $curAmounts[$n['key']] ?? 0.0;
+            }
+        }
 
         $rows = [];
-        foreach (array_keys($cur + $pri) as $key) {
-            $c = $cur[$key]['amount'] ?? 0.0;
-            $p = $priorAvailable ? ($pri[$key]['amount'] ?? 0.0) : null;
-            $rows[] = [
-                'key' => $key,
-                'label' => $labels[$key] ?? $key,
+        foreach ($nodes as $n) {
+            $c = $curAmounts[$n['key']] ?? 0.0;
+            $p = $priorAvailable ? ($priAmounts[$n['key']] ?? 0.0) : null;
+            // 売上も前年の売上も無い部門は出さない（部は、課に売上があれば出る）
+            if ($c == 0.0 && ($p === null || $p == 0.0) && ($curClients[$n['key']] ?? 0) === 0) {
+                continue;
+            }
+            $rows[] = $n + [
                 'amount' => $c,
                 'prior_amount' => $p,
                 'diff' => $p !== null ? $c - $p : null,
                 'rate' => ($p !== null && $p > 0) ? round(($c - $p) / $p * 100, 1) : null,
                 'share_pct' => $total > 0 ? round($c / $total * 100, 1) : null,
-                'client_count' => $cur[$key]['clients'] ?? 0,
-                '_order' => $order[$key] ?? 999,
+                'client_count' => $curClients[$n['key']] ?? 0,
             ];
         }
-        usort($rows, fn ($a, $b) => $a['_order'] <=> $b['_order']);
 
-        return array_map(function ($r) {
-            unset($r['_order']);
-
-            return $r;
-        }, $rows);
+        return $rows;
     }
 }

@@ -189,8 +189,17 @@ class AnalysisTest extends TestCase
 
         $this->assertEquals(900, $rows['dept1']['amount']);
         $this->assertEquals(700, $rows['dept1']['prior_amount']);
+        // 営業第三部は「全体」の行を持ち（課・直轄の合計）、その下に課・直轄の行が並ぶ
+        $this->assertEquals(100, $rows['dept3']['amount']);
+        $this->assertTrue($rows['dept3']['has_children']);
+        $this->assertSame(0, $rows['dept3']['level']);
         $this->assertEquals(100, $rows['dept3_sec1']['amount']);
-        $this->assertSame('営業第三部 第一課', $rows['dept3_sec1']['label']);
+        $this->assertSame('第一課', $rows['dept3_sec1']['label']);
+        $this->assertSame(1, $rows['dept3_sec1']['level']);
+        $this->assertSame('dept3', $rows['dept3_sec1']['parent']);
+        $this->assertSame(['dept1', 'dept2', 'dept3', 'dept3_sec1'], $rows->keys()->all());     // 部の直後に課。売上の無い課・直轄は出ない
+        $this->assertSame(1, $rows['dept3']['client_count']);
+        $this->assertEquals(10, $rows['dept3']['share_pct']);                                     // 100 ÷ 1000（課は部に含まれるので、二重に数えない）
         $this->assertEquals(0, $rows['dept2']['amount']);       // 前年だけある部門も並ぶ
         $this->assertEquals(50, $rows['dept2']['prior_amount']);
         $this->assertEquals(90, $rows['dept1']['share_pct']);
@@ -218,6 +227,11 @@ class AnalysisTest extends TestCase
         $matrix = collect($jan['by_department']['rows'])->keyBy('key');
         $this->assertEquals([2023 => 10, 2024 => 100, 2025 => 650], $matrix['dept1']['amounts']);
         $this->assertEquals([2023 => 0, 2024 => 50, 2025 => 0], $matrix['dept2']['amounts']);
+        // 第三部は「全体」の行と、課の行（2025年1月は第一課 80）
+        $this->assertEquals([2023 => 0, 2024 => 0, 2025 => 80], $matrix['dept3']['amounts']);
+        $this->assertEquals([2023 => 0, 2024 => 0, 2025 => 80], $matrix['dept3_sec1']['amounts']);
+        $this->assertTrue($matrix['dept3']['has_children']);
+        $this->assertSame('dept3', $matrix['dept3_sec1']['parent']);
 
         // 登録の無い月
         $none = $this->api('same_month.summary', ['month' => 12]);

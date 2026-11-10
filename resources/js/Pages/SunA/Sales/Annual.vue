@@ -30,7 +30,11 @@ const errorMessage = ref('');
 const summary = ref(null);
 const monthlyTableOpen = ref(false);
 const refreshKey = ref(0);
-const deptShare = computed(() => (summary.value?.by_department ?? []).map((d) => ({ label: d.label, amount: d.amount })));
+// 部門別: 部は常に、課・直轄は親の部（営業第三部）が開いているときだけ表示。構成比の棒は、部（第三部は全体）だけで作る
+const collapsed = ref({}); // 閉じている部（既定は空 = 営業第三部も開いた状態）
+const toggleDept = (key) => { collapsed.value = { ...collapsed.value, [key]: !collapsed.value[key] }; };
+const visibleDepartments = computed(() => (summary.value?.by_department ?? []).filter((d) => d.level === 0 || !collapsed.value[d.parent]));
+const deptShare = computed(() => (summary.value?.by_department ?? []).filter((d) => d.level === 0).map((d) => ({ label: d.label, amount: d.amount })));
 const clientShareRows = ref([]);
 const clientShareTotal = ref(null);
 
@@ -237,8 +241,11 @@ const kpiCards = computed(() => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="d in summary.by_department" :key="d.key" class="border-t">
-                                        <td class="py-1">{{ d.label }}</td>
+                                    <tr v-for="d in visibleDepartments" :key="d.key" class="border-t" :class="d.level === 1 ? 'bg-amber-50/40 text-gray-600' : ''">
+                                        <td class="min-w-[11rem] whitespace-nowrap py-1" :class="d.level === 1 ? 'pl-6' : ''">
+                                            {{ d.level === 1 ? `└ ${d.label}` : d.label }}<span v-if="d.has_children" class="ml-1 text-[10px] text-gray-400">（全体）</span>
+                                            <button v-if="d.has_children" type="button" class="ml-1 inline-block w-4 text-indigo-600" :title="collapsed[d.key] ? '課・直轄を開く' : '課・直轄を閉じる'" @click="toggleDept(d.key)">{{ collapsed[d.key] ? '▶' : '▼' }}</button>
+                                        </td>
                                         <td class="py-1 text-right">{{ yen(d.amount) }}</td>
                                         <td v-if="summary.prior.available" class="py-1 text-right" :class="pctClass(d.rate)">{{ d.diff !== null ? yen(d.diff) : '—' }}</td>
                                         <td v-if="summary.prior.available" class="py-1 text-right" :class="pctClass(d.rate)">{{ d.rate !== null ? pct(d.rate) : '—' }}</td>

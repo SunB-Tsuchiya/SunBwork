@@ -32,7 +32,7 @@ const monthB = ref(props.latestMonth);
 const loading = ref(false);
 const errorMessage = ref('');
 const summary = ref(null);
-const expanded = ref({});
+const collapsed = ref({}); // 閉じている部（既定は空 = 営業第三部も開いた状態）
 
 const registered = (year, month) => (props.monthsByYear[year] ?? []).includes(month);
 
@@ -70,8 +70,8 @@ const fetchSummary = async () => {
 watch([mode, dept, yearA, yearB, monthYearA, monthA, monthYearB, monthB], fetchSummary);
 onMounted(() => { if (props.years.length) fetchSummary(); });
 
-const toggle = (key) => { expanded.value = { ...expanded.value, [key]: !expanded.value[key] }; };
-const visibleDepartments = computed(() => (summary.value?.by_department ?? []).filter((r) => r.level === 0 || expanded.value[r.parent]));
+const toggle = (key) => { collapsed.value = { ...collapsed.value, [key]: !collapsed.value[key] }; };
+const visibleDepartments = computed(() => (summary.value?.by_department ?? []).filter((r) => r.level === 0 || !collapsed.value[r.parent]));
 
 const kpiCards = computed(() => {
     const k = summary.value?.kpi;
@@ -180,9 +180,9 @@ const STATUS = { new: { text: '新規', cls: 'bg-blue-100 text-blue-700' }, ende
                             </thead>
                             <tbody>
                                 <tr v-for="r in visibleDepartments" :key="r.key" class="border-t" :class="r.key === 'total' ? 'bg-gray-50 font-semibold' : r.level === 1 ? 'bg-amber-50/40 text-gray-600' : ''">
-                                    <td class="py-1" :class="r.level === 1 ? 'pl-6' : ''">
-                                        <button v-if="r.has_children" type="button" class="mr-1 inline-block w-4 text-indigo-600" :title="expanded[r.key] ? '課・直轄を閉じる' : '課・直轄を開く'" @click="toggle(r.key)">{{ expanded[r.key] ? '▼' : '▶' }}</button>
-                                        {{ r.level === 1 ? `└ ${r.label}` : r.label }}<span v-if="r.has_children && !expanded[r.key]" class="ml-1 text-[10px] text-gray-400">（全体）</span>
+                                    <td class="min-w-[11rem] whitespace-nowrap py-1" :class="r.level === 1 ? 'pl-6' : ''">
+                                        {{ r.level === 1 ? `└ ${r.label}` : r.label }}<span v-if="r.has_children" class="ml-1 text-[10px] text-gray-400">（全体）</span>
+                                        <button v-if="r.has_children" type="button" class="ml-1 inline-block w-4 text-indigo-600" :title="collapsed[r.key] ? '課・直轄を開く' : '課・直轄を閉じる'" @click="toggle(r.key)">{{ collapsed[r.key] ? '▶' : '▼' }}</button>
                                     </td>
                                     <td class="py-1 text-right">{{ yen(r.a) }}</td>
                                     <td class="py-1 text-right">{{ yen(r.b) }}</td>
