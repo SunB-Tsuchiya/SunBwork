@@ -28,13 +28,14 @@ async function component(file, behavior = false) {
         b.onResolve({ filter: /^(axios|ziggy-js|@inertiajs\/vue3)$/ }, a => ({ path: a.path, namespace: 'mock' }));
         b.onLoad({ filter: /.*/, namespace: 'mock' }, a => ({ loader: 'js', contents: a.path === 'file-analyzer' ? `const {ref}=require('vue'); export const SUPPORTED_TYPES=[];export const UNSUPPORTED_NOTICE='';export const useFileAnalyzer=()=>({results:ref([]),rejectedFiles:ref([]),grouped:ref([]),summary:ref({totalFiles:0}),analyzing:ref(false),clearFiles(){},clearRejected(){},buildFileInfo:()=>null});` : a.path === 'axios' ? 'export default globalThis.__unifiedAxios;' : a.path === 'ziggy-js' ? `export const route=${route.toString()};` : `const {h}=require('vue'); export const router=globalThis.__unifiedRouter; export const usePage=()=>globalThis.__historyPage||{props:{}}; export const Link={props:['href'],setup(p,{slots}){return ()=>h('a',{href:p.href},slots.default?.())}};` }));
         b.onResolve({ filter: /useFileAnalyzer$/ }, () => ({path:'file-analyzer',namespace:'mock'}));
-        b.onResolve({ filter: /^@\// }, a => a.path.endsWith('/WorkJobSeries.vue') ? {path:path.join(root,'resources/js',a.path.slice(2))} : a.path.endsWith('.vue') ? { path: a.path, namespace: 'shell' } : { path: path.join(root, 'resources/js', a.path.slice(2) + '.js') });
+        b.onResolve({ filter: /^@\// }, a => ['/WorkJobSeries.vue','/AssignmentDetailCard.vue','/LegacyWorkJobContinuation.vue'].some(name=>a.path.endsWith(name)) ? {path:path.join(root,'resources/js',a.path.slice(2))} : a.path.endsWith('.vue') ? { path: a.path, namespace: 'shell' } : { path: path.join(root, 'resources/js', a.path.slice(2) + '.js') });
         b.onLoad({ filter: /.*/, namespace: 'shell' }, () => ({ loader: 'js', contents: `const {h}=require('vue'); export default {setup(p,{slots}){return ()=>h('div',{},[slots.header?.(),slots.tabs?.(),slots.default?.()])}};` }));
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
                 ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyCreate,canCreateLegacy,changeWorkCategory,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
                 : file === 'resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue' ? '\nglobalThis.__legacyForm={assignments,save,workDate,startTimeHour,startTimeMin,endTimeHour,endTimeMin};' : file === 'resources/js/Pages/MyJobBox/Show.vue' ? '\nglobalThis.__legacyComplete={submitComplete,isSubmittingComplete};' : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options,formAssignments,receivedPrefill,picker};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection,showRequestModal,requestRecords,applyRequestJob,formAssignments,prefillEvent,projectJob,userClients,userProjects,receivedPrefill};' : file === 'resources/js/Pages/MyJobBox/Create_user.vue' ? '\nglobalThis.__oldRequestPage={applyRequestJob,formAssignments,projectJob,userClients,userProjects,receivedPrefill,showRequestModal};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate,detailHref,openDetails};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError,detailsOpen,detailsSaved};') + '\n</script>');
+            if (!behavior && a.path === path.join(root, file) && file === 'resources/js/Pages/MyJobBox/Show.vue' && globalThis.__legacyLayoutEvents) source = source.replace('</script>', '\nevents.value=globalThis.__legacyLayoutEvents;eventsLoaded.value=true;\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
             const { descriptor } = parse(source);
             return { loader: 'js', contents: compileScript(descriptor, { id: 'unified-input', inlineTemplate: !behavior, templateOptions: { ssr: !behavior } }).content, resolveDir: path.dirname(a.path) };
@@ -338,7 +339,33 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     legacyShowApp.mount({});await settle();await globalThis.__legacyComplete.submitComplete();
     assert.ok(confirmations[0].includes('旧元\n簡易続き'));assert.ok(confirmations[0].includes('ほかの続きの状態'));assert.ok(confirmations[0].includes('元依頼の完了状態と依頼主・案件リーダーへの通知'));
     assert.deepEqual(globalThis.__detailReload,[{preserveScroll:true}]);assert.equal(globalThis.__legacyComplete.isSubmittingComplete.value,false);
-    legacyShowApp.unmount();global.confirm=previousConfirm;global.route=previousRoute;global.sessionStorage=previousSession;
+    legacyShowApp.unmount();
+    globalThis.__historyPage={props:{auth:{user:{id:1},featureFlags:{proofRequest:true}}}};
+    globalThis.__legacyLayoutEvents=[{id:70,project_job_assignment_id:7,start:'2026-11-10T11:00:00+09:00',end:'2026-11-10T11:30:00+09:00'}];
+    const actualOldDetail=await component('resources/js/Pages/MyJobBox/Show.vue');
+    const oldDetailProps={projectJob:{id:10},canDelete:true,assignment:{id:7,title:'旧BOXの作業',scheduled:true,user:{id:1,name:'試験担当'},project_job:{id:10,title:'試験案件',client:{name:'試験先'}},status_model:{key:'in_progress',name:'進行中'}},workJobContinuation:{prefill:{},source:{id:7,type:'assignment'},series:{items:[],totals:{},operationsEnabled:true,completionTargets:[]}}};
+    const renderOldDetail=props=>{const app=createSSRApp(actualOldDetail,props);app.config.globalProperties.$page=globalThis.__historyPage;app.config.globalProperties.route=route;return renderToString(app);};
+    const oldHtml=await renderOldDetail(oldDetailProps);
+    const oldTop=oldHtml.slice(oldHtml.indexOf('旧BOXの作業'),oldHtml.indexOf('案件情報'));
+    for(const text of ['マイジョブの操作','削除','予定を編集','完了にする','校正依頼','続きのマイジョブを作成'])assert.ok(oldTop.includes(text),text+' must precede old BOX details');
+    assert.equal((oldHtml.match(/aria-label="マイジョブの操作"/g)||[]).length,1);
+    assert.equal((oldHtml.match(/続きのマイジョブを作成/g)||[]).length,1);
+    const completedOldHtml=await renderOldDetail({...oldDetailProps,assignment:{...oldDetailProps.assignment,completed:true}});
+    assert.ok(!/<button\b[^>]*>\s*校正依頼\s*<\/button>/.test(completedOldHtml));
+    assert.ok(completedOldHtml.includes('完了済み'));
+    const unscheduledOldHtml=await renderOldDetail({...oldDetailProps,canDelete:false,workJobContinuation:null,assignment:{...oldDetailProps.assignment,scheduled:false}});
+    const unscheduledTop=unscheduledOldHtml.slice(unscheduledOldHtml.indexOf('旧BOXの作業'),unscheduledOldHtml.indexOf('案件情報'));
+    assert.ok(unscheduledTop.includes('予定をセット'));assert.ok(!unscheduledTop.includes('>\n                                    削除'));
+    const requestedOldHtml=await renderOldDetail({...oldDetailProps,proofRequested:true});
+    assert.ok(requestedOldHtml.includes('校正依頼済み'));assert.ok(!/<button\b[^>]*>\s*校正依頼\s*<\/button>/.test(requestedOldHtml));
+    const plainCard=await component('resources/js/Components/AssignmentDetailCard.vue');
+    const plainCardHtml=await renderToString(createSSRApp(plainCard,{assignment:oldDetailProps.assignment}));
+    assert.ok(plainCardHtml.includes('案件情報'));assert.ok(!plainCardHtml.includes('マイジョブの操作'));
+    const ordinaryContinuation=await component('resources/js/Components/LegacyWorkJobContinuation.vue');
+    const ordinaryContinuationHtml=await renderToString(createSSRApp(ordinaryContinuation,{data:oldDetailProps.workJobContinuation}));
+    assert.ok(ordinaryContinuationHtml.includes('この仕事の続きを、簡易入力で登録します'));
+    delete globalThis.__legacyLayoutEvents;
+    global.confirm=previousConfirm;global.route=previousRoute;global.sessionStorage=previousSession;
     global.fetch=originalFetch;global.document=realDocument;global.window=realWindow;
     globalThis.__historyPage={props:{date:'2026-12-04',simpleContinuation:{id:7,title:'<script>source</script>',classification:'大分類 ／ 中分類'},assignments:[{source_personal_work_entry_id:7}]}};
     const legacyPageComponent=await component('resources/js/Pages/Events/Create_Job.vue');const legacyPageHtml=await renderToString(createSSRApp(legacyPageComponent));

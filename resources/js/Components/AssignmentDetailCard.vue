@@ -132,6 +132,10 @@ const hasStandardWorkDetails = computed(() => workItemTypeName.value !== '—'
             </div>
         </div>
 
+        <div v-if="$slots.actions" class="border-b border-gray-200 bg-gray-50 px-5 py-3">
+            <slot name="actions" />
+        </div>
+
         <div class="divide-y divide-gray-100">
             <!-- 案件情報セクション -->
             <div class="px-5 py-4">

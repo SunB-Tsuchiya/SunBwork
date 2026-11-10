@@ -9,7 +9,87 @@
 
         <div class="space-y-4">
             <!-- ジョブ割り当て詳細カード -->
-            <AssignmentDetailCard :assignment="assignment" />
+            <AssignmentDetailCard :assignment="assignment">
+                <template #actions>
+                    <div class="flex flex-wrap items-center gap-2" aria-label="マイジョブの操作">
+                        <button
+                            v-if="canDelete"
+                            @click="deleteAssignment"
+                            class="inline-flex items-center rounded bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200"
+                        >
+                            削除
+                        </button>
+
+                        <template v-if="isAssignee">
+                            <Link
+                                v-if="eventsLoaded && (assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0"
+                                :href="editHref"
+                                class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                            >
+                                予定を編集
+                            </Link>
+
+                            <div v-if="(assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0">
+                                <button
+                                    @click="submitComplete"
+                                    :disabled="isAssignmentCompleted || isSubmittingComplete"
+                                    :class="
+                                        isAssignmentCompleted || isSubmittingComplete
+                                            ? 'cursor-not-allowed rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
+                                            : 'rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'
+                                    "
+                                >
+                                    {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
+                                </button>
+                            </div>
+
+                            <Link
+                                v-else-if="!(assignment.scheduled || assignment.scheduled_at)"
+                                :href="typeof route === 'function' ? route('events.create_job', { job: assignment.id }) : `/events/create-job?job=${assignment.id}`"
+                                class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                            >
+                                予定をセット
+                            </Link>
+                        </template>
+
+                        <div v-else-if="assignment.scheduled || assignment.scheduled_at">
+                            <span class="text-sm font-semibold text-green-600">セット済</span>
+                        </div>
+
+                        <div v-if="assignment.linked_assignment_id && projectJob?.id" class="ml-auto">
+                            <Link
+                                :href="
+                                    route('coordinator.project_jobs.assignments.show', {
+                                        projectJob: projectJob.id,
+                                        assignment: assignment.linked_assignment_id,
+                                    })
+                                "
+                                class="text-sm text-blue-600 hover:underline"
+                            >
+                                割当を見る (#{{ assignment.linked_assignment_id }})
+                            </Link>
+                        </div>
+
+                        <!-- 校正依頼ボタン（情報出版部署のみ表示・完了済みは非表示） -->
+                        <template v-if="$page.props.auth.featureFlags.proofRequest">
+                            <button
+                                v-if="!isAssignmentCompleted && !proofRequested"
+                                @click="showProofModal = true"
+                                class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
+                            >
+                                校正依頼
+                            </button>
+                            <span
+                                v-else-if="!isAssignmentCompleted && proofRequested"
+                                class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"
+                            >
+                                校正依頼済み
+                            </span>
+                        </template>
+                        <LegacyWorkJobContinuation v-if="workJobContinuation" :data="workJobContinuation" compact />
+                    </div>
+                </template>
+            </AssignmentDetailCard>
 
             <!-- 校正依頼情報（proof型ジョブの場合のみ表示） -->
             <div v-if="proofRequestInfo" class="overflow-hidden rounded-lg border border-pink-200 bg-pink-50 shadow-sm">
@@ -186,85 +266,9 @@
                 </div>
             </div>
 
-            <LegacyWorkJobContinuation v-if="workJobContinuation" :data="workJobContinuation" />
+            <WorkJobSeries v-if="workJobContinuation" :series="workJobContinuation.series" />
 
-            <!-- アクションボタン -->
-            <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
-                <button
-                    v-if="canDelete"
-                    @click="deleteAssignment"
-                    class="ml-auto inline-flex items-center rounded bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200"
-                >
-                    削除
-                </button>
 
-                <template v-if="isAssignee">
-                    <Link
-                        v-if="eventsLoaded && (assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0"
-                        :href="editHref"
-                        class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-                    >
-                        予定を編集
-                    </Link>
-
-                    <div v-if="(assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0">
-                        <button
-                            @click="submitComplete"
-                            :disabled="isAssignmentCompleted || isSubmittingComplete"
-                            :class="
-                                isAssignmentCompleted || isSubmittingComplete
-                                    ? 'cursor-not-allowed rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
-                                    : 'rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'
-                            "
-                        >
-                            {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
-                        </button>
-                    </div>
-
-                    <Link
-                        v-else-if="!(assignment.scheduled || assignment.scheduled_at)"
-                        :href="typeof route === 'function' ? route('events.create_job', { job: assignment.id }) : `/events/create-job?job=${assignment.id}`"
-                        class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-                    >
-                        予定をセット
-                    </Link>
-                </template>
-
-                <div v-else-if="assignment.scheduled || assignment.scheduled_at">
-                    <span class="text-sm font-semibold text-green-600">セット済</span>
-                </div>
-
-                <div v-if="assignment.linked_assignment_id && projectJob?.id" class="ml-auto">
-                    <Link
-                        :href="
-                            route('coordinator.project_jobs.assignments.show', {
-                                projectJob: projectJob.id,
-                                assignment: assignment.linked_assignment_id,
-                            })
-                        "
-                        class="text-sm text-blue-600 hover:underline"
-                    >
-                        割当を見る (#{{ assignment.linked_assignment_id }})
-                    </Link>
-                </div>
-
-                <!-- 校正依頼ボタン（情報出版部署のみ表示・完了済みは非表示） -->
-                <template v-if="$page.props.auth.featureFlags.proofRequest">
-                    <button
-                        v-if="!isAssignmentCompleted && !proofRequested"
-                        @click="showProofModal = true"
-                        class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
-                    >
-                        校正依頼
-                    </button>
-                    <span
-                        v-else-if="!isAssignmentCompleted && proofRequested"
-                        class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"
-                    >
-                        校正依頼済み
-                    </span>
-                </template>
-            </div>
         </div>
 
         <ProofRequestModal
@@ -279,6 +283,7 @@
 
 <script setup>
 import LegacyWorkJobContinuation from '@/Components/LegacyWorkJobContinuation.vue';
+import WorkJobSeries from '@/Components/WorkJobSeries.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
