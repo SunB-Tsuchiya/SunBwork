@@ -1952,3 +1952,15 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-dep
 統合後Integration92件1056断言と実Vue入力/詳細上部配置/校正新旧/ナビ/ファイル説明の検証を再成功。members buildも成功、manifest488 entry/519参照/欠落0、最新e279のsource entryと旧hash資産保持、tracked資産削除0。manifest SHA256 b83a47754f4dbc1d29f7060a4623db59c280f4aade052f56970611251c6dffc4。
 
 次の一手: この最新版保持版を保存し、固定元e279の別名/tmp/quick-work-ui-deploy-20261110-v2.shを準備。今回も実行コード差分は共有Middlewareと簡易詳細の2件だけ、DB/migration/seedなし。旧手順の承認を新版へ拡張せず、正確な新SSHを提示して承認を得る。表示修正/校正試用実受信は未確認、一般公開未承認、共有Claude作業は未編集。
+
+
+## 2026-11-10 e279保持版と表示修正v2手順を保存・承認待ち
+
+検証済み統合版705a8e6da473222b6b081ff4fd9dd06ba408de36を保存。固定元e27916cbc58b520874d30e553dac3d0437861175→同固定先の/tmp/quick-work-ui-deploy-20261110-v2.shを作成、sh -n成功。SHA256 a571417de9876869d873467985905878dc691459030c102316c908f1804c4500。同一コピーはstorage/app/private/codex-quick-work-ui-deploy-20261110-v2/。
+
+固定HEAD/main/追跡変更なし/既知未追跡5件/本番manifest ffef87fca59e10f96adbd926a37685b03f4d0d67717e0495da17e63dcf5280ccを照合。source12許可一覧/削除なし/database・routes・依存・設定不変/PHP2構文/488 entry・519資産/members baseを確認してff-only。配備資産とview:clear、最終変更/未追跡状態保持を検査。DB照会/更新・migration/seed・試験通知は含めない。最新営業分析のcontroller/service/画面/部品・ルート・Ziggy・変更履歴はe279の内容を維持する。
+
+実行候補（v2はまだ未承認・未実行）:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-deploy-20261110-v2.sh
+
+次の一手: この新しい正確なSSHの承認。旧v1の承認は新版へ拡張しない。表示修正の実配備/利用者画面と、校正試用の実受信2点は未実施/未確認。新式一般公開未承認。
