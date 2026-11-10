@@ -1703,3 +1703,9 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/proof-completion-
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php
 
 結果に基づき、一般公開を維持したまま管理者/進行管理/Leaderの代表レビュー方法と公開対象・時期の意思決定へ進む。資料の基準は保存227c70992と利用者回答。失われた/tmp旧ツリーは同コミットから隔離ツリーfeature/proof-notice-confirm-20261111へ復元、共有Claude作業を変更しない。本番最新HEADを今回確認した意味ではない。
+
+
+## 2026-11-11 本番限定読取のローカルパス訂正（SSH未実行）
+
+利用者yesは提示したコマンドへの承認として受領したが、実行直前のローカル確認で提示パス `/home/w229/SunBWork/...` と実ファイル `/home/w229/SunBwork/...` の大文字・小文字違いを検出。実ファイルSHA256 f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2を再確認。SSHは一切実行しておらず、本番DB/アプリに変更なし。AGENTSの正確なコマンド提示を満たすため、次の訂正版だけを利用者へ提示し確認を得る。旧パスのコマンドは実行しない。
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php
