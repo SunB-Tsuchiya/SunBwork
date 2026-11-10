@@ -2151,3 +2151,12 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 
 利用者yesは提示したコマンドへの承認として受領したが、実行直前のローカル確認で提示パス `/home/w229/SunBWork/...` と実ファイル `/home/w229/SunBwork/...` の大文字・小文字違いを検出。実ファイルSHA256 f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2を再確認。SSHは一切実行しておらず、本番DB/アプリに変更なし。AGENTSの正確なコマンド提示を満たすため、次の訂正版だけを利用者へ提示し確認を得る。旧パスのコマンドは実行しない。
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php
+
+
+## 2026-11-11 新式元参照の本番限定読取0件・試用入口の再特定
+
+承認済みの訂正版SSHを同一スクリプトhash f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2で実行しexit0。本番1414df8679cb2ba4f139cf144b896bdf26038daa、mysql実DB名照合、READ ONLY transaction/rollback。2026-11-10以降でsource_personal_work_entry_id非NULLのproof_requestsは0件。氏名/件名/本文/結果/ファイル/売上を取得せず、更新/通知送信なし。したがって先の旧式由来依頼162による成功を新式元紐づけの本番証拠へ拡張できない。利用者が確認した送受信・完了通知は成功のまま維持する。
+
+コード読取: 保存版と本番1414でQuickWorkProofRequest/WorkDetail/ProofRequestModalは差分なし。新式詳細MyJobBox/WorkDetail.vueの校正依頼ボタンはProofRequestModalにquick-entry-id=work.idを渡し、専用POSTはproof_requests.source_personal_work_entry_idを元PersonalWorkEntry.idで保存する。旧/新式は同じ『校正依頼』表示だが新式詳細のURLは/members/myjobbox/work-entries/{entry}。本番で新式送信を証明するには、このURLの未完了簡易作業から1件の実送信が必要。
+
+次の一手: 利用者自身が試用SuperAdminで仕事・案件→マイジョブの簡易入力1件（未完了）を開き、詳細URLに/myjobbox/work-entries/が含まれることを確認してから校正依頼を実送信する。窓口へ本物の通知が届くことを案内。送信後は同詳細の『校正依頼済み・状況を見る』表示と元未完了を確認し、詳細URLを報告してもらう。これは従前確認した旧式由来162とは異なる、新式元紐づけの未確認1点。結果を得た後、同じ承認済み読み取りコマンドで本番元参照を再照合する。新しいDB書込みやCodexからの試験送信なし。一般公開未承認。
