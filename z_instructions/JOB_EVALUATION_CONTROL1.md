@@ -1781,3 +1781,16 @@ PHP11ファイル構文成功。ChangelogSeederの自動merge差分はLegacyRece
 元9683/9684は既に両方完了済みなので修正後の再操作でも過去未送信を送らない。今回分の補正・再送は未承認。一般Userの既存完了経路のバグ修正であり、新式入力/BOXの公開制限は保持。共有Claude作業を変更せず、実DBでのテスト登録/完了/通知もしていない。
 
 状態: 設計承認・再現・実装・最終コード検証完了、今回配備/修正後の実通知受信は未実施。次の一手はac363から今回PHP差分だけの固定配備手順を用意し、正確なSSH承認を得る。
+
+
+## 2026-11-10 従来完了通知修正の配備手順準備（未承認・未実行）
+
+検証済み最新版保持版6ef5280fa93d9a5ab90b57944e44af9e3b79bb25をfeature/myjob-request-checks-20261110へ保存・push済み。/tmp/legacy-received-completion-deploy-20261110.shを準備、sh -n成功。SHA256 50bd68b393234c9b880f11d5ee6bec756cff656334723197b370bbd699ab7896。同一内容をstorage/app/private/codex-legacy-received-completion-20261110にも保存。
+
+固定元ac36333cc4d699d2e362fb47a36edc82a9c74dc4→固定先6ef5280fa93d9a5ab90b57944e44af9e3b79bb25。main/追跡変更なし/既知未追跡5件、source22許可一覧、削除なし、資産/JS/ビュー/routes/設定/依存/migration/CLAUDE/AGENTS/.gitignore差分0、PHP11構文を照合してff-only。ac363の既存manifest固定hash/481 entry/512資産/members base、既定mysqlとDB名/version26文字を確認し、LegacyReceivedCompletionChangelogSeederだけ--database=mysql --force、view:clear/最終作業状態保持を確認する。他作業の売上報告のmigration・データ・画面設定は操作しない。
+
+次の一手は正確なSSHを提示し、承認後に同一スクリプトを実行:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/legacy-received-completion-deploy-20261110.sh
+HEADが異なれば変更前に停止して最新版を再統合する。本番の通知作成/仕事の完了/旧未送信分の再送/一括補正はこの手順に含めない。新式一般公開はしないが、承認された既存一般Userの通知不具合修正は既存経路へ適用する（SuperAdminだけに限定して今回の一般Userの問題を残す意味ではない）。
+
+今回の配備・修正後の実受信確認はまだ未実施。配備後は実際に完了してよい別の代表例で、依頼主に完了報告1件・リーダー兼任で重複なしを確認する。すでに両方完了済みの9683/9684へ勝手に再送しない。
