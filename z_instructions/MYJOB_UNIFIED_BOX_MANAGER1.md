@@ -1429,3 +1429,14 @@ proof_requests.source_personal_work_entry_idのnullable/index migration1件を�
 環境補正の記録: 初回buildは隔離vendor参照不足で失敗、読取用symlinkを整えて最終build成功。Ziggy初回はvendorの相対autoload先不一致で停止、標準/work/vendor読取mountへ戻して生成成功。生成先の絶対パスがbase_pathで二重になり、隔離work/storage/appに一時出力が残った。権限により移動できないため未追跡一時出力としてコミット対象外。共有vendor/環境変数/本番/業務DBは変更していない。中間失敗を最終成功の証拠にしない。
 
 状態: 設計承認・実装・コード検証・本番build完了。配備/追加migration実行/変更履歴seed/実通知受信/窓口レビューは未実施。既成功画面は反復しない。次の一手は保存した今回差分を基準に、正確な読取SSH承認で本番最新HEAD/作業中ファイルを確認し、他作業を保持した固定配備手順を作る。新式一般公開はしない。試験通知や校正依頼をCodexから本番作成しない。
+
+
+## 2026-11-10 本番最新版54d1c68e6を保持した統合版検証成功・未配備
+
+利用者yesで提示済みread-only SSHを承認し、同一コマンドを実行。HEAD54d1c68e62580ec8311c3a6a1fad3eb15a1b2bc8/main、追跡対象変更なし、既知未追跡5件とmanifest未変更を確認。旧最終6ef後の別作業「営業ダッシュボード/カレンダー・部署別カレンダー分離」が追加されていた。ローカル同SHA objectで差分を照合し、隔離ブランチの校正試用39c1e102eへ取り込んだ。共有作業ツリー/CLAUDE.md/本番sales DBは未編集・未照会。
+
+統合競合はmanifestと1行Ziggyのみ。Ziggyは54d版の全ルートを保持し、生成照合済みの校正POST1件だけを追加。manifestは統合後の全ソースを/membersで再build。ChangelogSeederは自動mergeで他作業を保持し、54d比は専用Seeder呼出し1行のみ。営業/Clerk/共通AppLayout/HandleInertiaRequests/routes.suna/依存/config/bootstrap/AGENTS/CLAUDEのソース差分0。
+
+統合後にIntegration91件1022断言・実Vue校正新旧/入力/詳細/ナビの4検証・PHP10構文が再成功。members build成功、manifest484 entry/515資産/欠落0、54dのソースentryと旧hash資産を保持。静的Ziggyは54d版全定義一致+新規1件だけ。最終manifest SHA256 51a14e0dc78a75fe178225d962bd3ef440edb1bc55f54a8b59f7730c9b5cc519。自動chunkキーの変更はbundle再構成によるもので、既存page sourceの欠落ではない。
+
+次の一手: この統合版を保存し、固定元54d/固定先・source許可一覧/削除なし/既知未追跡5件/本番用manifestを照合する/tmp/quick-work-proof-deploy-20261110.shを準備。追加列migration1件だけを旧コードの段階で--database=mysql --realpath --path=<対象ファイル> --forceにより先行追加し、元参照列がない新コードをWebへ出す時間を避ける。その後ff-onlyし、QuickWorkProofChangelogSeederだけ--database=mysql --force、route/view cache clear・最終作業状態確認。他作業のmigration/seedは実行しない。正確なSSHとスクリプトを提示して承認後に配備する。現時点は配備/migration/実受信未実施。一般公開未承認・Codexによる試験送信なし。

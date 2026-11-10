@@ -1,4 +1,5 @@
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import { ref, watch } from 'vue';
 import axios from 'axios';
 import { route } from 'ziggy-js';
@@ -18,7 +19,7 @@ const dragOverIdx = ref(null);
 async function fetchColors() {
     loading.value = true;
     try {
-        const res = await axios.get(route('clerk.calendar.colors.index'));
+        const res = await axios.get(calRoute('calendar.colors.index'));
         colors.value = res.data;
         emit('colors-updated', colors.value);
     } catch { /* ignore */ } finally {
@@ -38,7 +39,7 @@ function onLabelInput(item) {
 
 async function saveLabel(item) {
     try {
-        await axios.patch(route('clerk.calendar.colors.update', { colorKey: item.color_key }), {
+        await axios.patch(calRoute('calendar.colors.update', { colorKey: item.color_key }), {
             label: item.label || null,
         });
         emit('colors-updated', colors.value);
@@ -65,7 +66,7 @@ async function onDrop(targetIdx) {
     emit('colors-updated', colors.value);
 
     try {
-        await axios.post(route('clerk.calendar.colors.reorder'), {
+        await axios.post(calRoute('calendar.colors.reorder'), {
             orders: arr.map((c, i) => ({ color_key: c.color_key, sort_order: i })),
         });
     } catch {

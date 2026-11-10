@@ -1,4 +1,5 @@
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import { CLERK_EVENT_COLORS, CLERK_EVENT_COLOR_KEYS } from '@/Components/Clerk/clerkEventColors';
 import RecipientPicker from '@/Components/Clerk/RecipientPicker.vue';
 import SimpleRichText from '@/Components/Common/SimpleRichText.vue';
@@ -31,10 +32,10 @@ const plainLength = computed(() => (form.content || '').replace(/<[^>]*>/g, '').
 
 function submit() {
     if (editing.value) {
-        form.put(route('clerk.reminders.update', { reminder: props.reminder.id }));
+        form.put(calRoute('reminders.update', { reminder: props.reminder.id }));
         return;
     }
-    form.post(route('clerk.reminders.store'));
+    form.post(calRoute('reminders.store'));
 }
 </script>
 
@@ -42,7 +43,7 @@ function submit() {
     <AppLayout :title="editing ? 'リマインダー編集' : 'リマインダー追加'">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('clerk.reminders.index')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300">
+                <Link :href="calRoute('reminders.index')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300">
                     ← 一覧に戻る
                 </Link>
                 <h2 class="text-base font-semibold text-gray-800 sm:text-xl">{{ editing ? 'リマインダー編集' : 'リマインダー追加' }}</h2>
@@ -114,7 +115,7 @@ function submit() {
                     <button :disabled="form.processing" class="rounded bg-purple-600 px-5 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
                         {{ form.processing ? '保存中…' : editing ? '保存する' : '登録する' }}
                     </button>
-                    <Link :href="route('clerk.reminders.index')" class="rounded bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300">キャンセル</Link>
+                    <Link :href="calRoute('reminders.index')" class="rounded bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300">キャンセル</Link>
                 </div>
             </form>
         </div>

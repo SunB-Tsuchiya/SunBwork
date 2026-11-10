@@ -90,7 +90,8 @@ class NoticeService
     public function upsertReminder(Campaign $campaign, User $by, ?string $content = null): ClerkCalendarReminder
     {
         $content = $content !== null && trim($content) !== '' ? trim($content) : $this->reminderDraft($campaign);
-        $attrs = ['company_id' => $campaign->company_id, 'content' => $content, 'color_key' => 'orange',
+        // 年末調整は総務の業務なので、総務のカレンダーのリマインダーにする（サンエー印刷は総務・経理・営業でカレンダーが別。SUNASALES_PLAN1.md §14）
+        $attrs = ['company_id' => $campaign->company_id, 'calendar_kind' => 'soumu', 'content' => $content, 'color_key' => 'orange',
             'starts_on' => $campaign->opens_on->toDateString(), 'ends_on' => $campaign->due_on->toDateString(), 'is_active' => true];
         $reminder = $campaign->calendar_reminder_id ? ClerkCalendarReminder::find($campaign->calendar_reminder_id) : null;
         if ($reminder) {

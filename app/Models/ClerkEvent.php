@@ -9,7 +9,7 @@ class ClerkEvent extends Model
 {
     protected $fillable = [
         'company_id', 'user_id', 'title', 'description', 'starts_at', 'ends_at', 'all_day',
-        'color_key', 'completed_at',
+        'color_key', 'completed_at', 'calendar_kind',
     ];
 
     protected function casts(): array
@@ -46,5 +46,14 @@ class ClerkEvent extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * 会社＋カレンダーの種類で絞り込む（calendar_kind: ''=従来のカレンダー、'soumu'/'keiri'/'sales'=サンエー印刷）。
+     * 種類を指定しない既存の呼び出し（forCompany 等）は、そのまま動く。
+     */
+    public function scopeInCalendar(\Illuminate\Database\Eloquent\Builder $query, int $companyId, string $kind = ''): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where($this->getTable() . '.company_id', $companyId)->where($this->getTable() . '.calendar_kind', $kind);
     }
 }

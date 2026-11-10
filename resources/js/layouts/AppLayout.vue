@@ -8,6 +8,7 @@ import IrukaStatusBadge from '@/Components/Iruka/IrukaStatusBadge.vue';
 import IrukaMobileStatusButton from '@/Components/Iruka/IrukaMobileStatusButton.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
+import SalesNavigationTabs from '@/Components/SunA/Sales/SalesNavigationTabs.vue';
 import PrepressNavigationTabs from '@/Components/Tabs/PrepressNavigationTabs.vue';
 import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTabs.vue';
 import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
@@ -212,7 +213,6 @@ const getTopTabActive = () => {
         if (r.includes('teams')) return 'teams';
         if (r.includes('clients')) return 'clients';
         if (r.includes('workload_setting')) return 'workload_setting';
-        if (r === 'schedule.index' && page.props.showDepartmentWork && page.props.departmentWorkEnabled && page.props.auth?.companyType !== 'general') return 'department_work';
         if (r === 'schedule.department_work.details') return 'workload';
         if (r.includes('workload_analyzer')) return 'workload';
         if (r.includes('project_jobs')) return 'project_jobs';
@@ -318,6 +318,8 @@ const currentRouteContext = computed(() => {
         if (r.startsWith('coordinator.')) return 'coordinator';
         if (r.startsWith('proof_coordinator.')) return 'proof_coordinator';
         if (r.startsWith('clerk.')) return 'clerk';
+        // サンエー印刷の営業（ダッシュボード・カレンダー。売上レポートは独立レイアウト）
+        if (r.startsWith('suna.sales.')) return 'sales';
         if (r.startsWith('prepress.')) return 'prepress';
         if (r.startsWith('diary_manager.')) return page.props.auth?.user?.user_role || 'user';
         // user.project_jobs.* / user.jobbox.* は user エリア
@@ -341,6 +343,7 @@ const ROLE_DASHBOARD_ROUTE = {
     coordinator:      'coordinator.dashboard',
     proof_coordinator:'proof_coordinator.dashboard',
     clerk:            'clerk.dashboard',
+    sales:            'suna.sales.dashboard',
     user:             'user.dashboard',
     prepress:         'prepress.dashboard',
 };
@@ -396,7 +399,7 @@ function navigateToRole(role) {
     try {
         // サンエー印刷の営業: 売上レポート（独立レイアウト。許可された人だけ。SunA/Sales）
         if (role === 'sales') {
-            router.get(route('suna.sales.report.index'));
+            router.get(route('suna.sales.dashboard'));
             return;
         }
         // 一般会社の総務/経理: 同じ Clerk エリアを kind 付きで開く（kind はサーバー側セッションに保持）
@@ -794,8 +797,8 @@ function navigateToRole(role) {
                             >
                                 <span :class="clerkKind === 'keiri' ? 'text-teal-600' : 'text-purple-600'">{{ clerkKind === 'keiri' ? '経理' : '総務' }} Dashboard</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink v-if="$page.props.auth.salesReportAccess" :href="route('suna.sales.report.index')" :active="route().current('suna.sales.report.*')">
-                                <span class="text-indigo-600">営業 売上レポート</span>
+                            <ResponsiveNavLink v-if="$page.props.auth.salesReportAccess" :href="route('suna.sales.dashboard')" :active="route().current('suna.sales.*')">
+                                <span class="text-indigo-600">営業 Dashboard</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">ユーザー Dashboard</span>
@@ -1030,6 +1033,7 @@ function navigateToRole(role) {
                                 <AdminNavigationTabs v-else-if="currentRouteContext === 'admin'" :active="getTopTabActive()" />
                                 <LeaderNavigationTabs v-else-if="currentRouteContext === 'leader'" :active="getTopTabActive()" />
                                 <ClerkNavigationTabs v-else-if="currentRouteContext === 'clerk'" :active="getTopTabActive()" />
+                                <SalesNavigationTabs v-else-if="currentRouteContext === 'sales'" :active="getTopTabActive()" />
                                 <PrepressNavigationTabs v-else-if="currentRouteContext === 'prepress'" :active="getTopTabActive()" />
                                 <ProofCoordinatorNavigationTabs v-else-if="currentRouteContext === 'proof_coordinator'" :active="getTopTabActive()" />
                                 <CoordinatorNavigationTabs

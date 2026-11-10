@@ -1,4 +1,5 @@
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import { CLERK_EVENT_COLORS } from '@/Components/Clerk/clerkEventColors';
 import RichTextView from '@/Components/Common/RichTextView.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -32,7 +33,7 @@ function toggle(reminder) {
     if (!confirm(`このリマインダーを${action}しますか？`)) return;
     busyId.value = reminder.id;
     router.patch(
-        route('clerk.reminders.toggle', { reminder: reminder.id }),
+        calRoute('reminders.toggle', { reminder: reminder.id }),
         { is_active: !reminder.is_active },
         { preserveScroll: true, onFinish: () => { busyId.value = null; } },
     );
@@ -41,7 +42,7 @@ function toggle(reminder) {
 function remove(reminder) {
     if (!confirm('このリマインダーを削除しますか？')) return;
     busyId.value = reminder.id;
-    router.delete(route('clerk.reminders.destroy', { reminder: reminder.id }), {
+    router.delete(calRoute('reminders.destroy', { reminder: reminder.id }), {
         preserveScroll: true,
         onFinish: () => { busyId.value = null; },
     });
@@ -52,7 +53,7 @@ function remove(reminder) {
     <AppLayout title="リマインダー設定">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('clerk.calendar')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300">
+                <Link :href="calRoute('calendar')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300">
                     ← カレンダーに戻る
                 </Link>
                 <h2 class="text-base font-semibold text-gray-800 sm:text-xl">リマインダー設定</h2>
@@ -62,7 +63,7 @@ function remove(reminder) {
         <div class="rounded bg-white p-6 shadow">
             <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <p class="text-sm text-gray-600">表示期間中、ユーザーのカレンダー上部へ案内を表示します。</p>
-                <Link :href="route('clerk.reminders.create')" class="rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">
+                <Link :href="calRoute('reminders.create')" class="rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">
                     リマインダーを追加
                 </Link>
             </div>
@@ -92,7 +93,7 @@ function remove(reminder) {
                                 <span class="rounded-full px-2 py-1 text-xs font-medium" :class="status(reminder).classes">{{ status(reminder).label }}</span>
                             </td>
                             <td class="whitespace-nowrap px-3 py-3 text-right">
-                                <Link :href="route('clerk.reminders.edit', { reminder: reminder.id })" class="mr-3 text-purple-700 hover:underline">編集</Link>
+                                <Link :href="calRoute('reminders.edit', { reminder: reminder.id })" class="mr-3 text-purple-700 hover:underline">編集</Link>
                                 <button :disabled="busyId === reminder.id" class="mr-3 text-gray-600 hover:underline disabled:opacity-50" @click="toggle(reminder)">
                                     {{ reminder.is_active ? '停止' : '再開' }}
                                 </button>

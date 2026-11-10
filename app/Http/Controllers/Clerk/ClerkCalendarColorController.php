@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Clerk;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesClerkCalendar;
 use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\ClerkCalendarColor;
 use Illuminate\Http\Request;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class ClerkCalendarColorController extends Controller
 {
-    use ResolvesContextCompany;
+    use ResolvesClerkCalendar, ResolvesContextCompany;
 
     private const COLOR_KEYS = [
         'indigo', 'blue', 'cyan', 'teal', 'green',
@@ -24,12 +25,12 @@ class ClerkCalendarColorController extends Controller
 
         foreach (self::COLOR_KEYS as $i => $key) {
             ClerkCalendarColor::firstOrCreate(
-                ['company_id' => $companyId, 'color_key' => $key],
+                ['company_id' => $companyId, 'calendar_kind' => $this->calendarKind(), 'color_key' => $key],
                 ['sort_order' => $i]
             );
         }
 
-        $colors = ClerkCalendarColor::where('company_id', $companyId)
+        $colors = ClerkCalendarColor::inCalendar($companyId, $this->calendarKind())
             ->orderBy('sort_order')
             ->get(['color_key', 'label', 'sort_order']);
 
@@ -42,7 +43,7 @@ class ClerkCalendarColorController extends Controller
             'label' => 'nullable|string|max:20',
         ]);
 
-        ClerkCalendarColor::where('company_id', $this->companyId())
+        ClerkCalendarColor::inCalendar($this->companyId(), $this->calendarKind())
             ->where('color_key', $colorKey)
             ->update(['label' => $validated['label'] ?: null]);
 
@@ -58,10 +59,11 @@ class ClerkCalendarColorController extends Controller
         ]);
 
         $companyId = $this->companyId();
+        $kind = $this->calendarKind();
 
-        DB::transaction(function () use ($request, $companyId) {
+        DB::transaction(function () use ($request, $companyId, $kind) {
             foreach ($request->orders as $item) {
-                ClerkCalendarColor::where('company_id', $companyId)
+                ClerkCalendarColor::inCalendar($companyId, $kind)
                     ->where('color_key', $item['color_key'])
                     ->update(['sort_order' => $item['sort_order']]);
             }

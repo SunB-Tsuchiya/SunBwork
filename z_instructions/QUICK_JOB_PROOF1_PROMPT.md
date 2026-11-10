@@ -1,5 +1,7 @@
 # 簡易ジョブ校正依頼：再開
 
+> 2026-11-10最新: 承認済みread SSHで本番54d1c68e6を確認。別作業の営業/部署別カレンダーを統合保持し、Integration91/1022・実Vue4検証・PHP10構文・members build484/515欠落0が再成功。未配備。次は固定元54dの限定配備スクリプトを準備し正確なSSH承認。追加migration1件と専用Seederのみ。一般公開未承認。QUICK_JOB_PROOF_MANAGER1末尾優先。
+
 > 2026-11-10最新: 具体案yes承認。校正入口/元参照/同会社部署窓口通知/二重送信防止/削除保護を実装しIntegration91件1022断言、実Vue新旧/既存入力・詳細・ナビ、PHP10構文、members build482/513欠落0が成功。未配備。次は正確なread SSH承認で本番最新版と作業状態を取得し、他作業保持の固定配備手順へ。QUICK_JOB_PROOF_MANAGER1末尾優先。一般公開未承認。
 
 AGENTS.md→JOB_EVALUATION_CONTROL1.md→QUICK_JOB_PROOF_PLAN1.md/MANAGER1.mdを読む。
