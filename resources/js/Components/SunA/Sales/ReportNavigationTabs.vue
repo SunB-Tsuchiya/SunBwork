@@ -27,6 +27,14 @@ const groups = computed(() => [
         tabs: [{ key: 'index', route: 'index', label: 'データ登録状況' }],
     },
     {
+        label: '分析',
+        tabs: [
+            { key: 'annual', route: 'annual', label: '年次分析' },
+            { key: 'same_month', route: 'same_month', label: '同月比較' },
+            { key: 'client', route: 'client', label: '得意先分析' },
+        ],
+    },
+    {
         label: '設定・取込',
         tabs: [
             { key: 'import', route: 'import.create', label: 'Excel取込', show: canImport.value },

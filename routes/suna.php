@@ -10,9 +10,12 @@ use App\Http\Controllers\SunA\GeneralAffairs\Nencho\MyNenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NoticeController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\SubmissionController;
+use App\Http\Controllers\SunA\Sales\AnnualAnalysisController;
+use App\Http\Controllers\SunA\Sales\ClientAnalysisController;
 use App\Http\Controllers\SunA\Sales\DashboardController as SalesDashboardController;
 use App\Http\Controllers\SunA\Sales\ImportController;
 use App\Http\Controllers\SunA\Sales\RegistrationStatusController;
+use App\Http\Controllers\SunA\Sales\SameMonthController;
 use App\Http\Controllers\SunA\Sales\ReportPermissionController;
 use App\Http\Controllers\Clerk\ClerkCalendarColorController;
 use App\Http\Controllers\Clerk\ClerkCalendarController;
@@ -117,6 +120,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // 取込履歴（何が変わったか。閲覧できる人）
         Route::get('history', [ImportController::class, 'history'])->name('history.index');
         Route::get('api/history/{import}/changes', [ImportController::class, 'changes'])->whereNumber('import')->name('api.history.changes');
+
+        // 分析（段階2）: 年次分析・同月比較・得意先分析。画面と JSON API
+        Route::get('annual', [AnnualAnalysisController::class, 'index'])->name('annual');
+        Route::get('api/annual/summary', [AnnualAnalysisController::class, 'summary'])->name('api.annual.summary');
+        Route::get('api/annual/clients', [AnnualAnalysisController::class, 'clients'])->name('api.annual.clients');
+        Route::get('same-month', [SameMonthController::class, 'index'])->name('same_month');
+        Route::get('api/same-month/summary', [SameMonthController::class, 'summary'])->name('api.same_month.summary');
+        Route::get('client', [ClientAnalysisController::class, 'index'])->name('client');
+        Route::get('api/client/search', [ClientAnalysisController::class, 'search'])->name('api.client.search');
+        Route::get('api/client/detail', [ClientAnalysisController::class, 'detail'])->name('api.client.detail');
     });
 
 // 売上レポート（営業）: 取込。取込を許可された人（と SuperAdmin）のみ（suna_sales_report:import）。
