@@ -120,6 +120,7 @@
 </template>
 
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
@@ -324,7 +325,7 @@ function toggleReplyForm(id) {
 async function fetchPosts() {
     postsLoading.value = true;
     try {
-        const res = await axios.get(route('clerk.calendar.week_posts.index'), {
+        const res = await axios.get(calRoute('calendar.week_posts.index'), {
             params: { year: currentYear.value, week: currentWeek.value },
         });
         flatPosts.value = res.data;
@@ -340,7 +341,7 @@ async function submitPost() {
     postSubmitting.value = true;
     try {
         const res = await axios.post(
-            route('clerk.calendar.week_posts.store'),
+            calRoute('calendar.week_posts.store'),
             { year: currentYear.value, week: currentWeek.value, body: newPostBody.value.trim() },
             { headers: { 'X-CSRF-TOKEN': getCsrf() } },
         );
@@ -358,7 +359,7 @@ async function submitReply(targetItem) {
     replySubmitting.value = true;
     try {
         const res = await axios.post(
-            route('clerk.calendar.week_posts.store'),
+            calRoute('calendar.week_posts.store'),
             {
                 year: currentYear.value,
                 week: currentWeek.value,

@@ -1,4 +1,5 @@
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import { ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
@@ -21,7 +22,7 @@ function reset() {
 watch(() => props.year, (year) => { selectedYear.value = year; reset(); });
 function changeYear() {
     notice.value = '';
-    router.get(route('clerk.calendar.holidays.index'), { year: selectedYear.value });
+    router.get(calRoute('calendar.holidays.index'), { year: selectedYear.value });
 }
 function edit(holiday) {
     form.clearErrors();
@@ -33,13 +34,13 @@ function edit(holiday) {
 }
 function save() {
     const options = { preserveScroll: true, onSuccess: () => { reset(); notice.value = '保存しました。カレンダーに反映されます。'; } };
-    if (editingId.value) form.put(route('clerk.calendar.holidays.update', { holiday: editingId.value }), options);
-    else form.post(route('clerk.calendar.holidays.store'), options);
+    if (editingId.value) form.put(calRoute('calendar.holidays.update', { holiday: editingId.value }), options);
+    else form.post(calRoute('calendar.holidays.store'), options);
 }
 function remove(holiday) {
     if (!confirm(`${holiday.date}「${holiday.name}」を削除しますか？`)) return;
     deleting.value = holiday.id;
-    router.delete(route('clerk.calendar.holidays.destroy', { holiday: holiday.id }), {
+    router.delete(calRoute('calendar.holidays.destroy', { holiday: holiday.id }), {
         preserveScroll: true,
         onSuccess: () => { if (editingId.value === holiday.id) reset(); notice.value = '削除しました。'; },
         onError: () => { notice.value = '削除できませんでした。もう一度お試しください。'; },
@@ -52,7 +53,7 @@ function remove(holiday) {
     <AppLayout title="祝日設定">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('clerk.calendar.settings')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300">← 設定に戻る</Link>
+                <Link :href="calRoute('calendar.settings')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300">← 設定に戻る</Link>
                 <h2 class="text-base font-semibold text-gray-800 sm:text-xl">祝日設定</h2>
             </div>
         </template>
@@ -62,7 +63,7 @@ function remove(holiday) {
                 <select id="holiday-year" v-model.number="selectedYear" :disabled="form.processing || deleting !== null" class="rounded border-gray-300 text-sm" @change="changeYear">
                     <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
                 </select>
-                <Link :href="route('clerk.calendar')" class="text-sm text-purple-700 hover:underline">カレンダーへ</Link>
+                <Link :href="calRoute('calendar')" class="text-sm text-purple-700 hover:underline">カレンダーへ</Link>
             </div>
             <p class="mb-2 text-sm text-gray-600">登録した日付は、会社共通のカレンダーで赤く表示されます。</p>
             <p class="mb-5 text-xs text-gray-500">

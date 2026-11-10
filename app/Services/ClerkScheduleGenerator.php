@@ -12,9 +12,12 @@ class ClerkScheduleGenerator
 {
     public function __construct(private ClerkScheduleDates $dates) {}
 
-    public function generateCompany(int $companyId, ?int $year = null): void
+    /** $kind を指定すると、そのカレンダー（総務/経理/営業。サン・ブレーンは空文字）のルールだけを生成する。null は全て（従来どおり） */
+    public function generateCompany(int $companyId, ?int $year = null, ?string $kind = null): void
     {
-        ClerkScheduleRule::where('company_id', $companyId)->where('is_active', true)->eachById(function ($rule) use ($year) {
+        ClerkScheduleRule::where('company_id', $companyId)
+            ->when($kind !== null, fn ($q) => $q->where('calendar_kind', $kind))
+            ->where('is_active', true)->eachById(function ($rule) use ($year) {
             $this->generate($rule->id);
             if ($year !== null) {
                 $this->generate($rule->id, CarbonImmutable::create($year, 1, 1, 0, 0, 0, 'Asia/Tokyo')->subDays(42)->toDateString(),
@@ -49,7 +52,7 @@ class ClerkScheduleGenerator
             if (! $occurrence->wasRecentlyCreated && $date < now('Asia/Tokyo')->toDateString()) {
                 continue;
             }
-            $event = ClerkEvent::create($this->eventData($rule, $date) + ['company_id' => $rule->company_id, 'user_id' => $rule->created_by]);
+            $event = ClerkEvent::create($this->eventData($rule, $date) + ['company_id' => $rule->company_id, 'calendar_kind' => $rule->calendar_kind ?? '', 'user_id' => $rule->created_by]);
             $occurrence->update(['clerk_event_id' => $event->id, 'state' => 'generated']);
         }
     }

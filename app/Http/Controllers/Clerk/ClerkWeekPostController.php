@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Clerk;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesClerkCalendar;
 use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\ClerkWeekPost;
 use Illuminate\Http\Request;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 
 class ClerkWeekPostController extends Controller
 {
-    use ResolvesContextCompany;
+    use ResolvesClerkCalendar, ResolvesContextCompany;
 
     public function index(Request $request)
     {
@@ -19,7 +20,7 @@ class ClerkWeekPostController extends Controller
             'week' => 'required|integer|min:1|max:53',
         ]);
 
-        $posts = ClerkWeekPost::where('company_id', $this->companyId())
+        $posts = ClerkWeekPost::inCalendar($this->companyId(), $this->calendarKind())
             ->where('year', $request->year)
             ->where('week', $request->week)
             ->with('user:id,name,user_role')
@@ -48,6 +49,7 @@ class ClerkWeekPostController extends Controller
 
         $post = ClerkWeekPost::create(array_merge($validated, [
             'company_id' => $this->companyId(),
+            'calendar_kind' => $this->calendarKind(),
             'user_id'    => Auth::id(),
         ]));
 
@@ -66,7 +68,7 @@ class ClerkWeekPostController extends Controller
 
     public function destroy(ClerkWeekPost $post)
     {
-        abort_unless($post->company_id === $this->companyId(), 404);
+        $this->abortUnlessInCalendar($post);
 
         $post->delete();
 

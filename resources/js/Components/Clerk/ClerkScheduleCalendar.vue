@@ -1,4 +1,5 @@
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -21,7 +22,7 @@ let eventRequest = 0;
 async function fetchEvents() {
     const request = ++eventRequest;
     try {
-        const res = await axios.get(route('clerk.calendar.events.index'), { params: { year: selectedYear.value } });
+        const res = await axios.get(calRoute('calendar.events.index'), { params: { year: selectedYear.value } });
         if (request !== eventRequest) return;
         events.value = res.data;
         eventError.value = '';
@@ -38,7 +39,7 @@ const colorSettings  = ref([]); // [{ color_key, label, sort_order }]
 
 async function fetchColorSettings() {
     try {
-        const res = await axios.get(route('clerk.calendar.colors.index'));
+        const res = await axios.get(calRoute('calendar.colors.index'));
         colorSettings.value = res.data;
     } catch { /* ignore */ }
 }
@@ -174,7 +175,7 @@ async function savePanelEdits() {
     const deletedIds  = [...originalIds].filter(id => !editIds.has(id));
     try {
         for (const id of deletedIds) {
-            await axios.delete(route('clerk.calendar.events.destroy', { event: id }));
+            await axios.delete(calRoute('calendar.events.destroy', { event: id }));
         }
         for (const row of panelEditRows.value) {
             if (!row.name.trim()) continue;
@@ -186,9 +187,9 @@ async function savePanelEdits() {
                 all_day:     true,
             };
             if (row.id) {
-                await axios.put(route('clerk.calendar.events.update', { event: row.id }), payload);
+                await axios.put(calRoute('calendar.events.update', { event: row.id }), payload);
             } else {
-                await axios.post(route('clerk.calendar.events.store'), payload);
+                await axios.post(calRoute('calendar.events.store'), payload);
             }
         }
         panelEditMode.value = false;
@@ -281,9 +282,9 @@ async function saveEvent() {
             color_key:   eventForm.value.color_key || null,
         };
         if (eventModalIsEdit.value && eventForm.value.id) {
-            await axios.put(route('clerk.calendar.events.update', { event: eventForm.value.id }), payload);
+            await axios.put(calRoute('calendar.events.update', { event: eventForm.value.id }), payload);
         } else {
-            await axios.post(route('clerk.calendar.events.store'), payload);
+            await axios.post(calRoute('calendar.events.store'), payload);
         }
         showEventModal.value = false;
         await fetchEvents();
@@ -299,7 +300,7 @@ async function deleteEvent() {
     if (!confirm('この予定を削除しますか？')) return;
     eventFormSaving.value = true;
     try {
-        await axios.delete(route('clerk.calendar.events.destroy', { event: eventForm.value.id }));
+        await axios.delete(calRoute('calendar.events.destroy', { event: eventForm.value.id }));
         showEventModal.value = false;
         await fetchEvents();
     } catch {
@@ -313,7 +314,7 @@ async function toggleComplete() {
     if (!eventForm.value.id) return;
     eventFormSaving.value = true;
     try {
-        const res = await axios.patch(route('clerk.calendar.events.complete', { event: eventForm.value.id }));
+        const res = await axios.patch(calRoute('calendar.events.complete', { event: eventForm.value.id }));
         eventForm.value.completed = res.data.completed;
         await fetchEvents();
     } catch {
@@ -346,7 +347,7 @@ async function handleEventDrop(info) {
         newEnd = fmtLocal(d);
     }
     try {
-        await axios.put(route('clerk.calendar.events.update', { event: eid }), {
+        await axios.put(calRoute('calendar.events.update', { event: eid }), {
             title:     ev.title,
             starts_at: newStart,
             ends_at:   newEnd || newStart,
@@ -370,7 +371,7 @@ async function handleEventResize(info) {
         newEnd = fmtLocal(d);
     }
     try {
-        await axios.put(route('clerk.calendar.events.update', { event: eid }), {
+        await axios.put(calRoute('calendar.events.update', { event: eid }), {
             title:     ev.title,
             starts_at: newStart,
             ends_at:   newEnd || newStart,
@@ -395,7 +396,7 @@ const subOneDayStr = (dateStr) => {
 
 // ────────────────── CSV ──────────────────
 function handleCsvExport() {
-    window.location.href = route('clerk.calendar.events.csv_export');
+    window.location.href = calRoute('calendar.events.csv_export');
 }
 
 const showCsvImportModal = ref(false);
@@ -422,7 +423,7 @@ async function submitCsvImport() {
         const formData = new FormData();
         formData.append('file', csvImportFile.value);
         const res = await axios.post(
-            route('clerk.calendar.events.csv_import'),
+            calRoute('calendar.events.csv_import'),
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } },
         );
@@ -519,7 +520,7 @@ const calendarOptions = {
                 :class="currentView === 'week-planner' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
                 class="rounded px-3 py-1.5 text-sm font-medium"
             >週間プランナー</button>
-            <Link :href="route('clerk.calendar.settings')" class="rounded border border-purple-300 px-3 py-1.5 text-sm font-medium text-purple-700 hover:bg-purple-50">カレンダー設定</Link>
+            <Link :href="calRoute('calendar.settings')" class="rounded border border-purple-300 px-3 py-1.5 text-sm font-medium text-purple-700 hover:bg-purple-50">カレンダー設定</Link>
             <span class="mx-1 text-gray-300">|</span>
             <button
                 @click="openCreateModal()"

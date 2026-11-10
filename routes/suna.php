@@ -10,9 +10,17 @@ use App\Http\Controllers\SunA\GeneralAffairs\Nencho\MyNenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NoticeController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\SubmissionController;
+use App\Http\Controllers\SunA\Sales\DashboardController as SalesDashboardController;
 use App\Http\Controllers\SunA\Sales\ImportController;
 use App\Http\Controllers\SunA\Sales\RegistrationStatusController;
 use App\Http\Controllers\SunA\Sales\ReportPermissionController;
+use App\Http\Controllers\Clerk\ClerkCalendarColorController;
+use App\Http\Controllers\Clerk\ClerkCalendarController;
+use App\Http\Controllers\Clerk\ClerkCalendarHolidayController;
+use App\Http\Controllers\Clerk\ClerkCalendarReminderController;
+use App\Http\Controllers\Clerk\ClerkEventController;
+use App\Http\Controllers\Clerk\ClerkScheduleRuleController;
+use App\Http\Controllers\Clerk\ClerkWeekPostController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -156,3 +164,41 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'throttle:60,1'])
     ->get('suna/postal-lookup', [PostalLookupController::class, 'lookup'])
     ->name('suna.postal_lookup');
+
+// 営業のカレンダー（総務・経理とは別の、営業だけの予定）。クラークのカレンダーと同じコントローラーを、ルート名 suna.sales.* で使う。
+// どのカレンダーかは ClerkCalendarKind が「ルート名が suna.sales.*」から営業と判断する。休日は会社共通。
+// 利用できる人は、売上レポートの閲覧を許可された人（と SuperAdmin）。サンエー印刷のみ。
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'suna_sales_report:view'])
+    ->prefix('suna/sales')
+    ->name('suna.sales.')
+    ->group(function () {
+        Route::get('dashboard', [SalesDashboardController::class, 'index'])->name('dashboard');
+        Route::get('calendar', [ClerkCalendarController::class, 'index'])->name('calendar');
+        Route::get('calendar/settings/schedule-rules', [ClerkScheduleRuleController::class, 'index'])->name('calendar.schedule_rules.index');
+        Route::get('calendar/settings/schedule-rules/create', [ClerkScheduleRuleController::class, 'create'])->name('calendar.schedule_rules.create');
+        Route::post('calendar/settings/schedule-rules/preview', [ClerkScheduleRuleController::class, 'preview'])->name('calendar.schedule_rules.preview');
+        Route::post('calendar/settings/schedule-rules', [ClerkScheduleRuleController::class, 'store'])->name('calendar.schedule_rules.store');
+        Route::get('calendar/settings/schedule-rules/{scheduleRule}/edit', [ClerkScheduleRuleController::class, 'edit'])->name('calendar.schedule_rules.edit');
+        Route::put('calendar/settings/schedule-rules/{scheduleRule}', [ClerkScheduleRuleController::class, 'update'])->name('calendar.schedule_rules.update');
+        Route::patch('calendar/settings/schedule-rules/{scheduleRule}/active', [ClerkScheduleRuleController::class, 'toggle'])->name('calendar.schedule_rules.toggle');
+        Route::delete('calendar/settings/schedule-rules/{scheduleRule}', [ClerkScheduleRuleController::class, 'destroy'])->name('calendar.schedule_rules.destroy');
+        Route::get('calendar/settings', [ClerkCalendarHolidayController::class, 'settings'])->name('calendar.settings');
+        Route::get('calendar/settings/holidays', [ClerkCalendarHolidayController::class, 'index'])->name('calendar.holidays.index');
+        Route::post('calendar/settings/holidays', [ClerkCalendarHolidayController::class, 'store'])->name('calendar.holidays.store');
+        Route::put('calendar/settings/holidays/{holiday}', [ClerkCalendarHolidayController::class, 'update'])->name('calendar.holidays.update');
+        Route::delete('calendar/settings/holidays/{holiday}', [ClerkCalendarHolidayController::class, 'destroy'])->name('calendar.holidays.destroy');
+        Route::get('calendar/holidays', [ClerkCalendarHolidayController::class, 'data'])->name('calendar.holidays.data');
+        Route::get('calendar/events', [ClerkEventController::class, 'index'])->name('calendar.events.index');
+        Route::post('calendar/events', [ClerkEventController::class, 'store'])->name('calendar.events.store');
+        Route::get('calendar/events/csv-export', [ClerkEventController::class, 'csvExport'])->name('calendar.events.csv_export');
+        Route::post('calendar/events/csv-import', [ClerkEventController::class, 'csvImport'])->name('calendar.events.csv_import');
+        Route::put('calendar/events/{event}', [ClerkEventController::class, 'update'])->name('calendar.events.update');
+        Route::delete('calendar/events/{event}', [ClerkEventController::class, 'destroy'])->name('calendar.events.destroy');
+        Route::patch('calendar/events/{event}/complete', [ClerkEventController::class, 'complete'])->name('calendar.events.complete');
+        Route::get('calendar/week-posts', [ClerkWeekPostController::class, 'index'])->name('calendar.week_posts.index');
+        Route::post('calendar/week-posts', [ClerkWeekPostController::class, 'store'])->name('calendar.week_posts.store');
+        Route::delete('calendar/week-posts/{post}', [ClerkWeekPostController::class, 'destroy'])->name('calendar.week_posts.destroy');
+        Route::get('calendar/colors', [ClerkCalendarColorController::class, 'index'])->name('calendar.colors.index');
+        Route::patch('calendar/colors/{colorKey}', [ClerkCalendarColorController::class, 'update'])->name('calendar.colors.update');
+        Route::post('calendar/colors/reorder', [ClerkCalendarColorController::class, 'reorder'])->name('calendar.colors.reorder');
+    });

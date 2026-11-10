@@ -1,4 +1,5 @@
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import { CLERK_EVENT_COLORS, CLERK_EVENT_COLOR_KEYS } from '@/Components/Clerk/clerkEventColors';
 import { changeNotice, scheduleTypes, weekdays } from '@/Components/Clerk/clerkScheduleRuleLabels';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -47,7 +48,7 @@ async function preview() {
     previewError.value = '';
     form.clearErrors();
     try {
-        const response = await axios.post(route('clerk.calendar.schedule_rules.preview'), form.data());
+        const response = await axios.post(calRoute('calendar.schedule_rules.preview'), form.data());
         if (revision === previewRevision) previewDates.value = response.data.dates;
     } catch (error) {
         if (revision !== previewRevision) return;
@@ -61,8 +62,8 @@ async function preview() {
 function save() {
     if (editing.value && !confirm(`${changeNotice}\n日付条件を変えると、保持した個別変更分と新しい予定が両方残ることがあります。保存しますか？`))
         return;
-    if (editing.value) form.put(route('clerk.calendar.schedule_rules.update', { scheduleRule: props.scheduleRule.id }));
-    else form.post(route('clerk.calendar.schedule_rules.store'));
+    if (editing.value) form.put(calRoute('calendar.schedule_rules.update', { scheduleRule: props.scheduleRule.id }));
+    else form.post(calRoute('calendar.schedule_rules.store'));
 }
 function colorLabel(key) {
     return props.colorSettings.find((item) => item.color_key === key)?.label || key;
@@ -74,7 +75,7 @@ function colorLabel(key) {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link
-                    :href="route('clerk.calendar.schedule_rules.index')"
+                    :href="calRoute('calendar.schedule_rules.index')"
                     class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300"
                     >← 一覧に戻る</Link
                 >
@@ -251,7 +252,7 @@ function colorLabel(key) {
                     >
                         {{ form.processing ? '保存中…' : editing ? '保存する' : '登録する' }}
                     </button>
-                    <Link :href="route('clerk.calendar.schedule_rules.index')" class="rounded bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
+                    <Link :href="calRoute('calendar.schedule_rules.index')" class="rounded bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
                         >キャンセル</Link
                     >
                 </div>

@@ -15,6 +15,12 @@ class ClerkCalendarHolidayController extends Controller
 {
     use ResolvesContextCompany;
 
+    /** 営業のカレンダーから使うときは 'suna.sales'、それ以外（クラーク）は従来どおり 'clerk'。休日は会社共通 */
+    private function routePrefix(): string
+    {
+        return request()->routeIs('suna.sales.*') ? 'suna.sales' : 'clerk';
+    }
+
     public function settings()
     {
         return Inertia::render('Clerk/Calendar/Settings');
@@ -48,7 +54,7 @@ class ClerkCalendarHolidayController extends Controller
         $holidays->initialize($companyId, $year);
         ClerkCalendarHoliday::create(['company_id' => $companyId] + $this->validated($request, $companyId, $year));
 
-        return to_route('clerk.calendar.holidays.index', ['year' => $year]);
+        return to_route($this->routePrefix() . '.calendar.holidays.index', ['year' => $year]);
     }
 
     public function update(Request $request, ClerkCalendarHoliday $holiday)
@@ -59,7 +65,7 @@ class ClerkCalendarHolidayController extends Controller
         abort_unless((int) $holiday->date->format('Y') === $year, 422);
         $holiday->update($this->validated($request, $companyId, $year, $holiday));
 
-        return to_route('clerk.calendar.holidays.index', ['year' => $year]);
+        return to_route($this->routePrefix() . '.calendar.holidays.index', ['year' => $year]);
     }
 
     public function destroy(ClerkCalendarHoliday $holiday)
@@ -68,7 +74,7 @@ class ClerkCalendarHolidayController extends Controller
         $year = (int) $holiday->date->format('Y');
         $holiday->delete();
 
-        return to_route('clerk.calendar.holidays.index', ['year' => $year]);
+        return to_route($this->routePrefix() . '.calendar.holidays.index', ['year' => $year]);
     }
 
     private function validated(Request $request, int $companyId, int $year, ?ClerkCalendarHoliday $holiday = null): array

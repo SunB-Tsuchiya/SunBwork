@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ClerkCalendarReminder extends Model
 {
-    protected $fillable = ['company_id', 'created_by', 'content', 'color_key', 'target_type', 'target_block', 'starts_on', 'ends_on', 'is_active'];
+    protected $fillable = ['company_id', 'created_by', 'content', 'color_key', 'target_type', 'target_block', 'starts_on', 'ends_on', 'is_active', 'calendar_kind'];
 
     protected function casts(): array
     {
@@ -67,5 +67,14 @@ class ClerkCalendarReminder extends Model
             ->orderBy('starts_on')
             ->orderBy('id')
             ->get(['id', 'content', 'color_key']);
+    }
+
+    /**
+     * 会社＋カレンダーの種類で絞り込む（calendar_kind: ''=従来のカレンダー、'soumu'/'keiri'/'sales'=サンエー印刷）。
+     * 種類を指定しない既存の呼び出し（forCompany 等）は、そのまま動く。
+     */
+    public function scopeInCalendar(\Illuminate\Database\Eloquent\Builder $query, int $companyId, string $kind = ''): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where($this->getTable() . '.company_id', $companyId)->where($this->getTable() . '.calendar_kind', $kind);
     }
 }

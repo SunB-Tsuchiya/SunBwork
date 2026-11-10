@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Clerk;
 
+use App\Http\Controllers\Concerns\ResolvesClerkCalendar;
 use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ClerkCalendarReminderRequest;
@@ -15,12 +16,12 @@ use Inertia\Inertia;
 
 class ClerkCalendarReminderController extends Controller
 {
-    use ResolvesContextCompany;
+    use ResolvesClerkCalendar, ResolvesContextCompany;
 
     public function index()
     {
         return Inertia::render('Clerk/Calendar/Reminders/Index', [
-            'reminders' => ClerkCalendarReminder::forCompany($this->companyId())
+            'reminders' => ClerkCalendarReminder::inCalendar($this->companyId(), $this->calendarKind())
                 ->withCount('users')
                 ->orderByDesc('starts_on')
                 ->orderByDesc('id')
@@ -42,11 +43,12 @@ class ClerkCalendarReminderController extends Controller
 
         $reminder = ClerkCalendarReminder::create($data + [
             'company_id' => $this->companyId(),
+            'calendar_kind' => $this->calendarKind(),
             'created_by' => Auth::id(),
         ]);
         $reminder->users()->sync($data['target_type'] === 'individual' ? $userIds : []);
 
-        return to_route('clerk.reminders.index')->with('success', 'リマインダーを登録しました。');
+        return to_route($this->calendarRoutePrefix() . '.reminders.index')->with('success', 'リマインダーを登録しました。');
     }
 
     public function edit(ClerkCalendarReminder $reminder)
@@ -66,7 +68,7 @@ class ClerkCalendarReminderController extends Controller
         $reminder->update($data);
         $reminder->users()->sync($data['target_type'] === 'individual' ? $userIds : []);
 
-        return to_route('clerk.reminders.index')->with('success', 'リマインダーを更新しました。');
+        return to_route($this->calendarRoutePrefix() . '.reminders.index')->with('success', 'リマインダーを更新しました。');
     }
 
     public function toggle(Request $request, ClerkCalendarReminder $reminder)
@@ -75,7 +77,7 @@ class ClerkCalendarReminderController extends Controller
         $data = $request->validate(['is_active' => ['required', 'boolean']]);
         $reminder->update($data);
 
-        return to_route('clerk.reminders.index')->with('success', $data['is_active'] ? 'リマインダーを再開しました。' : 'リマインダーを停止しました。');
+        return to_route($this->calendarRoutePrefix() . '.reminders.index')->with('success', $data['is_active'] ? 'リマインダーを再開しました。' : 'リマインダーを停止しました。');
     }
 
     public function destroy(ClerkCalendarReminder $reminder)
@@ -83,7 +85,7 @@ class ClerkCalendarReminderController extends Controller
         $this->checkCompany($reminder);
         $reminder->delete();
 
-        return to_route('clerk.reminders.index')->with('success', 'リマインダーを削除しました。');
+        return to_route($this->calendarRoutePrefix() . '.reminders.index')->with('success', 'リマインダーを削除しました。');
     }
 
     private function form(?ClerkCalendarReminder $reminder = null)
@@ -123,7 +125,7 @@ class ClerkCalendarReminderController extends Controller
 
     private function checkCompany(ClerkCalendarReminder $reminder): void
     {
-        abort_unless((int) $reminder->company_id === $this->companyId(), 404);
+        $this->abortUnlessInCalendar($reminder);
     }
 
     private function companyId(): int

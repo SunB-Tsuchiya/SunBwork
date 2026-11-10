@@ -1,4 +1,5 @@
 <script setup>
+import { calRoute } from '@/Components/Clerk/clerkCalendarRoute.js';
 import { CLERK_EVENT_COLORS } from '@/Components/Clerk/clerkEventColors';
 import { changeNotice, scheduleLabel } from '@/Components/Clerk/clerkScheduleRuleLabels';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -23,8 +24,8 @@ function change(rule, remove = false) {
             error.value = '変更できませんでした。もう一度お試しください。';
         },
     };
-    if (remove) router.delete(route('clerk.calendar.schedule_rules.destroy', { scheduleRule: rule.id }), options);
-    else router.patch(route('clerk.calendar.schedule_rules.toggle', { scheduleRule: rule.id }), { is_active: !rule.is_active }, options);
+    if (remove) router.delete(calRoute('calendar.schedule_rules.destroy', { scheduleRule: rule.id }), options);
+    else router.patch(calRoute('calendar.schedule_rules.toggle', { scheduleRule: rule.id }), { is_active: !rule.is_active }, options);
 }
 </script>
 
@@ -32,7 +33,7 @@ function change(rule, remove = false) {
     <AppLayout title="予定日設定">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('clerk.calendar.settings')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300"
+                <Link :href="calRoute('calendar.settings')" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm hover:bg-gray-300"
                     >← 設定に戻る</Link
                 >
                 <h2 class="text-base font-semibold text-gray-800 sm:text-xl">予定日設定</h2>
@@ -42,7 +43,7 @@ function change(rule, remove = false) {
             <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <p class="text-sm text-gray-600">交通費申請・外注費提出などの予定を、指定した日付に自動登録します。</p>
                 <Link
-                    :href="route('clerk.calendar.schedule_rules.create')"
+                    :href="calRoute('calendar.schedule_rules.create')"
                     class="rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
                     >予定日設定を追加</Link
                 >
@@ -75,7 +76,7 @@ function change(rule, remove = false) {
                             </td>
                             <td class="whitespace-nowrap px-3 py-3 text-right">
                                 <Link
-                                    :href="route('clerk.calendar.schedule_rules.edit', { scheduleRule: rule.id })"
+                                    :href="calRoute('calendar.schedule_rules.edit', { scheduleRule: rule.id })"
                                     class="mr-3 text-purple-700 hover:underline"
                                     >編集</Link
                                 >

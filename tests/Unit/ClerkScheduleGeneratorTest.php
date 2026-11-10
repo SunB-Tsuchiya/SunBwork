@@ -41,6 +41,10 @@ class ClerkScheduleGeneratorTest extends TestCase
         (require database_path('migrations/2026_08_20_100001_create_clerk_events_table.php'))->up();
         (require database_path('migrations/2026_08_20_100004_add_color_key_and_completed_at_to_clerk_events_table.php'))->up();
         (require database_path('migrations/2026_09_15_110000_create_clerk_schedule_rules_tables.php'))->up();
+        // カレンダーの種類（calendar_kind）列。本番のマイグレーションは他の表も触るため、この単体テストでは必要な2表にだけ足す
+        foreach (['clerk_events', 'clerk_schedule_rules'] as $name) {
+            Schema::table($name, fn ($table) => $table->string('calendar_kind', 20)->default(''));
+        }
         Carbon::setTestNow('2026-09-15 12:00:00');
         $this->generator = new ClerkScheduleGenerator(new ClerkScheduleDates);
     }

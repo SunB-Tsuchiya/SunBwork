@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Clerk;
 
 use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
+use App\Http\Controllers\Concerns\ResolvesClerkCalendar;
 use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Http\Controllers\Controller;
 use App\Models\ClerkEvent;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ClerkEventController extends Controller
 {
-    use NormalizesCsvEncoding, ResolvesContextCompany;
+    use NormalizesCsvEncoding, ResolvesClerkCalendar, ResolvesContextCompany;
 
     public function index(Request $request, ClerkScheduleGenerator $generator)
     {
@@ -23,8 +24,8 @@ class ClerkEventController extends Controller
         [$rangeStart, $rangeEnd] = ClerkCalendarRange::forYear($year);
         $companyId = $this->companyId();
 
-        $generator->generateCompany($companyId, $year);
-        $events = ClerkEvent::where('company_id', $companyId)
+        $generator->generateCompany($companyId, $year, $this->calendarKind());
+        $events = ClerkEvent::inCalendar($companyId, $this->calendarKind())
             ->overlappingRange($rangeStart, $rangeEnd)
             ->with(['user:id,name', 'scheduleOccurrence:id,clerk_event_id,rule_id,state'])
             ->orderBy('starts_at')
@@ -64,6 +65,7 @@ class ClerkEventController extends Controller
 
         $event = ClerkEvent::create(array_merge($validated, [
             'company_id' => $this->companyId(),
+            'calendar_kind' => $this->calendarKind(),
             'user_id' => Auth::id(),
         ]));
 
@@ -72,7 +74,7 @@ class ClerkEventController extends Controller
 
     public function update(Request $request, ClerkEvent $event, ClerkScheduleGenerator $generator)
     {
-        abort_unless($event->company_id === $this->companyId(), 404);
+        $this->abortUnlessInCalendar($event);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -90,7 +92,7 @@ class ClerkEventController extends Controller
 
     public function destroy(ClerkEvent $event, ClerkScheduleGenerator $generator)
     {
-        abort_unless($event->company_id === $this->companyId(), 404);
+        $this->abortUnlessInCalendar($event);
 
         $generator->changeEvent($event, [], 'delete');
 
@@ -99,7 +101,7 @@ class ClerkEventController extends Controller
 
     public function complete(ClerkEvent $event, ClerkScheduleGenerator $generator)
     {
-        abort_unless($event->company_id === $this->companyId(), 404);
+        $this->abortUnlessInCalendar($event);
 
         $event = $generator->changeEvent($event, [], 'complete');
 
@@ -108,8 +110,8 @@ class ClerkEventController extends Controller
 
     public function csvExport(ClerkScheduleGenerator $generator)
     {
-        $generator->generateCompany($this->companyId());
-        $events = ClerkEvent::where('company_id', $this->companyId())
+        $generator->generateCompany($this->companyId(), null, $this->calendarKind());
+        $events = ClerkEvent::inCalendar($this->companyId(), $this->calendarKind())
             ->orderBy('starts_at')
             ->get();
 
@@ -186,6 +188,7 @@ class ClerkEventController extends Controller
         foreach ($rows as $row) {
             ClerkEvent::create(array_merge($row, [
                 'company_id' => $this->companyId(),
+                'calendar_kind' => $this->calendarKind(),
                 'user_id' => Auth::id(),
             ]));
             $created++;

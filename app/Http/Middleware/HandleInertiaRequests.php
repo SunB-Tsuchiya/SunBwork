@@ -109,7 +109,8 @@ class HandleInertiaRequests extends Middleware
             // セッション移行（login() / regenerate()）後も soft navigation で
             // meta[name="csrf-token"] が更新されるよう AppLayout が参照している。
             'csrf_token' => csrf_token(),
-            'userWorkHub' => fn () => app(\App\Services\UserWorkHub::class)->navigation($request->user()),
+            // クラーク系カレンダーのルート名の接頭辞。営業のカレンダー（suna.sales.*）だけ 'suna.sales'、それ以外は 'clerk'
+            'clerkCalendarRoutePrefix' => $request->routeIs('suna.sales.*') ? 'suna.sales' : 'clerk',
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
             'departmentFieldConfigs' => $departmentFieldConfigs,
             'jobFieldOptions'        => $jobFieldOptions,
@@ -237,7 +238,6 @@ class HandleInertiaRequests extends Middleware
 
                     return false;
                 })(),
-                'canManageBroadProjects' => app(\App\Services\BroadProjectTree::class)->canManage($request->user()),
                 // ポートフォリオ機能へのアクセス権（SB専用。SuperAdmin・SBのAdminは常時可、他は個人許可がオンの場合のみ。サンエー印刷は不可）
                 'canAccessPortfolio' => $request->user() ? \App\Services\Portfolio\PortfolioAccess::canUse($request->user()) : false,
                 'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()

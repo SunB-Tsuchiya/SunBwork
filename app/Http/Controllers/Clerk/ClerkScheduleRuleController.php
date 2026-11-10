@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Clerk;
 
+use App\Http\Controllers\Concerns\ResolvesClerkCalendar;
 use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ClerkScheduleRuleRequest;
@@ -16,12 +17,12 @@ use Inertia\Inertia;
 
 class ClerkScheduleRuleController extends Controller
 {
-    use ResolvesContextCompany;
+    use ResolvesClerkCalendar, ResolvesContextCompany;
 
     public function index()
     {
         return Inertia::render('Clerk/Calendar/ScheduleRules/Index', [
-            'rules' => ClerkScheduleRule::where('company_id', $this->companyId())->latest('id')->get(),
+            'rules' => ClerkScheduleRule::inCalendar($this->companyId(), $this->calendarKind())->latest('id')->get(),
         ]);
     }
 
@@ -41,7 +42,7 @@ class ClerkScheduleRuleController extends Controller
     {
         return Inertia::render('Clerk/Calendar/ScheduleRules/Form', [
             'scheduleRule' => $rule,
-            'colorSettings' => ClerkCalendarColor::where('company_id', $this->companyId())->orderBy('sort_order')->get(['color_key', 'label']),
+            'colorSettings' => ClerkCalendarColor::inCalendar($this->companyId(), $this->calendarKind())->orderBy('sort_order')->get(['color_key', 'label']),
             'today' => now('Asia/Tokyo')->toDateString(),
         ]);
     }
@@ -58,11 +59,11 @@ class ClerkScheduleRuleController extends Controller
     public function store(ClerkScheduleRuleRequest $request, ClerkScheduleGenerator $generator)
     {
         DB::transaction(function () use ($request, $generator) {
-            $rule = ClerkScheduleRule::create($request->payload() + ['company_id' => $this->companyId(), 'created_by' => Auth::id()]);
+            $rule = ClerkScheduleRule::create($request->payload() + ['company_id' => $this->companyId(), 'calendar_kind' => $this->calendarKind(), 'created_by' => Auth::id()]);
             $generator->generate($rule->id);
         });
 
-        return to_route('clerk.calendar.schedule_rules.index')->with('success', '予定日設定を登録しました。');
+        return to_route($this->calendarRoutePrefix() . '.calendar.schedule_rules.index')->with('success', '予定日設定を登録しました。');
     }
 
     public function update(ClerkScheduleRuleRequest $request, ClerkScheduleRule $scheduleRule, ClerkScheduleGenerator $generator)
@@ -70,7 +71,7 @@ class ClerkScheduleRuleController extends Controller
         $this->checkCompany($scheduleRule);
         $generator->changeRule($scheduleRule, $request->payload());
 
-        return to_route('clerk.calendar.schedule_rules.index')->with('success', '予定日設定を更新しました。');
+        return to_route($this->calendarRoutePrefix() . '.calendar.schedule_rules.index')->with('success', '予定日設定を更新しました。');
     }
 
     public function toggle(Request $request, ClerkScheduleRule $scheduleRule, ClerkScheduleGenerator $generator)
@@ -79,7 +80,7 @@ class ClerkScheduleRuleController extends Controller
         $data = $request->validate(['is_active' => 'required|boolean']);
         $generator->changeRule($scheduleRule, $data);
 
-        return to_route('clerk.calendar.schedule_rules.index');
+        return to_route($this->calendarRoutePrefix() . '.calendar.schedule_rules.index');
     }
 
     public function destroy(ClerkScheduleRule $scheduleRule, ClerkScheduleGenerator $generator)
@@ -87,12 +88,12 @@ class ClerkScheduleRuleController extends Controller
         $this->checkCompany($scheduleRule);
         $generator->changeRule($scheduleRule, [], true);
 
-        return to_route('clerk.calendar.schedule_rules.index')->with('success', '予定日設定を削除しました。');
+        return to_route($this->calendarRoutePrefix() . '.calendar.schedule_rules.index')->with('success', '予定日設定を削除しました。');
     }
 
     private function checkCompany(ClerkScheduleRule $rule): void
     {
-        abort_unless((int) $rule->company_id === $this->companyId(), 404);
+        $this->abortUnlessInCalendar($rule);
     }
 
     private function companyId(): int

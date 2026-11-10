@@ -19,7 +19,7 @@ const page = usePage();
 const isSuperAdmin = computed(() => !!page.props.auth?.user?.isSuperAdmin);
 const dashboardHref = computed(() => {
     try {
-        return route('dashboard');
+        return route('suna.sales.dashboard');
     } catch {
         return '/';
     }
@@ -34,7 +34,7 @@ const dashboardHref = computed(() => {
         <div class="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4">
                 <div class="flex min-w-0 items-center gap-3">
-                    <Link :href="dashboardHref" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300">← 通常メニューへ</Link>
+                    <Link :href="dashboardHref" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300">← 営業メニューへ</Link>
                     <h1 class="truncate text-base font-semibold text-gray-800 sm:text-lg">売上レポート<span class="ml-2 text-sm font-normal text-gray-500">{{ title }}</span></h1>
                 </div>
                 <div class="flex flex-shrink-0 items-center gap-3">
