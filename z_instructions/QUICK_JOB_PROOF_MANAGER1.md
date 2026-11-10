@@ -39,3 +39,15 @@ proof_requests.source_personal_work_entry_idのnullable/index migration1件を�
 統合後にIntegration91件1022断言・実Vue校正新旧/入力/詳細/ナビの4検証・PHP10構文が再成功。members build成功、manifest484 entry/515資産/欠落0、54dのソースentryと旧hash資産を保持。静的Ziggyは54d版全定義一致+新規1件だけ。最終manifest SHA256 51a14e0dc78a75fe178225d962bd3ef440edb1bc55f54a8b59f7730c9b5cc519。自動chunkキーの変更はbundle再構成によるもので、既存page sourceの欠落ではない。
 
 次の一手: この統合版を保存し、固定元54d/固定先・source許可一覧/削除なし/既知未追跡5件/本番用manifestを照合する/tmp/quick-work-proof-deploy-20261110.shを準備。追加列migration1件だけを旧コードの段階で--database=mysql --realpath --path=<対象ファイル> --forceにより先行追加し、元参照列がない新コードをWebへ出す時間を避ける。その後ff-onlyし、QuickWorkProofChangelogSeederだけ--database=mysql --force、route/view cache clear・最終作業状態確認。他作業のmigration/seedは実行しない。正確なSSHとスクリプトを提示して承認後に配備する。現時点は配備/migration/実受信未実施。一般公開未承認・Codexによる試験送信なし。
+
+
+## 2026-11-10 固定配備手順を準備・承認待ち
+
+統合版4e83575c97cd216124ee46def506f3d8cb317406を保存。固定元54d1c68e62580ec8311c3a6a1fad3eb15a1b2bc8、固定先上記、branch feature/myjob-request-checks-20261110の限定配備手順を/tmp/quick-work-proof-deploy-20261110.shへ作成。sh -n成功。SHA256 3a0527484c3e47b778b4aaebca064b336de7a594fc9d73e6cf4dbb0d0ee81108。同一コピーはstorage/app/private/codex-quick-proof-deploy-20261110/に保管。
+
+手順はmain/HEAD/追跡変更なし/既知未追跡5件/既存manifest66efc751501fabb8849bb2771adc852c8d852915cdbc7f76ba333658e63d2911を確認してfetch。祖先/ソース33許可一覧/削除なし/他作業の営業・Clerk・AppLayout等ソース不変/新規migration1件/PHP10構文/target manifest484・515資産/members baseを照合する。既定mysql DB名を確認後、追加列1件だけを旧アプリ中に--database=mysql --realpath --path=<固定migration> --forceで適用し、ff-only。route:clear、配備資産検査、QuickWorkProofChangelogSeederだけ--database=mysql --force、view:clear、追跡変更なしと未追跡5件保持を確認。既存営業カレンダーのmigration/seedや本番sales DBは操作しない。途中停止しても追加列を自動削除しない。
+
+実行候補（まだ未承認・未実行）:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-proof-deploy-20261110.sh
+
+次の一手: 同じスクリプトを利用者へ示し、この正確なSSHの承認を得る。一般公開はせず、本番校正依頼/試験通知は作らない。配備後は新たな校正入口/窓口への受け渡しの確認だけを依頼する。既に成功したモバイルBOX/旧未予定・複数日/通常依頼の登録・完了・通知を再試験しない。
