@@ -2113,3 +2113,12 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/proof-completion-notice-deploy-20261110.sh
 
 配備後に新たに完了する校正の依頼者通知1件の実受信だけを確認する。既に成功した依頼送信/窓口受信/レイアウト等を繰り返させない。過去162へは再送しない。一般公開未承認。
+
+
+## 2026-11-10 校正完了通知修正を限定配備成功・実受信確認待ち
+
+確定: 利用者yesで提示済み専用SSHを承認。同一SHA256 212a4b68e7bd1deb56b74e4b07612042bce70a3470cf29d15172ad7f0eba29deの/tmp/proof-completion-notice-deploy-20261110.shを実行しexit0。固定元19d6/main/追跡変更なし/既知未追跡5件/manifest、許可20ファイル/削除なし/画面資産・JS・routes・設定・依存・migration等不変、親Changelog追加1行・PHP10構文を検証して4ec6f0bb6c734252dc0c0084054cb6e27c8d86f1へff-only。manifest493entry/524参照/欠落0/hash一致、既定mysql検証後に専用ProofCompletionNoticeChangelogSeeder --forceだけ実行しDONE、最終追跡変更なし・既知未追跡5件を保持。他作業の営業更新も保持。DB構造変更/業務データの試験操作/校正送信/過去通知補正はなし。
+
+実装/合成106件1133断言/本番配備完了。利用者による修正後の校正完了通知実受信・重複確認は未確認。次の一手は、次に完了する未完了の校正1件で、校正依頼者の通知画面へ校正完了通知が1件届くことだけを確認してもらう。新規依頼送信/窓口受信/上部操作配置など成功済みの試験を反復しない。既に完了した11516/校正162の再操作による過去通知の補正はしない。一般公開未承認、試用制限維持。
+
+回答形式: 通知が1件届けば『成功』、届かない/複数の場合は対象URLと件数。校正専用通知が対象であり通常自己割当の完了通知を新たに有効化した意味ではない。
