@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SunA\Sales;
 
 use App\Http\Controllers\Controller;
 use App\Services\SunA\Sales\ImportHistoryService;
+use App\Services\SunA\Sales\ImportUndoService;
 use App\Services\SunA\Sales\SunaSalesImportException;
 use App\Services\SunA\Sales\SunaSalesImportService;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class ImportController extends Controller
     public function __construct(
         private SunaSalesImportService $importService,
         private ImportHistoryService $historyService,
+        private ImportUndoService $undoService,
     ) {
     }
 
@@ -105,6 +107,18 @@ class ImportController extends Controller
         $this->importService->discard($data['token'], (int) Auth::id());
 
         return response()->json(['discarded' => true]);
+    }
+
+    /** 直近の取込を、取り込む前の状態に戻す（取込できる人。SUNASALES_PLAN1.md §16） */
+    public function undo(int $import)
+    {
+        try {
+            $result = $this->undoService->undo($import, (int) Auth::id());
+        } catch (SunaSalesImportException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($result);
     }
 
     public function history()

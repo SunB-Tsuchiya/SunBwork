@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import ReportShell from '@/Components/SunA/Sales/ReportShell.vue';
 
@@ -8,6 +9,39 @@ import ReportShell from '@/Components/SunA/Sales/ReportShell.vue';
 const props = defineProps({
     imports: { type: Array, default: () => [] },
 });
+
+const page = usePage();
+// 取り消せるのは、取込できる人（サーバー側のルートでも同じ条件で保護している）
+const canImport = computed(() => !!page.props.auth?.salesReportCanImport);
+const undoing = ref(false);
+const undoMessage = ref('');
+const undoError = ref('');
+
+// 直近の取込を、取り込む前の状態に戻す（SUNASALES_PLAN1.md §16）
+const undoImport = async (imp) => {
+    const text = [
+        `「${imp.original_filename}」（${importedAt(imp.imported_at)}）の取込を取り消します。`,
+        `・追加した ${imp.added_count.toLocaleString()} 件（月）を削除`,
+        `・変更した ${imp.changed_count.toLocaleString()} 件（月）を元に戻す`,
+        `・削除した ${imp.removed_count.toLocaleString()} 件（月）を復元`,
+        '取り込む前の状態に戻ります。よろしいですか？',
+    ].join('\n');
+    if (!window.confirm(text)) return;
+    undoing.value = true;
+    undoMessage.value = '';
+    undoError.value = '';
+    try {
+        await axios.post(route('suna.sales.report.api.history.undo', { import: imp.id }));
+        undoMessage.value = '取込を取り消しました。';
+        selected.value = null;
+        changes.value = null;
+        router.reload({ only: ['imports'] });
+    } catch (e) {
+        undoError.value = e.response?.data?.message ?? '取り消しに失敗しました。';
+    } finally {
+        undoing.value = false;
+    }
+};
 
 const selected = ref(null); // 変更ログを開いている取込
 const loading = ref(false);
@@ -48,6 +82,8 @@ const pageCount = computed(() => (changes.value ? Math.max(1, Math.ceil(changes.
         <div class="space-y-4">
             <div class="rounded bg-white p-4 shadow">
                 <h2 class="mb-2 text-sm font-semibold text-gray-900">取込の履歴</h2>
+                <p v-if="undoMessage" class="mb-2 rounded bg-green-50 p-2 text-xs text-green-700">{{ undoMessage }}</p>
+                <p v-if="undoError" class="mb-2 rounded bg-red-50 p-2 text-xs text-red-700">{{ undoError }}</p>
                 <p v-if="!props.imports.length" class="text-xs text-gray-500">まだ取り込まれていません。</p>
                 <div v-else class="overflow-x-auto rounded border">
                     <table class="min-w-full text-xs tabular-nums">
@@ -66,24 +102,32 @@ const pageCount = computed(() => (changes.value ? Math.max(1, Math.ceil(changes.
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="i in props.imports" :key="i.id" class="border-t" :class="selected?.id === i.id ? 'bg-indigo-50' : ''">
+                            <tr v-for="i in props.imports" :key="i.id" class="border-t" :class="[selected?.id === i.id ? 'bg-indigo-50' : '', i.status === 'undone' ? 'text-gray-400' : '']">
                                 <td class="px-2 py-1">{{ importedAt(i.imported_at) }}</td>
                                 <td class="px-2 py-1">{{ i.imported_by_name }}</td>
-                                <td class="px-2 py-1">{{ i.original_filename }}<span v-if="i.replace_years.length" class="ml-1 rounded bg-red-100 px-1 text-[10px] text-red-700">{{ i.replace_years.join('・') }}年を入れ替え</span></td>
+                                <td class="px-2 py-1">{{ i.original_filename }}<span v-if="i.status === 'undone'" class="ml-1 rounded bg-gray-200 px-1 text-[10px] text-gray-600" :title="`${importedAt(i.undone_at)} に ${i.undone_by_name} が取り消し`">取消済み</span><span v-if="i.replace_years.length" class="ml-1 rounded bg-red-100 px-1 text-[10px] text-red-700">{{ i.replace_years.join('・') }}年を入れ替え</span></td>
                                 <td class="px-2 py-1 text-right">{{ i.year_min }}〜{{ i.year_max }}年</td>
                                 <td class="px-2 py-1 text-right">{{ i.row_count.toLocaleString() }}</td>
                                 <td class="px-2 py-1 text-right">{{ i.added_count.toLocaleString() }}</td>
                                 <td class="px-2 py-1 text-right">{{ i.changed_count.toLocaleString() }}</td>
                                 <td class="px-2 py-1 text-right">{{ i.removed_count.toLocaleString() }}</td>
                                 <td class="px-2 py-1 text-right text-gray-400">{{ i.unchanged_count.toLocaleString() }}</td>
-                                <td class="px-2 py-1 text-right">
+                                <td class="whitespace-nowrap px-2 py-1 text-right">
                                     <button type="button" class="text-indigo-600 hover:underline" @click="loadChanges(i)">変更内容を見る</button>
+                                    <button
+                                        v-if="canImport && i.can_undo"
+                                        type="button"
+                                        class="ml-3 rounded border border-red-300 px-2 py-0.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                        :disabled="undoing"
+                                        @click="undoImport(i)"
+                                    >この取込を取り消す</button>
+                                    <span v-else-if="canImport && i.undo_reason" class="ml-3 cursor-help text-[10px] text-gray-400" :title="i.undo_reason">取り消せません</span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <p class="mt-1 text-[11px] text-gray-400">取込に使ったExcelファイルは保存していません。変更のあった行（追加・変更・削除）だけを、変更内容として残しています。</p>
+                <p class="mt-1 text-[11px] text-gray-400">取込に使ったExcelファイルは保存していません。変更のあった行（追加・変更・削除）だけを、変更内容として残しています。取り消せるのは、最新の取込だけです（新しい方から順に取り消します）。</p>
             </div>
 
             <div v-if="selected" class="rounded bg-white p-4 shadow">

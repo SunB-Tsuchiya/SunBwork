@@ -1964,3 +1964,16 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-dep
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-deploy-20261110-v2.sh
 
 次の一手: この新しい正確なSSHの承認。旧v1の承認は新版へ拡張しない。表示修正の実配備/利用者画面と、校正試用の実受信2点は未実施/未確認。新式一般公開未承認。
+
+
+## 2026-11-10 v2も変更前停止・最新4c70の取り込み取消を保持
+
+利用者yesで提示済みv2固定SSHを承認。同一SHA256 a571417de9876869d873467985905878dc691459030c102316c908f1804c4500で実行したが最初のHEAD検査でSTOP: production HEAD differs、exit1。fetch/merge/cache clear/DB操作の前に停止し、表示修正は未配備。旧v1/v2はいずれも再開先として使わない。
+
+承認済み同一read-only SSHで本番4c70df40a48619885ae62b1710c05b7ace9be045/main/追跡変更なし/既知未追跡5件を確認。e279後の別作業SunA営業取り込み取消（段階3-a）が追加済み、今回の2ソース修正はまだ未反映。ローカル同SHA objectを照合し隔離ブランチへ統合。manifestのみ競合し統合後全ソースでmembers再build。取り込み取消のcontroller/model/service/画面/DB migration・ChangelogSeeder・静的Ziggy・routes.suna・依存・設定等は4c70比差分0。本番sales DBの参照/コピーや当該migration実行なし。
+
+統合後Integration92件1056断言、実Vue入力/上部操作/校正新旧/ナビを再成功。members build成功、manifest488 entry/519参照/欠落0、4c70のsource entryと旧hash資産保持、tracked削除0。manifest SHA256 d6568b6c0d6e170563796de6e777c79433cc02f3f38612994283f8b53a84ec5e。今回も本番実行差分は共有Middlewareと簡易WorkDetailの2ソースのみ。
+
+配備が2回重なったため、利用者へ「今回の表示修正が配備されるまで、他の本番配備だけ一時的に待てるか（ソース編集は並行可）」を非同期で質問。現時点では未回答で、一時待機済みと仮定しない。未回答でもHEAD/作業状態一致を必須とする手順を維持し、別作業を上書きしない。
+
+次の一手: この4c70保持版を保存し、固定元4c70のv3手順を準備・正確なSSH承認へ。表示修正は未配備/実画面未確認。校正送信/本人状況/窓口実受信2点も未確認。一般公開未承認。

@@ -17,11 +17,11 @@ class Import extends Model
     protected $fillable = [
         'company_id', 'format', 'original_filename', 'file_sha256', 'status', 'imported_by', 'imported_at',
         'year_min', 'year_max', 'row_count', 'added_count', 'changed_count', 'removed_count', 'unchanged_count',
-        'replace_years', 'warnings',
+        'replace_years', 'warnings', 'undone_at', 'undone_by',
     ];
 
     protected function casts(): array
     {
-        return ['imported_at' => 'datetime', 'replace_years' => 'array', 'warnings' => 'array'];
+        return ['imported_at' => 'datetime', 'undone_at' => 'datetime', 'replace_years' => 'array', 'warnings' => 'array'];
     }
 }

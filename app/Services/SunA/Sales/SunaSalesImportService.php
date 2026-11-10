@@ -6,6 +6,7 @@ use App\Models\SunA\Sales\AuditLog;
 use App\Models\SunA\Sales\Fact;
 use App\Models\SunA\Sales\Import;
 use App\Models\SunA\Sales\ImportChange;
+use App\Models\SunA\Sales\ImportSnapshot;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -151,6 +152,9 @@ class SunaSalesImportService
             ]);
 
             $now = now();
+            // 取り消し用に、変更・削除される行の「変更前の姿」を保存する（SUNASALES_PLAN1.md §16）。追加される行は保存しない
+            $this->saveSnapshots($import->id, array_keys($plan['updates']), $plan['deletes']);
+
             $inserts = array_map(fn ($f) => $f + ['import_id' => $import->id, 'created_at' => $now, 'updated_at' => $now], $plan['inserts']);
             Fact::insertScoped($inserts);
 
@@ -179,6 +183,32 @@ class SunaSalesImportService
         $this->discard($token, $userId);
 
         return $import;
+    }
+
+    /**
+     * 取込で変更・削除される行の、変更前の姿を保存する（取込の取り消し用）。
+     *
+     * @param  array<int, int>  $updatedIds
+     * @param  array<int, int>  $deletedIds
+     */
+    private function saveSnapshots(int $importId, array $updatedIds, array $deletedIds): void
+    {
+        $rows = [];
+        foreach ([['updated', $updatedIds], ['deleted', $deletedIds]] as [$kind, $ids]) {
+            foreach (array_chunk($ids, 500) as $chunk) {
+                foreach (Fact::query()->whereIn('id', $chunk)->get() as $f) {
+                    $rows[] = [
+                        'import_id' => $importId, 'kind' => $kind, 'fact_id' => $f->id,
+                        'client_key' => $f->client_key, 'client_name' => $f->client_name,
+                        'sales_year' => $f->sales_year, 'sales_month' => $f->sales_month,
+                        'department_key' => $f->department_key, 'section_key' => $f->section_key,
+                        'amount' => $f->amount, 'order_count' => $f->order_count,
+                        'fact_import_id' => $f->import_id, 'fact_created_at' => $f->created_at, 'fact_updated_at' => $f->updated_at,
+                    ];
+                }
+            }
+        }
+        ImportSnapshot::insertScoped($rows);
     }
 
     /** 一時ファイルと確認用の情報を削除する（確定・破棄・失敗時） */

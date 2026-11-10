@@ -66,7 +66,8 @@ class RegistrationStatusService
             ];
         }
 
-        $last = Import::query()->orderByDesc('imported_at')->orderByDesc('id')->first();
+        // 取消済みの取込は「直近の取込」に含めない
+        $last = Import::query()->where('status', 'completed')->orderByDesc('imported_at')->orderByDesc('id')->first();
         $importerName = $last ? User::find($last->imported_by)?->name : null;
 
         return [
