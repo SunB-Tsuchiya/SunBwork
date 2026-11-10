@@ -18,6 +18,7 @@ use App\Http\Controllers\SunA\Sales\DashboardController as SalesDashboardControl
 use App\Http\Controllers\SunA\Sales\DepartmentComparisonController;
 use App\Http\Controllers\SunA\Sales\ImportController;
 use App\Http\Controllers\SunA\Sales\RegistrationStatusController;
+use App\Http\Controllers\SunA\Sales\ReportExportController;
 use App\Http\Controllers\SunA\Sales\SameMonthController;
 use App\Http\Controllers\SunA\Sales\ReportPermissionController;
 use App\Http\Controllers\Clerk\ClerkCalendarColorController;
@@ -137,6 +138,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('api/department/summary', [DepartmentComparisonController::class, 'summary'])->name('api.department.summary');
         Route::get('compare', [CompareController::class, 'index'])->name('compare');
         Route::get('api/compare/summary', [CompareController::class, 'summary'])->name('api.compare.summary');
+
+        // Excel出力（画面と同じ条件で、見ている内容をそのまま。閲覧できる人は全員）
+        Route::get('export/annual', [ReportExportController::class, 'annual'])->name('export.annual');
+        Route::get('export/same-month', [ReportExportController::class, 'sameMonth'])->name('export.same_month');
+        Route::get('export/department', [ReportExportController::class, 'department'])->name('export.department');
+        Route::get('export/compare', [ReportExportController::class, 'compare'])->name('export.compare');
+        Route::get('export/client', [ReportExportController::class, 'client'])->name('export.client');
 
         // 名寄せ設定（閲覧。変更は取込できる人のグループ）
         Route::get('client-groups', [ClientGroupController::class, 'index'])->name('client_groups');

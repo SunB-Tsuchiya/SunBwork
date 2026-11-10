@@ -2495,6 +2495,21 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'suna-sales-3e2',
+                'title' => '営業：売上レポートをExcelに出力（サンエー印刷）',
+                'released_at' => '2026-11-13',
+                'summary' => '年次分析・同月比較・部門比較・左右比較・得意先分析の画面から、表示中の内容をExcelファイルで出力できるようにしました。',
+                'design_files' => ['z_instructions/SUNASALES_PLAN1.md', 'z_instructions/SUNASALES_MANAGER1.md'],
+                'claude_notes' => 'SunA/Sales 段階3-5。画面と同じ集計サービスの結果をそのまま PhpSpreadsheet で出力（文字は文字列固定で数式にならない）。ファイルは保存せずダウンロードのみ。監査ログは画面名と行数だけ。閲覧権限があれば出力可。新しいテーブルは無し。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>営業：売上レポートのExcel出力（サンエー印刷）</h3><ul>
+<li>年次分析・同月比較・部門比較・左右比較・得意先分析の右上の「Excel出力」で、いま表示している内容をExcelで保存できます。</li>
+<li>各シートの先頭に、タイトル・条件・出力日時が入ります。金額は数値で、桁区切りの書式です。</li>
+<li>名寄せした得意先は、1社にまとめた数字で出力されます。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         // 一部の機能だけを本番へ反映するときは、そのバージョンだけを登録できる（他の登録済みエントリを上書きしない）。
