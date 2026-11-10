@@ -1,4 +1,4 @@
-> 2026-11-11最新: 校正完了通知の実受信1件を利用者「成功」で確認、独立PROOF_COMPLETION_NOTICE本体をarchived。保存227c70992から隔離/tmp/sunbwork-proof-notice-confirm-20261111へ復元。公開前の役割/会社部署境界をコードと既存合成で監査し問題未検出。次は新式元参照の本番READ ONLY限定照合（/tmp/sunbwork-quick-proof-origin-audit-20261111.php、f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2）の正確なSSH確認。一般公開未承認。MANAGER末尾優先。
+> 2026-11-11最新: 校正完了通知の実受信1件を利用者「成功」で確認、独立PROOF_COMPLETION_NOTICE本体をarchived。保存227c70992から隔離/tmp/sunbwork-proof-notice-confirm-20261111へ復元。公開前の役割/会社部署境界をコードと既存合成で監査し問題未検出。次は新式元参照の本番READ ONLY限定照合（/home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php、f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2）の正確なSSH確認。一般公開未承認。MANAGER末尾優先。
 
 > 2026-11-11最新: 校正完了時の依頼者通知1件を利用者「成功」で実受信確認済み。独立PROOF_COMPLETION_NOTICE本体はarchived。既確認の送受信/レイアウトを反復しない。次は公開前の権限・会社部署contextの読取監査と代表レビュー範囲の整理。新式元参照は合成確認済み、本番依頼162は旧式由来。一般公開未承認。MANAGER末尾優先。
 

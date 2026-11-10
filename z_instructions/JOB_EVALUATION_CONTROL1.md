@@ -2139,9 +2139,9 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/proof-completion-
 
 保存227c70992のコード読取監査: UnifiedMyJobBox.availableはUserWorkHubと会社context一致を使用。UserWorkHubはPersonalWorkSchedule.available（実SuperAdmin、本人会社所属INFO）と非general会社を要求。index/storeはサーバで403、WorkJobReader.resolveは本人・会社・部署・元案件/分類を照合、QuickWorkProofRequest.storeは同じ試用guardと本人元・同会社部署の窓口・入力混在拒否・通知原子性を持つ。ProofRequestの新式元参照表示も会社部署/ロール・context境界。既存合成には一般User/Admin/Coordinator/Leader/INFO外/一般会社/別会社context拒否、他人元、通知失敗rollbackが含まれる。これはコード/合成の監査であり全roleの本番画面試験や公開承認ではない。今回コード変更/追加試験なし。
 
-成功済みの校正送信/窓口受信2点は反復しない。ただし先の実例162はsource_personal_work_entry_id=NULLの旧形式由来で、新式元参照の本番証拠にはならない。対象を2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼に限り、件数上限20、ID/状態/作成時刻と元所有者・会社部署一致の真偽だけをREAD ONLY transactionで調べる/tmp/sunbwork-quick-proof-origin-audit-20261111.phpを準備。SHA256 f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2。氏名/件名/本文/結果/ファイル/売上は出力しない。未実行、修正/再送/新規依頼なし。
+成功済みの校正送信/窓口受信2点は反復しない。ただし先の実例162はsource_personal_work_entry_id=NULLの旧形式由来で、新式元参照の本番証拠にはならない。対象を2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼に限り、件数上限20、ID/状態/作成時刻と元所有者・会社部署一致の真偽だけをREAD ONLY transactionで調べる/home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.phpを準備。SHA256 f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2。氏名/件名/本文/結果/ファイル/売上は出力しない。未実行、修正/再送/新規依頼なし。
 
 次の一手はAGENTSの新しい正確なSSH事前確認を得て以下の限定読取を実行し、新式元が実際にあるかを判定する:
-ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /tmp/sunbwork-quick-proof-origin-audit-20261111.php
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php
 
 結果に基づき、一般公開を維持したまま管理者/進行管理/Leaderの代表レビュー方法と公開対象・時期の意思決定へ進む。資料の基準は保存227c70992と利用者回答。失われた/tmp旧ツリーは同コミットから隔離ツリーfeature/proof-notice-confirm-20261111へ復元、共有Claude作業を変更しない。本番最新HEADを今回確認した意味ではない。
