@@ -255,6 +255,7 @@ function roleNavClass(role) {
         prepress:          'bg-green-700 text-white font-semibold',
         soumu:             'bg-purple-600 text-white font-semibold',
         keiri:             'bg-teal-600 text-white font-semibold',
+        sales:             'bg-indigo-600 text-white font-semibold',
     };
     const inactiveMap = {
         superadmin:        'text-yellow-600 hover:text-yellow-800',
@@ -267,6 +268,7 @@ function roleNavClass(role) {
         prepress:          'text-green-700 hover:text-green-900',
         soumu:             'text-purple-600 hover:text-purple-800',
         keiri:             'text-teal-600 hover:text-teal-800',
+        sales:             'text-indigo-600 hover:text-indigo-800',
     };
     return `${base} ${activeRoleKey.value === role ? activeMap[role] : inactiveMap[role]}`;
 }
@@ -392,6 +394,11 @@ watch(
 // 常にそのロールのダッシュボードへ遷移させる
 function navigateToRole(role) {
     try {
+        // サンエー印刷の営業: 売上レポート（独立レイアウト。許可された人だけ。SunA/Sales）
+        if (role === 'sales') {
+            router.get(route('suna.sales.report.index'));
+            return;
+        }
         // 一般会社の総務/経理: 同じ Clerk エリアを kind 付きで開く（kind はサーバー側セッションに保持）
         if (role === 'soumu' || role === 'keiri') {
             router.get(route('clerk.dashboard', { kind: role }));
@@ -673,6 +680,8 @@ function navigateToRole(role) {
                                 v-else-if="$page.props.auth.user.user_role === 'clerk'"
                                 type="button" @click="navigateToRole(clerkKind)" :class="roleNavClass(clerkKind)"
                             >{{ clerkKind === 'keiri' ? '経理' : '総務' }}</button>
+                            <!-- 営業（売上レポート）。経理の後・ユーザーの前。管理者が許可した人（と SuperAdmin）だけに出す -->
+                            <button v-if="$page.props.auth.salesReportAccess" type="button" @click="navigateToRole('sales')" :class="roleNavClass('sales')">営業</button>
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">ユーザー</button>
                         </template>
 
@@ -784,6 +793,9 @@ function navigateToRole(role) {
                                 :href="route('clerk.dashboard')" :active="route().current('clerk.dashboard')"
                             >
                                 <span :class="clerkKind === 'keiri' ? 'text-teal-600' : 'text-purple-600'">{{ clerkKind === 'keiri' ? '経理' : '総務' }} Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink v-if="$page.props.auth.salesReportAccess" :href="route('suna.sales.report.index')" :active="route().current('suna.sales.report.*')">
+                                <span class="text-indigo-600">営業 売上レポート</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">ユーザー Dashboard</span>
