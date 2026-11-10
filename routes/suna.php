@@ -143,6 +143,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('api/import/repreview', [ImportController::class, 'repreview'])->name('api.import.repreview');
         Route::post('api/import/confirm', [ImportController::class, 'confirm'])->name('api.import.confirm');
         Route::post('api/import/discard', [ImportController::class, 'discard'])->name('api.import.discard');
+        Route::post('api/history/{import}/undo', [ImportController::class, 'undo'])->whereNumber('import')->name('api.history.undo');
     });
 
 // 売上レポート（営業）: 管理者の「利用メンバー設定」（サンエー印刷用。ポートフォリオの利用メンバー設定と同じ形。

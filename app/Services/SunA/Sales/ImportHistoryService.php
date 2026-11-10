@@ -18,7 +18,8 @@ class ImportHistoryService
     public function history(): array
     {
         $imports = Import::query()->orderByDesc('imported_at')->orderByDesc('id')->limit(200)->get();
-        $names = User::whereIn('id', $imports->pluck('imported_by')->unique()->all())->pluck('name', 'id');
+        $names = User::whereIn('id', $imports->pluck('imported_by')->merge($imports->pluck('undone_by'))->filter()->unique()->all())->pluck('name', 'id');
+        $undo = app(ImportUndoService::class);
 
         return $imports->map(fn (Import $i) => [
             'id' => $i->id,
@@ -34,7 +35,22 @@ class ImportHistoryService
             'unchanged_count' => $i->unchanged_count,
             'replace_years' => $i->replace_years ?? [],
             'warning_count' => count($i->warnings ?? []),
-        ])->values()->all();
+            // 取り消し（SUNASALES_PLAN1.md §16）
+            'status' => $i->status,
+            'undone_at' => $i->undone_at?->toIso8601String(),
+            'undone_by_name' => $i->undone_by ? ($names[$i->undone_by] ?? '（不明）') : null,
+        ] + $this->undoInfo($undo, $i))->values()->all();
+    }
+
+    /** @return array{can_undo:bool, undo_reason:?string} 取消済みの取込は理由を出さない（status で表示する） */
+    private function undoInfo(ImportUndoService $undo, Import $import): array
+    {
+        if ($import->status === 'undone') {
+            return ['can_undo' => false, 'undo_reason' => null];
+        }
+        $e = $undo->eligibility($import);
+
+        return ['can_undo' => $e['can_undo'], 'undo_reason' => $e['reason']];
     }
 
     /**
