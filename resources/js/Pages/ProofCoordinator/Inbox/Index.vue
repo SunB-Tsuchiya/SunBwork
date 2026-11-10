@@ -1,4 +1,5 @@
 <script setup>
+import ProofQuickWorkSource from '@/Components/ProofQuickWorkSource.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
 import { useUIState } from '@/Composables/useUIState';
@@ -177,6 +178,7 @@ function changeSortOrder() {
                                 </td>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">
                                     {{ req.title }}
+                                    <ProofQuickWorkSource :source="req.quick_work_source" />
                                     <p v-if="req.note" class="mt-0.5 text-xs text-gray-500">{{ req.note }}</p>
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-600">

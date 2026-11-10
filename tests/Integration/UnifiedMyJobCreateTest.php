@@ -34,7 +34,7 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('project_jobs', function (Blueprint $t) { $t->id(); $t->string('title')->nullable(); $t->integer('company_id')->nullable(); $t->integer('broad_project_id')->nullable(); $t->boolean('show_on_department_schedule')->default(true); $t->integer('user_id')->nullable(); $t->integer('client_id')->nullable(); });
         Schema::create('clients', function (Blueprint $t) { $t->id(); $t->string('name'); $t->integer('company_id')->nullable(); });
         Schema::create('company_clients', function (Blueprint $t) { $t->integer('company_id'); $t->integer('client_id'); });
-        Schema::create('users', function (Blueprint $t) { $t->id(); $t->string('name')->nullable(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
+        Schema::create('users', function (Blueprint $t) { $t->id(); $t->string('name')->nullable(); $t->string('user_role')->nullable(); $t->integer('company_id'); $t->integer('department_id'); $t->boolean('is_ghost')->default(false); });
         Schema::create('project_job_coordinators', function (Blueprint $t) { $t->integer('project_job_id'); $t->integer('user_id'); });
         Schema::create('project_team_members', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); });
         Schema::create('project_job_assignments', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('user_id'); $t->integer('company_id')->nullable(); $t->integer('department_id')->nullable(); $t->integer('sender_id')->nullable(); $t->integer('source_assignment_id')->nullable(); $t->integer('supersedes_assignment_id')->nullable(); $t->string('title')->nullable(); $t->boolean('completed')->default(false); $t->integer('status_id')->nullable(); $t->timestamp('proof_completed_at')->nullable(); $t->string('job_type')->nullable(); $t->date('desired_end_date')->nullable(); $t->string('amounts_unit')->nullable(); $t->timestamps(); });
@@ -62,8 +62,9 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('statuses', function (Blueprint $t) { $t->id(); $t->string('key'); $t->string('slug'); });
         DB::table('statuses')->insert(['id' => 1, 'key' => 'completed', 'slug' => 'completed']);
         Schema::create('progress_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
-        Schema::create('proof_requests', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('proofreader_id'); $t->integer('project_job_assignment_id')->nullable(); $t->integer('requester_id'); $t->string('title'); $t->string('status'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
-        Schema::create('job_notifications', function (Blueprint $t) { $t->id(); $t->string('type'); $t->integer('sender_id'); $t->integer('recipient_id'); $t->integer('project_job_id'); $t->integer('assignment_id')->nullable(); $t->text('message'); $t->timestamps(); });
+        Schema::create('proof_requests', function (Blueprint $t) { $t->id(); $t->integer('project_job_id')->nullable(); $t->integer('proofreader_id')->nullable(); $t->integer('project_job_assignment_id')->nullable(); $t->integer('requester_id'); $t->string('title'); $t->string('status'); $t->dateTime('deadline')->nullable(); $t->text('note')->nullable(); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_10_180001_add_quick_work_source_to_proof_requests.php')->up();
+        Schema::create('job_notifications', function (Blueprint $t) { $t->id(); $t->string('type'); $t->integer('sender_id'); $t->integer('recipient_id'); $t->integer('project_job_id')->nullable(); $t->integer('assignment_id')->nullable(); $t->text('message'); $t->timestamps(); });
         config(['database.connections.mginbon.database' => '']);
         foreach (['user_monthly_schedules', 'user_monthly_breaks'] as $name) {
             Schema::create($name, function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->string('year_month'); $t->json('schedule'); });
@@ -1651,6 +1652,185 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(1, $history(1)['records'][0]['client_id']);
         self::assertSame('Alpha', $history(1)['records'][0]['client_name']);
 
+    }
+
+    private function quickProofFixture(): int
+    {
+        $this->save($this->request($this->payload(['title' => '元作業', 'result_note' => '非公開の結果'])));
+        DB::table('users')->insert([
+            ['id' => 11, 'company_id' => 1, 'department_id' => 1, 'user_role' => 'proof_coordinator'],
+            ['id' => 12, 'company_id' => 1, 'department_id' => 2, 'user_role' => 'proof_coordinator'],
+            ['id' => 13, 'company_id' => 2, 'department_id' => 3, 'user_role' => 'proof_coordinator'],
+        ]);
+        return (int) DB::table('personal_work_entries')->value('id');
+    }
+
+    private function sendQuickProof(int $id, array $extra = [], ?User $user = null, ?int $context = null): array
+    {
+        $request = $this->request($extra + ['title' => '元作業_校正', 'deadline' => '2026-12-01T17:30:00+09:00', 'note' => '校正の注意'], $user, $context);
+        $this->app['auth']->setUser($request->user());
+        return app(\App\Services\QuickWorkProofRequest::class)->store($request, $id, $context);
+    }
+
+    public function test_quick_proof_handoff_without_project_and_replay_are_atomic_and_scoped(): void
+    {
+        $id = $this->quickProofFixture();
+        $before = (array) DB::table('personal_work_entries')->find($id);
+        $first = $this->sendQuickProof($id);
+        self::assertFalse($first['replayed']);
+        self::assertSame(['id' => $first['id'], 'replayed' => true], $this->sendQuickProof($id));
+        self::assertSame(1, DB::table('proof_requests')->count());
+        $proof = DB::table('proof_requests')->first();
+        self::assertSame($id, $proof->source_personal_work_entry_id);
+        self::assertNull($proof->project_job_assignment_id);
+        self::assertNull($proof->project_job_id);
+        self::assertSame(1, $proof->requester_id);
+        self::assertSame('pending', $proof->status);
+        self::assertSame('2026-12-01 08:30:00', $proof->deadline);
+        self::assertSame([11], DB::table('job_notifications')->pluck('recipient_id')->all());
+        self::assertSame($before, (array) DB::table('personal_work_entries')->find($id));
+        self::assertSame(0, DB::table('project_job_assignments')->count());
+        self::assertSame(1, DB::table('events')->count());
+        self::assertTrue(app(\App\Services\QuickWorkProofRequest::class)->state($this->user(), $id)['requested']);
+    }
+
+    public function test_quick_proof_keeps_real_project_and_source_labels_without_exposing_source_body(): void
+    {
+        $id = $this->quickProofFixture();
+        DB::table('project_jobs')->insert(['id' => 77, 'company_id' => 1, 'title' => '実案件']);
+        DB::table('personal_work_entries')->where('id', $id)->update(['project_job_id' => 77]);
+        $result = $this->sendQuickProof($id);
+        self::assertSame(77, DB::table('proof_requests')->value('project_job_id'));
+        $this->app['auth']->setUser($this->user(['id' => 11, 'user_role' => 'proof_coordinator']));
+        $data = \App\Models\ProofRequest::findOrFail($result['id'])->toArray();
+        self::assertSame('元作業', $data['quick_work_source']['title']);
+        self::assertSame('承認済み分類', $data['quick_work_source']['classification']);
+        self::assertNull($data['quick_work_source']['entryId']);
+        self::assertArrayNotHasKey('source_personal_work_entry', $data);
+        self::assertStringNotContainsString('非公開の結果', json_encode($data));
+        $this->app['auth']->setUser($this->user());
+        self::assertSame($id, \App\Models\ProofRequest::findOrFail($result['id'])->quick_work_source['entryId']);
+    }
+
+    public function test_quick_proof_rejects_role_owner_context_and_injected_source_references(): void
+    {
+        $id = $this->quickProofFixture();
+        foreach ([['user_role' => 'user'], ['user_role' => 'coordinator'], ['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $attributes) {
+            try { $this->sendQuickProof($id, [], $this->user($attributes)); self::fail('Forbidden proof handoff'); }
+            catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+        }
+        try { $this->sendQuickProof($id, [], null, 2); self::fail('Context bypass'); }
+        catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+        try { $this->sendQuickProof($id, [], $this->user(['id' => 2])); self::fail('Other owner'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertNotNull($e); }
+        foreach (['project_job_id', 'project_job_assignment_id', 'proof_cell_id', 'proof_row_id', 'proof_col_key', 'workflow_cell_id', 'workflow_sheet_id', 'workflow_stage_key', 'requester_id', 'source_personal_work_entry_id'] as $key) {
+            try { $this->sendQuickProof($id, [$key => 77]); self::fail('Injected '.$key); }
+            catch (ValidationException $e) { self::assertArrayHasKey($key, $e->errors()); }
+        }
+        self::assertSame(0, DB::table('proof_requests')->count());
+        self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_quick_proof_rejects_completed_source_and_missing_local_coordinator(): void
+    {
+        $id = $this->quickProofFixture();
+        DB::table('personal_work_entries')->where('id', $id)->update(['completed_at' => now()]);
+        try { $this->sendQuickProof($id); self::fail('Completed source accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('title', $e->errors()); }
+        DB::table('personal_work_entries')->where('id', $id)->update(['completed_at' => null]);
+        DB::table('users')->where('id', 11)->update(['user_role' => 'user']);
+        try { $this->sendQuickProof($id); self::fail('No coordinator accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('title', $e->errors()); }
+        self::assertSame(0, DB::table('proof_requests')->count());
+    }
+
+    public function test_quick_proof_notification_failure_rolls_back_request_and_all_notifications(): void
+    {
+        $id = $this->quickProofFixture();
+        DB::table('users')->insert(['id' => 14, 'company_id' => 1, 'department_id' => 1, 'user_role' => 'proof_coordinator']);
+        DB::statement("CREATE TRIGGER quick_proof_notification_failure BEFORE INSERT ON job_notifications WHEN NEW.recipient_id = 14 BEGIN SELECT RAISE(ABORT, 'synthetic notification failure'); END");
+        try { $this->sendQuickProof($id); self::fail('Failure swallowed'); }
+        catch (\Illuminate\Database\QueryException $e) { self::assertStringContainsString('synthetic notification failure', $e->getMessage()); }
+        self::assertSame(0, DB::table('proof_requests')->count());
+        self::assertSame(0, DB::table('job_notifications')->count());
+        DB::statement('DROP TRIGGER quick_proof_notification_failure');
+        self::assertFalse($this->sendQuickProof($id)['replayed']);
+    }
+
+    public function test_quick_proof_visibility_does_not_expand_legacy_visibility_or_other_company_sources(): void
+    {
+        $id = $this->quickProofFixture();
+        $result = $this->sendQuickProof($id);
+        DB::table('proof_requests')->insert(['id' => 77, 'project_job_id' => 77, 'requester_id' => 1, 'title' => '旧依頼', 'status' => 'pending']);
+        foreach ([['company_id' => 2, 'department_id' => 3], ['department_id' => 2]] as $attributes) {
+            $this->app['auth']->setUser($this->user($attributes));
+            self::assertNull(\App\Models\ProofRequest::find($result['id']));
+            self::assertNotNull(\App\Models\ProofRequest::find(77));
+        }
+        $this->app['auth']->setUser($this->user(['id' => 11, 'user_role' => 'proof_coordinator']));
+        self::assertNotNull(\App\Models\ProofRequest::find($result['id']));
+    }
+
+    public function test_quick_proof_pending_cancel_allows_resend_and_prevents_source_deletion(): void
+    {
+        $id = $this->quickProofFixture();
+        $result = $this->sendQuickProof($id);
+        $controller = app(\App\Http\Controllers\User\WorkJobDetailController::class);
+        try { $controller->destroy($this->request(), $id, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class)); self::fail('Source deleted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        $request = $this->request();
+        app(\App\Http\Controllers\ProofCoordinator\ProofRequestController::class)->destroy($request, \App\Models\ProofRequest::findOrFail($result['id']));
+        self::assertFalse(app(\App\Services\QuickWorkProofRequest::class)->state($this->user(), $id)['requested']);
+        self::assertFalse($this->sendQuickProof($id)['replayed']);
+        self::assertSame(1, DB::table('proof_requests')->count());
+        self::assertSame(2, DB::table('job_notifications')->count()); // New notification belongs to an explicit re-request.
+    }
+
+    public function test_quick_proof_route_and_legacy_injected_source_are_kept_separate(): void
+    {
+        $id = $this->quickProofFixture();
+        $request = $this->request(['title' => '試験_校正', 'deadline' => '2026-12-01T17:30:00+09:00']);
+        $request->server->set('REQUEST_URI', '/myjobbox/work-entries/'.$id.'/proof-request');
+        $routeRequest = Request::create('/myjobbox/work-entries/'.$id.'/proof-request', 'POST');
+        self::assertSame('user.myjobbox.entries.proof_request', app('router')->getRoutes()->match($routeRequest)->getName());
+        $this->app['auth']->setUser($this->user());
+        $response = app(\App\Http\Controllers\User\WorkJobDetailController::class)->requestProof($request, $id, app(\App\Services\QuickWorkProofRequest::class));
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame(1, DB::table('proof_requests')->count());
+        try {
+            app(\App\Http\Controllers\ProofCoordinator\ProofRequestController::class)->store($this->request(['source_personal_work_entry_id' => $id, 'title' => '不正な旧送信']));
+            self::fail('Quick reference accepted on legacy endpoint');
+        } catch (ValidationException $e) { self::assertArrayHasKey('source_personal_work_entry_id', $e->errors()); }
+        self::assertSame(1, DB::table('proof_requests')->count());
+    }
+
+    public function test_quick_proof_changed_context_hides_even_a_preloaded_source(): void
+    {
+        $id = $this->quickProofFixture();
+        $result = $this->sendQuickProof($id);
+        $proof = \App\Models\ProofRequest::findOrFail($result['id']);
+        self::assertNotNull($proof->quick_work_source);
+        $this->request([], $this->user(), 2);
+        self::assertNull(\App\Models\ProofRequest::find($result['id']));
+        self::assertNull($proof->quick_work_source);
+    }
+
+    public function test_quick_proof_completion_keeps_source_work_uncompleted_and_preserves_reference(): void
+    {
+        $id = $this->quickProofFixture();
+        $result = $this->sendQuickProof($id);
+        $coordinator = $this->user(['id' => 11, 'user_role' => 'proof_coordinator']);
+        $this->app['auth']->setUser($coordinator);
+        $request = $this->request([], $coordinator);
+        app(\App\Http\Controllers\ProofCoordinator\ProofRequestController::class)->complete($request, \App\Models\ProofRequest::findOrFail($result['id']));
+        self::assertSame('completed', DB::table('proof_requests')->value('status'));
+        self::assertNull(DB::table('personal_work_entries')->value('completed_at'));
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->where('recipient_id', 1)->count());
+        $this->app['auth']->setUser($this->user());
+        try { app(DepartmentWorkController::class)->destroy($this->request(), \App\Models\PersonalWorkEntry::findOrFail($id)); self::fail('Historical source deleted'); }
+        catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
+        self::assertTrue($this->sendQuickProof($id)['replayed']);
+        self::assertSame(1, DB::table('proof_requests')->count());
     }
 
 }

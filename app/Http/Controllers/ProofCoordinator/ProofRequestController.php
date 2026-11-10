@@ -114,7 +114,7 @@ class ProofRequestController extends Controller
         }
 
         // workflow_cell_id も proof_cell_id も未設定でも project_job に管理シートがある場合はリダイレクト
-        if ($proofRequest->project_job_id) {
+        if ($proofRequest->project_job_id && ! $proofRequest->source_personal_work_entry_id) {
             $fallbackSheet = \App\Models\WorkflowSheet::where('project_job_id', $proofRequest->project_job_id)
                 ->latest()
                 ->first();
@@ -1097,6 +1097,7 @@ class ProofRequestController extends Controller
      */
     public function store(Request $request)
     {
+        $request->validate(['source_personal_work_entry_id' => ['prohibited']]);
         $data = $request->validate([
             'project_job_assignment_id' => ['nullable', 'exists:project_job_assignments,id'],
             'project_job_id'            => ['nullable', 'exists:project_jobs,id'],

@@ -380,6 +380,7 @@ class DepartmentWorkController extends Controller
             $locked = PersonalWorkEntry::whereKey($entry->id)->lockForUpdate()->firstOrFail();
             abort_if($locked->diary_id, 422, '日報へ取り込んだ記録は日報編集画面で変更してください。');
             abort_if(app(\App\Services\WorkJobReader::class)->hasEntryChildren((int) $locked->id), 422, '続きがあるため、この仕事は削除できません。');
+            abort_if(\App\Models\ProofRequest::withoutGlobalScopes()->where('source_personal_work_entry_id', $locked->id)->exists(), 422, '校正依頼の元になっているため、この仕事は削除できません。');
             $locked->delete();
         });
         return response()->noContent();

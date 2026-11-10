@@ -157,6 +157,7 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        (new QuickWorkProofChangelogSeeder())->run();
         (new LegacyReceivedCompletionChangelogSeeder())->run();
         (new ReceivedJobPrefillChangelogSeeder())->run();
         (new RequestJobCompletionChangelogSeeder())->run();

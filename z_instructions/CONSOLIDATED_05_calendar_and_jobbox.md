@@ -404,3 +404,12 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 既存の担当本人のカレンダー/旧MyJob詳細/JobBox完了は、通常依頼を取り込んだ旧形式系列についてLegacyReceivedJobCompletionを使用する。新式UIの一般公開やUnifiedMyJobBox/WorkJobReaderのguard解除は行わない。明示supersedes元の本人・案件・会社部署・一意な取り込みを検証し、選択と旧祖先だけをロックして完了。元依頼の完了遷移を基準に依頼主とリーダーへ宛先ごと1件、自己通知なし・再操作重複なし。既定DBの状態/元メッセージ/セル/予定表示/通知/outboxを同一transactionで確定し、銀本はcommit後同期。カレンダー由来の工程日はCalculatesEventTimeで解決したJST作業日を保持する。担当本人の既存内部Message抑制を維持し、Toastはcommit後に一度。銀本反映待ちは二重Toastを避けてflash案内する。単独自作・直接依頼・校正・代理操作の旧専用経路は維持し、typed混在は既存試用guard内の共通完了へ委譲する。対応しない親を黙って切り落とさない。
 
 過去に完了済みで通知がないものの自動再送はしない。配備と利用者実受信の状態はLEGACY_RECEIVED_COMPLETION_MANAGER1.md参照。
+
+
+## 新式マイジョブから校正依頼の限定試用（2026-11-10）
+
+実装範囲: 情報出版・sunbrainの試用SuperAdmin本人の未完了簡易ジョブ詳細から既存校正依頼モーダルを使用する。専用POSTは本人/実会社部署/contextを再検証し、元行lockで再送を抑止。proof_requests.source_personal_work_entry_idを元参照とし、旧割当/セルIDと混在させない。案件は元の実ProjectJob（なければNULL）、依頼者は認証本人に固定。校正窓口は同会社・部署のみ、依頼とDB通知は同じtransaction。窓口未登録/保存失敗は入力を保持して案内する。
+
+依頼者の校正状況と窓口受信/割当画面で元作業の名称・分類を認可範囲だけ表示する。別会社部署/contextではこの新規元付き依頼を取得しない。旧依頼の既存表示条件は変更しない。元の結果文/ファイル/時刻を校正画面へ丸ごと渡さない。依頼が残る元は削除不可（完了後の参照も維持）、pending依頼のキャンセル後は再依頼可能。依頼送信/校正完了で元簡易ジョブを自動完了にしない。進行表・銀本の専用連携は旧マイジョブで対応する方針。
+
+追加migrationは2026_11_10_180001の1件。実装/コード検証と配備/実通知受信はQUICK_JOB_PROOF_MANAGER1.mdで別管理し、一般公開は未承認。

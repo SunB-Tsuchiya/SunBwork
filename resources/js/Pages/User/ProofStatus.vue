@@ -1,4 +1,5 @@
 <script setup>
+import ProofQuickWorkSource from '@/Components/ProofQuickWorkSource.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useUIState } from '@/Composables/useUIState';
@@ -256,7 +257,7 @@ const displayGroups = computed(() => {
                                 :key="req.id"
                                 class="hover:bg-gray-50"
                             >
-                                <td class="break-words border px-3 py-2 text-sm font-medium text-gray-900">{{ req.title || '—' }}</td>
+                                <td class="break-words border px-3 py-2 text-sm font-medium text-gray-900">{{ req.title || '—' }}<ProofQuickWorkSource :source="req.quick_work_source" /></td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">
                                     {{ req.project_job?.client?.name || '—' }}
                                 </td>

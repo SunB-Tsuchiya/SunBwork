@@ -1,4 +1,5 @@
 <script setup>
+import ProofQuickWorkSource from '@/Components/ProofQuickWorkSource.vue';
 import { ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
@@ -86,6 +87,7 @@ function onPickerConfirmed({ newSlots, updatedSlots }) {
             <!-- 依頼情報（読み取り専用） -->
             <div class="rounded border border-pink-100 bg-pink-50 p-4 text-sm">
                 <p class="mb-1 font-semibold text-pink-700">校正依頼情報</p>
+                <ProofQuickWorkSource :source="proofRequest.quick_work_source" />
                 <dl class="grid grid-cols-2 gap-x-6 gap-y-1 text-gray-700 sm:grid-cols-4">
                     <div>
                         <dt class="text-xs font-medium text-gray-500">依頼者</dt>

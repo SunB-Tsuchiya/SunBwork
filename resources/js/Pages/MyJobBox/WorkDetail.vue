@@ -1,5 +1,6 @@
 <script setup>
 import axios from 'axios';
+import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import WorkJobDetailsEditor from '@/Components/WorkJobDetailsEditor.vue';
 import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import { ref, computed } from 'vue';
@@ -11,8 +12,9 @@ import WorkJobSeries from '@/Components/WorkJobSeries.vue';
 import QuickWorkEntryModal from '@/Components/Calendar/QuickWorkEntryModal.vue';
 import { workCategories, workActivities } from '@/Constants/personalWorkActivities';
 
-const props = defineProps({ work: Object, time: Object, ancestors: Array, back: Object, series: { type: Object, default: () => ({items:[],operationsEnabled:false,completionTargets:[]}) } });
+const props = defineProps({ proof: { type: Object, default: () => ({ enabled: false }) }, work: Object, time: Object, ancestors: Array, back: Object, series: { type: Object, default: () => ({items:[],operationsEnabled:false,completionTargets:[]}) } });
 const editing = ref(false);
+const proofOpen = ref(false);
 const detailsOpen = ref(false);
 const continuing = ref(false);
 const completing = ref(false);
@@ -126,6 +128,10 @@ async function complete() {
                 <div class="flex justify-end gap-2"><button type="button" :disabled="completing" class="rounded border px-3 py-2 text-sm" @click="confirmationOpen = false">キャンセル</button><button type="button" :disabled="completing" class="rounded bg-yellow-700 px-3 py-2 text-sm text-white disabled:opacity-50" @click="complete">{{ completing ? '処理中…' : '完了にする' }}</button></div>
             </section>
             <div class="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
+                <template v-if="proof.enabled">
+                    <button v-if="!work.completed && !proof.requested" type="button" class="rounded border border-pink-300 bg-pink-50 px-3 py-2 text-sm font-medium text-pink-700" @click="proofOpen = true">校正依頼</button>
+                    <Link v-if="proof.requested" :href="route('user.proof.status', { period: 'all', hide_completed: 0 })" class="rounded border px-3 py-2 text-sm text-pink-700">校正依頼済み・状況を見る</Link>
+                </template>
                 <button type="button" :disabled="detailsOpen" class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" @click="detailsOpen = true">詳細入力</button>
                 <button v-if="series.canContinue ?? series.operationsEnabled" type="button" class="rounded border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700" @click="continuing = true">続きのマイジョブを作成</button>
                 <Link :href="route('calendar.index', { date: work.work_date, view: 'day' })" class="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">この日のカレンダー</Link>
@@ -134,6 +140,7 @@ async function complete() {
                 <span v-if="work.completed" class="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">完了済み</span>
             </div>
         </div>
+        <ProofRequestModal :show="proofOpen" :quick-entry-id="work.id" :initial-title="proof.title || ''" @close="proofOpen = false" />
         <QuickWorkEntryModal :show="editing || continuing" :entry="work" :continuation-source="continuing ? {id: work.id} : null" :date="work.work_date" entry-point="myjob" @close="editing = false; continuing = false" @saved="saved" @deleted="deleted" />
     </AppLayout>
 </template>

@@ -19,7 +19,15 @@ class WorkJobDetailController extends Controller
             'q' => ['nullable', 'string', 'max:200'], 'page' => ['nullable', 'integer', 'min:1'], 'hide_completed' => ['nullable', 'boolean'],
         ]);
         return Inertia::render('MyJobBox/WorkDetail', $data + ['back' => $back,
+            'proof' => app(\App\Services\QuickWorkProofRequest::class)->state($request->user(), $entry, $context === null ? null : (int) $context),
             'series' => $jobs->series($request->user(), $entry, $context === null ? null : (int) $context)]);
+    }
+
+    public function requestProof(Request $request, int $entry, \App\Services\QuickWorkProofRequest $proof)
+    {
+        $context = $request->session()->get('superadmin_context.company_id');
+        $result = $proof->store($request, $entry, $context === null ? null : (int) $context);
+        return back()->with('success', $result['replayed'] ? '校正依頼は送信済みです。' : '校正依頼を送信しました。');
     }
 
     public function continueEntry(Request $request, int $entry, \App\Services\WorkJobMutation $jobs, DepartmentWorkController $entries)
