@@ -13,7 +13,9 @@ use App\Http\Controllers\SunA\GeneralAffairs\Nencho\SubmissionController;
 use App\Http\Controllers\SunA\Sales\AnnualAnalysisController;
 use App\Http\Controllers\SunA\Sales\ClientAnalysisController;
 use App\Http\Controllers\SunA\Sales\ClientGroupController;
+use App\Http\Controllers\SunA\Sales\CompareController;
 use App\Http\Controllers\SunA\Sales\DashboardController as SalesDashboardController;
+use App\Http\Controllers\SunA\Sales\DepartmentComparisonController;
 use App\Http\Controllers\SunA\Sales\ImportController;
 use App\Http\Controllers\SunA\Sales\RegistrationStatusController;
 use App\Http\Controllers\SunA\Sales\SameMonthController;
@@ -131,6 +133,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('client', [ClientAnalysisController::class, 'index'])->name('client');
         Route::get('api/client/search', [ClientAnalysisController::class, 'search'])->name('api.client.search');
         Route::get('api/client/detail', [ClientAnalysisController::class, 'detail'])->name('api.client.detail');
+        Route::get('department', [DepartmentComparisonController::class, 'index'])->name('department');
+        Route::get('api/department/summary', [DepartmentComparisonController::class, 'summary'])->name('api.department.summary');
+        Route::get('compare', [CompareController::class, 'index'])->name('compare');
+        Route::get('api/compare/summary', [CompareController::class, 'summary'])->name('api.compare.summary');
 
         // 名寄せ設定（閲覧。変更は取込できる人のグループ）
         Route::get('client-groups', [ClientGroupController::class, 'index'])->name('client_groups');
