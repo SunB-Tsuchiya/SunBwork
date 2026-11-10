@@ -75,6 +75,10 @@ onMounted(fetchSummary);
 onBeforeUnmount(() => chart?.destroy());
 
 const matrix = computed(() => summary.value?.by_department ?? { years: [], rows: [] });
+// 部門別: 部は常に、課・直轄は親の部（営業第三部）が開いているときだけ表示
+const collapsed = ref({}); // 閉じている部（既定は空 = 営業第三部も開いた状態）
+const toggleDept = (key) => { collapsed.value = { ...collapsed.value, [key]: !collapsed.value[key] }; };
+const visibleDepartmentRows = computed(() => matrix.value.rows.filter((r) => r.level === 0 || !collapsed.value[r.parent]));
 </script>
 
 <template>
@@ -151,8 +155,11 @@ const matrix = computed(() => summary.value?.by_department ?? { years: [], rows:
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="r in matrix.rows" :key="r.key" class="border-t">
-                                    <td class="py-1">{{ r.label }}</td>
+                                <tr v-for="r in visibleDepartmentRows" :key="r.key" class="border-t" :class="r.level === 1 ? 'bg-amber-50/40 text-gray-600' : ''">
+                                    <td class="min-w-[11rem] whitespace-nowrap py-1" :class="r.level === 1 ? 'pl-6' : ''">
+                                        {{ r.level === 1 ? `└ ${r.label}` : r.label }}<span v-if="r.has_children" class="ml-1 text-[10px] text-gray-400">（全体）</span>
+                                        <button v-if="r.has_children" type="button" class="ml-1 inline-block w-4 text-indigo-600" :title="collapsed[r.key] ? '課・直轄を開く' : '課・直轄を閉じる'" @click="toggleDept(r.key)">{{ collapsed[r.key] ? '▶' : '▼' }}</button>
+                                    </td>
                                     <td v-for="y in matrix.years" :key="y" class="py-1 text-right">{{ yen(r.amounts[y]) }}</td>
                                 </tr>
                             </tbody>

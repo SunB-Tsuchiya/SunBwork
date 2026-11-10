@@ -14,6 +14,8 @@ class AnnualAnalysisService
     public function __construct(
         private PeriodResolver $periods,
         private DepartmentFilter $departments,
+        private PeriodAggregator $aggregator,
+        private DepartmentTree $tree,
     ) {
     }
 
@@ -115,42 +117,15 @@ class AnnualAnalysisService
         ];
     }
 
-    /** 期間内の合計（売上・受注件数・平均受注単価・取引社数＝期間の売上が0円を超える得意先の数） */
     private function totals(int $year, array $months, string $dept): array
     {
-        $base = $this->facts($year, $months, $dept);
-        $sum = (clone $base)->selectRaw('COALESCE(SUM(amount),0) as amount, COALESCE(SUM(order_count),0) as orders')->first();
-        $clients = (clone $base)->selectRaw('client_key')->groupBy('client_key')->havingRaw('SUM(amount) > 0')->get()->count();
-        $amount = (float) $sum->amount;
-        $orders = (int) $sum->orders;
-
-        return [
-            'amount' => $amount,
-            'order_count' => $orders,
-            'avg_order_price' => $orders > 0 ? round($amount / $orders) : null,
-            'client_count' => $clients,
-        ];
+        return $this->aggregator->totals($year, $months, $dept);
     }
 
-    /** @return array<string, array{name:string, amount:float}> 得意先キー → 名前と期間の売上 */
+    /** @return array<string, array{name:string, amount:float}> 得意先キー（名寄せ後）→ 名前と期間の売上 */
     private function clientTotals(int $year, array $months, string $dept): array
     {
-        if ($months === []) {
-            return [];
-        }
-        $out = [];
-        foreach ($this->facts($year, $months, $dept)->selectRaw('client_key, MAX(client_name) as name, SUM(amount) as amount')->groupBy('client_key')->get() as $r) {
-            $out[$r->client_key] = ['name' => (string) $r->name, 'amount' => (float) $r->amount];
-        }
-
-        return $out;
-    }
-
-    private function facts(int $year, array $months, string $dept)
-    {
-        $q = Fact::query()->where('sales_year', $year)->whereIn('sales_month', $months);
-
-        return $this->departments->apply($q, $dept);
+        return $this->aggregator->clientTotals($year, $months, $dept);
     }
 
     /** @return array{value:float|int|null, prior:float|int|null, diff:float|int|null, rate:float|null} */
@@ -197,50 +172,56 @@ class AnnualAnalysisService
     }
 
     /**
-     * 部門別（課のある部は課まで）。部門の絞り込みの影響は受けない（全部門の内訳を見せる）。
+     * 部門別。部の行の直後に、課のある部は課・直轄の行が並ぶ（画面で開閉）。「第三部（全体）」は課・直轄の合計。
+     * 部門の絞り込みの影響は受けない（全部門の内訳を見せる）。社数は名寄せ後。
      *
      * @return array<int, array<string,mixed>>
      */
     private function byDepartment(int $year, array $months, bool $priorAvailable): array
     {
-        $labels = $this->departments->rowLabels();
-        $order = $this->departments->order();
-        $collect = function (int $y) use ($months) {
-            $out = [];
-            foreach (Fact::query()->where('sales_year', $y)->whereIn('sales_month', $months)
-                ->selectRaw('department_key, section_key, SUM(amount) as amount, COUNT(DISTINCT client_key) as clients')
-                ->groupBy('department_key', 'section_key')->get() as $r) {
-                $out[$r->section_key ?? $r->department_key] = ['amount' => (float) $r->amount, 'clients' => (int) $r->clients];
+        $nodes = $this->tree->nodes();
+        $collect = function (int $y) use ($months): array {
+            $amounts = $this->tree->amounts($this->aggregator->departmentAmounts($y, $months));
+            $base = EffectiveClient::join(Fact::query())->where('sales_year', $y)->whereIn('sales_month', $months);
+            $clients = [];
+            // 部 = その部の全行、課 = その課の行の取引社数（名寄せ後）
+            foreach ((clone $base)->selectRaw('department_key as k, COUNT(DISTINCT ' . EffectiveClient::KEY . ') as n')->groupBy('department_key')->get() as $r) {
+                $clients[$r->k] = (int) $r->n;
+            }
+            foreach ((clone $base)->whereNotNull('section_key')->selectRaw('section_key as k, COUNT(DISTINCT ' . EffectiveClient::KEY . ') as n')->groupBy('section_key')->get() as $r) {
+                $clients[$r->k] = (int) $r->n;
             }
 
-            return $out;
+            return [$amounts, $clients];
         };
-        $cur = $collect($year);
-        $pri = $priorAvailable ? $collect($year - 1) : [];
-        $total = array_sum(array_column($cur, 'amount'));
+        [$curAmounts, $curClients] = $collect($year);
+        [$priAmounts] = $priorAvailable ? $collect($year - 1) : [[], []];
+        // 構成比の分母 = 部（level 0）の合計（課は部に含まれるので、二重に数えない）
+        $total = 0.0;
+        foreach ($nodes as $n) {
+            if ($n['level'] === 0) {
+                $total += $curAmounts[$n['key']] ?? 0.0;
+            }
+        }
 
         $rows = [];
-        foreach (array_keys($cur + $pri) as $key) {
-            $c = $cur[$key]['amount'] ?? 0.0;
-            $p = $priorAvailable ? ($pri[$key]['amount'] ?? 0.0) : null;
-            $rows[] = [
-                'key' => $key,
-                'label' => $labels[$key] ?? $key,
+        foreach ($nodes as $n) {
+            $c = $curAmounts[$n['key']] ?? 0.0;
+            $p = $priorAvailable ? ($priAmounts[$n['key']] ?? 0.0) : null;
+            // 売上も前年の売上も無い部門は出さない（部は、課に売上があれば出る）
+            if ($c == 0.0 && ($p === null || $p == 0.0) && ($curClients[$n['key']] ?? 0) === 0) {
+                continue;
+            }
+            $rows[] = $n + [
                 'amount' => $c,
                 'prior_amount' => $p,
                 'diff' => $p !== null ? $c - $p : null,
                 'rate' => ($p !== null && $p > 0) ? round(($c - $p) / $p * 100, 1) : null,
                 'share_pct' => $total > 0 ? round($c / $total * 100, 1) : null,
-                'client_count' => $cur[$key]['clients'] ?? 0,
-                '_order' => $order[$key] ?? 999,
+                'client_count' => $curClients[$n['key']] ?? 0,
             ];
         }
-        usort($rows, fn ($a, $b) => $a['_order'] <=> $b['_order']);
 
-        return array_map(function ($r) {
-            unset($r['_order']);
-
-            return $r;
-        }, $rows);
+        return $rows;
     }
 }

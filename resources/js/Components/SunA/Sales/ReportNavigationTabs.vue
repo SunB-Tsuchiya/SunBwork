@@ -32,6 +32,8 @@ const groups = computed(() => [
             { key: 'annual', route: 'annual', label: '年次分析' },
             { key: 'same_month', route: 'same_month', label: '同月比較' },
             { key: 'client', route: 'client', label: '得意先分析' },
+            { key: 'department', route: 'department', label: '部門比較' },
+            { key: 'compare', route: 'compare', label: '左右比較' },
         ],
     },
     {
@@ -39,6 +41,7 @@ const groups = computed(() => [
         tabs: [
             { key: 'import', route: 'import.create', label: 'Excel取込', show: canImport.value },
             { key: 'history', route: 'history.index', label: '取込履歴' },
+            { key: 'client_groups', route: 'client_groups', label: '名寄せ' },
         ],
     },
 ]

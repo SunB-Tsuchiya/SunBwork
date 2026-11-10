@@ -13,6 +13,8 @@ class SameMonthService
     public function __construct(
         private PeriodResolver $periods,
         private DepartmentFilter $departments,
+        private PeriodAggregator $aggregator,
+        private DepartmentTree $tree,
     ) {
     }
 
@@ -33,8 +35,9 @@ class SameMonthService
         $rows = $this->departments->apply(Fact::query()->where('sales_month', $month), $dept)
             ->selectRaw('sales_year, SUM(amount) as amount, SUM(order_count) as orders')
             ->groupBy('sales_year')->get()->keyBy('sales_year');
-        $clients = $this->departments->apply(Fact::query()->where('sales_month', $month), $dept)
-            ->selectRaw('sales_year, client_key')->groupBy('sales_year', 'client_key')->havingRaw('SUM(amount) > 0')->get()
+        // 取引社数は名寄せ後の数（グループは1社）
+        $clients = $this->departments->apply(EffectiveClient::join(Fact::query())->where('sales_month', $month), $dept)
+            ->selectRaw('sales_year, ' . EffectiveClient::KEY . ' as ck')->groupBy('sales_year', 'ck')->havingRaw('SUM(suna_sl_facts.amount) > 0')->get()
             ->groupBy('sales_year')->map->count();
 
         $list = [];
@@ -64,38 +67,31 @@ class SameMonthService
     }
 
     /**
-     * 部門別（課のある部は課まで）× 年。部門の絞り込みの影響は受けない（全部門の内訳を見せる）。
+     * 部門別 × 年。部の行の直後に、課のある部は課・直轄の行が並ぶ（画面で開閉）。「第三部（全体）」は課・直轄の合計。
+     * 部門の絞り込みの影響は受けない（全部門の内訳を見せる）。
      *
      * @return array{years:array<int,int>, rows:array<int,array<string,mixed>>}
      */
     private function byDepartment(int $month, array $years): array
     {
-        $labels = $this->departments->rowLabels();
-        $order = $this->departments->order();
-        $matrix = [];
-        foreach (Fact::query()->where('sales_month', $month)->whereIn('sales_year', $years)
-            ->selectRaw('sales_year, department_key, section_key, SUM(amount) as amount')
-            ->groupBy('sales_year', 'department_key', 'section_key')->get() as $r) {
-            $matrix[$r->section_key ?? $r->department_key][(int) $r->sales_year] = (float) $r->amount;
+        $byYear = [];
+        foreach ($years as $y) {
+            $byYear[$y] = $this->tree->amounts($this->aggregator->departmentAmounts($y, [$month]));
         }
 
         $rows = [];
-        foreach ($matrix as $key => $byYear) {
+        foreach ($this->tree->nodes() as $n) {
             $amounts = [];
             foreach ($years as $y) {
-                $amounts[$y] = $byYear[$y] ?? 0.0;
+                $amounts[$y] = $byYear[$y][$n['key']] ?? 0.0;
             }
-            $rows[] = ['key' => (string) $key, 'label' => $labels[$key] ?? $key, 'amounts' => $amounts, '_order' => $order[$key] ?? 999];
+            // どの年も売上が無い部門は出さない
+            if (array_sum(array_map('abs', $amounts)) == 0.0) {
+                continue;
+            }
+            $rows[] = $n + ['amounts' => $amounts];
         }
-        usort($rows, fn ($a, $b) => $a['_order'] <=> $b['_order']);
 
-        return [
-            'years' => $years,
-            'rows' => array_map(function ($r) {
-                unset($r['_order']);
-
-                return $r;
-            }, $rows),
-        ];
+        return ['years' => $years, 'rows' => $rows];
     }
 }
