@@ -260,6 +260,14 @@ function onMobileSelect(e) {
             >
                 社員情報権限管理
             </Link>
+            <!-- サンエー印刷（general）のみ: 売上レポート（営業）を見られる人・取込できる人を管理（SunA/Sales） -->
+            <Link
+                v-if="isGeneral && typeof route === 'function' && route().has('admin.suna.sales.permissions.index')"
+                :href="route('admin.suna.sales.permissions.index')"
+                :class="tab('sales_report_permissions')"
+            >
+                売上レポート利用設定
+            </Link>
         </nav>
     </div>
 </template>
