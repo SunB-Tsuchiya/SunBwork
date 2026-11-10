@@ -1535,3 +1535,15 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-dep
 配備が2回重なったため、利用者へ「今回の表示修正が配備されるまで、他の本番配備だけ一時的に待てるか（ソース編集は並行可）」を非同期で質問。現時点では未回答で、一時待機済みと仮定しない。未回答でもHEAD/作業状態一致を必須とする手順を維持し、別作業を上書きしない。
 
 次の一手: この4c70保持版を保存し、固定元4c70のv3手順を準備・正確なSSH承認へ。表示修正は未配備/実画面未確認。校正送信/本人状況/窓口実受信2点も未確認。一般公開未承認。
+
+
+## 2026-11-10 他配備の一時待機を利用者確認・v3準備完了
+
+確定: 利用者が非同期質問に「ほかの本番配備を一時的に待たせる」と回答。直前の調整未回答状態を置換。ソース編集の停止は求めておらず、今回表示修正の配備が終わるまでの本番配備調整。待機の回答を、新たなSSH実行承認や一般公開承認へ拡張しない。
+
+最新4c70の取り込み取消保持版27b2d9a5d9dce35b1d3186a0b5f13314f583290aを保存。/tmp/quick-work-ui-deploy-20261110-v3.sh、SHA256 e3150a2f6cd494dd903dbfbb593f66540324ed14aac5de58e51053026dd5251c、sh -n成功。同一コピーはstorage/app/private/codex-quick-work-ui-deploy-20261110-v3/。固定元4c70df40a48619885ae62b1710c05b7ace9be045→同固定先、source12許可一覧（実行ソース2件+試験/資料）、削除なし/database・routes・依存・設定不変、PHP2構文、manifest488/519資産/members base、view:clearと作業状態保持を検証する。旧manifest3c025cc167caa5c06bbca647a4e6731b02270488c85742fa8c72e65b63f05156→新manifest d6568b6c0d6e170563796de6e777c79433cc02f3f38612994283f8b53a84ec5e。DB操作/migration/seed/試験通知なし。
+
+次の一手（まだ未承認・未実行）:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-deploy-20261110-v3.sh
+
+旧v1/v2の承認とは分け、この正確なv3コマンドを確認する。表示修正の配備/実画面・校正試用の実受信2点はまだ未実施/未確認。一般公開未承認。
