@@ -23,3 +23,15 @@
 最終Integration104件1122断言すべて成功。旧カレンダー実Controllerの再現修正、入口をまたぐ再操作、通知保存失敗時のジョブ/校正/予定/元マーク/outbox rollbackとToastなし、複数候補、窓口違い、後発依頼、直接proof/旧coordinator参照、無関係作業の維持、別会社を検証。既存新式元未完了維持/入力/通常依頼/会社context/系列も全体成功。合成fixtureに本番にあるproof_coordinator_idを追加し旧『校正は専用fallback』期待を新要件へ更新。SQLite memory/network noneのみ、実DBを試験に使用しない。ログ/tmp/proof-completion-notice-tests-20261110.log。
 
 Changelogは専用ProofCompletionNoticeChangelogSeeder（version proof-notify-20261110）と親呼出し1行のみ。PHPのみでVue/JS/routes/資産/DB列/依存の変更なし、build不要。未配備・修正後の実通知未確認。過去162の再送は未承認のまま。次の一手は調査時本番19d6c07daを取り込み他作業保持を照合、最新本番状態を読み取り固定配備準備へ。
+
+
+## 2026-11-10 本番19d6保持統合・最終106件1133断言成功、未配備
+
+保存6f34d53b0の修正を本番調査19d6c07da7a7cee072c59daf75cc8fc78ea7a3dfへ無衝突merge（e655d0a91）。営業分析・Excel出力等の他作業を保持。ChangelogSeederは他の登録を残し専用Seeder呼出し1行のみ。manifestは19dとbyte一致、493entry/524参照/欠落0/members base、SHA256 7d4c433e666f000ae6342814bc7aa8a369830e264f366fb607f95019431ce43c。Vue/JS/routes/設定/依存/migration/資産は19d比変更0。build不要。
+
+追加の旧元作業校正済みマーク/未完了維持、新式元参照つき校正ジョブをカレンダーから完了して通知/元未完了維持の合成検証も成功。通常proofには一般completed通知を重ねず専用proof_completedを使用、進行表通知は従来維持。窓口違い/後発依頼の誤紐付け、直接proof outbox、他社、複数割当、元作業保持も検証。系列再照合signatureにjob_type/coordinator_assignment_idも含める。
+
+最終Integration106件1133断言すべて成功（/tmp/proof-completion-notice-final-tests-20261110.log）。PHP10ファイル構文成功、diff --check成功。修正前失敗の証拠と分けて記録。コード検証完了、本番配備/修正後実通知受信/管理者レビューは未実施。過去162の通知再送をしない。共有Claude作業未編集、新式一般公開未承認。
+
+次の一手: 最新の本番版と作業状態だけを以下の読み取り専用SSHで取得する承認。19dを現在も本番最新と決めつけない。結果を保持した固定元/先/許可差分の配備スクリプトを準備して別途正確なSSH承認を得る。
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && git branch --show-current && git status --short --untracked-files=all -- . ":!public/build" && git diff --name-only -- public/build/manifest.json'

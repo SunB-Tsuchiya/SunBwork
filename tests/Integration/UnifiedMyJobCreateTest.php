@@ -2036,4 +2036,34 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(0, DB::table('job_notifications')->count());
     }
 
+    public function test_calendar_proof_completion_marks_source_as_proofed_without_completing_source_work(): void
+    {
+        $event = $this->proofNoticeFixture();
+        DB::table('project_job_assignments')->insert(['id' => 30, 'project_job_id' => 10, 'user_id' => 2, 'sender_id' => 2]);
+        DB::table('proof_requests')->where('id', 1)->update(['project_job_assignment_id' => 30, 'proof_coordinator_id' => 2]);
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $this->user(['user_role' => 'user'])), $event);
+        self::assertNotNull(DB::table('project_job_assignments')->find(30)->proof_completed_at);
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(30)->completed);
+        self::assertSame(1, DB::table('job_notifications')->where('assignment_id', 30)->where('type', 'proof_completed')->count());
+    }
+
+    public function test_quick_source_proof_completed_from_calendar_notifies_owner_and_keeps_source_pending(): void
+    {
+        $source = $this->quickProofFixture();
+        $result = $this->sendQuickProof($source);
+        DB::table('project_jobs')->insert(['id' => 10, 'company_id' => 1]);
+        DB::table('proof_requests')->where('id', $result['id'])->update(['project_job_id' => 10, 'proofreader_id' => 1, 'proof_coordinator_id' => 11, 'status' => 'in_progress']);
+        DB::table('project_job_assignments')->insert([
+            ['id' => 20, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 11, 'job_type' => 'proof', 'supersedes_assignment_id' => null],
+            ['id' => 10, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 1, 'job_type' => null, 'supersedes_assignment_id' => 20],
+        ]);
+        DB::table('events')->insert(['id' => 101, 'user_id' => 1, 'project_job_assignment_id' => 10]);
+        \Illuminate\Support\Facades\Event::fake([\App\Events\AssignmentStatusToast::class]);
+        app(\App\Http\Controllers\EventController::class)->complete($this->request(), \App\Models\Event::findOrFail(101));
+        self::assertSame('completed', DB::table('proof_requests')->find($result['id'])->status);
+        self::assertSame(1, DB::table('job_notifications')->where('recipient_id', 1)->where('type', 'proof_completed')->count());
+        self::assertNull(DB::table('personal_work_entries')->find($source)->completed_at);
+        self::assertSame($source, DB::table('proof_requests')->find($result['id'])->source_personal_work_entry_id);
+    }
+
 }

@@ -1564,7 +1564,6 @@ class EventController extends Controller
             $assignment->save();
             if (! $wasCompleted) app(\App\Services\ProofRequestCompletion::class)->completeAssignment($request->user(), $assignment);
 
-
             // カレンダー完了を銀本専用進行表へ反映する。
             $mginbonCompletedOn = $this->resolveJstCarbon($event, 'starts_at')?->toDateString()
                 ?? now()->toDateString();

@@ -114,7 +114,7 @@ class LegacyReceivedJobCompletion
 
     private function signature(array $tree): array
     {
-        return array_map(fn ($a) => $a->only(['id', 'user_id', 'sender_id', 'project_job_id', 'source_assignment_id', 'source_personal_work_entry_id', 'supersedes_assignment_id']), $tree['chain']);
+        return array_map(fn ($a) => $a->only(['id', 'user_id', 'sender_id', 'project_job_id', 'source_assignment_id', 'source_personal_work_entry_id', 'supersedes_assignment_id', 'coordinator_assignment_id', 'job_type']), $tree['chain']);
     }
 
     private function lockEvent(User $user, int $id, int $eventId): Event
