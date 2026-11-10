@@ -1386,6 +1386,10 @@ class JobBoxController extends Controller
             return response()->json(['error' => 'Access denied'], 403);
         }
 
+        $context = $request->session()->get('superadmin_context.company_id');
+        $legacyResult = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($user, (int) $assignment->id, $context === null ? null : (int) $context);
+        if ($legacyResult !== null) return response()->json(['success' => true, 'assignment_id' => $assignment->id] + $legacyResult);
+
         try {
             $assignment->completed = true;
         } catch (\Throwable $__e) {}

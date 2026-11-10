@@ -4,16 +4,18 @@ namespace App\Services;
 
 use App\Models\Event;
 use App\Models\ProgressCell;
+use App\Models\JobAssignmentMessage;
+use Illuminate\Support\Facades\Schema;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProofRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Called only inside the trial completion transaction, after all series authorization. */
+/** Called inside an owned completion transaction after all series authorization. */
 class WorkJobLegacyCompletion
 {
-    public function complete(User $user, array $assignments): array
+    public function complete(User $user, array $assignments, ?string $occurredOn = null): array
     {
         if (! $assignments) return [];
         $status = DB::table('statuses')->where('key', 'completed')->orWhere('slug', 'completed')->first();
@@ -28,10 +30,11 @@ class WorkJobLegacyCompletion
             $assignment->save();
             $progress = ProgressCell::where('assignment_id', $assignment->id)->exists();
             ProgressCell::where('assignment_id', $assignment->id)->whereNull('completed_at')->update(['completed_at' => now()]);
+            \App\Models\WorkflowCell::where('assignment_id', $assignment->id)->whereNull('completed_at')->update(['completed_at' => now()]);
             foreach (Event::where('project_job_assignment_id', $assignment->id)->lockForUpdate()->get() as $event) {
-                if (isset($originals[$assignment->id]) && ((int) $event->user_id !== (int) $user->id
+                if ((int) $event->user_id !== (int) $user->id
                     || ($event->company_id !== null && (int) $event->company_id !== (int) $user->company_id)
-                    || ($event->department_id !== null && (int) $event->department_id !== (int) $user->department_id))) {
+                    || ($event->department_id !== null && (int) $event->department_id !== (int) $user->department_id)) {
                     throw ValidationException::withMessages(['source' => '元の依頼の予定との関係を確認してください。']);
                 }
                 if (! str_starts_with((string) $event->title, '【完了】')) {
@@ -42,7 +45,10 @@ class WorkJobLegacyCompletion
             if ($progress) $progressProjects[(int) $assignment->project_job_id] = true;
             if (isset($originals[$assignment->id])) {
                 if ($changed) $receivedNotifications[] = [$assignment, $progress];
-                \App\Models\WorkflowCell::where('assignment_id', $assignment->id)->whereNull('completed_at')->update(['completed_at' => now()]);
+                $messageState = [];
+                if (Schema::hasColumn('job_assignment_messages', 'completed')) $messageState['completed'] = true;
+                if (Schema::hasColumn('job_assignment_messages', 'status_id')) $messageState['status_id'] = $status->id;
+                if ($messageState) JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)->update($messageState);
             } elseif ($changed) $this->completeProof($user, $assignment);
             if ($changed && $assignment->projectJob && ! isset($originals[$assignment->id])
                 && ! isset($originals[$assignment->supersedes_assignment_id])) {
@@ -52,7 +58,7 @@ class WorkJobLegacyCompletion
             }
             DB::table('work_job_completion_syncs')->insertOrIgnore([
                 'assignment_id' => $assignment->id, 'user_id' => $user->id, 'company_id' => $user->company_id,
-                'department_id' => $user->department_id, 'occurred_on' => now()->toDateString(),
+                'department_id' => $user->department_id, 'occurred_on' => $occurredOn ?? now()->toDateString(),
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }

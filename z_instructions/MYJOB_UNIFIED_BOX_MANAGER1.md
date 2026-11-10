@@ -1315,3 +1315,14 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 
 提案・未承認: 新式を一般公開せず、既存所有者の旧カレンダー/旧詳細/JobBoxの通常依頼取り込み完了だけを元依頼基準の共通処理へ接続し、状態と通知を同一transaction、元依頼の完了遷移ごと宛先1件、銀本はoutboxでcommit後同期に揃える。既存の自己完了抑止と専用校正/進行/Toastを保護。LEGACY_RECEIVED_COMPLETION_PLAN1.md / MANAGER1.md / LEGACY_RECEIVED_COMPLETION1_PROMPT.mdを具体設計として作成。次の一手はこの修正案の承認。
 今回は診断と資料のみ、コード/build/配備変更なし。元9683の過去未送信分の補正/再送は別承認なしに行わない。一般公開未承認、共有Claude作業未編集。
+
+
+## 2026-11-10 修正設計を承認・再現と実装、他作業の最新版保持へ
+
+確定: 利用者yesでLEGACY_RECEIVED_COMPLETION_PLAN1の具体設計を承認。新式公開制限を維持し、既存の担当本人の通常依頼取り込み完了を修正する。自己完了通知なし、過去9683/9684の未送信補正なしを維持。
+
+合成の一般Userカレンダーで元依頼と自己割当が完了しても完了通知0となる失敗を再現した。LegacyReceivedJobCompletionと旧3入口の接続、明示元依頼の認可/ロック/原子的通知、祖先・子兄弟境界、元JobAssignmentMessage/セル同期、銀本のcommit後outbox・JST作業日、担当本人Toastのcommit後/再操作抑止を実装。typed混在は既存guard付き共通完了へ委譲し、単独自作・直接依頼・校正・代理操作の専用経路は維持する。
+再現の対象テストは修正後1件12断言成功、その後76件905断言、79件922断言を成功。追加した反映待ちflashテストはレスポンス用sessionとrequest用の試験sessionの違いにより取得先を修正中/最終検証予定。最終成功数として前の途中結果を流用しない。PHP11構文、実Vue入力/ナビ検証成功。JS/ルート/資産の変更はなくPHPのみ。
+
+承認済み同一read SSHで本番ac36333cc4d699d2e362fb47a36edc82a9c74dc4/main/追跡変更なし/既知未追跡5件を確認。b4後の別作業の売上報告基盤（source/route/layout/build）更新が入っている。ローカルgit objectで同じSHAを確認。新しい業務データや売上DBは読まない。この最新版を統合し、今回修正だけをac363から反映できるようにする。共有Claude作業とCLAUDE.mdは未編集。
+次の一手は今回版を保存してac363を統合し、最終合成検証・資産不変を確認する。配備と利用者実受信はまだ未実施。一般公開未承認。

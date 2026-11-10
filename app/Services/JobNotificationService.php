@@ -120,7 +120,7 @@ class JobNotificationService
         }
     }
 
-    /** Trial received-request completion: one notification per original/recipient, transaction owned by caller. */
+    /** Received-request completion: one notification per original/recipient, transaction owned by caller. */
     public static function notifyReceivedCompleted(User $user, ProjectJobAssignment $original, ProjectJob $projectJob, bool $progress): void
     {
         $recipients = array_map('intval', self::getLeaderIds($projectJob, (int) $user->id));

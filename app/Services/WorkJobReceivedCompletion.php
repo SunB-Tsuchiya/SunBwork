@@ -35,7 +35,7 @@ class WorkJobReceivedCompletion
     /** Revalidate an ordinary original when consuming its durable cross-DB sync receipt. */
     public function validateSync(User $user, ProjectJobAssignment $original): void
     {
-        $imports = ProjectJobAssignment::where('supersedes_assignment_id', $original->id)->limit(2)->get();
+        $imports = ProjectJobAssignment::where('supersedes_assignment_id', $original->id)->orderBy('id')->lockForUpdate()->limit(2)->get();
         if ($imports->count() !== 1 || ! $imports->first()->completed) $this->invalid();
         $this->validate($user, $original, $imports->first());
     }
@@ -56,7 +56,7 @@ class WorkJobReceivedCompletion
                 || ($assignment->projectJob->company_id !== null && (int) $assignment->projectJob->company_id !== (int) $user->company_id)) $this->invalid();
         }
         // Do not guess which of multiple imports represents this request.
-        $ids = ProjectJobAssignment::where('supersedes_assignment_id', $original->id)->limit(2)->pluck('id');
+        $ids = ProjectJobAssignment::where('supersedes_assignment_id', $original->id)->orderBy('id')->lockForUpdate()->limit(2)->pluck('id');
         if ($ids->count() !== 1 || (int) $ids->first() !== (int) $import->id) $this->invalid();
     }
 

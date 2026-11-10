@@ -216,6 +216,8 @@ class MyProjectJobController extends Controller
                     + app(\App\Services\WorkJobMutation::class)->completeWork($user, 'assignment', (int) $assignment->id, $context));
             }
         }
+        $legacyResult = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($user, (int) $assignment->id, $context);
+        if ($legacyResult !== null) return response()->json(['success' => true, 'assignment_id' => $assignment->id] + $legacyResult);
         try {
             // completed カラムが存在する場合のみセット（カラム不存在時の SQL エラーを防ぐ）
             if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignments', 'completed')) {

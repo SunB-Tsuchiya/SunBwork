@@ -18,6 +18,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class UnifiedMyJobCreateTest extends TestCase
 {
     private $app;
+    private array $completionToastLevels = [];
 
     protected function setUp(): void
     {
@@ -1096,6 +1097,275 @@ class UnifiedMyJobCreateTest extends TestCase
         try { app(\App\Http\Controllers\User\ProjectJobAssignmentController::class)->store($this->request(['assignments' => [$slot]], null, 2), \App\Models\ProjectJob::findOrFail(10)); self::fail('Changed context accepted'); }
         catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
         self::assertSame(1, DB::table('project_job_assignments')->count());
+    }
+
+    private function regularReceivedCompletionFixture(): \App\Models\Event
+    {
+        $this->receivedFixture();
+        Schema::create('job_assignment_messages', function (Blueprint $t) { $t->id(); $t->integer('project_job_assignment_id'); $t->boolean('completed')->default(false); $t->integer('status_id')->nullable(); $t->timestamps(); });
+        Schema::create('messages', function (Blueprint $t) { $t->id(); });
+        DB::table('job_assignment_messages')->insert(['project_job_assignment_id' => 20]);
+        DB::table('events')->insert(['id' => 101, 'user_id' => 1, 'project_job_assignment_id' => 10, 'title' => '合成の自己予定']);
+        $this->app['auth']->setUser($this->user(['user_role' => 'user']));
+        \Illuminate\Support\Facades\Event::fake([function ($name) {
+            if ($name !== \App\Events\AssignmentStatusToast::class) return false;
+            $this->completionToastLevels[] = DB::transactionLevel();
+            return true;
+        }]);
+        return \App\Models\Event::findOrFail(101);
+    }
+
+    public function test_regular_worker_calendar_completion_notifies_original_requester_once_across_entrypoints(): void
+    {
+        $event = $this->regularReceivedCompletionFixture();
+        $actor = $this->user(['user_role' => 'user']);
+        $response = app(\App\Http\Controllers\EventController::class)->complete($this->request([], $actor), $event);
+        self::assertSame(302, $response->getStatusCode());
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(10)->completed);
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'completed')->where('recipient_id', 2)->where('assignment_id', 20)->count());
+        self::assertTrue((bool) DB::table('job_assignment_messages')->first()->completed);
+        self::assertSame(1, DB::table('job_assignment_messages')->first()->status_id);
+        self::assertSame(0, DB::table('messages')->count());
+        app(\App\Http\Controllers\User\MyProjectJobController::class)->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(10));
+        app(\App\Http\Controllers\ProjectJobs\JobBoxController::class)->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(10));
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $actor), $event->fresh());
+        self::assertSame(1, DB::table('job_notifications')->count());
+        \Illuminate\Support\Facades\Event::assertDispatchedTimes(\App\Events\AssignmentStatusToast::class, 1);
+        self::assertSame([0], $this->completionToastLevels);
+        self::assertFalse(app(\App\Services\UnifiedMyJobBox::class)->available($actor));
+    }
+
+    public static function legacyReceivedEntrypoints(): array
+    {
+        return [['myjob'], ['jobbox']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('legacyReceivedEntrypoints')]
+    public function test_regular_worker_legacy_json_entrypoints_notify_once_and_update_linked_cells(string $entrypoint): void
+    {
+        $this->regularReceivedCompletionFixture();
+        DB::table('progress_cells')->insert(['assignment_id' => 10]);
+        DB::table('workflow_cells')->insert(['assignment_id' => 10]);
+        $actor = $this->user(['user_role' => 'user']);
+        $controller = $entrypoint === 'myjob'
+            ? app(\App\Http\Controllers\User\MyProjectJobController::class)
+            : app(\App\Http\Controllers\ProjectJobs\JobBoxController::class);
+        $result = $controller->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(10))->getData(true);
+        self::assertTrue($result['success']); self::assertSame(0, $result['pending_syncs']);
+        self::assertSame(1, DB::table('job_notifications')->where('recipient_id', 2)->where('assignment_id', 20)->count());
+        self::assertSame(0, DB::table('progress_cells')->whereNull('completed_at')->count());
+        self::assertSame(0, DB::table('workflow_cells')->whereNull('completed_at')->count());
+        self::assertTrue((bool) DB::table('job_assignment_messages')->first()->completed);
+        $controller->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(10));
+        self::assertSame(1, DB::table('job_notifications')->count());
+        self::assertFalse(app(\App\Services\UnifiedMyJobBox::class)->available($actor));
+    }
+
+    public function test_regular_worker_received_notification_deduplicates_requester_leader_and_excludes_actor(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        DB::table('users')->insert(['id' => 3, 'company_id' => 1, 'department_id' => 1]);
+        DB::table('project_job_coordinators')->insert([['project_job_id' => 10, 'user_id' => 1], ['project_job_id' => 10, 'user_id' => 2], ['project_job_id' => 10, 'user_id' => 3]]);
+        app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10);
+        self::assertSame([2, 3], DB::table('job_notifications')->orderBy('recipient_id')->pluck('recipient_id')->all());
+        self::assertSame(['completed', 'completed_info'], DB::table('job_notifications')->orderBy('recipient_id')->pluck('type')->all());
+        self::assertSame([20], DB::table('job_notifications')->distinct()->pluck('assignment_id')->all());
+    }
+
+    public function test_regular_worker_received_continuation_completes_only_selected_and_ancestors(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        foreach ([11 => 10, 12 => 10, 13 => 11] as $id => $parent) DB::table('project_job_assignments')->insert(['id' => $id, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 1, 'source_assignment_id' => $parent]);
+        $result = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 11);
+        self::assertSame([['type' => 'assignment', 'id' => 10], ['type' => 'assignment', 'id' => 11]], $result['completed_targets']);
+        foreach ([10, 11, 20] as $id) self::assertTrue((bool) DB::table('project_job_assignments')->find($id)->completed);
+        foreach ([12, 13] as $id) self::assertFalse((bool) DB::table('project_job_assignments')->find($id)->completed);
+        self::assertSame(1, DB::table('job_notifications')->count());
+    }
+
+    public function test_regular_worker_notification_failure_rolls_back_original_messages_events_cells_and_outbox(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        DB::table('users')->insert(['id' => 3, 'company_id' => 1, 'department_id' => 1]);
+        DB::table('project_job_coordinators')->insert(['project_job_id' => 10, 'user_id' => 3]);
+        DB::table('progress_cells')->insert(['assignment_id' => 10]);
+        DB::statement("CREATE TRIGGER fail_second_legacy_recipient BEFORE INSERT ON job_notifications WHEN NEW.recipient_id = 3 BEGIN SELECT RAISE(ABORT, 'legacy notification failure'); END");
+        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10, null, 101); self::fail('Notification failure swallowed'); }
+        catch (\Illuminate\Database\QueryException $e) { self::assertStringContainsString('legacy notification failure', $e->getMessage()); }
+        self::assertSame(0, DB::table('project_job_assignments')->where('completed', true)->count());
+        self::assertFalse((bool) DB::table('job_assignment_messages')->first()->completed);
+        self::assertNull(DB::table('progress_cells')->first()->completed_at);
+        self::assertNull(DB::table('workflow_cells')->first()->completed_at);
+        self::assertSame('合成の自己予定', DB::table('events')->find(101)->title);
+        self::assertSame(0, DB::table('job_notifications')->count()); self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+        \Illuminate\Support\Facades\Event::assertNotDispatched(\App\Events\AssignmentStatusToast::class);
+    }
+
+    public function test_regular_worker_already_completed_request_is_not_backfilled_or_toasted_on_replay(): void
+    {
+        $event = $this->regularReceivedCompletionFixture();
+        DB::table('project_job_assignments')->whereIn('id', [10, 20])->update(['completed' => true, 'status_id' => 1]);
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $this->user(['user_role' => 'user'])), $event);
+        self::assertSame(0, DB::table('job_notifications')->count());
+        \Illuminate\Support\Facades\Event::assertNotDispatched(\App\Events\AssignmentStatusToast::class);
+        self::assertSame(0, DB::table('messages')->count());
+    }
+
+    public function test_regular_worker_standalone_and_direct_request_and_proof_keep_existing_paths(): void
+    {
+        $event = $this->regularReceivedCompletionFixture(); $actor = $this->user(['user_role' => 'user']);
+        DB::table('project_job_assignments')->where('id', 10)->update(['supersedes_assignment_id' => null]);
+        self::assertNull(app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10));
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $actor), $event);
+        self::assertSame(0, DB::table('job_notifications')->count());
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertNull(app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 20));
+        self::assertNull(app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['id' => 2, 'user_role' => 'admin']), 10));
+        DB::table('project_job_assignments')->where('id', 10)->update(['supersedes_assignment_id' => 20, 'completed' => false]);
+        DB::table('project_job_assignments')->where('id', 20)->update(['job_type' => 'proof']);
+        self::assertNull(app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10));
+        DB::table('proof_requests')->insert(['id' => 1, 'project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '合成校正', 'status' => 'assigned']);
+        app(\App\Http\Controllers\User\MyProjectJobController::class)->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(10));
+        self::assertSame('completed', DB::table('proof_requests')->find(1)->status);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
+        self::assertSame(0, DB::table('job_notifications')->where('type', 'completed')->count());
+    }
+
+    public function test_regular_worker_original_owner_project_and_scope_mismatches_are_rejected_before_writes(): void
+    {
+        $this->regularReceivedCompletionFixture(); $actor = $this->user(['user_role' => 'user']);
+        foreach ([['user_id' => 2], ['project_job_id' => 99], ['company_id' => 2], ['department_id' => 2], ['sender_id' => 1]] as $change) {
+            DB::table('project_job_assignments')->where('id', 20)->update($change);
+            try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10); self::fail('Invalid original accepted'); }
+            catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+            self::assertSame(0, DB::table('project_job_assignments')->where('completed', true)->count());
+            self::assertSame(0, DB::table('job_notifications')->count());
+            DB::table('project_job_assignments')->where('id', 20)->update(['user_id' => 1, 'project_job_id' => 10, 'company_id' => null, 'department_id' => null, 'sender_id' => 2]);
+        }
+        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10, 2); self::fail('Changed context accepted'); }
+        catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertNotNull($e); }
+        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['id' => 2, 'user_role' => 'user']), 10, null, 101); self::fail('Foreign calendar owner accepted'); }
+        catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertNotNull($e); }
+    }
+
+    public function test_regular_worker_ambiguous_replacements_and_cyclic_ancestors_are_rejected(): void
+    {
+        $this->regularReceivedCompletionFixture(); $actor = $this->user(['user_role' => 'user']);
+        DB::table('project_job_assignments')->insert(['id' => 11, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 1, 'supersedes_assignment_id' => 20]);
+        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10); self::fail('Ambiguous import accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        DB::table('project_job_assignments')->where('id', 11)->update(['supersedes_assignment_id' => null, 'source_assignment_id' => 10]);
+        DB::table('project_job_assignments')->where('id', 10)->update(['source_assignment_id' => 11]);
+        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10); self::fail('Cycle accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertSame(0, DB::table('job_notifications')->count()); self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+    }
+
+    public function test_regular_worker_mixed_parent_is_not_dropped_and_trial_guard_stays_closed(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        $entry = $this->save($this->request($this->payload()))->getData(true)['id'];
+        DB::table('project_job_assignments')->where('id', 10)->update(['source_personal_work_entry_id' => $entry]);
+        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10); self::fail('User accessed typed trial series'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(), 10, null, 100); self::fail('Mismatched event binding accepted'); }
+        catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertNotNull($e); }
+        self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        $result = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(), 10, null, 101);
+        self::assertSame(0, $result['pending_syncs']);
+        self::assertNotNull(DB::table('personal_work_entries')->find($entry)->completed_at);
+        self::assertSame(1, DB::table('job_notifications')->count());
+    }
+
+    public function test_regular_worker_mginbon_uses_calendar_jst_day_after_commit_and_retries_without_notification_duplicates(): void
+    {
+        $event = $this->regularReceivedCompletionFixture();
+        DB::table('events')->where('id', 101)->update(['starts_at' => '2001-01-02 00:15:00', 'ends_at' => '2001-01-02 01:15:00']);
+        $state = (object) ['committed' => false];
+        DB::listen(function ($query) use ($state) {
+            if (str_starts_with($query->sql, 'insert into "job_notifications"')) DB::afterCommit(function () use ($state) { $state->committed = true; });
+        });
+        $sync = new class($state) extends \App\Services\MGinbon\MGinbonAssignmentSyncService {
+            public bool $fail = true;
+            public array $days = [];
+            public function __construct(private object $state) {}
+            public function complete(\App\Models\ProjectJobAssignment $assignment, ?int $actorId = null, ?string $occurredOn = null, bool $includeAncestors = true): void {
+                if (! $this->state->committed) throw new \LogicException('Separate sync ran before default commit');
+                $this->days[] = $occurredOn;
+                if ($this->fail) throw new \RuntimeException('Synthetic separate sync unavailable');
+            }
+        };
+        app()->instance(\App\Services\MGinbon\MGinbonAssignmentSyncService::class, $sync);
+        $result = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10, null, 101);
+        self::assertSame(2, $result['pending_syncs']); self::assertTrue($state->committed);
+        self::assertSame(['2001-01-02', '2001-01-02'], $sync->days);
+        self::assertSame(1, DB::table('job_notifications')->count());
+        $sync->fail = false;
+        self::assertSame(0, \Illuminate\Support\Facades\Artisan::call('work-jobs:sync-completions'));
+        self::assertSame(0, DB::table('work_job_completion_syncs')->whereNull('synced_at')->count());
+        app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10, null, 101);
+        self::assertSame(1, DB::table('job_notifications')->count());
+        self::assertSame(['2001-01-02', '2001-01-02', '2001-01-02', '2001-01-02'], $sync->days);
+    }
+
+    public function test_regular_worker_direct_request_keeps_existing_completion_notification(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        $actor = $this->user(['user_role' => 'user']);
+        app(\App\Http\Controllers\User\MyProjectJobController::class)->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(20));
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'completed')->where('assignment_id', 20)->where('recipient_id', 2)->count());
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(10)->completed);
+    }
+
+    public function test_existing_non_trial_company_and_department_worker_can_complete_without_trial_access(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        DB::table('companies')->where('id', 1)->update(['company_type' => 'general']);
+        DB::table('users')->where('id', 1)->update(['department_id' => 2]);
+        $actor = $this->user(['user_role' => 'user', 'department_id' => 2]);
+        $result = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10);
+        self::assertSame(0, $result['pending_syncs']);
+        self::assertSame(1, DB::table('job_notifications')->count());
+        self::assertFalse(app(\App\Services\UnifiedMyJobBox::class)->available($actor));
+    }
+
+    public function test_legacy_received_completion_refuses_outer_transaction_before_any_effect(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        DB::beginTransaction();
+        try {
+            try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10); self::fail('Outer transaction accepted'); }
+            catch (\LogicException $e) { self::assertStringContainsString('own its transaction', $e->getMessage()); }
+            self::assertSame(0, DB::table('project_job_assignments')->where('completed', true)->count());
+            self::assertSame(0, DB::table('job_notifications')->count());
+        } finally { DB::rollBack(); }
+    }
+
+    public function test_regular_worker_calendar_pending_sync_uses_one_flash_and_no_duplicate_toast(): void
+    {
+        $event = $this->regularReceivedCompletionFixture();
+        $sync = new class extends \App\Services\MGinbon\MGinbonAssignmentSyncService {
+            public function complete(\App\Models\ProjectJobAssignment $assignment, ?int $actorId = null, ?string $occurredOn = null, bool $includeAncestors = true): void {
+                throw new \RuntimeException('Synthetic pending sync');
+            }
+        };
+        app()->instance(\App\Services\MGinbon\MGinbonAssignmentSyncService::class, $sync);
+        $request = $this->request([], $this->user(['user_role' => 'user']));
+        $response = app(\App\Http\Controllers\EventController::class)->complete($request, $event);
+        self::assertStringContainsString('再試行待ち', $response->getSession()->get('success'));
+        \Illuminate\Support\Facades\Event::assertNotDispatched(\App\Events\AssignmentStatusToast::class);
+        self::assertSame(1, DB::table('job_notifications')->count());
+        self::assertSame(0, DB::table('messages')->count());
+    }
+
+    public function test_unrelated_legacy_continuation_from_direct_request_is_not_rerouted(): void
+    {
+        $this->regularReceivedCompletionFixture();
+        DB::table('project_job_assignments')->where('id', 10)->update(['supersedes_assignment_id' => null, 'source_assignment_id' => 20]);
+        self::assertNull(app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10));
+        self::assertSame(0, DB::table('project_job_assignments')->where('completed', true)->count());
     }
 
     private function detailPayload(array $data = []): array

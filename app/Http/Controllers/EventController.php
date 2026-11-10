@@ -1501,6 +1501,31 @@ class EventController extends Controller
             return redirect()->back()->with('error', 'このイベントはジョブに紐づいていません。');
         }
 
+        $context = $request->session()->get('superadmin_context.company_id');
+        try {
+            $legacyResult = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($request->user(),
+                (int) $event->project_job_assignment_id, $context === null ? null : (int) $context, (int) $event->id);
+            if ($legacyResult !== null) {
+                if (! $legacyResult['changed']) return redirect()->back();
+                if ($legacyResult['pending_syncs']) return redirect()->back()->with('success', '完了にしました。銀本への反映は再試行待ちです。');
+                $freshEvent = $event->fresh();
+                try {
+                    event(new \App\Events\AssignmentStatusToast([
+                        'assignment_id' => $event->project_job_assignment_id, 'event_id' => $event->id,
+                        'action' => 'completed', 'actor_id' => $request->user()->id,
+                        'actor_name' => $request->user()->name, 'title' => $freshEvent?->title ?? $event->title,
+                    ]));
+                    return redirect()->back();
+                } catch (\Throwable $e) {
+                    Log::warning('Received completion toast failed', ['event_id' => $event->id]);
+                }
+                return redirect()->back()->with('success', '完了にしました。');
+            }
+        } catch (\Throwable $e) {
+            report($e);
+            return redirect()->back()->with('error', '完了処理中にエラーが発生しました。詳細を開き直して確認してください。');
+        }
+
         // フロントのモーダルで「Coordinator割当も完了にする」を選択したかどうか
         $alsoCompleteCoordinator = filter_var($request->input('also_complete_coordinator', false), FILTER_VALIDATE_BOOLEAN);
 
