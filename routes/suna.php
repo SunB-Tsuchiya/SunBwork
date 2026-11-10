@@ -11,6 +11,7 @@ use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NoticeController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\SubmissionController;
 use App\Http\Controllers\SunA\Sales\AnnualAnalysisController;
+use App\Http\Controllers\SunA\Sales\AttentionController;
 use App\Http\Controllers\SunA\Sales\ClientAnalysisController;
 use App\Http\Controllers\SunA\Sales\ClientGroupController;
 use App\Http\Controllers\SunA\Sales\CompareController;
@@ -138,6 +139,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('api/department/summary', [DepartmentComparisonController::class, 'summary'])->name('api.department.summary');
         Route::get('compare', [CompareController::class, 'index'])->name('compare');
         Route::get('api/compare/summary', [CompareController::class, 'summary'])->name('api.compare.summary');
+        // 注目ポイント（段階3-6）: 大きく増減・新規・休眠
+        Route::get('attention', [AttentionController::class, 'index'])->name('attention');
+        Route::get('api/attention/summary', [AttentionController::class, 'summary'])->name('api.attention.summary');
 
         // Excel出力（画面と同じ条件で、見ている内容をそのまま。閲覧できる人は全員）
         Route::get('export/annual', [ReportExportController::class, 'annual'])->name('export.annual');
@@ -145,6 +149,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('export/department', [ReportExportController::class, 'department'])->name('export.department');
         Route::get('export/compare', [ReportExportController::class, 'compare'])->name('export.compare');
         Route::get('export/client', [ReportExportController::class, 'client'])->name('export.client');
+        Route::get('export/attention', [ReportExportController::class, 'attention'])->name('export.attention');
 
         // 名寄せ設定（閲覧。変更は取込できる人のグループ）
         Route::get('client-groups', [ClientGroupController::class, 'index'])->name('client_groups');

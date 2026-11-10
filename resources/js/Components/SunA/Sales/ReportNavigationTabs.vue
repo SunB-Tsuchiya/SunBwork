@@ -34,6 +34,7 @@ const groups = computed(() => [
             { key: 'client', route: 'client', label: '得意先分析' },
             { key: 'department', route: 'department', label: '部門比較' },
             { key: 'compare', route: 'compare', label: '左右比較' },
+            { key: 'attention', route: 'attention', label: '注目ポイント' },
         ],
     },
     {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SunA\Sales;
 
 use App\Http\Controllers\Controller;
 use App\Models\SunA\Sales\AuditLog;
+use App\Services\SunA\Sales\Analysis\AttentionService;
 use App\Services\SunA\Sales\Analysis\DepartmentFilter;
 use App\Services\SunA\Sales\Export\ReportExportException;
 use App\Services\SunA\Sales\Export\ReportExportService;
@@ -64,6 +65,17 @@ class ReportExportController extends Controller
         $data = $request->validate(['client_key' => ['required', 'string', 'max:255']]);
 
         return $this->respond('client', fn () => $this->service->client($data['client_key']));
+    }
+
+    public function attention(Request $request)
+    {
+        $data = $request->validate([
+            'year' => ['required', 'integer', 'min:1990', 'max:2100'],
+            'dept' => ['nullable', 'string', 'max:50'],
+            'dormant_months' => ['nullable', 'integer', Rule::in(AttentionService::DORMANT_MONTHS)],
+        ]);
+
+        return $this->respond('attention', fn () => $this->service->attention((int) $data['year'], $this->dept($data), (int) ($data['dormant_months'] ?? 6)));
     }
 
     /** 部門の指定を確かめる（不明なキーは422） */

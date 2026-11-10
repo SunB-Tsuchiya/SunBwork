@@ -3,6 +3,7 @@
 namespace App\Services\SunA\Sales\Export;
 
 use App\Services\SunA\Sales\Analysis\AnnualAnalysisService;
+use App\Services\SunA\Sales\Analysis\AttentionService;
 use App\Services\SunA\Sales\Analysis\ClientAnalysisService;
 use App\Services\SunA\Sales\Analysis\CompareService;
 use App\Services\SunA\Sales\Analysis\DepartmentComparisonService;
@@ -24,6 +25,7 @@ class ReportExportService
         private CompareService $compare,
         private ClientAnalysisService $client,
         private DepartmentFilter $departments,
+        private AttentionService $attention,
     ) {
     }
 
@@ -68,6 +70,38 @@ class ReportExportService
         );
 
         return ['filename' => $this->filename('年次分析', ["{$year}年", $deptLabel]), 'workbook' => $wb];
+    }
+
+    /** 注目ポイント。新規・休眠は、画面の上位件数ではなく全件を出す */
+    public function attention(int $year, string $dept, int $dormantMonths): array
+    {
+        $s = $this->attention->summary($year, $dept, $dormantMonths, null);
+        if (! ($s['has_data'] ?? false)) {
+            throw new ReportExportException("{$year}年の売上データがありません。");
+        }
+        $deptLabel = $this->deptLabel($dept);
+        $d = $s['dormant'];
+        $conditions = ["年: {$year}年", "部門: {$deptLabel}", '集計期間: ' . $s['period']['label'], "休眠の期間: {$dormantMonths}か月"];
+        $conditions[] = $s['comparison_available'] ? "前年との比較: {$s['prior']['year']}年の同じ月と比べています" : '前年との比較: 前年のデータがないため、増加・減少・新規は出していません';
+        $wb = $this->workbook('注目ポイント', $conditions);
+
+        $diffCols = [['得意先', 'text', 34], ['売上', 'int'], ['前年同期間', 'int'], ['差', 'int'], ['増減率', 'pct']];
+        $diffRow = fn ($r) => [$r['label'], $r['amount'], $r['prior_amount'], $r['diff'], $r['rate']];
+        $wb->sheet('大きく増えた得意先')->note('前年との差額が大きい順の上位10社です。')->table($diffCols, array_map($diffRow, $s['increase']['rows'] ?? []));
+        $wb->sheet('大きく減った得意先')->note('前年との差額が大きい（減った額が大きい）順の上位10社です。')->table($diffCols, array_map($diffRow, $s['decrease']['rows'] ?? []));
+        $wb->sheet('新規の得意先')->note('前年に売上がなく、今の期間に売上がある得意先です（今年の売上の大きい順・全件）。')->table(
+            [['得意先', 'text', 34], ['売上', 'int']],
+            array_map(fn ($r) => [$r['label'], $r['amount']], $s['new']['rows'] ?? []),
+        );
+        $note = $d['available']
+            ? "直近の登録月（{$d['latest_label']}）から数えて{$d['months']}か月（{$d['silent_label']}）売上がなく、その前の12か月（{$d['prior_label']}）には売上があった得意先です（全件）。年・部門の選択のうち、部門は前の12か月の計上部門で絞っています。"
+            : $d['message'];
+        $wb->sheet('休眠の得意先')->note($note)->table(
+            [['得意先', 'text', 34], ['前の12か月の売上', 'int'], ['最後に売上があった月', 'text', 22], ['売上のない期間（か月）', 'int']],
+            array_map(fn ($r) => [$r['label'], $r['prior_amount'], $r['last_label'], $r['silent_months']], $d['rows']),
+        );
+
+        return ['filename' => $this->filename('注目ポイント', ["{$year}年", $deptLabel, "休眠{$dormantMonths}か月"]), 'workbook' => $wb];
     }
 
     /** @return array{filename:string, workbook:ReportWorkbook} */
