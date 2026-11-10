@@ -377,3 +377,5 @@ AppLayout 内にグローバル配置済み。各ページで重複させない�
 2026-11-10 表示修正（実装/検証済み・未配備）: 簡易WorkDetailは旧ジョブ予定詳細と同じ作業名→日時→操作の上部カードに揃え、詳細/時間内訳/系列はその下に残す。完了確認/詳細編集も上部操作の直後に表示。HandleInertiaRequestsのuserWorkHubとcanManageBroadProjects共有propを復元し、既存サービスのINFO/role/会社判定と、実会社context一致を保持する。営業用clerkCalendarRoutePrefix等の共有は維持。フロントSSRに加え実Middlewareの共有出力を合成検証し、共有項目欠落を再発検知する。一般公開/校正実受信の成功とは別管理。QUICK_JOB_PROOF_MANAGER1末尾参照。
 
 2026-11-10追記: 上記の上部操作配置/共有メニュー復旧は、最新の営業分析・取り込み取消を保持した27b2d9a5dへ固定v3手順で配備成功。manifest488/519資産欠落0。DB操作なし。今回表示3点の利用者画面確認と、校正試用の実受信は未確認。一般公開未承認。
+
+2026-11-10旧BOX追加対応（未配備）: カレンダーのEvents/ShowとBOXのMyJobBox/Showは別画面。旧BOXの既存操作もAssignmentDetailCardの任意actionsスロットに渡しタイトル直下へ置く。続き部品のcompactは操作だけを上に出し、系列一覧は本文に保持する。スロット/compactを指定しない他画面は従来表示。既存権限・保存/完了/校正処理を変更しない。実旧BOX+共有部品を一緒にSSR検証し、下部配置の取り残しを防ぐ。実装/配備/利用者確認はQUICK_JOB_PROOF_MANAGER1末尾で分けて管理。

@@ -1567,3 +1567,18 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-dep
 実施方針: 既存AssignmentDetailCardに任意のactionsスロットを追加し、旧BOX/Showの既存ボタンをタイトル直下へ移す。続きボタンも同じ操作行へ置き、系列の本文は従来位置を保つためLegacyWorkJobContinuationにcompact表示を追加する。スロットなし/compactなしの既存利用箇所は元のまま。既存認可・送信先・校正条件・完了確認・削除条件等は変更せず、旧形式の既存操作の配置だけを修正する。新式の公開制限/INFO SuperAdmin統合メニューは維持する。実際の旧BOX+共有カード+続き部品のVue描画で上部配置と旧条件を確認する。
 
 次の一手: 上記の限定的なUI修正と検証。校正送信/本人状況/窓口実受信2点は未確認のまま、今回も勝手に本番送信しない。既に確認した簡易上部操作/仕事・案件/校正モーダル開閉は反復しない。配備は別途正確な固定SSHの承認後。
+
+
+## 2026-11-10 旧BOXの上部操作修正・最新版b4c1保持で検証成功（未配備）
+
+確定: 利用者「続きをしましょう」で進行中の旧BOX表示修正を継続。簡易上部操作・統合メニュー・校正モーダル開閉の確認済み範囲は反復しない。旧BOXの下部操作が残った対応漏れを今回修正する。
+
+主な実装はVue3件。AssignmentDetailCardの任意actionsスロットをタイトル直下・案件情報より前に置く。旧MyJobBox/Showの既存操作をこのスロットへ移し、続き操作もLegacyWorkJobContinuation.compactで同じ行へ配置。元の系列表示はWorkJobSeriesで従来の本文位置に残す。スロットなしの共通カードとcompactなしの続き部品は従来の表示を保持。編集/予定セット/完了/削除/校正条件・送信処理・元参照・予定・数量等は変更しない。新式の試用権限と一般公開未承認は維持。
+
+既に承認済みの同一read-only SSHを再提示・実行し、本番b4c1e8d12e377a071c0d15a92f7255b6de5cebb6/main/追跡変更なし/既知未追跡5件/manifest未変更を確認。27b後の別作業（営業クライアントまとめ/部門比較/横並び比較/第3部門合計）が追加済み。同じSHA objectを照合し、旧BOX修正を先に保存した後に隔離ブランチへ統合。競合なし。営業側のcontroller/model/service/画面/部品・DB migration・ChangelogSeeder・静的Ziggy・routes.suna・設定/依存はb4c1比差分0。営業実データと本番sales DBは照会しない。
+
+検証は実際の旧BOX/AssignmentDetailCard/LegacyWorkJobContinuation/WorkJobSeriesを一緒にVue SSR描画するよう拡張。予定ロード後の編集/完了/削除/校正/続きの全操作がタイトル直下・案件情報より前に1回だけ出る、完了済みは校正ボタンなし、未予定は予定セット、依頼済みは依頼済み表示を確認。スロットなしの共通カードと通常の続き部品の従来表示も確認。SSR用fixtureは対象ページだけに予定を供給し、Inertiaの$pageを設定して実条件を検証する。従来の元依頼完了確認/新旧校正payload/簡易上部操作/日付/数量/エスケープ/ナビ/ファイル説明等のJS検証も全成功。今回PHP/バックエンド変更なしのため、以前の92件1056断言は既存証拠として保持し、新たな実施結果と混同しない。
+
+対象ESLintエラー0。旧Showの既存未使用変数chainOtherItems/sourceItem/continuationItemsの警告3件は今回無関係のため保持。members build成功、manifest491 entry/522参照/欠落0、b4c1のsource entryと旧hash資産保持、tracked削除0。新manifest SHA256 9b0c7c03b6485e4368e3a03f77d14c9d5f666b9954ecac8a78b1ff5e4bb49941。ソースdiff --check成功。
+
+ほかの本番配備を今回も一時待機できるか非同期質問中。現時点の未回答を同意にしない。次の一手は検証済み版を保存し、固定元b4c1の旧BOX配置専用配備手順を準備し正確なSSH承認を得る。DB/migration/seed/試験通知は含めない。旧BOXの今回実画面と、校正送信/実受信2点は未確認。
