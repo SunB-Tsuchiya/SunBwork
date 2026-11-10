@@ -2058,3 +2058,32 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/legacy-myjob-top-
 校正の実送信・本人の校正状況1件/元ジョブ未完了維持・窓口実受信1件は引き続き未確認。次の一手は、利用者の試用ジョブで校正を送信し、この2点を分けて確認してもらう。通知が実際に送られることを案内し、Codexは代わりに送信しない。窓口を確認できない場合は未確認として残す。一般公開未承認、管理者/リーダー最終確認は別状態。
 
 記録基準は保存fb1465e3eと今回の利用者回答。旧/tmp作業ツリーが消失していたため同コミットから/tmp/sunbwork-screen-confirm-20261110（feature/myjob-screen-confirm-20261110）を復元。共有作業ツリーは古い資料と他作業変更を含むため上書きしない。本番HEADを今回再取得した意味ではない。資料のみ更新、コード/build/配備/DB/通知操作なし。
+
+
+## 2026-11-10 校正受け渡し2点成功・イベント11516の完了通知非受信を調査
+
+確定: 利用者「成功」で直前の校正試用2点（簡易から送信し元未完了/本人状況1件、窓口実受信1件と元表示）を確認済みに更新。繰り返さない。続いて完了したが通知が来ないとの報告、events/11516を対象として調査依頼。完了操作のHTTP経路・校正依頼ID・実通知保存状況は未確定。校正完了が元簡易ジョブを自動完了しない方針は維持。
+
+保存511c8ec41の実装読取: ProofJobController.completeとProofCoordinator\ProofRequestController.completeはnotifyProofCompletedで依頼者へ作成する。EventController.completeのcoordinator_assignment_id/supersedes_assignment_id経路にはProofRequestをcompletedへ更新しても同通知を呼ばない箇所がある。対象11516がその経路かはまだ断定しない。
+
+/tmp/proof-event-11516-audit-20261110.phpを準備。既定mysqlと実DB名一致を検証しREAD ONLY transaction内で11516、明示祖先最大20、校正候補最大20/割当、依頼者向け校正完了通知候補最大21を照合。ID/状態/時刻のみ出力し本文/氏名/ファイル/売上を出さない。通知の完全一致照合に件名を内部利用するが出力しない。更新/送信/再完了なし。SSH未実行、正確なコマンド承認待ち。次の一手は限定読取。一般公開未承認。
+
+
+## 2026-11-10 イベント11516の限定読取結果・校正依頼者への完了通知を確定
+
+承認済みSSHを実行しexit0。本番19d6c07da7a7cee072c59daf75cc8fc78ea7a3df、mysql実DB名照合成功、READ ONLY transaction/rollback、更新0/再送0。event11516→自己割当9742→supersedes元9741（job_type=proof）。両割当完了。関連候補の校正依頼162はcompleted、依頼者1/窓口1/担当31、完了時刻2026-11-10 18:44:37。該当依頼者・案件・元割当・件名完全一致のproof_completed通知0件。画面表示のみの問題ではなく未保存を確認。HTTP操作履歴を読んだわけではないが、EventControllerのsupersedes経由完了が通知を作らない実装と整合する。対象4ソースは本番19dと保存版で差分0。売上DB照会なし。
+
+重要な範囲補足: 校正依頼162のsource_personal_work_entry_idはNULL、元project_job_assignment_id=9729。今回の実例は旧マイジョブ由来であり、利用者の成功報告で確認した校正受け渡しを、DB上で新式の元参照まで確認したと拡張しない。新式専用元参照の実例は別途未照合として残す。同じ画面試験を直ちに繰り返させない。
+
+確定した追加判断: 利用者『完了したら依頼したユーザーには完了通知が来るほうが良い』。旧式・新式の校正依頼者へ校正完了通知を送る方針。一般的な自己割当の完了通知抑止は変更しない。過去162の未送信分の補正/再送は未承認、勝手に実行しない。PROOF_COMPLETION_NOTICE_PLAN1/MANAGER1/PROOF_COMPLETION_NOTICE1_PROMPTへ修正設計を具体化。完了経路を共通化して通知を原子的に1件、再操作で重複なし、通知保存失敗時は完了もrollback。校正完了による元簡易ジョブ自動完了は追加しない。次の一手は大規模修正規約に基づく具体設計確認。コード/配備未変更、一般公開未承認。
+
+
+## 2026-11-10 具体設計承認・通知欠落再現・実装と合成検証成功
+
+確定: 利用者yesでPROOF_COMPLETION_NOTICE_PLAN1を承認。一般Userの旧カレンダーで校正状態completed/通知0となる失敗を実際に再現（修正前1件4断言/期待通知1に対し0）。共通ProofRequestCompletionを追加し、依頼行lock/元校正マーク/校正状態/strict通知を同一transactionで確定。再操作の過去補正なし。案件/担当/窓口/会社/作成時刻を照合し、候補複数のlatest選択を禁止。同じ案件の普通の作業割当を校正専用画面で一括完了しない。
+
+旧カレンダーの代理操作fallbackも共通処理へ接続。本人の旧カレンダー/MyJob/JobBoxでは既存LegacyReceivedJobCompletionを校正の明示参照にも適用し、既存WorkJobLegacyCompletionとcommit後outboxを利用。直接校正割当は通常依頼の取り込み検証と区別して既存の所有者/会社/部署完了済み照合でsync。これは追加調査で影響先に入ったLegacyReceivedJobCompletion/WorkJobCompletionSyncの修正理由。新式の入力/BOX認可は緩和せず、typed元系列の既存guardも維持。通常自己割当通知抑止・進行表通知・銀本outboxは維持。校正専用User/窓口完了も共通化し、新式元の自動完了を追加しない。
+
+最終Integration104件1122断言すべて成功。旧カレンダー実Controllerの再現修正、入口をまたぐ再操作、通知保存失敗時のジョブ/校正/予定/元マーク/outbox rollbackとToastなし、複数候補、窓口違い、後発依頼、直接proof/旧coordinator参照、無関係作業の維持、別会社を検証。既存新式元未完了維持/入力/通常依頼/会社context/系列も全体成功。合成fixtureに本番にあるproof_coordinator_idを追加し旧『校正は専用fallback』期待を新要件へ更新。SQLite memory/network noneのみ、実DBを試験に使用しない。ログ/tmp/proof-completion-notice-tests-20261110.log。
+
+Changelogは専用ProofCompletionNoticeChangelogSeeder（version proof-notify-20261110）と親呼出し1行のみ。PHPのみでVue/JS/routes/資産/DB列/依存の変更なし、build不要。未配備・修正後の実通知未確認。過去162の再送は未承認のまま。次の一手は調査時本番19d6c07daを取り込み他作業保持を照合、最新本番状態を読み取り固定配備準備へ。

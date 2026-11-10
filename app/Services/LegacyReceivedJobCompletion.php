@@ -19,23 +19,22 @@ class LegacyReceivedJobCompletion
     {
         $root = ProjectJobAssignment::findOrFail($id);
         if ($eventId !== null && (int) $root->user_id !== (int) $user->id) throw new AuthorizationException;
-        // Keep original direct-request, privileged proxy and proof flows in their existing handlers.
-        if ((int) $root->user_id !== (int) $user->id || (int) $root->sender_id !== (int) $user->id || $root->job_type === 'proof') return null;
+        // Keep non-proof direct requests and privileged proxies in their existing handlers.
+        if ((int) $root->user_id !== (int) $user->id || ((int) $root->sender_id !== (int) $user->id && $root->job_type !== 'proof')) return null;
         if (! $this->hasCandidate($user, $id)) return null;
         if ($context !== null && $context !== (int) $user->company_id) throw new AuthorizationException;
         $tree = $this->inspect($user, $id);
-        if ($tree['proof']) return null;
         if ($tree['mixed']) {
             // A typed ancestor must never be silently discarded. Its existing guard remains authoritative.
             if (! app(UnifiedMyJobBox::class)->available($user, $context)) $this->invalid('この系列は専用のマイジョブ詳細から完了してください。');
             return app(WorkJobMutation::class)->completeWork($user, 'assignment', $id, $context, $eventId);
         }
-        if (! $tree['received']) return null;
+        if (! $tree['received'] && ! $tree['proof']) return null;
         if (DB::transactionLevel() !== 0) throw new \LogicException('Legacy received completion must own its transaction');
         $result = DB::transaction(function () use ($user, $id, $tree, $eventId) {
             foreach ($tree['chain'] as $assignment) ProjectJobAssignment::whereKey($assignment->id)->lockForUpdate()->firstOrFail();
             $again = $this->inspect($user, $id, true);
-            if ($again['mixed'] || $again['proof'] || ! $again['received'] || $this->signature($tree) !== $this->signature($again)) {
+            if ($again['mixed'] || (! $again['received'] && ! $again['proof']) || $this->signature($tree) !== $this->signature($again)) {
                 $this->invalid('続き元または依頼が更新されました。詳細を開き直してください。');
             }
             $occurredOn = null;
@@ -47,7 +46,7 @@ class LegacyReceivedJobCompletion
             // Read originals and duplicate imports under current-read locks, not an earlier RR snapshot.
             $originals = app(WorkJobReceivedCompletion::class)->originals($user, $again['chain']);
             $expected = array_unique(array_filter(array_map(fn ($a) => $a->supersedes_assignment_id, $again['chain'])));
-            if (count($originals) !== count($expected)) $this->invalid('依頼の種類が更新されました。詳細を開き直してください。');
+            if (! $again['proof'] && count($originals) !== count($expected)) $this->invalid('依頼の種類が更新されました。詳細を開き直してください。');
             $changed = ! $again['chain'][count($again['chain']) - 1]->completed;
             $syncAssignments = app(WorkJobLegacyCompletion::class)->complete($user, $again['chain'], $occurredOn);
             return ['id' => $id, 'type' => 'assignment', 'changed' => $changed,
@@ -68,7 +67,7 @@ class LegacyReceivedJobCompletion
             if (isset($seen[$id])) $this->invalid('続き元が循環しています。');
             $seen[$id] = true;
             $job = ProjectJobAssignment::where('user_id', $user->id)->findOrFail($id);
-            if ($job->supersedes_assignment_id || $job->source_personal_work_entry_id) return true;
+            if ($job->job_type === 'proof' || $job->coordinator_assignment_id || $job->supersedes_assignment_id || $job->source_personal_work_entry_id) return true;
             if (! $job->source_assignment_id) return false;
             $id = (int) $job->source_assignment_id;
         }
@@ -83,13 +82,17 @@ class LegacyReceivedJobCompletion
             $seen[$id] = true;
             $assignment = ProjectJobAssignment::with('projectJob')->findOrFail($id);
             if ($lock) $assignment->setRelation('projectJob', ProjectJob::whereKey($assignment->project_job_id)->lockForUpdate()->firstOrFail());
-            if ((int) $assignment->user_id !== (int) $user->id || (int) $assignment->sender_id !== (int) $user->id
+            if ((int) $assignment->user_id !== (int) $user->id || ((int) $assignment->sender_id !== (int) $user->id && $assignment->job_type !== 'proof')
                 || ($assignment->company_id !== null && (int) $assignment->company_id !== (int) $user->company_id)
                 || ($assignment->department_id !== null && (int) $assignment->department_id !== (int) $user->department_id)
                 || ! $assignment->projectJob
                 || ($assignment->projectJob->company_id !== null && (int) $assignment->projectJob->company_id !== (int) $user->company_id)) throw new AuthorizationException;
             $chain[] = $assignment;
             $proof = $proof || $assignment->job_type === 'proof';
+            if ($assignment->coordinator_assignment_id) {
+                $linked = ProjectJobAssignment::whereKey($assignment->coordinator_assignment_id)->where('user_id', $user->id)->where('project_job_id', $assignment->project_job_id)->firstOrFail();
+                $proof = $proof || $linked->job_type === 'proof';
+            }
             if ($assignment->supersedes_assignment_id) {
                 $original = ProjectJobAssignment::whereKey($assignment->supersedes_assignment_id)
                     ->where('user_id', $user->id)->where('project_job_id', $assignment->project_job_id)->first(['id', 'job_type']);

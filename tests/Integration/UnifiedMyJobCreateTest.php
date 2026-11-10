@@ -62,7 +62,7 @@ class UnifiedMyJobCreateTest extends TestCase
         Schema::create('statuses', function (Blueprint $t) { $t->id(); $t->string('key'); $t->string('slug'); });
         DB::table('statuses')->insert(['id' => 1, 'key' => 'completed', 'slug' => 'completed']);
         Schema::create('progress_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
-        Schema::create('proof_requests', function (Blueprint $t) { $t->id(); $t->integer('project_job_id')->nullable(); $t->integer('proofreader_id')->nullable(); $t->integer('project_job_assignment_id')->nullable(); $t->integer('requester_id'); $t->string('title'); $t->string('status'); $t->dateTime('deadline')->nullable(); $t->text('note')->nullable(); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
+        Schema::create('proof_requests', function (Blueprint $t) { $t->id(); $t->integer('project_job_id')->nullable(); $t->integer('proofreader_id')->nullable(); $t->integer('proof_coordinator_id')->nullable(); $t->integer('project_job_assignment_id')->nullable(); $t->integer('requester_id'); $t->string('title'); $t->string('status'); $t->dateTime('deadline')->nullable(); $t->text('note')->nullable(); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_10_180001_add_quick_work_source_to_proof_requests.php')->up();
         Schema::create('job_notifications', function (Blueprint $t) { $t->id(); $t->string('type'); $t->integer('sender_id'); $t->integer('recipient_id'); $t->integer('project_job_id')->nullable(); $t->integer('assignment_id')->nullable(); $t->text('message'); $t->timestamps(); });
         config(['database.connections.mginbon.database' => '']);
@@ -1225,7 +1225,6 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertNull(app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['id' => 2, 'user_role' => 'admin']), 10));
         DB::table('project_job_assignments')->where('id', 10)->update(['supersedes_assignment_id' => 20, 'completed' => false]);
         DB::table('project_job_assignments')->where('id', 20)->update(['job_type' => 'proof']);
-        self::assertNull(app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($actor, 10));
         DB::table('proof_requests')->insert(['id' => 1, 'project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '合成校正', 'status' => 'assigned']);
         app(\App\Http\Controllers\User\MyProjectJobController::class)->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(10));
         self::assertSame('completed', DB::table('proof_requests')->find(1)->status);
@@ -1880,6 +1879,161 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(['enabled' => true, 'unregisteredRequests' => 1], $share($this->user(), 1)['userWorkHub']);
         self::assertSame(['enabled' => false, 'unregisteredRequests' => 0], $share(null)['userWorkHub']);
         app('session')->forget('superadmin_context');
+    }
+
+    private function proofNoticeFixture(): \App\Models\Event
+    {
+        $event = $this->regularReceivedCompletionFixture();
+        Schema::table('project_job_assignments', function (Blueprint $t) { $t->integer('coordinator_assignment_id')->nullable(); });
+        DB::table('project_job_assignments')->where('id', 20)->update(['job_type' => 'proof']);
+        DB::table('proof_requests')->insert(['id' => 1, 'project_job_id' => 10, 'project_job_assignment_id' => null,
+            'proofreader_id' => 1, 'requester_id' => 2, 'title' => '通知試験', 'status' => 'in_progress']);
+        return $event;
+    }
+
+    public function test_regular_worker_calendar_proof_completion_notifies_requester(): void
+    {
+        $event = $this->proofNoticeFixture();
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $this->user(['user_role' => 'user'])), $event);
+        self::assertSame('completed', DB::table('proof_requests')->find(1)->status);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->where('recipient_id', 2)->count());
+    }
+
+    public function test_proof_completion_across_calendar_myjob_jobbox_and_explicit_pages_is_idempotent(): void
+    {
+        $event = $this->proofNoticeFixture();
+        $actor = $this->user(['user_role' => 'user']);
+        $request = $this->request([], $actor);
+        app(\App\Http\Controllers\User\MyProjectJobController::class)->completeAssignment($request, \App\Models\ProjectJobAssignment::findOrFail(10));
+        app(\App\Http\Controllers\ProjectJobs\JobBoxController::class)->completeAssignment($request, \App\Models\ProjectJobAssignment::findOrFail(10));
+        app(\App\Http\Controllers\EventController::class)->complete($request, $event);
+        app(\App\Http\Controllers\User\ProofJobController::class)->complete(\App\Models\ProofRequest::findOrFail(1));
+        app(\App\Http\Controllers\ProofCoordinator\ProofRequestController::class)->complete($request, \App\Models\ProofRequest::findOrFail(1));
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
+        self::assertSame(0, DB::table('job_notifications')->where('type', 'completed')->count());
+        self::assertSame(0, DB::table('work_job_completion_syncs')->whereNull('synced_at')->count());
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertStringStartsWith('【完了】', DB::table('events')->find(101)->title);
+    }
+
+    public function test_proof_notification_failure_rolls_back_calendar_job_and_proof_without_toast(): void
+    {
+        $event = $this->proofNoticeFixture();
+        DB::statement("CREATE TRIGGER fail_proof_notice BEFORE INSERT ON job_notifications WHEN NEW.type = 'proof_completed' BEGIN SELECT RAISE(ABORT, 'proof notice failure'); END");
+        $response = app(\App\Http\Controllers\EventController::class)->complete($this->request([], $this->user(['user_role' => 'user'])), $event);
+        self::assertNotNull($response->getSession()->get('error'));
+        self::assertSame('in_progress', DB::table('proof_requests')->find(1)->status);
+        self::assertSame(0, DB::table('project_job_assignments')->where('completed', true)->count());
+        self::assertSame(0, DB::table('job_notifications')->count());
+        self::assertSame(0, DB::table('work_job_completion_syncs')->count());
+        self::assertSame('合成の自己予定', DB::table('events')->find(101)->title);
+        \Illuminate\Support\Facades\Event::assertNotDispatched(\App\Events\AssignmentStatusToast::class);
+    }
+
+    public function test_proof_calendar_ambiguous_request_rolls_back_instead_of_selecting_latest(): void
+    {
+        $event = $this->proofNoticeFixture();
+        DB::table('proof_requests')->insert(['project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '同じ担当の別校正', 'status' => 'assigned']);
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $this->user(['user_role' => 'user'])), $event);
+        self::assertSame(0, DB::table('project_job_assignments')->where('completed', true)->count());
+        self::assertSame(0, DB::table('proof_requests')->where('status', 'completed')->count());
+        self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_proof_coordinator_reference_and_direct_proof_use_same_notification_transaction(): void
+    {
+        $event = $this->proofNoticeFixture();
+        DB::table('proof_requests')->where('id', 1)->update(['proof_coordinator_id' => 2]);
+        DB::table('project_job_assignments')->where('id', 10)->update(['job_type' => 'proof', 'supersedes_assignment_id' => null, 'coordinator_assignment_id' => 20]);
+        $actor = $this->user(['user_role' => 'user']);
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $actor), $event);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertSame(0, DB::table('work_job_completion_syncs')->whereNull('synced_at')->count());
+    }
+
+    public function test_direct_nonself_proof_assignment_can_complete_from_requested_job_box(): void
+    {
+        $this->proofNoticeFixture();
+        $actor = $this->user(['user_role' => 'user']);
+        app(\App\Http\Controllers\ProjectJobs\JobBoxController::class)->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(20));
+        self::assertSame('completed', DB::table('proof_requests')->find(1)->status);
+        self::assertSame(1, DB::table('job_notifications')->where('recipient_id', 2)->where('type', 'proof_completed')->count());
+        self::assertSame(0, DB::table('work_job_completion_syncs')->whereNull('synced_at')->count());
+        self::assertSame(1, DB::table('job_notifications')->count());
+    }
+
+    public function test_completed_old_proof_import_does_not_complete_or_notify_later_request(): void
+    {
+        $event = $this->proofNoticeFixture();
+        DB::table('project_job_assignments')->whereIn('id', [10, 20])->update(['completed' => true]);
+        DB::table('proof_requests')->where('id', 1)->update(['status' => 'completed']);
+        DB::table('proof_requests')->insert(['project_job_id' => 10, 'proofreader_id' => 1, 'requester_id' => 2, 'title' => '後の校正', 'status' => 'assigned']);
+        app(\App\Http\Controllers\EventController::class)->complete($this->request([], $this->user(['user_role' => 'user'])), $event);
+        self::assertSame('assigned', DB::table('proof_requests')->find(2)->status);
+        self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_explicit_proof_pages_only_complete_proof_assignment_and_notify_once(): void
+    {
+        $this->proofNoticeFixture();
+        DB::table('proof_requests')->where('id', 1)->update(['proof_coordinator_id' => 2]);
+        DB::table('project_job_assignments')->insert(['id' => 30, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 2, 'job_type' => 'work']);
+        $actor = $this->user(['user_role' => 'user']);
+        app(\App\Http\Controllers\User\ProofJobController::class)->complete(\App\Models\ProofRequest::findOrFail(1));
+        app(\App\Http\Controllers\ProofCoordinator\ProofRequestController::class)->complete($this->request([], $actor), \App\Models\ProofRequest::findOrFail(1));
+        self::assertTrue((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(30)->completed);
+        self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
+    }
+
+    public function test_explicit_proof_notification_failure_preserves_source_and_assignment(): void
+    {
+        $this->proofNoticeFixture();
+        DB::table('proof_requests')->where('id', 1)->update(['proof_coordinator_id' => 2, 'project_job_assignment_id' => 30]);
+        DB::table('project_job_assignments')->insert(['id' => 30, 'project_job_id' => 10, 'user_id' => 2, 'sender_id' => 2]);
+        DB::statement("CREATE TRIGGER fail_explicit_proof_notice BEFORE INSERT ON job_notifications BEGIN SELECT RAISE(ABORT, 'proof notice failure'); END");
+        try { app(\App\Services\ProofRequestCompletion::class)->completeRequest($this->user(), 1); self::fail('Notification failure swallowed'); }
+        catch (\Illuminate\Database\QueryException $e) { self::assertStringContainsString('proof notice failure', $e->getMessage()); }
+        self::assertSame('in_progress', DB::table('proof_requests')->find(1)->status);
+        self::assertNull(DB::table('project_job_assignments')->find(30)->proof_completed_at);
+        self::assertFalse((bool) DB::table('project_job_assignments')->find(20)->completed);
+        self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_proof_matching_does_not_complete_another_coordinators_request(): void
+    {
+        $this->proofNoticeFixture();
+        DB::table('proof_requests')->where('id', 1)->update(['proof_coordinator_id' => 3]);
+        app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10);
+        self::assertSame('in_progress', DB::table('proof_requests')->find(1)->status);
+        self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_explicit_proof_rejects_foreign_company_source_and_ambiguous_assignments(): void
+    {
+        $this->proofNoticeFixture();
+        DB::table('proof_requests')->where('id', 1)->update(['proof_coordinator_id' => 2]);
+        DB::table('project_job_assignments')->insert(['id' => 30, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 2, 'job_type' => 'proof']);
+        try { app(\App\Services\ProofRequestCompletion::class)->completeRequest($this->user(), 1); self::fail('Ambiguous assignments accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertSame(0, DB::table('job_notifications')->count());
+        DB::table('project_job_assignments')->where('id', 30)->update(['job_type' => 'work']);
+        DB::table('users')->where('id', 2)->update(['company_id' => 2]);
+        try { app(\App\Services\ProofRequestCompletion::class)->completeRequest($this->user(), 1); self::fail('Foreign company accepted'); }
+        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertSame('in_progress', DB::table('proof_requests')->find(1)->status);
+        self::assertSame(0, DB::table('job_notifications')->count());
+    }
+
+    public function test_proof_import_cannot_consume_request_created_after_proof_assignment(): void
+    {
+        $this->proofNoticeFixture();
+        DB::table('project_job_assignments')->where('id', 20)->update(['created_at' => '2026-11-01 10:00:00']);
+        DB::table('proof_requests')->where('id', 1)->update(['created_at' => '2026-11-02 10:00:00']);
+        app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10);
+        self::assertSame('in_progress', DB::table('proof_requests')->find(1)->status);
+        self::assertSame(0, DB::table('job_notifications')->count());
     }
 
 }

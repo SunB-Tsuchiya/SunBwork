@@ -422,3 +422,10 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 2026-11-10旧BOX追加対応（未配備）: カレンダーのEvents/ShowとBOXのMyJobBox/Showは別画面。旧BOXの既存操作もAssignmentDetailCardの任意actionsスロットに渡しタイトル直下へ置く。続き部品のcompactは操作だけを上に出し、系列一覧は本文に保持する。スロット/compactを指定しない他画面は従来表示。既存権限・保存/完了/校正処理を変更しない。実旧BOX+共有部品を一緒にSSR検証し、下部配置の取り残しを防ぐ。実装/配備/利用者確認はQUICK_JOB_PROOF_MANAGER1末尾で分けて管理。
 
 2026-11-10追記: 旧BOXの上部操作追加は最新営業更新を保持した08e239cfbへ専用固定手順で配備成功。manifest491/522資産欠落0、DB操作なし。旧BOXの今回1点の利用者表示確認は待ち、校正実受信も未確認。
+
+
+## 校正完了の依頼者通知（2026-11-10 実装・合成検証済み、配備前）
+
+ProofRequestCompletionが校正依頼行をロックし、完了状態・元割当のproof_completed_at・proof_completed通知を同じtransactionで保存する。既存の各入口の認可は維持し、旧カレンダー/本人旧BOX/混在系列/校正専用画面を接続。通知失敗を握り潰して完了だけ確定しない。既に完了した依頼への再操作では過去通知を補正しない。校正元の新式作業は自動完了しない。
+
+旧割当の推定参照は同案件/担当/窓口/会社と作成時刻を照合し、複数候補はlatestで選ばず確認エラーとする。直接proofのsyncは通常依頼supersedesの検証と区別。通常依頼・自己割当通知・新式公開範囲を変更しない。実配備/実受信状態はPROOF_COMPLETION_NOTICE_MANAGER1末尾を参照。

@@ -43,25 +43,7 @@ class ProofJobController extends Controller
             return back()->with('error', 'この校正依頼はすでに完了済みです。');
         }
 
-        $proofRequest->update([
-            'status'       => 'completed',
-            'completed_at' => now(),
-        ]);
-
-        if ($proofRequest->project_job_assignment_id) {
-            \App\Models\ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
-                ->whereNull('proof_completed_at')
-                ->update(['proof_completed_at' => now()]);
-        }
-
-        if ($proofRequest->proofreader_id && $proofRequest->proof_coordinator_id) {
-            \App\Models\ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
-                ->where('user_id', $proofRequest->proofreader_id)
-                ->where('sender_id', $proofRequest->proof_coordinator_id)
-                ->update(['completed' => true]);
-        }
-
-        \App\Services\JobNotificationService::notifyProofCompleted($user, $proofRequest->fresh());
+        app(\App\Services\ProofRequestCompletion::class)->completeRequest(Auth::user(), (int) $proofRequest->id);
 
         return redirect()->route('user.jobbox.index')
             ->with('success', '校正が完了しました。依頼者に通知しました。');

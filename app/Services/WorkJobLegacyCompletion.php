@@ -7,7 +7,6 @@ use App\Models\ProgressCell;
 use App\Models\JobAssignmentMessage;
 use Illuminate\Support\Facades\Schema;
 use App\Models\ProjectJobAssignment;
-use App\Models\ProofRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -71,41 +70,13 @@ class WorkJobLegacyCompletion
         foreach ($notifications as $projectId => [$assignment, $progress]) {
             if (isset($receivedProjects[$projectId])) continue;
             if (isset($progressProjects[$projectId])) JobNotificationService::notifyProgressCompleted($user, $assignment->projectJob, $assignment, true);
-            else JobNotificationService::notifyCompleted($user, $assignment, $assignment->projectJob, true);
+            elseif ($assignment->job_type !== 'proof') JobNotificationService::notifyCompleted($user, $assignment, $assignment->projectJob, true);
         }
         return array_map(fn ($a) => (int) $a->id, $allAssignments);
     }
 
     private function completeProof(User $user, ProjectJobAssignment $assignment): void
     {
-        $proof = $assignment->job_type === 'proof' ? $assignment : null;
-        if (! $proof && $assignment->supersedes_assignment_id) {
-            $candidate = ProjectJobAssignment::whereKey($assignment->supersedes_assignment_id)->lockForUpdate()->firstOrFail();
-            if ((int) $candidate->user_id !== (int) $user->id || (int) $candidate->project_job_id !== (int) $assignment->project_job_id) {
-                throw ValidationException::withMessages(['source' => '元の依頼との関係を確認してください。']);
-            }
-            if ($candidate->job_type === 'proof') $proof = $candidate;
-        }
-        if (! $proof) return;
-        if ((int) $proof->user_id !== (int) $user->id || (int) $proof->project_job_id !== (int) $assignment->project_job_id
-            || ($proof->company_id !== null && (int) $proof->company_id !== (int) $user->company_id)
-            || ($proof->department_id !== null && (int) $proof->department_id !== (int) $user->department_id)) {
-            throw ValidationException::withMessages(['source' => '校正依頼との関係を確認してください。']);
-        }
-        $requests = ProofRequest::where('project_job_id', $proof->project_job_id)->where('proofreader_id', $user->id)
-            ->whereIn('status', ['assigned', 'in_progress'])->orderBy('id')->lockForUpdate()->limit(2)->get();
-        if ($requests->count() > 1) throw ValidationException::withMessages(['source' => '対応する校正依頼を一意に確認できません。']);
-        if (! $proof->completed) { $proof->completed = true; $proof->save(); }
-        if (! $request = $requests->first()) return;
-        if ($request->project_job_assignment_id) {
-            $coordinator = ProjectJobAssignment::whereKey($request->project_job_assignment_id)->lockForUpdate()->firstOrFail();
-            if ((int) $coordinator->project_job_id !== (int) $proof->project_job_id
-                || ($coordinator->company_id !== null && (int) $coordinator->company_id !== (int) $user->company_id)) {
-                throw ValidationException::withMessages(['source' => '校正依頼の案件を確認してください。']);
-            }
-            if (! $coordinator->proof_completed_at) { $coordinator->proof_completed_at = now(); $coordinator->save(); }
-        }
-        $request->status = 'completed'; $request->completed_at = now(); $request->save();
-        JobNotificationService::notifyProofCompleted($user, $request, true);
+        app(ProofRequestCompletion::class)->completeAssignment($user, $assignment);
     }
 }

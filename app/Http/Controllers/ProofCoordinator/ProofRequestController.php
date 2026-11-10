@@ -913,29 +913,7 @@ class ProofRequestController extends Controller
      */
     public function complete(Request $request, ProofRequest $proofRequest)
     {
-        $proofRequest->update([
-            'status'       => 'completed',
-            'completed_at' => now(),
-        ]);
-
-        // 元ジョブ（pja_operator）に校正済みマークを付与
-        if ($proofRequest->project_job_assignment_id) {
-            ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
-                ->whereNull('proof_completed_at')
-                ->update(['proof_completed_at' => now()]);
-        }
-
-        // pja100（校正割当ジョブ）を完了にする → 進行表の proof_user セルに反映
-        // 自己proof（sender=user）も対象に含めるため sender!=user 条件は設けない
-        if ($proofRequest->proofreader_id && $proofRequest->proof_coordinator_id) {
-            ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
-                ->where('user_id', $proofRequest->proofreader_id)
-                ->where('sender_id', $proofRequest->proof_coordinator_id)
-                ->update(['completed' => true]);
-        }
-
-        // 依頼者への完了通知
-        JobNotificationService::notifyProofCompleted(Auth::user(), $proofRequest->fresh());
+        app(\App\Services\ProofRequestCompletion::class)->completeRequest(Auth::user(), (int) $proofRequest->id);
 
         if ($request->wantsJson()) {
             return response()->json(['ok' => true, 'status' => 'completed']);

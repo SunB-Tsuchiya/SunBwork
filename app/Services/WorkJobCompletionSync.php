@@ -19,7 +19,8 @@ class WorkJobCompletionSync
                 if ($receipt->synced_at) return true;
                 $assignment = ProjectJobAssignment::with('projectJob')->findOrFail($receipt->assignment_id);
                 $user = User::findOrFail($receipt->user_id);
-                if ((int) $assignment->sender_id !== (int) $user->id) {
+                // Direct proof jobs are validated by the proof completion path, not ordinary import links.
+                if ((int) $assignment->sender_id !== (int) $user->id && $assignment->job_type !== 'proof') {
                     app(WorkJobReceivedCompletion::class)->validateSync($user, $assignment);
                 }
                 abort_unless($assignment->completed && (int) $assignment->user_id === (int) $user->id
