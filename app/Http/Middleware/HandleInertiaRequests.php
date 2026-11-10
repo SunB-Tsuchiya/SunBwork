@@ -194,6 +194,9 @@ class HandleInertiaRequests extends Middleware
 
                     return \App\Support\SunA\GeneralAffairs\StaffAccess::for($u)->toArray();
                 })(),
+                // サンエー印刷 売上レポート（営業）: 見られる人／取込できる人（general のときだけ計算。ロール行の「営業」ボタンの表示に使う）
+                'salesReportAccess' => $contextCompany?->company_type === 'general' && \App\Support\SunA\Sales\ReportAccess::canView($request->user()),
+                'salesReportCanImport' => $contextCompany?->company_type === 'general' && \App\Support\SunA\Sales\ReportAccess::canImport($request->user()),
                 // Admin 権限（admin ロール時のみ取得、それ以外は null）
                 'adminPermissions' => $request->user()?->isAdmin()
                     ? AdminPermission::where('user_id', $request->user()->id)->first()

@@ -10,6 +10,9 @@ use App\Http\Controllers\SunA\GeneralAffairs\Nencho\MyNenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NoticeController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\SubmissionController;
+use App\Http\Controllers\SunA\Sales\ImportController;
+use App\Http\Controllers\SunA\Sales\RegistrationStatusController;
+use App\Http\Controllers\SunA\Sales\ReportPermissionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -92,6 +95,43 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('staff-permissions/{staff}/edit', [StaffPermissionController::class, 'edit'])->name('staff_permissions.edit');
         Route::put('staff-permissions/{staff}', [StaffPermissionController::class, 'update'])->name('staff_permissions.update');
         Route::get('my-number-logs', [StaffPermissionController::class, 'logs'])->name('my_number_logs.index');
+    });
+
+// 売上レポート（営業）: 閲覧。許可された人（と SuperAdmin）・サンエー印刷のみ（suna_sales_report:view）。
+// 独立レイアウト（AppLayout を使わない）。ルート名の接頭辞 suna.sales.report.（clerk. は使わない）。
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'suna_sales_report:view'])
+    ->prefix('suna/sales/report')
+    ->name('suna.sales.report.')
+    ->group(function () {
+        Route::get('/', [RegistrationStatusController::class, 'index'])->name('index');
+        Route::get('api/registration-status', [RegistrationStatusController::class, 'data'])->name('api.registration_status');
+
+        // 取込履歴（何が変わったか。閲覧できる人）
+        Route::get('history', [ImportController::class, 'history'])->name('history.index');
+        Route::get('api/history/{import}/changes', [ImportController::class, 'changes'])->whereNumber('import')->name('api.history.changes');
+    });
+
+// 売上レポート（営業）: 取込。取込を許可された人（と SuperAdmin）のみ（suna_sales_report:import）。
+// 流れ: アップロード → 解析・検証 → 差分プレビュー → 確定。取込ファイルは保存しない
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'suna_sales_report:import'])
+    ->prefix('suna/sales/report')
+    ->name('suna.sales.report.')
+    ->group(function () {
+        Route::get('import', [ImportController::class, 'create'])->name('import.create');
+        Route::post('api/import/preview', [ImportController::class, 'preview'])->name('api.import.preview');
+        Route::post('api/import/repreview', [ImportController::class, 'repreview'])->name('api.import.repreview');
+        Route::post('api/import/confirm', [ImportController::class, 'confirm'])->name('api.import.confirm');
+        Route::post('api/import/discard', [ImportController::class, 'discard'])->name('api.import.discard');
+    });
+
+// 売上レポート（営業）: 管理者の「利用メンバー設定」（サンエー印刷用。ポートフォリオの利用メンバー設定と同じ形。
+// SuperAdmin の「売上分析 利用許可設定」（サン・ブレーン用）とは別）。suna_sales_report:manage = Admin/SuperAdmin かつサンエー印刷
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'admin', 'suna_sales_report:manage'])
+    ->prefix('admin/suna-sales')
+    ->name('admin.suna.sales.')
+    ->group(function () {
+        Route::get('permissions', [ReportPermissionController::class, 'index'])->name('permissions.index');
+        Route::put('permissions', [ReportPermissionController::class, 'update'])->name('permissions.update');
     });
 
 // 従業員: 自分の年末調整の入力。サンエー印刷・サン・ブレーンのどちらの従業員でも、受付の対象者なら使える

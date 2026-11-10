@@ -27,6 +27,7 @@ const GENERAL_ALLOWED = [
     'dashboard', 'companies', 'users', 'departments', 'special_teams', 'diaries', 'diary_teams',
     'worktypes', 'work_records', 'leader_permissions', 'meeting_definitions',
     'presence_board_settings', 'meeting_rooms', 'schedule_settings', 'staff_permissions', 'applicants',
+    'sales_report_permissions',
 ];
 const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
 
@@ -75,6 +76,8 @@ const tabs = computed(() => [
     { key: 'schedule_settings',   href: tryRoute('admin.schedule-settings.edit'), label: '予定表権限設定' },
     // サンエー印刷（general）のみ: 社員情報（マイナンバー等）の閲覧権限を管理（SunA/GeneralAffairs）
     { key: 'staff_permissions', href: tryRoute('admin.general_affairs.staff_permissions.index'), label: '社員情報権限管理', condition: isGeneral.value },
+    // サンエー印刷（general）のみ: 売上レポート（営業）を見られる人・取込できる人を管理（SunA/Sales）
+    { key: 'sales_report_permissions', href: tryRoute('admin.suna.sales.permissions.index'), label: '売上レポート利用設定', condition: isGeneral.value },
 ].filter(t => t.condition !== false && t.href && showTab(t.key)));
 
 function onMobileSelect(e) {

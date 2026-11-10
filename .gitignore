@@ -39,3 +39,7 @@ yarn-error.log
 
 # N_DBSystem / FileMaker受領資料（元データはGit管理しない）
 /z_NDBSystem/
+
+# サンエー印刷 売上レポート: 得意先名を含む実データ・サンプルのExcelは git に上げない（SUNASALES_PLAN1.md §4・§10）
+z_instructions/★*得意先別*.xlsx
+z_instructions/*得意先別*.xlsx

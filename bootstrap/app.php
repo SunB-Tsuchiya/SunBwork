@@ -52,6 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'company_type'   => \App\Http\Middleware\CheckCompanyType::class,
             'deny_general'   => \App\Http\Middleware\DenyGeneralCompany::class,
             'suna_staff'     => \App\Http\Middleware\SunAStaffAbility::class,
+            'suna_sales_report' => \App\Http\Middleware\SunASalesReportAccess::class,
             'sales_analysis' => \App\Http\Middleware\EnsureSalesAnalysisAccess::class,
             'portfolio'      => \App\Http\Middleware\EnsurePortfolioAccess::class,
         ]);
