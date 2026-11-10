@@ -181,3 +181,17 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-dep
 対象ESLintエラー0。旧Showの既存未使用変数chainOtherItems/sourceItem/continuationItemsの警告3件は今回無関係のため保持。members build成功、manifest491 entry/522参照/欠落0、b4c1のsource entryと旧hash資産保持、tracked削除0。新manifest SHA256 9b0c7c03b6485e4368e3a03f77d14c9d5f666b9954ecac8a78b1ff5e4bb49941。ソースdiff --check成功。
 
 ほかの本番配備を今回も一時待機できるか非同期質問中。現時点の未回答を同意にしない。次の一手は検証済み版を保存し、固定元b4c1の旧BOX配置専用配備手順を準備し正確なSSH承認を得る。DB/migration/seed/試験通知は含めない。旧BOXの今回実画面と、校正送信/実受信2点は未確認。
+
+
+## 2026-11-10 旧BOX配置修正の配備調整を確認・専用手順準備
+
+確定: 利用者が今回も「ほかの本番配備を一時的に待たせる」と回答し、調整質問の未回答状態を置換。ソース編集は並行可。これは新しいSSHの実行承認や一般公開承認ではない。
+
+最新版b4c1を保持した検証済み保存版08e239cfbdfa141fd9f1c53fa28494dcff07daf1。専用/tmp/legacy-myjob-top-actions-deploy-20261110.shを作成、sh -n成功。SHA256 4fbbb63a57b47cd7e3caab5509a8242e739e2b195598d00e1b78db6878308295。同一コピーはstorage/app/private/codex-legacy-myjob-top-actions-deploy-20261110/。
+
+固定元b4c1e8d12e377a071c0d15a92f7255b6de5cebb6→固定先上記。main/HEAD/追跡変更なし/既知未追跡5件/旧manifest308845ce9372414458ccbd0dccedf871c89b3da87a72c184e4f4ae8d36708da2を照合しfetch。source11許可一覧（実行ソースVue3件+試験1件+資料7件）/削除なし/database・routes・設定・依存等不変/manifest491・522資産/members baseを確認してff-only。配備資産検査、view:clear、最終追跡/未追跡状態保持を確認する。DB照会/変更・migration/seed・試験通知は含めない。共通カードのスロットを使わない画面の従来配置も維持する。
+
+次の一手（まだ未承認・未実行）:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/legacy-myjob-top-actions-deploy-20261110.sh
+
+配備後は旧BOX詳細のタイトル直下に既存操作と続きが見えることだけを新たに確認してもらう。簡易上部/統合メニュー/モーダル開閉は確認済みで反復しない。校正送信/実受信2点は別の未確認のまま。一般公開未承認。
