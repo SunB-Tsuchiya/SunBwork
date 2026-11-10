@@ -12,6 +12,7 @@ use App\Http\Controllers\SunA\GeneralAffairs\Nencho\NenchoController;
 use App\Http\Controllers\SunA\GeneralAffairs\Nencho\SubmissionController;
 use App\Http\Controllers\SunA\Sales\AnnualAnalysisController;
 use App\Http\Controllers\SunA\Sales\ClientAnalysisController;
+use App\Http\Controllers\SunA\Sales\ClientGroupController;
 use App\Http\Controllers\SunA\Sales\DashboardController as SalesDashboardController;
 use App\Http\Controllers\SunA\Sales\ImportController;
 use App\Http\Controllers\SunA\Sales\RegistrationStatusController;
@@ -130,6 +131,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('client', [ClientAnalysisController::class, 'index'])->name('client');
         Route::get('api/client/search', [ClientAnalysisController::class, 'search'])->name('api.client.search');
         Route::get('api/client/detail', [ClientAnalysisController::class, 'detail'])->name('api.client.detail');
+
+        // 名寄せ設定（閲覧。変更は取込できる人のグループ）
+        Route::get('client-groups', [ClientGroupController::class, 'index'])->name('client_groups');
+        Route::get('api/client-groups/data', [ClientGroupController::class, 'data'])->name('api.client_groups.data');
+        Route::get('api/client-groups/clients', [ClientGroupController::class, 'clients'])->name('api.client_groups.clients');
+        Route::get('api/client-groups/events', [ClientGroupController::class, 'events'])->name('api.client_groups.events');
     });
 
 // 売上レポート（営業）: 取込。取込を許可された人（と SuperAdmin）のみ（suna_sales_report:import）。
@@ -144,6 +151,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('api/import/confirm', [ImportController::class, 'confirm'])->name('api.import.confirm');
         Route::post('api/import/discard', [ImportController::class, 'discard'])->name('api.import.discard');
         Route::post('api/history/{import}/undo', [ImportController::class, 'undo'])->whereNumber('import')->name('api.history.undo');
+
+        // 名寄せ設定の変更（グループの作成・名前変更・メンバーの追加/解除・解散）
+        Route::post('api/client-groups', [ClientGroupController::class, 'store'])->name('api.client_groups.store');
+        Route::patch('api/client-groups/{group}', [ClientGroupController::class, 'update'])->whereNumber('group')->name('api.client_groups.update');
+        Route::post('api/client-groups/{group}/members', [ClientGroupController::class, 'addMembers'])->whereNumber('group')->name('api.client_groups.members.add');
+        Route::post('api/client-groups/{group}/members/remove', [ClientGroupController::class, 'removeMember'])->whereNumber('group')->name('api.client_groups.members.remove');
+        Route::delete('api/client-groups/{group}', [ClientGroupController::class, 'destroy'])->whereNumber('group')->name('api.client_groups.destroy');
     });
 
 // 売上レポート（営業）: 管理者の「利用メンバー設定」（サンエー印刷用。ポートフォリオの利用メンバー設定と同じ形。

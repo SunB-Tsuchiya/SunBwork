@@ -119,8 +119,9 @@ class AnnualAnalysisService
     private function totals(int $year, array $months, string $dept): array
     {
         $base = $this->facts($year, $months, $dept);
-        $sum = (clone $base)->selectRaw('COALESCE(SUM(amount),0) as amount, COALESCE(SUM(order_count),0) as orders')->first();
-        $clients = (clone $base)->selectRaw('client_key')->groupBy('client_key')->havingRaw('SUM(amount) > 0')->get()->count();
+        $sum = (clone $base)->selectRaw('COALESCE(SUM(suna_sl_facts.amount),0) as amount, COALESCE(SUM(suna_sl_facts.order_count),0) as orders')->first();
+        // 取引社数は名寄せ後の数（グループは1社）
+        $clients = (clone $base)->selectRaw(EffectiveClient::KEY . ' as ck')->groupBy('ck')->havingRaw('SUM(suna_sl_facts.amount) > 0')->get()->count();
         $amount = (float) $sum->amount;
         $orders = (int) $sum->orders;
 
@@ -139,8 +140,8 @@ class AnnualAnalysisService
             return [];
         }
         $out = [];
-        foreach ($this->facts($year, $months, $dept)->selectRaw('client_key, MAX(client_name) as name, SUM(amount) as amount')->groupBy('client_key')->get() as $r) {
-            $out[$r->client_key] = ['name' => (string) $r->name, 'amount' => (float) $r->amount];
+        foreach ($this->facts($year, $months, $dept)->selectRaw(EffectiveClient::KEY . ' as ck, ' . EffectiveClient::NAME . ' as name, SUM(suna_sl_facts.amount) as amount')->groupBy('ck')->get() as $r) {
+            $out[$r->ck] = ['name' => (string) $r->name, 'amount' => (float) $r->amount];
         }
 
         return $out;
@@ -148,7 +149,8 @@ class AnnualAnalysisService
 
     private function facts(int $year, array $months, string $dept)
     {
-        $q = Fact::query()->where('sales_year', $year)->whereIn('sales_month', $months);
+        // 名寄せを反映するため、メンバー表・グループ表を結合している（EffectiveClient）
+        $q = EffectiveClient::join(Fact::query())->where('sales_year', $year)->whereIn('sales_month', $months);
 
         return $this->departments->apply($q, $dept);
     }
@@ -207,8 +209,8 @@ class AnnualAnalysisService
         $order = $this->departments->order();
         $collect = function (int $y) use ($months) {
             $out = [];
-            foreach (Fact::query()->where('sales_year', $y)->whereIn('sales_month', $months)
-                ->selectRaw('department_key, section_key, SUM(amount) as amount, COUNT(DISTINCT client_key) as clients')
+            foreach (EffectiveClient::join(Fact::query())->where('sales_year', $y)->whereIn('sales_month', $months)
+                ->selectRaw('department_key, section_key, SUM(suna_sl_facts.amount) as amount, COUNT(DISTINCT ' . EffectiveClient::KEY . ') as clients')
                 ->groupBy('department_key', 'section_key')->get() as $r) {
                 $out[$r->section_key ?? $r->department_key] = ['amount' => (float) $r->amount, 'clients' => (int) $r->clients];
             }

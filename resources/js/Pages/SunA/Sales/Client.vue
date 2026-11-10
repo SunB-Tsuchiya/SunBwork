@@ -117,6 +117,9 @@ const hasDeptChange = computed(() => (detail.value?.department_history ?? []).so
                 <div class="rounded bg-white p-4 shadow">
                     <h2 class="text-base font-bold text-gray-900">{{ detail.name }}</h2>
                     <p class="mt-0.5 text-xs text-gray-500">{{ detail.first_year }}年〜{{ detail.last_year }}年・累計 {{ yen(detail.total_amount) }}</p>
+                    <p v-if="detail.members" class="mt-1 text-xs text-indigo-700">
+                        名寄せ済み（{{ detail.members.length }}社をまとめて集計）: {{ detail.members.map((m) => m.name).join('、') }}
+                    </p>
                     <div class="mt-3"><canvas ref="chartRef" style="max-height: 240px"></canvas></div>
                 </div>
 

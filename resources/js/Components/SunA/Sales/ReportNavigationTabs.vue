@@ -39,6 +39,7 @@ const groups = computed(() => [
         tabs: [
             { key: 'import', route: 'import.create', label: 'Excel取込', show: canImport.value },
             { key: 'history', route: 'history.index', label: '取込履歴' },
+            { key: 'client_groups', route: 'client_groups', label: '名寄せ' },
         ],
     },
 ]

@@ -33,8 +33,9 @@ class SameMonthService
         $rows = $this->departments->apply(Fact::query()->where('sales_month', $month), $dept)
             ->selectRaw('sales_year, SUM(amount) as amount, SUM(order_count) as orders')
             ->groupBy('sales_year')->get()->keyBy('sales_year');
-        $clients = $this->departments->apply(Fact::query()->where('sales_month', $month), $dept)
-            ->selectRaw('sales_year, client_key')->groupBy('sales_year', 'client_key')->havingRaw('SUM(amount) > 0')->get()
+        // 取引社数は名寄せ後の数（グループは1社）
+        $clients = $this->departments->apply(EffectiveClient::join(Fact::query())->where('sales_month', $month), $dept)
+            ->selectRaw('sales_year, ' . EffectiveClient::KEY . ' as ck')->groupBy('sales_year', 'ck')->havingRaw('SUM(suna_sl_facts.amount) > 0')->get()
             ->groupBy('sales_year')->map->count();
 
         $list = [];

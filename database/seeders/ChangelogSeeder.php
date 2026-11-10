@@ -2451,6 +2451,21 @@ HTML,
 </ul></section>
 HTML,
             ],
+            [
+                'version' => 'suna-sales-3e',
+                'title' => '営業：売上レポートに得意先の名寄せ設定を追加（サンエー印刷）',
+                'released_at' => '2026-11-12',
+                'summary' => '表記ゆれのある得意先（例: 「株式会社A」と「A（株）」）を1社にまとめて集計する「名寄せ」設定を追加しました。設定すると、分析の数字が常に統合された状態になります。',
+                'design_files' => ['z_instructions/SUNASALES_PLAN1.md', 'z_instructions/SUNASALES_MANAGER1.md'],
+                'claude_notes' => 'SunA/Sales 段階3-e。売上DBに suna_sl_client_groups / suna_sl_client_group_members / suna_sl_client_group_events（全て company_id 必須）を新設。売上の行は変更せず、集計時に実効キー（所属グループがあれば g:<ID>）で得意先を数える（Analysis/EffectiveClient）。設定したら常に統合して集計（ON/OFFなし）。候補は名前の前後の法人格を除いて一致するもの。設定できるのは取込できる人、閲覧は閲覧できる人。変更の記録に得意先名を残し、監査ログは件数のみ。',
+                'body' => <<<'HTML'
+<section class="cl-feature"><h3>営業：得意先の名寄せ（サンエー印刷）</h3><ul>
+<li>売上レポートの「名寄せ」で、表記ゆれのある得意先（例: 「株式会社A」と「A（株）」）を1社にまとめられます。「株式会社」「（株）」「（学）」などを除くと同じ名前になる得意先は、候補として出ます。</li>
+<li>統合すると、年次分析・同月比較・得意先分析の数字が、常に統合された状態になります。売上の元データは変わりません。解散すると元に戻ります。</li>
+<li>統合・解除できるのは取込できる人です。誰がいつ、どの得意先を統合・解除したかが、履歴に残ります。</li>
+</ul></section>
+HTML,
+            ],
         ];
 
         // 一部の機能だけを本番へ反映するときは、そのバージョンだけを登録できる（他の登録済みエントリを上書きしない）。
