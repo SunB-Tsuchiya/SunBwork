@@ -6,6 +6,7 @@ import Chart from 'chart.js/auto';
 import ReportShell from '@/Components/SunA/Sales/ReportShell.vue';
 import PeriodBar from '@/Components/SunA/Sales/PeriodBar.vue';
 import { useSalesChart } from '@/Composables/useSalesChart';
+import { useReportExport } from '@/Components/SunA/Sales/useReportExport.js';
 
 // サンエー印刷 売上レポートの同月比較（SUNASALES_PLAN1.md §15）。選んだ月を年どうしで比べる。
 // その月に登録のない年は除外する（0円として並べない）。前年比は、前の年にもその月の登録があるときだけ出す。
@@ -16,6 +17,7 @@ const props = defineProps({
 });
 
 const { yen, pct, pctClass } = useSalesChart();
+const { exporting, exportError, exportExcel } = useReportExport();
 const query = new URLSearchParams(window.location.search);
 const qMonth = Number(query.get('month'));
 const qDept = query.get('dept');
@@ -83,6 +85,10 @@ const visibleDepartmentRows = computed(() => matrix.value.rows.filter((r) => r.l
 
 <template>
     <ReportShell title="同月比較" active="same_month">
+        <template #actions>
+            <span v-if="exportError" class="max-w-xs text-xs text-red-600">{{ exportError }}</span>
+            <button type="button" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50" :disabled="exporting || !summary" @click="exportExcel(route('suna.sales.report.export.same_month'), { month, dept: deptKey })">Excel出力</button>
+        </template>
         <div v-if="!monthsWithData.length" class="rounded bg-white p-6 shadow">
             <p class="text-sm text-gray-500">まだ売上データが取り込まれていません。</p>
             <Link :href="route('suna.sales.report.index')" class="mt-3 inline-block text-sm text-indigo-600 hover:underline">データ登録状況へ</Link>

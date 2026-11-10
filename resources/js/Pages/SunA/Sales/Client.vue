@@ -4,6 +4,7 @@ import axios from 'axios';
 import Chart from 'chart.js/auto';
 import ReportShell from '@/Components/SunA/Sales/ReportShell.vue';
 import { useSalesChart } from '@/Composables/useSalesChart';
+import { useReportExport } from '@/Components/SunA/Sales/useReportExport.js';
 
 // サンエー印刷 売上レポートの得意先分析（SUNASALES_PLAN1.md §15）。得意先を検索して選び、年別・月別の推移と担当部門の履歴を見る。
 // 年次分析のランキングから ?client=キー で開くと、その得意先を最初から表示する。
@@ -12,6 +13,7 @@ const props = defineProps({
 });
 
 const { yen, pct, pctClass } = useSalesChart();
+const { exporting, exportError, exportExcel } = useReportExport();
 const keyword = ref('');
 const results = ref([]);
 const searching = ref(false);
@@ -88,6 +90,10 @@ const hasDeptChange = computed(() => (detail.value?.department_history ?? []).so
 
 <template>
     <ReportShell title="得意先分析" active="client">
+        <template #actions>
+            <span v-if="exportError" class="max-w-xs text-xs text-red-600">{{ exportError }}</span>
+            <button type="button" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50" :disabled="exporting || !detail" @click="exportExcel(route('suna.sales.report.export.client'), { client_key: detail.client_key })">Excel出力</button>
+        </template>
         <div class="space-y-4">
             <div class="rounded bg-white p-4 shadow">
                 <label class="block text-xs font-medium text-gray-500">得意先を探す</label>

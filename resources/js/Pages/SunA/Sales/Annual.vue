@@ -8,6 +8,7 @@ import PeriodBar from '@/Components/SunA/Sales/PeriodBar.vue';
 import RankingPanel from '@/Components/SalesAnalysis/RankingPanel.vue';
 import ShareCompositionBar from '@/Components/SalesAnalysis/ShareCompositionBar.vue';
 import { useSalesChart } from '@/Composables/useSalesChart';
+import { useReportExport } from '@/Components/SunA/Sales/useReportExport.js';
 
 // サンエー印刷 売上レポートの年次分析（SUNASALES_PLAN1.md §15）。
 // 当年が途中でも、登録済みの月だけを、前年の同じ月と比べる。データの最初の年は前年比・新規・終了を出さない。
@@ -18,6 +19,7 @@ const props = defineProps({
 });
 
 const { yen, pct, pctClass } = useSalesChart();
+const { exporting, exportError, exportExcel } = useReportExport();
 const query = new URLSearchParams(window.location.search);
 const qYear = Number(query.get('year'));
 const qDept = query.get('dept');
@@ -150,6 +152,10 @@ const kpiCards = computed(() => {
 
 <template>
     <ReportShell title="年次分析" active="annual">
+        <template #actions>
+            <span v-if="exportError" class="max-w-xs text-xs text-red-600">{{ exportError }}</span>
+            <button type="button" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50" :disabled="exporting || !summary" @click="exportExcel(route('suna.sales.report.export.annual'), { year, dept: deptKey })">Excel出力</button>
+        </template>
         <div v-if="!years.length" class="rounded bg-white p-6 shadow">
             <p class="text-sm text-gray-500">まだ売上データが取り込まれていません。</p>
             <Link :href="route('suna.sales.report.index')" class="mt-3 inline-block text-sm text-indigo-600 hover:underline">データ登録状況へ</Link>

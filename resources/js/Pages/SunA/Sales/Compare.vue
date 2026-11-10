@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
 import ReportShell from '@/Components/SunA/Sales/ReportShell.vue';
 import { useSalesChart } from '@/Composables/useSalesChart';
+import { useReportExport } from '@/Components/SunA/Sales/useReportExport.js';
 
 // サンエー印刷 売上レポートの左右比較（SUNASALES_PLAN1.md §18）。2つの期間 A・B を並べて比べる。差・増減率は A に対する B。
 // 「年と年」は両方の年に登録のある月だけを比べる。「月と月」は「前月と比べる」「前年の同じ月と比べる」の近道がある（月次の見方を兼ねる）。
@@ -15,6 +16,7 @@ const props = defineProps({
 });
 
 const { yen, pct, pctClass } = useSalesChart();
+const { exporting, exportError, exportExcel } = useReportExport();
 const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
 const mode = ref('month');
@@ -89,6 +91,10 @@ const STATUS = { new: { text: '新規', cls: 'bg-blue-100 text-blue-700' }, ende
 
 <template>
     <ReportShell title="左右比較" active="compare">
+        <template #actions>
+            <span v-if="exportError" class="max-w-xs text-xs text-red-600">{{ exportError }}</span>
+            <button type="button" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50" :disabled="exporting || !summary" @click="exportExcel(route('suna.sales.report.export.compare'), params())">Excel出力</button>
+        </template>
         <div v-if="!years.length" class="rounded bg-white p-6 shadow">
             <p class="text-sm text-gray-500">まだ売上データが取り込まれていません。</p>
         </div>

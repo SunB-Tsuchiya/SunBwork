@@ -4,11 +4,13 @@ import axios from 'axios';
 import Chart from 'chart.js/auto';
 import ReportShell from '@/Components/SunA/Sales/ReportShell.vue';
 import { useSalesChart } from '@/Composables/useSalesChart';
+import { useReportExport } from '@/Components/SunA/Sales/useReportExport.js';
 
 // サンエー印刷 売上レポートの部門比較（SUNASALES_PLAN1.md §18）。部・課の売上を、年ごとに並べる。
 // 既定は「同じ月まで」に揃える（最新年の登録済みの月に、全ての年を揃える）。「通年」に切り替えると、途中の年に印が付く。
 // 営業第三部は「全体」の行を持ち、▶を開くと課・直轄の行が出る（第一部・第二部と、第三部全体を比べられる）。
 const { yen, pct, pctClass } = useSalesChart();
+const { exporting, exportError, exportExcel } = useReportExport();
 
 const basis = ref('same_month'); // 'same_month' | 'year'
 const splitChart = ref(false);   // グラフで、第三部を課・直轄に分けて表示する
@@ -88,6 +90,10 @@ const cell = (r, y) => r.amounts[y];
 
 <template>
     <ReportShell title="部門比較" active="department">
+        <template #actions>
+            <span v-if="exportError" class="max-w-xs text-xs text-red-600">{{ exportError }}</span>
+            <button type="button" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50" :disabled="exporting || !summary" @click="exportExcel(route('suna.sales.report.export.department'), { basis })">Excel出力</button>
+        </template>
         <div class="space-y-4">
             <div class="flex flex-wrap items-end gap-4 rounded bg-white p-4 shadow">
                 <div>

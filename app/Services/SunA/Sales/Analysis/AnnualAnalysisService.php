@@ -47,12 +47,12 @@ class AnnualAnalysisService
     }
 
     /**
-     * 得意先ランキング。mode: all（今の期間に売上のある得意先）／increase／decrease／new／ended。
-     * 前年比が使えないとき（最初の年など）は、all 以外は空。
+     * 得意先（名寄せ後）ごとの、期間の売上と前年同期間との比較（絞り込み・並べ替え前の全件。終了した得意先も含む）。
+     * 画面のランキングと、Excel出力が、同じ元から作るために切り出している。
      *
-     * @return array{rows:array<int,array<string,mixed>>, total_count:int, total_amount:float, comparison_available:bool}
+     * @return array{rows:array<int,array<string,mixed>>, total_amount:float, comparison_available:bool}
      */
-    public function clients(int $year, string $dept, string $mode, string $sort, string $direction, string $keyword, int $page, int $limit): array
+    public function clientRows(int $year, string $dept): array
     {
         $period = $this->periods->period($year);
         $prior = $this->periods->prior($year);
@@ -80,6 +80,20 @@ class AnnualAnalysisService
                 'status' => $status,
             ];
         }
+
+        return ['rows' => $rows, 'total_amount' => (float) $totalAmount, 'comparison_available' => $prior['available']];
+    }
+
+    /**
+     * 得意先ランキング。mode: all（今の期間に売上のある得意先）／increase／decrease／new／ended。
+     * 前年比が使えないとき（最初の年など）は、all 以外は空。
+     *
+     * @return array{rows:array<int,array<string,mixed>>, total_count:int, total_amount:float, comparison_available:bool}
+     */
+    public function clients(int $year, string $dept, string $mode, string $sort, string $direction, string $keyword, int $page, int $limit): array
+    {
+        ['rows' => $rows, 'total_amount' => $totalAmount, 'comparison_available' => $comparison] = $this->clientRows($year, $dept);
+        $prior = ['available' => $comparison];
 
         $rows = array_values(array_filter($rows, function ($r) use ($mode, $prior) {
             if ($mode === 'all') {
@@ -112,8 +126,8 @@ class AnnualAnalysisService
         return [
             'rows' => array_slice($rows, ($page - 1) * $limit, $limit),
             'total_count' => count($rows),
-            'total_amount' => (float) $totalAmount,
-            'comparison_available' => $prior['available'],
+            'total_amount' => $totalAmount,
+            'comparison_available' => $comparison,
         ];
     }
 
