@@ -372,3 +372,6 @@ AppLayout 内にグローバル配置済み。各ページで重複させない�
 情報出版・非一般会社のSuperAdmin本人だけ、ReceivedJobPrefillが元依頼を認可して案件client/固定sizeと作業詳細・数量単位・file_infoを組み立てる。依頼詳細の旧create、Events/Create_Job、旧Create_user内の選択、MyJobCreateModalが同じseedを使用。簡易から依頼へ進んだ作業日時は既存prefillEventを保持する。選択失敗は入力を保持し、閉じる/切替/遅延で古い依頼情報を反映しない。保存時は元依頼/案件をロックしてrevisionと未取り込みを再照合し、セルや校正参照は元データを正本にする。一般role・入口別status・数量算定の方式は維持し、過去データの一括補正や一般公開はしない。
 
 詳細はMYJOB_REQUEST_HANDOFF_PLAN1.md、実装/検証/配備/利用者画面の各状態は同MANAGER1.mdで区別する。
+
+
+2026-11-10 表示修正（実装/検証済み・未配備）: 簡易WorkDetailは旧ジョブ予定詳細と同じ作業名→日時→操作の上部カードに揃え、詳細/時間内訳/系列はその下に残す。完了確認/詳細編集も上部操作の直後に表示。HandleInertiaRequestsのuserWorkHubとcanManageBroadProjects共有propを復元し、既存サービスのINFO/role/会社判定と、実会社context一致を保持する。営業用clerkCalendarRoutePrefix等の共有は維持。フロントSSRに加え実Middlewareの共有出力を合成検証し、共有項目欠落を再発検知する。一般公開/校正実受信の成功とは別管理。QUICK_JOB_PROOF_MANAGER1末尾参照。

@@ -237,10 +237,17 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     detailApp.unmount();
     const workDetail = await component('resources/js/Pages/MyJobBox/WorkDetail.vue');
     const detailHtml = await renderToString(createSSRApp(workDetail, {
+        proof: {enabled:true,requested:false,title:'校正の元作業'},
         work: {id:1,title:'<script>work</script>',work_date:'2026-11-03',planned_start_time:'09:00',planned_end_time:'15:00',work_category:'other',actual_quantity:'90.00',actual_unit:'ページ',completed:false},
         time:{planned:360,lunch:60,afterLunch:300,recorded:150}, series:{items:[{key:'entry:1',type:'entry',id:1,title:'朝',date:'2026-11-03',start:'09:00',end:'12:00',completed:true,time:{afterLunch:180,recorded:150}},{key:'entry:2',type:'entry',id:2,title:'午後',date:'2026-11-03',start:'13:00',end:'15:00',parentKey:'entry:1',current:true,completed:false,time:{afterLunch:120,recorded:0}}],totals:{afterLunch:300,recorded:150},operationsEnabled:true,allCompleted:false,completionTargets:[]}, ancestors:[], back:{from:'box',period:'all',q:'search'},
     }));
-    for (const text of ['マイジョブ詳細','編集','詳細入力','予定枠','昼休憩との重なり','記録時間','150分','360分','90 ページ','案件情報','作業詳細','スケジュール','予定を編集','続きのマイジョブを作成','完了にする','シリーズ合計','300分','未完了の仕事あり','未完了','&lt;script&gt;work&lt;/script&gt;']) assert.ok(detailHtml.includes(text), text);
+    for (const text of ['マイジョブ詳細','編集','詳細入力','予定枠','昼休憩との重なり','記録時間','150分','360分','90 ページ','案件情報','作業詳細','日時','予定を編集','続きのマイジョブを作成','完了にする','シリーズ合計','300分','未完了の仕事あり','未完了','&lt;script&gt;work&lt;/script&gt;']) assert.ok(detailHtml.includes(text), text);
+    const topCard = detailHtml.slice(detailHtml.indexOf('aria-label="マイジョブ概要と操作"'), detailHtml.indexOf('</section>'));
+    for (const text of ['日時','2026-11-03 09:00','2026-11-03 15:00','360分','校正依頼','詳細入力','続きのマイジョブを作成','この日のカレンダー','予定を編集','完了にする']) assert.ok(topCard.includes(text), text);
+    assert.ok(detailHtml.indexOf('マイジョブの操作') < detailHtml.indexOf('案件情報'));
+    assert.ok(detailHtml.indexOf('マイジョブの操作') < detailHtml.indexOf('時間の内訳'));
+    assert.equal((detailHtml.match(/aria-label="マイジョブの操作"/g)||[]).length, 1);
+    assert.ok(detailHtml.includes('<summary class="cursor-pointer">時間の計算について</summary>'));
     assert.ok(!detailHtml.includes('<script>work</script>'));
     assert.ok(!detailHtml.includes('90.00'));
     const seriesComponent=await component('resources/js/Components/WorkJobSeries.vue');

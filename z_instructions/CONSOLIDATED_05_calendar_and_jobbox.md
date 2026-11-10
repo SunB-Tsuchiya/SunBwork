@@ -413,3 +413,6 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 依頼者の校正状況と窓口受信/割当画面で元作業の名称・分類を認可範囲だけ表示する。別会社部署/contextではこの新規元付き依頼を取得しない。旧依頼の既存表示条件は変更しない。元の結果文/ファイル/時刻を校正画面へ丸ごと渡さない。依頼が残る元は削除不可（完了後の参照も維持）、pending依頼のキャンセル後は再依頼可能。依頼送信/校正完了で元簡易ジョブを自動完了にしない。進行表・銀本の専用連携は旧マイジョブで対応する方針。
 
 追加migrationは2026_11_10_180001の1件。実装/コード検証と配備/実通知受信はQUICK_JOB_PROOF_MANAGER1.mdで別管理し、一般公開は未承認。
+
+
+2026-11-10 表示修正（実装/検証済み・未配備）: 簡易WorkDetailは旧ジョブ予定詳細と同じ作業名→日時→操作の上部カードに揃え、詳細/時間内訳/系列はその下に残す。完了確認/詳細編集も上部操作の直後に表示。HandleInertiaRequestsのuserWorkHubとcanManageBroadProjects共有propを復元し、既存サービスのINFO/role/会社判定と、実会社context一致を保持する。営業用clerkCalendarRoutePrefix等の共有は維持。フロントSSRに加え実Middlewareの共有出力を合成検証し、共有項目欠落を再発検知する。一般公開/校正実受信の成功とは別管理。QUICK_JOB_PROOF_MANAGER1末尾参照。

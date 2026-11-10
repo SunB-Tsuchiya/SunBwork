@@ -1833,4 +1833,53 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(1, DB::table('proof_requests')->count());
     }
 
+    public function test_actual_shared_props_restore_trial_hub_without_losing_sales_calendar_metadata(): void
+    {
+        // Exercise the real middleware: frontend fixtures alone cannot detect a missing shared prop.
+        Schema::table('companies', function (Blueprint $t) { $t->string('name')->nullable(); $t->string('code')->nullable(); $t->boolean('active')->default(true); $t->integer('sort_order')->default(0); });
+        Schema::table('departments', function (Blueprint $t) { $t->string('name')->nullable(); $t->string('module')->nullable(); });
+        Schema::table('job_notifications', fn (Blueprint $t) => $t->timestamp('read_at')->nullable());
+        Schema::table('project_job_assignments', fn (Blueprint $t) => $t->boolean('is_registered')->default(false));
+        Schema::create('job_assignment_messages', function (Blueprint $t) { $t->id(); $t->integer('project_job_assignment_id'); $t->integer('sender_id')->nullable(); $t->boolean('completed')->default(false); $t->timestamps(); });
+        Schema::create('teams', function (Blueprint $t) { $t->id(); $t->string('team_type'); $t->integer('company_id'); $t->integer('leader_id'); });
+        Schema::create('announcements', function (Blueprint $t) { $t->id(); $t->string('status'); });
+        Schema::create('announcement_recipients', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('announcement_id'); $t->timestamp('read_at')->nullable(); });
+        Schema::create('schedule_notifications', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->timestamp('read_at')->nullable(); });
+        Schema::create('department_field_configs', function (Blueprint $t) { $t->id(); $t->integer('department_id'); foreach (['slot','label','allowed_item_ids','source','source_group'] as $c) $t->string($c)->nullable(); $t->boolean('enabled')->default(true); });
+        Schema::create('job_field_options', function (Blueprint $t) { $t->id(); $t->integer('company_id'); foreach (['name','group_key'] as $c) $t->string($c)->nullable(); $t->integer('sort_order')->default(0); $t->float('coefficient')->default(1); });
+        Schema::create('suna_ga_nencho_campaigns', function (Blueprint $t) { $t->id(); $t->string('status'); $t->date('opens_on'); $t->date('due_on'); });
+        Schema::create('suna_ga_nencho_targets', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->integer('campaign_id'); $t->boolean('is_excluded')->default(false); });
+        Schema::create('suna_ga_nencho_submissions', function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->string('status'); });
+        foreach (['suna_ga_staff_permissions','user_application_access','portfolio_permissions','admin_permissions','leader_permissions','sales_analysis_permissions','proof_team_members','diary_team_leaders'] as $name) {
+            Schema::create($name, function (Blueprint $t) { $t->id(); $t->integer('user_id'); $t->boolean('enabled')->default(false); $t->string('feature_key')->nullable(); $t->boolean('script_access')->default(false); });
+        }
+        DB::table('project_jobs')->insert(['id' => 77, 'title' => '受信案件', 'company_id' => 1]);
+        DB::table('project_job_assignments')->insert(['id' => 77, 'project_job_id' => 77, 'user_id' => 1, 'sender_id' => 2]);
+        DB::table('job_assignment_messages')->insert(['id' => 77, 'project_job_assignment_id' => 77, 'sender_id' => 2, 'created_at' => now()]);
+        $share = function (?User $user, ?int $context = null, bool $sales = false) {
+            app('session')->forget('superadmin_context');
+            if ($context !== null) app('session')->put('superadmin_context.company_id', $context);
+            $request = $this->request([], $user, $context, 'GET');
+            if ($user === null) $request->setUserResolver(fn () => null);
+            else $user->setRelation('worktype', null);
+            if ($sales) $request->setRouteResolver(fn () => (new \Illuminate\Routing\Route('GET', '/suna/sales', fn () => null))->name('suna.sales.dashboard'));
+            $props = app(\App\Http\Middleware\HandleInertiaRequests::class)->share($request);
+            self::assertArrayHasKey('userWorkHub', $props);
+            self::assertSame($sales ? 'suna.sales' : 'clerk', $props['clerkCalendarRoutePrefix']);
+            $props['userWorkHub'] = ($props['userWorkHub'])();
+            return $props;
+        };
+        $props = $share($this->user());
+        self::assertSame(['enabled' => true, 'unregisteredRequests' => 1], $props['userWorkHub']);
+        self::assertTrue($props['auth']['canManageBroadProjects']);
+        self::assertTrue($props['auth']['canAccessPortfolio']);
+        foreach ([['user_role' => 'user'], ['user_role' => 'coordinator'], ['user_role' => 'admin'], ['user_role' => 'leader'], ['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $data) {
+            self::assertSame(['enabled' => false, 'unregisteredRequests' => 0], $share($this->user($data))['userWorkHub']);
+        }
+        self::assertSame(['enabled' => false, 'unregisteredRequests' => 0], $share($this->user(), 2, true)['userWorkHub']);
+        self::assertSame(['enabled' => true, 'unregisteredRequests' => 1], $share($this->user(), 1)['userWorkHub']);
+        self::assertSame(['enabled' => false, 'unregisteredRequests' => 0], $share(null)['userWorkHub']);
+        app('session')->forget('superadmin_context');
+    }
+
 }
