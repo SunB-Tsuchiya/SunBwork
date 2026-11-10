@@ -1487,3 +1487,15 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-proof-
 members build成功。manifest484 entry/515参照/欠落0、既存ソースentry欠落0・旧hash資産保持・tracked資産削除0。最終manifest SHA256 6f60dfb818eaa375b1e764da1b500753b15f8d6e49ba2a65642cb626f609a8b3。DB/migration/seed/routes/静的Ziggyの変更なし。共有Claude作業は未編集、営業/部署別カレンダーの変更を保持。
 
 次の一手: 保存後、直前配備の4e83575c97cd216124ee46def506f3d8cb317406を固定元に、HEAD/作業状態が違えば変更前停止する表示修正だけの配備手順を準備して正確なSSH承認を得る。まだ本番の表示修正は未配備/利用者画面未確認。校正依頼の送信/本人状況/窓口実受信の前回2点も未確認のまま保持し、先に今回UIの確認へ進む。新式一般公開は未承認。
+
+
+## 2026-11-10 表示修正の固定配備手順を準備（未配備）
+
+保存版7280253d0e64f565fc32528e2dedd96129782a2d。固定元は直前に配備成功した4e83575c97cd216124ee46def506f3d8cb317406、今回新たなSSH再読取はしていない。/tmp/quick-work-ui-deploy-20261110.shを準備、sh -n成功、SHA256 d1b96ea17f3823ead5d7a6658a05027ca6f5f15e3ee8e510d52054c0136b3085。storage/app/private/codex-quick-work-ui-deploy-20261110/へ同一コピー保管。
+
+手順は固定HEAD/main/追跡変更なし/既知未追跡5件/旧manifest51a14e...を検証してfetch。source12許可一覧/削除なし/database・routes・依存・設定等の不変/PHP2構文/新manifest484・515/members baseを照合してff-only。配備資産確認とview:clear、最終追跡/未追跡状態保持を確認する。DB照会/変更・migration/seed・校正試験通知は含まない。HEAD等が違えば変更前に停止し、勝手に最新コードを上書きしない。
+
+実行候補（まだ未承認）:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-work-ui-deploy-20261110.sh
+
+次の一手はこの正確なSSHの承認。配備後には、仕事・案件の限定統合メニュー、簡易詳細上部の日時/操作、校正モーダルを開いてキャンセルできることの今回表示確認を依頼する。校正送信/実受信2点はまだ未確認の別確認として保持。一般公開未承認、共有Claude作業未編集。
