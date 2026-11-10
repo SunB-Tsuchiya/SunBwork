@@ -46,9 +46,25 @@ const userRoleOptions = [
     { value: 'user',              label: 'ユーザー',           description: '基本機能のみアクセス可能' },
 ];
 
+// 選んだ会社がサンエー印刷（一般会社）か。サンエー印刷は、権限レベルが「管理者」「一般」の2種類で、見え方は所属部署のエリアで決まる
+const selectedCompany = computed(() => props.companies.find(c => String(c.id) === String(form.company_id)) ?? null);
+const isGeneralCompany = computed(() => selectedCompany.value?.company_type === 'general');
+const generalRoleOptions = [
+    { value: 'admin', label: '管理者', description: '管理者の画面と、自分の部署のエリアが使えます' },
+    { value: 'user',  label: '一般',   description: 'ユーザーの画面と、所属部署のエリア（総務・経理・営業）が使えます' },
+];
+
 const filteredRoleOptions = computed(() => {
-    if (currentUser.value?.user_role === 'superadmin') return userRoleOptions;
+    const isSuper = currentUser.value?.user_role === 'superadmin';
+    if (isGeneralCompany.value) return isSuper ? generalRoleOptions : generalRoleOptions.filter(o => o.value !== 'admin');
+    if (isSuper) return userRoleOptions;
     return userRoleOptions.filter(o => o.value !== 'admin');
+});
+
+// 選択欄の値。サンエー印刷で、以前のロール（クラーク・リーダーなど）のままのユーザーは「一般」として表示する（選び直さなければ保存してもロールは変わらない）
+const roleModel = computed({
+    get: () => (isGeneralCompany.value && form.user_role !== 'admin' ? 'user' : form.user_role),
+    set: (v) => { form.user_role = v; },
 });
 
 const selectedCompanyDepartments = computed(() => {
@@ -64,7 +80,8 @@ const availableAssignments = computed(() => {
     return dept.assignments.filter(a => a.active);
 });
 
-const availablePositionTitles = computed(() => props.positionTitles);
+// 役職称号: 全社共通のもの＋（サンエー印刷なら）サンエー印刷専用のもの（本部長・副本部長）
+const availablePositionTitles = computed(() => props.positionTitles.filter(t => !t.company_type || (isGeneralCompany.value && t.company_type === 'general')));
 
 watch(() => form.user_role,     () => { form.position_title_id = ''; });
 watch(() => form.company_id,    () => { form.department_id = ''; form.assignment_id = ''; });
@@ -183,15 +200,15 @@ const submit = () => {
                     <InputError class="mt-2" :message="form.errors.department_id" />
                 </div>
 
-                <!-- 担当 -->
-                <div class="mt-4">
+                <!-- 担当（サンエー印刷は使わない） -->
+                <div v-if="!isGeneralCompany" class="mt-4">
                     <InputLabel for="assignment_id" value="担当" />
                     <select
                         id="assignment_id"
                         v-model="form.assignment_id"
                         :disabled="!form.department_id"
                         class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                        required
+                        :required="!isGeneralCompany"
                     >
                         <option value="">-- 担当を選択してください --</option>
                         <option v-for="a in availableAssignments" :key="a.id" :value="a.id">
@@ -206,7 +223,7 @@ const submit = () => {
                     <InputLabel for="user_role" value="権限レベル" />
                     <select
                         id="user_role"
-                        v-model="form.user_role"
+                        v-model="roleModel"
                         class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                         required
                     >

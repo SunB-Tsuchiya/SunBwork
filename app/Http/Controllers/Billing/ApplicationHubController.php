@@ -25,7 +25,7 @@ class ApplicationHubController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        abort_unless(TransportCompany::isManager($user) || $user->isLeader(), 403);
+        abort_unless(TransportCompany::isManager($user) || (! \App\Support\SunA\Area::isGeneral($user) && $user->isLeader()), 403);
 
         $companyId = TransportCompany::manageScopeId($user);
         $company = $companyId ? Company::find($companyId) : null;
@@ -63,6 +63,10 @@ class ApplicationHubController extends Controller
     /** 経理か（general 会社の Clerk は所属部署名に「経理」を含む。Admin 以上は選択中の種別） */
     private function isKeiri($user): bool
     {
+        // サンエー印刷: 所属部署のエリア（SuperAdmin は選択中の種別）。それ以外は従来どおり
+        if (! $user->isSuperAdmin() && \App\Support\SunA\Area::isGeneral($user)) {
+            return \App\Support\SunA\Area::clerkKind($user) === \App\Support\SunA\Area::KEIRI;
+        }
         if ($user->isClerk()) {
             return str_contains((string) Department::find($user->department_id)?->name, '経理');
         }

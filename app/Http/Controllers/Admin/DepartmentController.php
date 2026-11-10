@@ -29,7 +29,7 @@ class DepartmentController extends Controller
         $departments = Department::where('company_id', $companyId)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'name', 'sort_order', 'active']);
+            ->get(['id', 'name', 'sort_order', 'active', 'area']);
 
         $teamMap = Team::where('company_id', $companyId)
             ->where('team_type', 'department')
@@ -42,7 +42,29 @@ class DepartmentController extends Controller
 
         return Inertia::render('Admin/Departments/Index', [
             'departments' => $departments,
+            // サンエー印刷（一般会社）だけ、部署ごとに「エリア」（総務/経理/営業）を設定する（SUNAROLE_PLAN1.md）
+            'isGeneral'   => \App\Models\Company::find($companyId)?->company_type === 'general',
+            'areaOptions' => \App\Support\SunA\Area::options(),
         ]);
+    }
+
+    /** 部署のエリア（総務/経理/営業/なし）を設定する。サンエー印刷（一般会社）の部署だけ */
+    public function updateArea(Request $request, Department $department)
+    {
+        $this->requireAdminPermission('team_management');
+        $companyId = $this->contextCompanyId() ?? Auth::user()->company_id;
+
+        if ($department->company_id !== $companyId) {
+            abort(403, 'この部署を変更する権限がありません');
+        }
+        abort_unless(\App\Models\Company::find($companyId)?->company_type === 'general', 422, 'エリアはサンエー印刷の部署だけに設定します。');
+
+        $validated = $request->validate([
+            'area' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\SunA\Area::all())],
+        ]);
+        $department->update(['area' => $validated['area'] ?? null]);
+
+        return back()->with('success', "「{$department->name}」のエリアを変更しました");
     }
 
     public function store(Request $request)

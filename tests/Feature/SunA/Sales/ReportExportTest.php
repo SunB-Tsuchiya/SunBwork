@@ -71,6 +71,7 @@ class ReportExportTest extends TestCase
     {
         $user = $this->saneiUser('user');
         ReportPermission::create(['user_id' => $user->id, 'enabled' => true, 'can_import' => false]);
+        $this->inSalesArea($user);
 
         return $user;
     }

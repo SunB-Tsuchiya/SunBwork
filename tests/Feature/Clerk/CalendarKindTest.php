@@ -36,8 +36,8 @@ class CalendarKindTest extends TestCase
         parent::setUp();
         $this->sanei = Company::create(['name' => 'サンエー_' . uniqid(), 'code' => 'SANEI_' . uniqid(), 'company_type' => 'general', 'active' => true]);
         $this->sunbrain = Company::create(['name' => 'SB_' . uniqid(), 'code' => 'SB_' . uniqid(), 'company_type' => 'sunbrain', 'active' => true]);
-        $this->soumuDept = Department::create(['company_id' => $this->sanei->id, 'name' => '総務部', 'code' => 'soumu_' . uniqid()]);
-        $this->keiriDept = Department::create(['company_id' => $this->sanei->id, 'name' => '経理部', 'code' => 'keiri_' . uniqid()]);
+        $this->soumuDept = Department::create(['company_id' => $this->sanei->id, 'name' => '総務部', 'code' => 'soumu_' . uniqid(), 'area' => 'soumu']);
+        $this->keiriDept = Department::create(['company_id' => $this->sanei->id, 'name' => '経理部', 'code' => 'keiri_' . uniqid(), 'area' => 'keiri']);
     }
 
     private function clerk(Department $dept, ?Company $company = null): User
@@ -77,11 +77,15 @@ class CalendarKindTest extends TestCase
         $this->assertSame('keiri', $this->kindFor($this->clerk($this->keiriDept)));
         // サン・ブレーンは、従来どおり（空文字）
         $this->assertSame('', $this->kindFor($this->sunbrainClerk()));
-        // Admin は、画面の総務/経理の切替（セッション）。既定は総務
-        $admin = User::factory()->create(['user_role' => 'admin', 'company_id' => $this->sanei->id]);
-        $this->assertSame('soumu', $this->kindFor($admin, ['clerk_kind' => null]));
-        $this->assertSame('keiri', $this->kindFor($admin, ['clerk_kind' => 'keiri']));
-        $this->assertSame('soumu', $this->kindFor($admin, ['clerk_kind' => 'bogus']));
+        // 管理者も、自分の部署のエリアだけ（切替はない）。エリアなしの一般は総務の扱い（入口の判定は別）
+        $adminKeiri = User::factory()->create(['user_role' => 'admin', 'company_id' => $this->sanei->id, 'department_id' => $this->keiriDept->id]);
+        $this->assertSame('keiri', $this->kindFor($adminKeiri, ['clerk_kind' => 'soumu']));
+        // SuperAdmin は、画面の総務/経理の切替（セッション）。既定は総務
+        $super = User::factory()->create(['user_role' => 'superadmin', 'company_id' => null]);
+        $ctx = ['superadmin_context' => ['company_id' => $this->sanei->id]];
+        $this->assertSame('soumu', $this->kindFor($super, $ctx + ['clerk_kind' => null]));
+        $this->assertSame('keiri', $this->kindFor($super, $ctx + ['clerk_kind' => 'keiri']));
+        $this->assertSame('soumu', $this->kindFor($super, $ctx + ['clerk_kind' => 'bogus']));
         // 未ログイン
         $this->assertSame('', $this->kindFor(null));
     }
@@ -109,15 +113,20 @@ class CalendarKindTest extends TestCase
         $this->actingAs($second)->putJson(route('clerk.calendar.events.update', ['event' => $soumuEventId]), ['title' => '更新後', 'starts_at' => '2026-11-10', 'all_day' => true])->assertOk();
     }
 
-    public function test_admin_sees_the_calendar_selected_by_the_soumu_keiri_switch()
+    public function test_superadmin_sees_the_calendar_selected_by_the_switch_and_admin_only_their_own_area()
     {
         $this->addEvent($this->clerk($this->soumuDept), '総務の予定');
         $this->addEvent($this->clerk($this->keiriDept), '経理の予定');
-        $admin = User::factory()->create(['user_role' => 'admin', 'company_id' => $this->sanei->id]);
+        $super = User::factory()->create(['user_role' => 'superadmin', 'company_id' => null]);
+        $this->withSession(['superadmin_context' => ['company_id' => $this->sanei->id]]);
 
-        $this->assertSame(['総務の予定'], $this->titles($admin));
+        $this->assertSame(['総務の予定'], $this->titles($super));
         $this->withSession(['clerk_kind' => 'keiri']);
-        $this->assertSame(['経理の予定'], $this->titles($admin));
+        $this->assertSame(['経理の予定'], $this->titles($super));
+
+        // 管理者は切替ができず、自分の部署のエリアのカレンダーだけ
+        $adminSoumu = User::factory()->create(['user_role' => 'admin', 'company_id' => $this->sanei->id, 'department_id' => $this->soumuDept->id]);
+        $this->assertSame(['総務の予定'], $this->titles($adminSoumu));
     }
 
     public function test_sunbrain_calendar_is_unchanged_company_wide_and_separate_from_sanei()

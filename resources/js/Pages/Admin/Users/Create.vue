@@ -102,7 +102,8 @@ function validateField(field) {
             else delete errors.value.department_id;
             break;
         case 'assignment_id':
-            if (!form.assignment_id) errors.value.assignment_id = validationMessages.assignment_id.required;
+            // サンエー印刷（一般会社）は担当を使わない
+            if (!isGeneralCompany.value && !form.assignment_id) errors.value.assignment_id = validationMessages.assignment_id.required;
             else delete errors.value.assignment_id;
             break;
         case 'user_role':
@@ -142,8 +143,12 @@ const availableAssignments = computed(() => {
     return department.assignments.filter(assignment => assignment.active);
 });
 
-// 選択中の user_role に応じて表示する役職称号
-const availablePositionTitles = computed(() => props.positionTitles);
+// 選んだ会社がサンエー印刷（一般会社）か。サンエー印刷は、権限レベルが「管理者」「一般」の2種類で、見え方は所属部署のエリアで決まる
+const selectedCompany = computed(() => props.companies.find(c => String(c.id) === String(form.company_id)) ?? null);
+const isGeneralCompany = computed(() => selectedCompany.value?.company_type === 'general');
+
+// 役職称号: 全社共通のもの＋（サンエー印刷なら）サンエー印刷専用のもの（本部長・副本部長）
+const availablePositionTitles = computed(() => props.positionTitles.filter(t => !t.company_type || (isGeneralCompany.value && t.company_type === 'general')));
 
 // user_role が変わったら役職称号をリセット
 watch(() => form.user_role, () => { form.position_title_id = ''; });
@@ -160,9 +165,22 @@ const userAssignmentOptions = [
 // 現在のユーザー情報を取得し、superadmin でなければ 'admin' オプションを非表示にする
 const page = usePage();
 const currentUser = computed(() => page.props.user || null);
+const generalRoleOptions = [
+    { value: 'admin', label: '管理者',  description: '管理者の画面と、自分の部署のエリアが使えます' },
+    { value: 'user',  label: '一般',    description: 'ユーザーの画面と、所属部署のエリア（総務・経理・営業）が使えます' },
+];
 const userAssignmentOptionsFiltered = computed(() => {
-    if (currentUser.value && currentUser.value.user_role === 'superadmin') return userAssignmentOptions;
+    const isSuper = currentUser.value && currentUser.value.user_role === 'superadmin';
+    if (isGeneralCompany.value) return isSuper ? generalRoleOptions : generalRoleOptions.filter(o => o.value !== 'admin');
+    if (isSuper) return userAssignmentOptions;
     return userAssignmentOptions.filter(o => o.value !== 'admin');
+});
+// 会社を切り替えて、選べない権限レベルになったら「ユーザー」に戻す
+watch(isGeneralCompany, () => {
+    form.assignment_id = '';
+    delete errors.value.assignment_id;
+    if (!userAssignmentOptionsFiltered.value.some(o => o.value === form.user_role)) form.user_role = 'user';
+    form.position_title_id = '';
 });
 
 const onCompanyChange = () => {
@@ -329,7 +347,7 @@ const submit = () => {
                         <InputError class="mt-2" :message="errors.department_id || form.errors.department_id" />
                     </div>
 
-                    <div class="mt-4">
+                    <div v-if="!isGeneralCompany" class="mt-4">
                         <InputLabel for="assignment_id" value="担当" />
                         <select
                             id="assignment_id"

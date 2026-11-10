@@ -94,7 +94,7 @@ class UserController extends Controller
             $q->where('active', true);
         }])->where('active', true)->ordered()->get();
 
-        $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
+        $positionTitles = $this->positionTitlesWithCompanyType();
 
         return Inertia::render('Admin/Users/Create', [
             'companies'      => $companies,
@@ -116,11 +116,13 @@ class UserController extends Controller
         }
 
         try {
+            $this->assertGeneralCompanyRules($request, null);
             $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|lowercase|email|max:255|unique:users|email',
                 'password' => ['required', 'confirmed', Rules\Password::defaults()],
-                'assignment_id' => 'required|exists:assignments,id',
+                // サンエー印刷（一般会社）は担当を使わない
+                'assignment_id' => [\App\Models\Company::find($request->input('company_id'))?->company_type === 'general' ? 'nullable' : 'required', 'exists:assignments,id'],
                 'user_role' => [
                     'required',
                     function($attribute, $value, $fail) {
@@ -219,7 +221,7 @@ class UserController extends Controller
             }]);
         }])->where('active', true)->ordered()->get();
 
-        $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
+        $positionTitles = $this->positionTitlesWithCompanyType();
 
         return Inertia::render('Admin/Users/Edit', [
             'user'           => $user,
@@ -248,7 +250,8 @@ class UserController extends Controller
             'user_role'   => 'required|string|in:admin,leader,coordinator,proof_coordinator,clerk,user',
             'company_id'  => 'required|exists:companies,id',
             'department_id' => 'required|exists:departments,id',
-            'assignment_id' => 'required|exists:assignments,id',
+            // サンエー印刷（一般会社）は担当を使わない
+            'assignment_id' => [\App\Models\Company::find($request->input('company_id'))?->company_type === 'general' ? 'nullable' : 'required', 'exists:assignments,id'],
             'employment_type' => 'nullable|string|in:regular,contract,dispatch,outsource',
             'position_title_id' => 'nullable|exists:position_titles,id',
         ];
@@ -259,6 +262,7 @@ class UserController extends Controller
         }
 
         $request->validate($rules);
+        $this->assertGeneralCompanyRules($request, $user);
 
         $updateData = [
             'name'              => $request->name,
@@ -892,5 +896,37 @@ class UserController extends Controller
 
         // 無効なユーザー権限
         return ['error' => "無効なユーザー権限: {$userRole}"];
+    }
+
+    /** 役職の一覧（サンエー印刷専用のものを含む）。画面で、選んだ会社のタイプに合わせて絞る */
+    private function positionTitlesWithCompanyType()
+    {
+        return PositionTitle::withoutGlobalScope('common_only')->orderBy('sort_order')->orderBy('id')->get(['id', 'name', 'company_type']);
+    }
+
+    /**
+     * サンエー印刷（一般会社）のユーザー登録の規則（SUNAROLE_PLAN1.md）。
+     *  - 権限レベルは「管理者」「一般（user）」だけ。既存のユーザーが元のロール（クラークなど）のまま保存するのは許す
+     *  - サンエー印刷専用の役職（本部長・副本部長）は、一般会社のユーザーだけに付けられる
+     */
+    private function assertGeneralCompanyRules(Request $request, ?User $existing): void
+    {
+        $isGeneral = \App\Models\Company::find($request->input('company_id'))?->company_type === 'general';
+
+        if ($isGeneral) {
+            $role = $request->input('user_role');
+            $unchanged = $existing !== null && $existing->user_role === $role;
+            if (! in_array($role, ['admin', 'user'], true) && ! $unchanged) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['user_role' => 'サンエー印刷の権限レベルは「管理者」か「一般」を選んでください。']);
+            }
+        }
+
+        $titleId = $request->input('position_title_id');
+        if ($titleId) {
+            $titleType = PositionTitle::withoutGlobalScope('common_only')->where('id', $titleId)->value('company_type');
+            if ($titleType !== null && $titleType !== ($isGeneral ? 'general' : null)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['position_title_id' => 'この役職は、選んだ会社では使えません。']);
+            }
+        }
     }
 }

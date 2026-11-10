@@ -48,6 +48,7 @@ class RegistrationStatusTest extends TestCase
     {
         $user = $this->saneiUser('user');
         ReportPermission::create(['user_id' => $user->id, 'enabled' => true, 'can_import' => false]);
+        $this->inSalesArea($user);
 
         return $user;
     }
@@ -125,6 +126,7 @@ class RegistrationStatusTest extends TestCase
         $sunbrain = Company::create(['name' => 'SB_' . uniqid(), 'code' => 'SB_' . uniqid(), 'company_type' => 'sunbrain', 'active' => true]);
         $sbUser = User::factory()->create(['user_role' => 'user', 'company_id' => $sunbrain->id]);
         ReportPermission::create(['user_id' => $sbUser->id, 'enabled' => true, 'can_import' => true]);
+        $this->inSalesArea($sbUser);
         $this->actingAs($sbUser)->get(route('suna.sales.report.index'))->assertForbidden();
         $this->actingAs($sbUser)->getJson(route('suna.sales.report.api.registration_status'))->assertForbidden();
     }

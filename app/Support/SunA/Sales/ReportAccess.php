@@ -5,6 +5,7 @@ namespace App\Support\SunA\Sales;
 use App\Models\SunA\Sales\ReportPermission;
 use App\Models\User;
 use App\Services\SunA\Sales\SunaCompanyContext;
+use App\Support\SunA\Area;
 
 /**
  * サンエー印刷 売上レポートの利用権限の判定。
@@ -58,6 +59,11 @@ class ReportAccess
         }
         if ($user->isSuperAdmin()) {
             return true;
+        }
+
+        // サンエー印刷: 営業エリアの部署の人だけ（管理者も同じ。SUNAROLE_PLAN1.md）。そのうえで、個別に許可された人だけ
+        if (! Area::canEnter($user, Area::SALES)) {
+            return false;
         }
 
         $permission = ReportPermission::where('user_id', $user->id)->first();

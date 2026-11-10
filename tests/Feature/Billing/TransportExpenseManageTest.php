@@ -146,6 +146,8 @@ class TransportExpenseManageTest extends TestCase
     {
         $clerkSb = $this->user('clerk', $this->sb);
         $clerkSanei = $this->user('clerk', $this->sanei);
+        // サンエー印刷は所属部署のエリア（総務）で総務・経理の画面に入る
+        $clerkSanei->update(['department_id' => Department::create(['company_id' => $this->sanei->id, 'name' => '総務部', 'code' => 'SOUMU' . uniqid(), 'sort_order' => 1, 'active' => true, 'area' => 'soumu'])->id]);
         [, $e] = $this->submitted($this->sb);
 
         $this->actingAs($clerkSanei)->get(route('clerk.billing.transport.show', ['expense' => $e->id]))->assertStatus(403);
@@ -213,8 +215,8 @@ class TransportExpenseManageTest extends TestCase
     public function test_申請ハブ_全Clerkに交通費が出て_年末調整などはサンエーの総務だけ(): void
     {
         ApplicationType::create(['company_id' => $this->sanei->id, 'created_by' => $this->user('admin', $this->sanei)->id, 'name' => '年末調整', 'feature_key' => 'nencho', 'sort_order' => 1, 'is_active' => true]);
-        $deptSoumu = Department::create(['company_id' => $this->sanei->id, 'name' => '総務部', 'code' => 'SOUMU', 'sort_order' => 1, 'active' => true]);
-        $deptKeiri = Department::create(['company_id' => $this->sanei->id, 'name' => '経理部', 'code' => 'KEIRI', 'sort_order' => 2, 'active' => true]);
+        $deptSoumu = Department::create(['company_id' => $this->sanei->id, 'name' => '総務部', 'code' => 'SOUMU', 'sort_order' => 1, 'active' => true, 'area' => 'soumu']);
+        $deptKeiri = Department::create(['company_id' => $this->sanei->id, 'name' => '経理部', 'code' => 'KEIRI', 'sort_order' => 2, 'active' => true, 'area' => 'keiri']);
 
         $clerkSb = $this->user('clerk', $this->sb);
         $soumu = User::factory()->create(['user_role' => 'clerk', 'company_id' => $this->sanei->id, 'department_id' => $deptSoumu->id]);

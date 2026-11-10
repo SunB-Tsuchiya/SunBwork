@@ -123,6 +123,10 @@ const switchClass = (on) => ['relative inline-flex h-5 w-9 shrink-0 cursor-point
                 Admin（名前の横にバッジ）も、スイッチで決めます（自分にも許可を付けられます）。SuperAdmin は、開発・確認のため、設定に関わらず常に使えます。
                 変更したら、「保存する」を押してください。
             </p>
+            <p class="mb-4 rounded bg-amber-50 p-3 text-xs text-amber-800">
+                売上レポートを使えるのは、<b>部署のエリアが「営業」の部署に所属している人で、ここで許可された人</b>だけです（管理者も同じ）。
+                営業以外の部署の人に許可を付けても、その人は売上レポートを開けません（部署のエリアは、管理者の「部署管理」で設定します）。
+            </p>
 
             <!-- 部署の絞り込み -->
             <div v-if="departments.length" class="mb-2 flex flex-wrap gap-2">

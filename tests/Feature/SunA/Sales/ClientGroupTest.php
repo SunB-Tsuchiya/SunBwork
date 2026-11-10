@@ -77,6 +77,7 @@ class ClientGroupTest extends TestCase
     {
         $user = $this->saneiUser('user');
         ReportPermission::create(['user_id' => $user->id, 'enabled' => true, 'can_import' => $canImport]);
+        $this->inSalesArea($user);
 
         return $user;
     }
@@ -275,6 +276,7 @@ class ClientGroupTest extends TestCase
         $this->seedData($this->otherSaneiCompanyId);
         $other = $this->saneiUser('user', ['company_id' => $this->otherSaneiCompanyId]);
         ReportPermission::create(['user_id' => $other->id, 'enabled' => true, 'can_import' => true]);
+        $this->inSalesArea($other);
         $this->withSession(['superadmin_context' => ['company_id' => $this->otherSaneiCompanyId]]);
         $this->createGroup($other)->assertStatus(201);
         $this->withSession(['superadmin_context' => ['company_id' => $this->saneiCompanyId]]);

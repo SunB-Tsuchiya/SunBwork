@@ -6,7 +6,14 @@ import { router, useForm } from '@inertiajs/vue3';
 
 defineProps({
     departments: { type: Array, default: () => [] },
+    isGeneral: { type: Boolean, default: false },
+    areaOptions: { type: Array, default: () => [] },
 });
+
+// サンエー印刷: 部署のエリア（総務/経理/営業/なし）。変更するとすぐ保存する
+function changeArea(dept, area) {
+    router.post(route('admin.departments.area.update', { department: dept.id }), { area: area || null }, { preserveScroll: true });
+}
 
 const showForm = ref(false);
 const form = useForm({ name: '' });
@@ -127,6 +134,9 @@ async function handleDelete(dept) {
         </div>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+            <p v-if="isGeneral" class="mb-3 text-xs text-gray-500">
+                「エリア」は、その部署の人が使える総務・経理・営業のエリアです。「なし」の部署の人は、ユーザーの画面だけを使います。
+            </p>
             <div v-if="departments.length === 0" class="py-8 text-center text-gray-500">
                 部署が登録されていません。
             </div>
@@ -136,6 +146,7 @@ async function handleDelete(dept) {
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署名</th>
+                            <th v-if="isGeneral" class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">エリア</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">チーム</th>
                             <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
                         </tr>
@@ -143,6 +154,12 @@ async function handleDelete(dept) {
                     <tbody class="divide-y divide-gray-200 bg-white">
                         <tr v-for="dept in departments" :key="dept.id" class="hover:bg-gray-50">
                             <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{{ dept.name }}</td>
+                            <td v-if="isGeneral" class="whitespace-nowrap px-4 py-3 text-sm">
+                                <select :value="dept.area ?? ''" class="rounded border-gray-300 py-1 text-sm" @change="changeArea(dept, $event.target.value)">
+                                    <option value="">なし</option>
+                                    <option v-for="o in areaOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+                                </select>
+                            </td>
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                                 <span v-if="dept.team_id" class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
                                     チームあり

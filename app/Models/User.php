@@ -324,7 +324,8 @@ class User extends Authenticatable
      */
     public function positionTitle()
     {
-        return $this->belongsTo(\App\Models\PositionTitle::class);
+        // サンエー印刷専用の役職（本部長・副本部長）も取得できるよう、共通役職だけに絞る既定の絞り込みを外す
+        return $this->belongsTo(\App\Models\PositionTitle::class)->withoutGlobalScope('common_only');
     }
 
     /**

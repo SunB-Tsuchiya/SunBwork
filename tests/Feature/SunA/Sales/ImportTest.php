@@ -45,6 +45,7 @@ class ImportTest extends TestCase
     {
         $user = $this->saneiUser('user');
         ReportPermission::create(['user_id' => $user->id, 'enabled' => true, 'can_import' => true]);
+        $this->inSalesArea($user);
 
         return $user;
     }
@@ -295,6 +296,7 @@ class ImportTest extends TestCase
         // 別会社の担当者として取り込む（部門マスタ・データは会社ごと）
         $otherUser = User::factory()->create(['user_role' => 'user', 'company_id' => $this->otherSaneiCompanyId]);
         ReportPermission::create(['user_id' => $otherUser->id, 'enabled' => true, 'can_import' => true]);
+        $this->inSalesArea($otherUser);
         $this->importRows($otherUser, [$this->row('テスト得意先001', 2025, '営業第二部', [1 => [999.0, 9]])]);
 
         $mine = $this->facts($this->saneiCompanyId);
@@ -309,6 +311,7 @@ class ImportTest extends TestCase
     {
         $viewer = $this->saneiUser('user');
         ReportPermission::create(['user_id' => $viewer->id, 'enabled' => true, 'can_import' => false]);
+        $this->inSalesArea($viewer);
         $noAccess = $this->saneiUser('user');
         $super = User::factory()->create(['user_role' => 'superadmin']);
 

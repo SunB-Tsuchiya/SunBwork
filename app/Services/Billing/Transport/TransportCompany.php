@@ -50,6 +50,11 @@ class TransportCompany
     /** 総務・経理（Clerk）・Admin・SuperAdmin か（交通費の受理などの管理操作ができる人） */
     public static function isManager(User $user): bool
     {
+        // サンエー印刷（一般会社）: 総務・経理のエリアの人（管理者も自分のエリアだけ）。それ以外は従来どおり
+        if (\App\Support\SunA\Area::isGeneral($user)) {
+            return \App\Support\SunA\Area::canEnterClerk($user);
+        }
+
         return $user->isClerk() || $user->isAdmin() || $user->isSuperAdmin();
     }
 

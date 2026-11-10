@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\SunA\Sales\SunaCompanyContext;
+use App\Support\SunA\Area;
 use App\Support\SunA\Sales\ReportAccess;
 use Closure;
 use Illuminate\Http\Request;
@@ -26,7 +27,10 @@ class SunASalesReportAccess
             default => ReportAccess::canView($user),
         };
         if (! $allowed) {
-            abort(403, 'この機能を利用する権限がありません。');
+            // 営業エリアの人には、許可が必要なことを案内する（それ以外の人は、営業エリアではないことを案内する）
+            abort(403, Area::canEnter($user, Area::SALES) && ReportAccess::inEligibleCompany($user)
+                ? '売上レポートを見るには、管理者の許可が必要です。必要な場合は、管理者に相談してください。'
+                : 'この機能を利用する権限がありません。売上レポートは、営業の部署の人で、許可された人だけが利用できます。');
         }
 
         SunaCompanyContext::set((int) ReportAccess::companyIdFor($user));

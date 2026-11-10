@@ -675,16 +675,17 @@ function navigateToRole(role) {
                                 v-if="['superadmin', 'admin'].includes($page.props.auth.user.user_role)"
                                 type="button" @click="navigateToRole('admin')" :class="roleNavClass('admin')"
                             >管理者</button>
-                            <template v-if="['superadmin', 'admin'].includes($page.props.auth.user.user_role)">
+                            <!-- サンエー印刷: 総務・経理・営業は、所属部署のエリアで決まる（管理者も自分のエリアだけ。SuperAdmin は全部） -->
+                            <template v-if="$page.props.auth.user.user_role === 'superadmin'">
                                 <button type="button" @click="navigateToRole('soumu')" :class="roleNavClass('soumu')">総務</button>
                                 <button type="button" @click="navigateToRole('keiri')" :class="roleNavClass('keiri')">経理</button>
                             </template>
                             <button
-                                v-else-if="$page.props.auth.user.user_role === 'clerk'"
+                                v-else-if="$page.props.auth.sunaCanEnterClerk && clerkKind"
                                 type="button" @click="navigateToRole(clerkKind)" :class="roleNavClass(clerkKind)"
                             >{{ clerkKind === 'keiri' ? '経理' : '総務' }}</button>
-                            <!-- 営業（売上レポート）。経理の後・ユーザーの前。管理者が許可した人（と SuperAdmin）だけに出す -->
-                            <button v-if="$page.props.auth.salesReportAccess" type="button" @click="navigateToRole('sales')" :class="roleNavClass('sales')">営業</button>
+                            <!-- 営業（売上レポート）。経理の後・ユーザーの前。営業エリアの部署の人（と SuperAdmin）に出す。中の売上レポートは許可された人だけ -->
+                            <button v-if="$page.props.auth.sunaCanEnterSales" type="button" @click="navigateToRole('sales')" :class="roleNavClass('sales')">営業</button>
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">ユーザー</button>
                         </template>
 
@@ -783,7 +784,7 @@ function navigateToRole(role) {
                             >
                                 <span class="text-red-600">管理者 Dashboard</span>
                             </ResponsiveNavLink>
-                            <template v-if="['superadmin', 'admin'].includes($page.props.auth.user.user_role)">
+                            <template v-if="$page.props.auth.user.user_role === 'superadmin'">
                                 <ResponsiveNavLink :href="route('clerk.dashboard', { kind: 'soumu' })" :active="route().current('clerk.*') && clerkKind === 'soumu'">
                                     <span class="text-purple-600">総務 Dashboard</span>
                                 </ResponsiveNavLink>
@@ -792,12 +793,12 @@ function navigateToRole(role) {
                                 </ResponsiveNavLink>
                             </template>
                             <ResponsiveNavLink
-                                v-else-if="$page.props.auth.user.user_role === 'clerk'"
+                                v-else-if="$page.props.auth.sunaCanEnterClerk && clerkKind"
                                 :href="route('clerk.dashboard')" :active="route().current('clerk.dashboard')"
                             >
                                 <span :class="clerkKind === 'keiri' ? 'text-teal-600' : 'text-purple-600'">{{ clerkKind === 'keiri' ? '経理' : '総務' }} Dashboard</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink v-if="$page.props.auth.salesReportAccess" :href="route('suna.sales.dashboard')" :active="route().current('suna.sales.*')">
+                            <ResponsiveNavLink v-if="$page.props.auth.sunaCanEnterSales" :href="route('suna.sales.dashboard')" :active="route().current('suna.sales.*')">
                                 <span class="text-indigo-600">営業 Dashboard</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">

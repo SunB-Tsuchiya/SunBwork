@@ -109,11 +109,6 @@ class HandleInertiaRequests extends Middleware
             // セッション移行（login() / regenerate()）後も soft navigation で
             // meta[name="csrf-token"] が更新されるよう AppLayout が参照している。
             'csrf_token' => csrf_token(),
-            // Trial navigation must remain shared alongside Clerk/SunA props.
-            'userWorkHub' => fn () => $request->user() && $contextCompany
-                && (int) $contextCompany->id === (int) $request->user()->company_id
-                    ? app(\App\Services\UserWorkHub::class)->navigation($request->user())
-                    : ['enabled' => false, 'unregisteredRequests' => 0],
             // クラーク系カレンダーのルート名の接頭辞。営業のカレンダー（suna.sales.*）だけ 'suna.sales'、それ以外は 'clerk'
             'clerkCalendarRoutePrefix' => $request->routeIs('suna.sales.*') ? 'suna.sales' : 'clerk',
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
@@ -157,10 +152,11 @@ class HandleInertiaRequests extends Middleware
                     if (! $u || $contextCompany?->company_type !== 'general') {
                         return null;
                     }
-                    if ($u->isClerk()) {
-                        return str_contains((string) \App\Models\Department::find($u->department_id)?->name, '経理') ? 'keiri' : 'soumu';
+                    // サンエー印刷: SuperAdmin 以外は所属部署のエリア（総務/経理）。エリアが総務・経理でなければ null
+                    if (! $u->isSuperAdmin()) {
+                        return \App\Support\SunA\Area::clerkKind($u);
                     }
-                    if ($u->isSuperAdmin() || $u->isAdmin()) {
+                    if ($u->isSuperAdmin()) {
                         $kind = $request->query('kind');
                         if (in_array($kind, ['soumu', 'keiri'], true)) {
                             session(['clerk_kind' => $kind]);
@@ -194,13 +190,18 @@ class HandleInertiaRequests extends Middleware
                     if (! $u) {
                         return null;
                     }
-                    if (! $u->isSuperAdmin() && ! ($contextCompany?->company_type === 'general' && ($u->isAdmin() || $u->isClerk()))) {
+                    // サンエー印刷は所属部署のエリアが総務・経理の人（StaffAccess が判定）。それ以外の会社は従来どおり
+                    if (! $u->isSuperAdmin() && ! ($contextCompany?->company_type === 'general' && \App\Support\SunA\Area::canEnterClerk($u))) {
                         return null;
                     }
 
                     return \App\Support\SunA\GeneralAffairs\StaffAccess::for($u)->toArray();
                 })(),
                 // サンエー印刷 売上レポート（営業）: 見られる人／取込できる人（general のときだけ計算。ロール行の「営業」ボタンの表示に使う）
+                // サンエー印刷: 自分のエリア（soumu/keiri/sales。SuperAdmin・エリアなしは null）と、各エリアに入れるか（ロール行のボタン表示に使う）
+                'sunaArea' => $contextCompany?->company_type === 'general' && $request->user() ? \App\Support\SunA\Area::of($request->user()) : null,
+                'sunaCanEnterSales' => $contextCompany?->company_type === 'general' && \App\Support\SunA\Area::canEnter($request->user(), \App\Support\SunA\Area::SALES),
+                'sunaCanEnterClerk' => $contextCompany?->company_type === 'general' && \App\Support\SunA\Area::canEnterClerk($request->user()),
                 'salesReportAccess' => $contextCompany?->company_type === 'general' && \App\Support\SunA\Sales\ReportAccess::canView($request->user()),
                 'salesReportCanImport' => $contextCompany?->company_type === 'general' && \App\Support\SunA\Sales\ReportAccess::canImport($request->user()),
                 // Admin 権限（admin ロール時のみ取得、それ以外は null）
@@ -243,8 +244,6 @@ class HandleInertiaRequests extends Middleware
 
                     return false;
                 })(),
-                // 分類管理は従来の会社・部署・ロール判定を維持する。
-                'canManageBroadProjects' => app(\App\Services\BroadProjectTree::class)->canManage($request->user()),
                 // ポートフォリオ機能へのアクセス権（SB専用。SuperAdmin・SBのAdminは常時可、他は個人許可がオンの場合のみ。サンエー印刷は不可）
                 'canAccessPortfolio' => $request->user() ? \App\Services\Portfolio\PortfolioAccess::canUse($request->user()) : false,
                 'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()

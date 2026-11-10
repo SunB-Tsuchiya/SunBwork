@@ -407,7 +407,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::post('/myjobbox/unified-preview', [\App\Http\Controllers\User\UnifiedMyJobBoxController::class, 'store'])->name('user.myjobbox.unified_store');
     Route::post('/myjobbox/work-assignments/{assignment}/continue', [\App\Http\Controllers\User\WorkJobDetailController::class, 'continueAssignment'])->whereNumber('assignment')->name('user.myjobbox.work_assignments.continue');
     Route::post('/myjobbox/work-entries/{entry}/continue', [\App\Http\Controllers\User\WorkJobDetailController::class, 'continueEntry'])->whereNumber('entry')->name('user.myjobbox.entries.continue');
-    Route::post('/myjobbox/work-entries/{entry}/proof-request', [\App\Http\Controllers\User\WorkJobDetailController::class, 'requestProof'])->whereNumber('entry')->name('user.myjobbox.entries.proof_request');
     Route::post('/myjobbox/work-entries/{entry}/complete', [\App\Http\Controllers\User\WorkJobDetailController::class, 'complete'])->whereNumber('entry')->name('user.myjobbox.entries.complete');
     Route::put('/myjobbox/work-entries/{entry}/details', [\App\Http\Controllers\User\WorkJobDetailController::class, 'saveDetails'])->whereNumber('entry')->name('user.myjobbox.entries.details');
     Route::get('/myjobbox/work-entries/{entry}', [\App\Http\Controllers\User\WorkJobDetailController::class, 'show'])->whereNumber('entry')->name('user.myjobbox.entries.show');
@@ -686,6 +685,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // 部署管理（Admin用 — SuperAdmin作成の部署も含む）
         Route::get('departments', [App\Http\Controllers\Admin\DepartmentController::class, 'index'])->name('departments.index');
         Route::post('departments', [App\Http\Controllers\Admin\DepartmentController::class, 'store'])->name('departments.store');
+        Route::post('departments/{department}/area', [App\Http\Controllers\Admin\DepartmentController::class, 'updateArea'])->name('departments.area.update');
         Route::post('departments/{department}/create-team', [App\Http\Controllers\Admin\DepartmentController::class, 'createTeam'])->name('departments.create_team');
         Route::delete('departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'destroy'])->name('departments.destroy');
         // 部署フィールド設定

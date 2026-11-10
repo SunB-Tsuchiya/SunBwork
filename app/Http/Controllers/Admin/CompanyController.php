@@ -123,7 +123,8 @@ class CompanyController extends Controller
             if ($department) {
                 $department->update(['name' => $depData['name']]);
             } else {
-                $department = $company->departments()->create(['name' => $depData['name']]);
+                // code は必須（会社内で一意）。画面からの追加では自動で付ける
+                $department = $company->departments()->create(['name' => $depData['name'], 'code' => 'DEPT_' . substr(uniqid(), -8)]);
             }
 
             // 担当（役割）の更新・追加
@@ -132,7 +133,8 @@ class CompanyController extends Controller
                 if ($assignments) {
                     $assignments->update(['name' => $assignmentsData['name']]);
                 } else {
-                    $department->assignments()->create(['name' => $assignmentsData['name']]);
+                    // code は必須（部署内で一意）。画面からの追加では自動で付ける
+                    $department->assignments()->create(['name' => $assignmentsData['name'], 'code' => 'ASG_' . substr(uniqid(), -8)]);
                 }
             }
         }

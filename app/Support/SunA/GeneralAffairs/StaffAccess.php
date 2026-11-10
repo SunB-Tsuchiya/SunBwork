@@ -4,12 +4,15 @@ namespace App\Support\SunA\GeneralAffairs;
 
 use App\Models\SunA\GeneralAffairs\Nencho\StaffPermission;
 use App\Models\User;
+use App\Support\SunA\Area;
 
 /**
  * 総務の社員情報・年末調整の権限判定。
  *  - SuperAdmin・管理者(admin): 社員情報（一般項目）の閲覧・編集と年末調整の管理は常に可。**マイナンバーだけは権限（can_view_my_number）が必要**
  *  - 総務・経理(clerk): 権限が未設定なら何も見られない（初期値オフ）
  *  - それ以外のロール: すべて不可
+ *  - サンエー印刷（一般会社）では、ロールではなく所属部署のエリア（総務・経理）で決める。管理者も自分のエリアが総務・経理のときだけ
+ *    （SUNAROLE_PLAN1.md）。エリアの人（一般）は、権限が未設定なら何も見られない
  */
 class StaffAccess
 {
@@ -29,7 +32,20 @@ class StaffAccess
         $perm = StaffPermission::where('user_id', $user->id)->first();
         $myNumber = (bool) $perm?->can_view_my_number;
 
-        if ($user->isSuperAdmin() || $user->isAdmin()) {
+        if ($user->isSuperAdmin()) {
+            return new self(true, true, $myNumber, true);
+        }
+        if (Area::isGeneral($user)) {
+            if (! Area::canEnterClerk($user)) {
+                return new self();
+            }
+            if ($user->isAdmin()) {
+                return new self(true, true, $myNumber, true);
+            }
+
+            return new self((bool) $perm?->can_view_employees, (bool) $perm?->can_edit_employees, $myNumber, (bool) $perm?->can_manage_nencho);
+        }
+        if ($user->isAdmin()) {
             return new self(true, true, $myNumber, true);
         }
         if ($user->isClerk()) {

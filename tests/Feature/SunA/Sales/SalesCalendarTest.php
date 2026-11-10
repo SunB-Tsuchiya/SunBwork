@@ -31,6 +31,7 @@ class SalesCalendarTest extends TestCase
     {
         $user = $this->saneiUser('user');
         ReportPermission::create(['user_id' => $user->id, 'enabled' => true, 'can_import' => false]);
+        $this->inSalesArea($user);
 
         return $user;
     }
@@ -45,7 +46,7 @@ class SalesCalendarTest extends TestCase
         $this->assertSame(['営業会議'], $titles);
 
         // 総務のカレンダーには出ない
-        $soumu = $this->saneiUser('clerk');
+        $soumu = $this->inArea($this->saneiUser('clerk'), 'soumu');
         $this->actingAs($soumu)->getJson(route('clerk.calendar.events.index', ['year' => 2026]))->assertOk()->assertJsonCount(0);
         $this->actingAs($soumu)->deleteJson(route('clerk.calendar.events.destroy', ['event' => $id]))->assertNotFound();
 
@@ -70,7 +71,7 @@ class SalesCalendarTest extends TestCase
         $this->actingAs($this->saneiUser('user'))->get(route('suna.sales.dashboard'))->assertForbidden();
 
         // 総務のカレンダーは従来の接頭辞のまま
-        $this->actingAs($this->saneiUser('clerk'))->get(route('clerk.calendar'))
+        $this->actingAs($this->inArea($this->saneiUser('clerk'), 'soumu'))->get(route('clerk.calendar'))
             ->assertOk()->assertInertia(fn ($p) => $p->where('clerkCalendarRoutePrefix', 'clerk'));
     }
 }

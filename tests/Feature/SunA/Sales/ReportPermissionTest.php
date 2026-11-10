@@ -108,6 +108,7 @@ class ReportPermissionTest extends TestCase
         $a = $this->saneiUser('user');
         $other = User::factory()->create(['user_role' => 'user', 'company_id' => $this->otherSaneiCompanyId]);
         ReportPermission::create(['user_id' => $a->id, 'enabled' => true, 'can_import' => false, 'granted_by' => 999, 'granted_at' => now()->subDay()]);
+        $this->inSalesArea($a);
 
         $response = $this->actingAs($admin)->putJson($this->url('update'), ['items' => [
             ['user_id' => $a->id, 'enabled' => true, 'can_import' => false],     // 変更なし
@@ -152,11 +153,13 @@ class ReportPermissionTest extends TestCase
         $this->assertTrue(ReportAccess::canImport($super));
 
         ReportPermission::create(['user_id' => $user->id, 'enabled' => true, 'can_import' => false]);
+        $this->inSalesArea($user);
         $this->assertTrue(ReportAccess::canView($user));
         $this->assertFalse(ReportAccess::canImport($user));
 
         // 閲覧OFFで取込ONの行があっても、取込は不可（取込は閲覧が前提）
         ReportPermission::create(['user_id' => $admin->id, 'enabled' => false, 'can_import' => true]);
+        $this->inSalesArea($admin);
         $this->assertFalse(ReportAccess::canView($admin));
         $this->assertFalse(ReportAccess::canImport($admin));
 
@@ -171,6 +174,7 @@ class ReportPermissionTest extends TestCase
     {
         $sunbrainUser = $this->sunbrainAdmin();
         ReportPermission::create(['user_id' => $sunbrainUser->id, 'enabled' => true, 'can_import' => true]);
+        $this->inSalesArea($sunbrainUser);
 
         $this->assertFalse(ReportAccess::canView($sunbrainUser));
         $this->assertFalse(ReportAccess::canImport($sunbrainUser));

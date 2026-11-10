@@ -3,6 +3,7 @@
 namespace Tests\Concerns;
 
 use App\Models\Company;
+use App\Models\Department;
 use App\Models\User;
 use App\Services\SunA\Sales\SunaCompanyContext;
 
@@ -29,6 +30,39 @@ trait SetsUpSunaSales
         SunaCompanyContext::clear();
         // SuperAdmin の会社切替は、サンエー印刷に向ける
         $this->withSession(['superadmin_context' => ['company_id' => $this->saneiCompanyId]]);
+    }
+
+    /** @var array<string,int> "会社ID:エリア" → 部署ID */
+    private array $areaDepartmentIds = [];
+
+    /** その会社の、指定したエリア（soumu/keiri/sales）の部署（SUNAROLE_PLAN1.md）。なければ作る */
+    protected function areaDepartmentId(string $area, ?int $companyId = null): int
+    {
+        $companyId ??= $this->saneiCompanyId;
+        $names = ['soumu' => '総務部', 'keiri' => '経理部', 'sales' => '営業部'];
+
+        return $this->areaDepartmentIds["{$companyId}:{$area}"] ??= Department::create([
+            'company_id' => $companyId, 'name' => $names[$area], 'code' => "{$area}_" . uniqid(), 'area' => $area, 'active' => true,
+        ])->id;
+    }
+
+    protected function salesDepartmentId(?int $companyId = null): int
+    {
+        return $this->areaDepartmentId('sales', $companyId);
+    }
+
+    /** 指定したエリアの部署に所属させる */
+    protected function inArea(User $user, string $area): User
+    {
+        $user->update(['department_id' => $this->areaDepartmentId($area, $user->company_id)]);
+
+        return $user;
+    }
+
+    /** 営業エリアの部署に所属させる（売上レポートを開ける前提） */
+    protected function inSalesArea(User $user): User
+    {
+        return $this->inArea($user, 'sales');
     }
 
     protected function tearDownSunaSales(): void

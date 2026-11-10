@@ -78,7 +78,12 @@ class DashboardController extends Controller
             // 一般会社（サンエー印刷等）の Leader/Coordinator/ProofCoordinator は専用エリアが無いため User ダッシュボードへ
             if ($user->company?->company_type === 'general'
                 && in_array($user->user_role, ['leader', 'coordinator', 'proof_coordinator'], true)) {
-                return redirect()->route('user.dashboard');
+                // 総務・経理のエリアの人は、そのダッシュボードへ（それ以外は User ダッシュボード）
+                return redirect()->route(\App\Support\SunA\Area::canEnterClerk($user) ? 'clerk.dashboard' : 'user.dashboard');
+            }
+            // サンエー印刷: 総務・経理の部署の人（一般）は、そのダッシュボードへ。それ以外のロールは従来どおり（管理者は管理者のダッシュボード）
+            if ($user->company?->company_type === 'general' && $user->user_role === 'user' && \App\Support\SunA\Area::canEnterClerk($user)) {
+                return redirect()->route('clerk.dashboard');
             }
             if ($user->user_role === 'superadmin') {
                 return redirect()->route('superadmin.dashboard');

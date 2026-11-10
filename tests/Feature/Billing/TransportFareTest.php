@@ -103,6 +103,8 @@ class TransportFareTest extends TestCase
     {
         $clerkSb = $this->user('clerk', $this->sb);
         $clerkSanei = $this->user('clerk', $this->sanei);
+        // サンエー印刷は所属部署のエリア（総務）で総務・経理の画面に入る
+        $clerkSanei->update(['department_id' => \App\Models\Department::create(['company_id' => $this->sanei->id, 'name' => '総務部', 'code' => 'SOUMU' . uniqid(), 'sort_order' => 1, 'active' => true, 'area' => 'soumu'])->id]);
         $f = $this->fare($this->sb, '田端', '新宿', 200);
 
         $this->actingAs($clerkSanei)->put(route('clerk.billing.transport.fares.update', ['fare' => $f->id]), ['station_a' => '田端', 'station_b' => '新宿', 'fare_ic' => 1, 'status' => 'verified'])->assertStatus(403);

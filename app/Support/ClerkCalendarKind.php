@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\User;
+use App\Support\SunA\Area;
 use Illuminate\Http\Request;
 
 /**
@@ -50,6 +51,11 @@ class ClerkCalendarKind
     /** クラークのルートでの種類（総務/経理）。サンエー印刷（一般会社）でだけ使う */
     public static function clerkKind(User $user): string
     {
+        // サンエー印刷（一般会社）: 所属部署のエリア（SuperAdmin だけ、画面の切替）
+        if (! $user->isSuperAdmin() && Area::isGeneral($user)) {
+            return Area::clerkKind($user) ?? self::SOUMU;
+        }
+
         if ($user->isSuperAdmin() || $user->isAdmin()) {
             $kind = session('clerk_kind', self::SOUMU);
 

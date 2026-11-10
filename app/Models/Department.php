@@ -15,6 +15,7 @@ class Department extends Model
         'company_id',
         'name',
         'module',
+        'area',
         'code',
         'description',
         'sort_order',
