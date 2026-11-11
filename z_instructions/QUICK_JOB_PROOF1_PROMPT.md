@@ -1,4 +1,4 @@
-> 2026-11-11最新優先: 本番は別作業の営業分析commitで925d87f6bへ進行。1414固定旧配備は破棄し、隔離 `feature/quick-proof-route-fix-20261111`（`/tmp/sunbwork-proof-error-20261111`）へ統合。新式校正POST1行復元、詳細からモーダルへのサーバーURL渡し、日報Editの初期化順修正。営業分析の追加ルート/ソースを維持してZiggy再生成・members全build494/525欠落0。実Vue2検査/ESLint/PHP構文/ローカルPOST登録1件成功。本番修正版配備/画面は未実施。次は統合版保存と925d固定の配備手順、正確なSSH承認。旧式成功画面を反復せず、新式一般公開未承認。MANAGER末尾優先。
+> 2026-11-11最新優先: 本番925d87f6bの営業分析更新を保持した隔離版を `feature/quick-proof-route-fix-20261111` に保存。新式校正POST1行復元、サーバーURL渡し、日報Edit初期化順修正。実Vue2検査/ESLint/PHP構文/ローカルPOST登録1件、members全build494/525欠落0。925d固定の `/tmp/quick-proof-route-fix-deploy-20261111-v2.sh` を準備、正確なSSH承認待ち。配備と新式画面/元参照確認は未実施。成功済み旧式試験を反復せず、新式一般公開未承認。MANAGER末尾優先。
 
 > 2026-11-11旧案: 訂正後のREAD ONLY本番SSH exit0。本番1414df867、2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼0件。旧式162の送受信/新しい完了通知の成功は維持。次はSuperAdmin本人がURL /members/myjobbox/work-entries/{entry} の未完了簡易作業から校正依頼を1件実送信し、依頼済み表示/元未完了/URLを報告。実通知が窓口へ届く。一般公開未承認、MANAGER末尾優先。
 
