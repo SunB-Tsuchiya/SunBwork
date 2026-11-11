@@ -94,6 +94,11 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/annual-multi-year-trend', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'multiYearTrend'])->name('api.annual_multi_year_trend');
         Route::get('annual/export', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'export'])->name('annual_analysis.export');
 
+        // 注目ポイント（SBATTN_PLAN1.md。大きく増減・新規・休眠）
+        Route::get('attention', [App\Http\Controllers\SalesAnalysis\AttentionController::class, 'index'])->name('attention');
+        Route::get('api/attention', [App\Http\Controllers\SalesAnalysis\AttentionController::class, 'summary'])->name('api.attention');
+        Route::get('attention/export', [App\Http\Controllers\SalesAnalysis\AttentionController::class, 'export'])->name('attention.export');
+
         // 期別分析（新規。4月始まり〜翌3月終わりの会計年度専用画面。実機フィードバック対応、2026-09-04）
         Route::get('fiscal-year', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'index'])->name('fiscal_year_analysis');
         Route::get('api/fiscal-year-summary', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'summary'])->name('api.fiscal_year_summary');

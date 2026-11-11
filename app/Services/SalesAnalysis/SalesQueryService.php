@@ -1559,6 +1559,52 @@ class SalesQueryService
         return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum(array_column($current, 'amount')));
     }
 
+    // ==================================================================
+    // 注目ポイント（SBATTN_PLAN1.md）用の公開メソッド。既存の集計の挙動は変えず、private の集計を包むだけ。
+    // ==================================================================
+
+    /**
+     * 得意先（統合ONならグループ名）ごとの期間売上。年次分析・得意先ランキングと同じ元の集計。
+     * $departmentKey に 'all' を渡すと、企画・制作・オンデマンドの合算。
+     *
+     * @return array<string, array{amount: float, standard_amount: float, direct_amount: float}>
+     */
+    public function clientTotalsForPeriod(string $departmentKey, int $year, int $startMonth, int $endMonth, bool $consolidate = false): array
+    {
+        return $this->periodOrdersGroupedByClient($this->resolveDepartmentKeys($departmentKey), $year, $startMonth, $endMonth, $consolidate);
+    }
+
+    /** その年の、登録済みの最後の月（登録がなければ 0）。部署は 'all' なら3部署のいずれか */
+    public function lastRegisteredMonthOfYear(string $departmentKey, int $year): int
+    {
+        return $this->lastRegisteredMonthForYear($this->resolveDepartmentKeys($departmentKey), $year);
+    }
+
+    /**
+     * 登録済みの月の範囲（通し番号 = 年×12＋月）。部署が1つならその部署の最初／最新。
+     * 'all' のときは、登録のある部署すべてを満たす範囲（最新は最も遅れている部署に合わせ、最初は最も遅く始まった部署に合わせる）。
+     * 登録が1つもなければ null。
+     *
+     * @return array{first: int, last: int}|null
+     */
+    public function registeredRange(string $departmentKey): ?array
+    {
+        $firsts = [];
+        $lasts = [];
+        foreach ($this->resolveDepartmentKeys($departmentKey) as $key) {
+            $row = $this->scopedActiveMonths()->where('department_key', $key)
+                ->selectRaw('MIN(sales_year * 12 + sales_month) as first_ord, MAX(sales_year * 12 + sales_month) as last_ord')
+                ->first();
+            if ($row === null || $row->first_ord === null) {
+                continue; // 登録のない部署は、判定の条件にしない
+            }
+            $firsts[] = (int) $row->first_ord;
+            $lasts[] = (int) $row->last_ord;
+        }
+
+        return $firsts === [] ? null : ['first' => max($firsts), 'last' => min($lasts)];
+    }
+
     /** 年次分析「内訳（分類/項目）」パネル用。`monthlyBreakdownPanel()`と同じ契約（Phase 13） */
     public function annualBreakdownPanel(string $departmentKey, int $year, string $dimension, ?string $keyword, string $sort, string $direction, int $limit, int $page): array
     {

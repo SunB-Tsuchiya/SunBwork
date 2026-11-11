@@ -1,4 +1,4 @@
-> 2026-11-11最新優先: 利用者の新式送信試行でZiggyルート欠落と日報Edit初期化ReferenceErrorを確認。実送信は未成功。本番1414df867で新式POSTが実際に削除されており、別作業cfccf17c6の差分で特定。隔離 `feature/quick-proof-route-fix-20261111`（`/tmp/sunbwork-proof-error-20261111`）にルート復元/古いタブにも対応するサーバーURL渡し/日報監視順を修正。JS再現/ローカルルート/PHP構文/ESLint/members build493/524欠落0成功、配備と修正後画面は未実施。次は差分監査・保存・固定版配備手順。旧式の成功済み試験は反復せず、新式一般公開未承認。MANAGER末尾優先。
+> 2026-11-11最新優先: 本番は別作業の営業分析commitで925d87f6bへ進行。1414固定旧配備は破棄し、隔離 `feature/quick-proof-route-fix-20261111`（`/tmp/sunbwork-proof-error-20261111`）へ統合。新式校正POST1行復元、詳細からモーダルへのサーバーURL渡し、日報Editの初期化順修正。営業分析の追加ルート/ソースを維持してZiggy再生成・members全build494/525欠落0。実Vue2検査/ESLint/PHP構文/ローカルPOST登録1件成功。本番修正版配備/画面は未実施。次は統合版保存と925d固定の配備手順、正確なSSH承認。旧式成功画面を反復せず、新式一般公開未承認。MANAGER末尾優先。
 
 > 2026-11-11旧案: 訂正後のREAD ONLY本番SSH exit0。本番1414df867、2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼0件。旧式162の送受信/新しい完了通知の成功は維持。次はSuperAdmin本人がURL /members/myjobbox/work-entries/{entry} の未完了簡易作業から校正依頼を1件実送信し、依頼済み表示/元未完了/URLを報告。実通知が窓口へ届く。一般公開未承認、MANAGER末尾優先。
 
