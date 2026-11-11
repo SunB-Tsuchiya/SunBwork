@@ -1,4 +1,4 @@
-> 2026-11-11最新優先: 本番925d87f6bの営業分析更新を保持した隔離版を `feature/quick-proof-route-fix-20261111` に保存。新式校正POST1行復元、サーバーURL渡し、日報Edit初期化順修正。実Vue2検査/ESLint/PHP構文/ローカルPOST登録1件、members全build494/525欠落0。925d固定の `/tmp/quick-proof-route-fix-deploy-20261111-v2.sh` を準備、正確なSSH承認待ち。配備と新式画面/元参照確認は未実施。成功済み旧式試験を反復せず、新式一般公開未承認。MANAGER末尾優先。
+> 2026-11-11最新優先: 利用者承認の固定手順SHA256 `2402dc46831019effe50a706bcdb676f20dda1fbf3df01e38b13eab6c91ba2cd` で、営業分析更新を保持した新式校正ルート/古いZiggy対応/日報Edit修正を本番 `9b6f5a64b` へ反映exit0。Laravel新式POST登録、members build494/525欠落0、追跡変更なし・既知未追跡5件保持。コード検証/配備完了、修正後画面と新式元参照の本番保存/窓口受信は未確認。次はSuperAdmin本人に新式詳細から1件だけ校正依頼送信と依頼済み/元未完了、日報Edit初期化エラー解消の確認。旧式成功画面を反復せず、一般公開未承認。MANAGER末尾優先。
 
 > 2026-11-11旧案: 訂正後のREAD ONLY本番SSH exit0。本番1414df867、2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼0件。旧式162の送受信/新しい完了通知の成功は維持。次はSuperAdmin本人がURL /members/myjobbox/work-entries/{entry} の未完了簡易作業から校正依頼を1件実送信し、依頼済み表示/元未完了/URLを報告。実通知が窓口へ届く。一般公開未承認、MANAGER末尾優先。
 
