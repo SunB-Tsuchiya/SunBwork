@@ -391,6 +391,100 @@ class SalesExportService
         $this->autoSizeColumns($sheet, 'A', $supportsChannels ? 'G' : 'F');
     }
 
+    /**
+     * 注目ポイントのExcel出力（SBATTN_PLAN1.md）。画面と同じ集計（SalesAttentionService）の結果を、シートごとに出力する。
+     * 新規・休眠は、画面の上位件数ではなく全件を出す。
+     *
+     * @return array{spreadsheet: Spreadsheet, rows: int} rows は一覧の行数の合計（監査ログ用）
+     */
+    public function attentionWorkbook(string $departmentKey, int $year, bool $consolidateClients, int $dormantMonths): array
+    {
+        $summary = app(SalesAttentionService::class)->forCompany($this->requireCompanyId())
+            ->summary($departmentKey, $year, $consolidateClients, $dormantMonths, null);
+        $departmentLabel = $departmentKey === 'all'
+            ? '全部署合計'
+            : (SalesDepartments::labelForKey($this->requireCompanyId(), $departmentKey) ?? $departmentKey);
+
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->removeSheetByIndex(0);
+        $rowCount = 0;
+
+        // 条件
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('条件');
+        $this->writeHeaderRow($sheet, ['項目', '内容']);
+        $dormant = $summary['dormant'] ?? null;
+        $conditions = [
+            ['部署', $departmentLabel],
+            ['年', "{$year}年"],
+            ['得意先統合', $consolidateClients ? 'する' : 'しない'],
+            ['集計期間', ($summary['has_data'] ?? false) ? "{$year}年1〜" . $summary['last_month'] . '月（登録済みの月）' : '登録なし'],
+            ['前年との比較', ($summary['comparison_available'] ?? false) ? ($year - 1) . '年の同じ月と比べています' : '前年のデータがないため、増加・減少・新規は出していません'],
+            ['休眠の期間', "{$dormantMonths}か月"],
+            ['休眠の判定', ($dormant['available'] ?? false)
+                ? "基準月 {$dormant['latest_label']}。{$dormant['silent_label']} に売上がなく、その前の12か月（{$dormant['prior_label']}）には売上があった得意先"
+                : ($dormant['message'] ?? '')],
+        ];
+        $r = 2;
+        foreach ($conditions as [$k, $v]) {
+            $this->setUserString($sheet, "A{$r}", $k);
+            $this->setUserString($sheet, "B{$r}", $v);
+            $r++;
+        }
+        $this->autoSizeColumns($sheet, 'A', 'B');
+
+        $diffHeaders = ['得意先', '金額', '前年同期金額', '差額', '増減率(%)'];
+        foreach ([
+            ['大きく増えた得意先', $summary['increase']['rows'] ?? []],
+            ['大きく減った得意先', $summary['decrease']['rows'] ?? []],
+        ] as [$title, $rows]) {
+            $sheet = $spreadsheet->createSheet();
+            $sheet->setTitle($title);
+            $this->writeHeaderRow($sheet, $diffHeaders);
+            $r = 2;
+            foreach ($rows as $row) {
+                $this->setUserString($sheet, "A{$r}", $row['label']);
+                $this->setAmount($sheet, "B{$r}", $row['amount']);
+                $this->setAmount($sheet, "C{$r}", $row['prior_amount']);
+                $this->setAmount($sheet, "D{$r}", $row['diff']);
+                $this->setAmount($sheet, "E{$r}", $row['rate']);
+                $r++;
+                $rowCount++;
+            }
+            $this->autoSizeColumns($sheet, 'A', 'E');
+        }
+
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('新規の得意先');
+        $this->writeHeaderRow($sheet, ['得意先', '今年の金額']);
+        $r = 2;
+        foreach ($summary['new']['rows'] ?? [] as $row) {
+            $this->setUserString($sheet, "A{$r}", $row['label']);
+            $this->setAmount($sheet, "B{$r}", $row['amount']);
+            $r++;
+            $rowCount++;
+        }
+        $this->autoSizeColumns($sheet, 'A', 'B');
+
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('休眠の得意先');
+        $this->writeHeaderRow($sheet, ['得意先', '前の12か月の金額', '最後に売上があった月', '売上のない期間(か月)']);
+        $r = 2;
+        foreach ($dormant['rows'] ?? [] as $row) {
+            $this->setUserString($sheet, "A{$r}", $row['label']);
+            $this->setAmount($sheet, "B{$r}", $row['prior_amount']);
+            $this->setUserString($sheet, "C{$r}", $row['last_label']);
+            $this->setAmount($sheet, "D{$r}", $row['silent_months']);
+            $r++;
+            $rowCount++;
+        }
+        $this->autoSizeColumns($sheet, 'A', 'D');
+
+        $spreadsheet->setActiveSheetIndex(0);
+
+        return ['spreadsheet' => $spreadsheet, 'rows' => $rowCount];
+    }
+
     private function writeHeaderRow(Worksheet $sheet, array $headers): void
     {
         $col = 'A';
