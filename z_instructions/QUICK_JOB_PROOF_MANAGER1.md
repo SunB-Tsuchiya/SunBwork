@@ -338,3 +338,9 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 同日本番配備: 利用者が `git push origin feature/quick-proof-route-fix-20261111` と `ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/quick-proof-route-fix-deploy-20261111-v2.sh` を承認。実行前に手順SHA256 `2402dc46831019effe50a706bcdb676f20dda1fbf3df01e38b13eab6c91ba2cd` と隔離HEAD `9b6f5a64b`・cleanを再確認。push成功、SSH exit0。固定元925d/main/追跡変更なし/既知未追跡5件/旧manifest、target許可差分/削除なし/PHP2構文/資産/members baseを検証して9b6fへff-only。route:clear/view:clear後に新式校正POST登録を確認。manifest494entry/参照525/欠落0、最終追跡変更なし・未追跡5件保持。scratch `/tmp/sb-quick-proof-route-fix.7KOFuj`。migration/seed/DB照会・更新/試験依頼・通知送信はなし。営業分析更新を保持。
 
 状態: 実装・ローカル検証・本番限定配備は完了。利用者の修正後画面、新式校正依頼1件の元参照保存/窓口実受信、日報Editの実画面は未確認。次の一手はSuperAdmin本人が新式未完了簡易作業の詳細 `/members/myjobbox/work-entries/{entry}` を再読み込みし校正依頼を1件送信、詳細の依頼済み表示と元未完了を確認し、日報編集画面がReferenceErrorなく開くことを確認する。旧式の成功済み送受信/通知試験は反復しない。一般公開未承認。
+
+同日修正後の利用者画面確認: 利用者「成功」は直前に列挙した2条件全てを確認した回答として受領。(1) 新式詳細の再読込から校正依頼1件送信・依頼済み表示・元作業未完了、(2) 日報Editが報告されたReferenceErrorなしで開く。日報の日付変更画面操作や校正窓口の新式通知実受信は依頼していないため確認済みへ拡張しない。旧式の以前成功済み試験を反復しない。
+
+同日本番元参照READ ONLY: 以前承認済みの同一監査スクリプトSHA256 `f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2` と同一SSHを再提示・実行exit0。本番9b6f5a64b、mysql実DB名一致、READ ONLY transaction/rollback。2026-11-10以降の新式元参照つき校正依頼1件、request164→entry18、owner=requester/会社部署一致、監査時status=completed。旧0件を置換。元作業未完了は利用者画面確認時点、校正依頼completedはDB監査時点の別事実。実通知の窓口受信画面は未確認。氏名/件名/本文/売上の取得、業務データ変更、通知送信なし。
+
+現在地: 原因の2エラー修正/コード検証/本番限定配備/利用者画面2条件/新式元参照保存は完了。窓口の新式由来通知実受信と一般公開判断は未実施。次の一手は成功済み試験を繰り返さず、公開前の権限・会社部署境界と代表レビュー範囲を利用者と相談する。一般公開未承認。

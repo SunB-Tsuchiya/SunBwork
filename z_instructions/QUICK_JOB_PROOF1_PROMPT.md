@@ -1,4 +1,4 @@
-> 2026-11-11最新優先: 利用者承認の固定手順SHA256 `2402dc46831019effe50a706bcdb676f20dda1fbf3df01e38b13eab6c91ba2cd` で、営業分析更新を保持した新式校正ルート/古いZiggy対応/日報Edit修正を本番 `9b6f5a64b` へ反映exit0。Laravel新式POST登録、members build494/525欠落0、追跡変更なし・既知未追跡5件保持。コード検証/配備完了、修正後画面と新式元参照の本番保存/窓口受信は未確認。次はSuperAdmin本人に新式詳細から1件だけ校正依頼送信と依頼済み/元未完了、日報Edit初期化エラー解消の確認。旧式成功画面を反復せず、一般公開未承認。MANAGER末尾優先。
+> 2026-11-11最新優先: 本番9b6f5a64bへの限定配備後、利用者「成功」で新式詳細から校正依頼送信・依頼済み表示/元作業未完了と日報Edit ReferenceError解消の2条件を確認。以前承認済み同一READ ONLY監査で新式元参照付き校正依頼1件（request164→entry18、owner/company/department一致、監査時status=completed）を確認。旧0件を置換。氏名/件名/本文/売上の取得やデータ変更なし。窓口の新式由来通知実受信は画面条件外で未確認。次は一般公開を前提にせず権限・会社部署境界と代表レビュー範囲を相談。成功済み画面は反復しない。MANAGER末尾優先。
 
 > 2026-11-11旧案: 訂正後のREAD ONLY本番SSH exit0。本番1414df867、2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼0件。旧式162の送受信/新しい完了通知の成功は維持。次はSuperAdmin本人がURL /members/myjobbox/work-entries/{entry} の未完了簡易作業から校正依頼を1件実送信し、依頼済み表示/元未完了/URLを報告。実通知が窓口へ届く。一般公開未承認、MANAGER末尾優先。
 
