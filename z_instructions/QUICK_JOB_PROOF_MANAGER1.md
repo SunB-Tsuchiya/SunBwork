@@ -256,3 +256,75 @@ Changelogは専用ProofCompletionNoticeChangelogSeeder（version proof-notify-20
 
 次の一手: 最新の本番版と作業状態だけを以下の読み取り専用SSHで取得する承認。19dを現在も本番最新と決めつけない。結果を保持した固定元/先/許可差分の配備スクリプトを準備して別途正確なSSH承認を得る。
 ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && git branch --show-current && git status --short --untracked-files=all -- . ":!public/build" && git diff --name-only -- public/build/manifest.json'
+
+
+## 2026-11-10 最新本番状態照合・固定配備手順準備（未配備）
+
+以前承認済みと同じread-only状態SSHを再提示して実行。利用者の追加yesも受領。exit0、本番は19d6c07da7a7cee072c59daf75cc8fc78ea7a3df/main、追跡変更なし/既知未追跡5件のみ/manifest差分なし。したがって直前の「read承認待ち」は置換。追加yesを未提示の配備コマンドの承認とは扱わない。
+
+専用ブランチへ4ec6f0bb6c734252dc0c0084054cb6e27c8d86f1を保存・push。最終106件1133断言/PHP10構文/493entry524資産保持済み。固定配備スクリプト/tmp/proof-completion-notice-deploy-20261110.sh、SHA256 212a4b68e7bd1deb56b74e4b07612042bce70a3470cf29d15172ad7f0eba29de。sh -n成功。同一コピーstorage/app/private/codex-proof-completion-notice-20261110/。
+
+固定元19d6→固定先4ec6。main/HEAD/追跡変更なし/既知未追跡5件/manifest hashを照合。専用branchをfetchし両ancestor・許可20ファイル・削除なし・資産/JS/routes/config/依存/migration/AGENTS/CLAUDE不変を確認。親Changelog差分は追加1行のみ、PHP10ファイルを配備前lint。ff-only後HEAD/493entry524資産/欠落0/manifest一致・既定mysqlを検証し、専用ProofCompletionNoticeChangelogSeeder --forceだけを実行、最終作業状態を再照合する。他作業の営業分析・出力を保持。migrationなし/業務データの変更・試験完了・過去通知再送なし。
+
+次の一手（配備はまだ未承認・未実行）:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'sh -s' < /tmp/proof-completion-notice-deploy-20261110.sh
+
+配備後に新たに完了する校正の依頼者通知1件の実受信だけを確認する。既に成功した依頼送信/窓口受信/レイアウト等を繰り返させない。過去162へは再送しない。一般公開未承認。
+
+
+## 2026-11-10 校正完了通知修正を限定配備成功・実受信確認待ち
+
+確定: 利用者yesで提示済み専用SSHを承認。同一SHA256 212a4b68e7bd1deb56b74e4b07612042bce70a3470cf29d15172ad7f0eba29deの/tmp/proof-completion-notice-deploy-20261110.shを実行しexit0。固定元19d6/main/追跡変更なし/既知未追跡5件/manifest、許可20ファイル/削除なし/画面資産・JS・routes・設定・依存・migration等不変、親Changelog追加1行・PHP10構文を検証して4ec6f0bb6c734252dc0c0084054cb6e27c8d86f1へff-only。manifest493entry/524参照/欠落0/hash一致、既定mysql検証後に専用ProofCompletionNoticeChangelogSeeder --forceだけ実行しDONE、最終追跡変更なし・既知未追跡5件を保持。他作業の営業更新も保持。DB構造変更/業務データの試験操作/校正送信/過去通知補正はなし。
+
+実装/合成106件1133断言/本番配備完了。利用者による修正後の校正完了通知実受信・重複確認は未確認。次の一手は、次に完了する未完了の校正1件で、校正依頼者の通知画面へ校正完了通知が1件届くことだけを確認してもらう。新規依頼送信/窓口受信/上部操作配置など成功済みの試験を反復しない。既に完了した11516/校正162の再操作による過去通知の補正はしない。一般公開未承認、試用制限維持。
+
+回答形式: 通知が1件届けば『成功』、届かない/複数の場合は対象URLと件数。校正専用通知が対象であり通常自己割当の完了通知を新たに有効化した意味ではない。
+
+
+## 2026-11-11 校正完了通知の実受信成功・工程完了
+
+確定: 直前に依頼した「次に完了する校正1件で、依頼したユーザーへ校正完了通知が1件届く」について、利用者が「成功」と回答。これを修正後の実受信・重複なしの代表1件確認として記録する。通知送信の別経路や全ユーザーでの実画面確認へ拡張しない。合成106件1133断言、本番4ec6f0bb6への限定配備、利用者の実受信が揃ったためPROOF_COMPLETION_NOTICEの独立修正工程を完了し、PLAN/MANAGER/PROMPT本体をarchivedへ移す。旧root名には履歴リンクの互換案内を置き、変更履歴design_filesの参照を維持する。
+
+残る親工程: 一般公開の権限/会社部署context・管理者/進行管理/Leaderの代表レビューと公開範囲・時期の明示判断。簡易ソースの校正受け渡し2点は利用者「成功」として記録済みだが、診断した校正依頼162は旧割当由来でsource_personal_work_entry_id=NULLだったため、これを新式元参照の本番DB照合として扱わない。新式元参照は合成で検証済み。成功した画面試験を繰り返さない。過去162の未送信通知は補正していない。一般公開未承認。次の一手は既存アクセス制御の読取監査から公開前の代表レビューの最小範囲を確定する。
+
+保存基準227c70992、今回の利用者回答。/tmp旧作業ツリーが消失したため同コミットから/tmp/sunbwork-proof-notice-confirm-20261111、feature/proof-notice-confirm-20261111を復元。共有ツリーはClaudeの別作業で汚れており編集しない。本番を今回再取得した意味ではない。今回資料のみ変更、コード/DB/SSH/build/配備なし。
+
+
+## 2026-11-11 完了通知の成功確定・公開前境界のコード監査・新式元参照の限定読取準備
+
+利用者の直前「成功」は、修正後に次に完了した校正1件で依頼者へ校正完了通知が1件届くという依頼項目を全確認した意味とし、重複なしの代表例として確定。ユーザーの「続けましょう」を親工程の続行指示として受領。PROOF_COMPLETION_NOTICE独立工程は実装/106件1133断言/本番4ec6限定配備/実受信を完了し本体3資料をarchivedへ、rootには履歴リンクの互換案内を置く。既に完了した依頼162の過去通知は再送しない。
+
+保存227c70992のコード読取監査: UnifiedMyJobBox.availableはUserWorkHubと会社context一致を使用。UserWorkHubはPersonalWorkSchedule.available（実SuperAdmin、本人会社所属INFO）と非general会社を要求。index/storeはサーバで403、WorkJobReader.resolveは本人・会社・部署・元案件/分類を照合、QuickWorkProofRequest.storeは同じ試用guardと本人元・同会社部署の窓口・入力混在拒否・通知原子性を持つ。ProofRequestの新式元参照表示も会社部署/ロール・context境界。既存合成には一般User/Admin/Coordinator/Leader/INFO外/一般会社/別会社context拒否、他人元、通知失敗rollbackが含まれる。これはコード/合成の監査であり全roleの本番画面試験や公開承認ではない。今回コード変更/追加試験なし。
+
+成功済みの校正送信/窓口受信2点は反復しない。ただし先の実例162はsource_personal_work_entry_id=NULLの旧形式由来で、新式元参照の本番証拠にはならない。対象を2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼に限り、件数上限20、ID/状態/作成時刻と元所有者・会社部署一致の真偽だけをREAD ONLY transactionで調べる/home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.phpを準備。SHA256 f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2。氏名/件名/本文/結果/ファイル/売上は出力しない。未実行、修正/再送/新規依頼なし。
+
+次の一手はAGENTSの新しい正確なSSH事前確認を得て以下の限定読取を実行し、新式元が実際にあるかを判定する:
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php
+
+結果に基づき、一般公開を維持したまま管理者/進行管理/Leaderの代表レビュー方法と公開対象・時期の意思決定へ進む。資料の基準は保存227c70992と利用者回答。失われた/tmp旧ツリーは同コミットから隔離ツリーfeature/proof-notice-confirm-20261111へ復元、共有Claude作業を変更しない。本番最新HEADを今回確認した意味ではない。
+
+
+## 2026-11-11 本番限定読取のローカルパス訂正（SSH未実行）
+
+利用者yesは提示したコマンドへの承認として受領したが、実行直前のローカル確認で提示パス `/home/w229/SunBWork/...` と実ファイル `/home/w229/SunBwork/...` の大文字・小文字違いを検出。実ファイルSHA256 f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2を再確認。SSHは一切実行しておらず、本番DB/アプリに変更なし。AGENTSの正確なコマンド提示を満たすため、次の訂正版だけを利用者へ提示し確認を得る。旧パスのコマンドは実行しない。
+ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse HEAD && php' < /home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php
+
+
+## 2026-11-11 新式元参照の本番限定読取0件・試用入口の再特定
+
+承認済みの訂正版SSHを同一スクリプトhash f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2で実行しexit0。本番1414df8679cb2ba4f139cf144b896bdf26038daa、mysql実DB名照合、READ ONLY transaction/rollback。2026-11-10以降でsource_personal_work_entry_id非NULLのproof_requestsは0件。氏名/件名/本文/結果/ファイル/売上を取得せず、更新/通知送信なし。したがって先の旧式由来依頼162による成功を新式元紐づけの本番証拠へ拡張できない。利用者が確認した送受信・完了通知は成功のまま維持する。
+
+コード読取: 保存版と本番1414でQuickWorkProofRequest/WorkDetail/ProofRequestModalは差分なし。新式詳細MyJobBox/WorkDetail.vueの校正依頼ボタンはProofRequestModalにquick-entry-id=work.idを渡し、専用POSTはproof_requests.source_personal_work_entry_idを元PersonalWorkEntry.idで保存する。旧/新式は同じ『校正依頼』表示だが新式詳細のURLは/members/myjobbox/work-entries/{entry}。本番で新式送信を証明するには、このURLの未完了簡易作業から1件の実送信が必要。
+
+次の一手: 利用者自身が試用SuperAdminで仕事・案件→マイジョブの簡易入力1件（未完了）を開き、詳細URLに/myjobbox/work-entries/が含まれることを確認してから校正依頼を実送信する。窓口へ本物の通知が届くことを案内。送信後は同詳細の『校正依頼済み・状況を見る』表示と元未完了を確認し、詳細URLを報告してもらう。これは従前確認した旧式由来162とは異なる、新式元紐づけの未確認1点。結果を得た後、同じ承認済み読み取りコマンドで本番元参照を再照合する。新しいDB書込みやCodexからの試験送信なし。一般公開未承認。
+
+
+## 2026-11-11 新式校正依頼の送信阻害と日報編集TDZ
+
+利用者が実送信を試みたところ、画面にZiggy `user.myjobbox.entries.proof_request` 欠落、同時にDiaries/Editの初期化ReferenceErrorを報告。新式元参照の実送信は失敗と記録し、直前の「次は実送信」依頼を修正配備まで延期。旧式162・完了通知の実成功は取り消さない。
+
+本番HEAD1414df867/mainを承認済みSSHで確認、既知未追跡5件と追跡変更なし。新式POSTは本番 `route:list --name` 0件、`--path=myjobbox/work-entries` でも他6件のみ。cfccf17c6（別作業）が routes/web.php から当該1行を削除。静的Ziggyには名前が残るが本番Laravelルートはない。Diaries/Editはform初期化前のwatch getterが同期評価され、minified Edit-kiFxhTwm.js:1:3864と一致。共有Claude作業ツリーは触らず、本番1414を基準に隔離 `/tmp/sunbwork-proof-error-20261111` を作成。
+
+修正はルート1行復元、サーバー生成URLを新式詳細→既存モーダルに渡す、日報監視をform定義後へ移動。受信/権限/旧式校正機能は維持。実Vueモーダル検査（古いZiggyで新式ルートを投げてもURL送信成功）と日報Edit実mount/日付変更、ローカルLaravel route:list新式POST1件、PHP2ファイル構文、members build493entry/524参照/欠落0まで確認。Ziggyは修正ルートから再生成し、旧定義を保持しつつ `user.myjobbox.received_prefill` の欠落も補完。旧hash資産の復元と配備前差分監査は進行中。**実装・コード検証は進行中、本番配備と修正後画面/通知は未実施。** 次はbuild差分の最終検査と隔離版保存、固定版配備手順を準備する。一般公開未承認。
+
+同日最終ローカル検証: `node tests/js/quickProofRequest.test.cjs` / `diaryEditInitialization.test.cjs` 成功。修正前の日報watch順と本番minified例の一致を確認し、実Vue setupで初期表示と日付変更の再読込を確認。ESLint対象3Vueエラー0。修正後ルートはローカルLaravel route:listでPOST1件、PHP2構文成功。再生成Ziggyは既存名削除0、新規 `user.myjobbox.received_prefill` 1件。最終`VITE_APP_BASE_PATH=/members` build成功、manifest493entry/参照524/欠落0/旧追跡資産欠落0、SHA256 `90bd2ecf3eb41505de1d2bc58ff3420611675ea0883a1545808e35749b20faf9`。途中buildはvendor mountなしで失敗したが、隔離環境を直して最終成功。共有ルート/営業分析/販売DBは未編集・未照会。**コード検証完了、本番配備・修正後画面・新式元参照の本番確認は未実施。** 次は1414基準の許可差分/既存資産の固定配備手順を作り、正確なSSH承認を得る。一般公開未承認。

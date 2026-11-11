@@ -20,6 +20,7 @@ class WorkJobDetailController extends Controller
         ]);
         return Inertia::render('MyJobBox/WorkDetail', $data + ['back' => $back,
             'proof' => app(\App\Services\QuickWorkProofRequest::class)->state($request->user(), $entry, $context === null ? null : (int) $context),
+            'proofRequestUrl' => route('user.myjobbox.entries.proof_request', ['entry' => $entry]),
             'series' => $jobs->series($request->user(), $entry, $context === null ? null : (int) $context)]);
     }
 

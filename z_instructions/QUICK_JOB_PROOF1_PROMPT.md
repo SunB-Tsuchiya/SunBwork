@@ -1,3 +1,15 @@
+> 2026-11-11最新優先: 利用者の新式送信試行でZiggyルート欠落と日報Edit初期化ReferenceErrorを確認。実送信は未成功。本番1414df867で新式POSTが実際に削除されており、別作業cfccf17c6の差分で特定。隔離 `feature/quick-proof-route-fix-20261111`（`/tmp/sunbwork-proof-error-20261111`）にルート復元/古いタブにも対応するサーバーURL渡し/日報監視順を修正。JS再現/ローカルルート/PHP構文/ESLint/members build493/524欠落0成功、配備と修正後画面は未実施。次は差分監査・保存・固定版配備手順。旧式の成功済み試験は反復せず、新式一般公開未承認。MANAGER末尾優先。
+
+> 2026-11-11旧案: 訂正後のREAD ONLY本番SSH exit0。本番1414df867、2026-11-10以降のsource_personal_work_entry_id非NULL校正依頼0件。旧式162の送受信/新しい完了通知の成功は維持。次はSuperAdmin本人がURL /members/myjobbox/work-entries/{entry} の未完了簡易作業から校正依頼を1件実送信し、依頼済み表示/元未完了/URLを報告。実通知が窓口へ届く。一般公開未承認、MANAGER末尾優先。
+
+> 2026-11-11最新: 校正完了通知の実受信1件を利用者「成功」で確認、独立PROOF_COMPLETION_NOTICE本体をarchived。保存227c70992から隔離/tmp/sunbwork-proof-notice-confirm-20261111へ復元。公開前の役割/会社部署境界をコードと既存合成で監査し問題未検出。次は新式元参照の本番READ ONLY限定照合（/home/w229/SunBwork/storage/app/private/codex-quick-proof-origin-20261111/audit.php、f075f87aaece170f7c70f0e8af2015677999a45b237b651cf918a430d6a927a2）の正確なSSH確認。一般公開未承認。MANAGER末尾優先。
+
+> 2026-11-11最新: 校正完了時の依頼者通知1件を利用者「成功」で実受信確認済み。独立PROOF_COMPLETION_NOTICE本体はarchived。既確認の送受信/レイアウトを反復しない。次は公開前の権限・会社部署contextの読取監査と代表レビュー範囲の整理。新式元参照は合成確認済み、本番依頼162は旧式由来。一般公開未承認。MANAGER末尾優先。
+
+> 2026-11-10最新: 承認済み固定SSHで本番4ec6f0bb6へ校正完了通知修正の限定配備exit0。専用Seederのみ、493/524資産完全保持、他作業/既知未追跡5件保持。次は次に完了する校正1件で依頼者の通知1件を実受信確認。まだ実受信未確認。既に完了した11516/162の過去通知再送なし、一般公開未承認。MANAGER末尾優先。
+
+> 2026-11-10最新: read SSHで本番19d6/main/clean+既知未追跡5件を再確認。修正4ec6を専用branchへpush、固定配備/tmp/proof-completion-notice-deploy-20261110.sh（212a4b68e7bd1deb56b74e4b07612042bce70a3470cf29d15172ad7f0eba29de）準備。次はこの正確なSSHの承認。未配備/修正後実受信未確認。106件1133断言成功、過去162再送なし、一般公開未承認。MANAGER末尾優先。
+
 > 2026-11-10最新: 本番調査19d6を保持統合し最終Integration106件1133断言/PHP10構文成功。PHPのみ、資産493/524完全保持、未配備。次は提示済みread-only本番状態SSHの承認、固定配備準備。過去162再送なし/一般公開未承認。PROOF_COMPLETION_NOTICE_MANAGER1末尾優先。
 
 > 2026-11-10最新: 具体設計承認後、旧カレンダー欠落を再現して修正。合成Integration104件1122断言成功。PHPのみ/資産不変/未配備。次は調査時本番19d6c07daの他作業保持統合と最新本番状態確認。過去162再送なし、一般公開未承認。PROOF_COMPLETION_NOTICE_MANAGER1末尾優先。

@@ -5,6 +5,7 @@ import { ref, watch } from 'vue';
 
 const props = defineProps({
     quickEntryId:            { type: Number, default: null },
+    quickRequestUrl:         { type: String, default: '' },
     show:                    { type: Boolean, default: false },
     initialTitle:            { type: String,  default: '' },
     projectJobAssignmentId:  { type: Number,  default: null },
@@ -85,7 +86,7 @@ function submit() {
     };
     const body = props.quickEntryId ? { title: payload.title, deadline: payload.deadline, note: payload.note } : payload;
     const destination = props.quickEntryId
-        ? route('user.myjobbox.entries.proof_request', { entry: props.quickEntryId })
+        ? (props.quickRequestUrl || route('user.myjobbox.entries.proof_request', { entry: props.quickEntryId }))
         : route('proof_requests.store');
     router.post(destination, body, {
         preserveScroll: true,

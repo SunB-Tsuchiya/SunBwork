@@ -81,10 +81,6 @@ onMounted(() => {
     fetchDayEvents(props.diary.date?.split('T')[0] ?? props.diary.date);
 });
 
-watch(() => form.date, (newDate) => {
-    if (newDate) fetchDayEvents(newDate);
-});
-
 async function onTimelineUpdate(payload) {
     try {
         await axios.put(`/events/${payload.id}/calendar`, {
@@ -227,6 +223,10 @@ const form = useForm({
     end_time:     `${et.hour}:${et.minute}`,
     content:      content.value,
     attachment_ids: [],
+});
+
+watch(() => form.date, (newDate) => {
+    if (newDate) fetchDayEvents(newDate);
 });
 
 function onWorktypeChange() {

@@ -15,7 +15,7 @@ const renderer = createRenderer({ patchProp() {}, insert() {}, remove() {}, crea
     await build({ entryPoints: [file], outfile: path.join(out, 'modal.cjs'), bundle: true, platform: 'node', format: 'cjs', plugins: [{ name: 'actual-vue', setup(b) {
         b.onResolve({ filter: /^vue$/ }, () => ({ path: require.resolve('vue'), external: true }));
         b.onResolve({ filter: /^(@inertiajs\/vue3|ziggy-js)$/ }, a => ({ path: a.path, namespace: 'mock' }));
-        b.onLoad({ filter: /.*/, namespace: 'mock' }, a => ({ loader: 'js', contents: a.path === 'ziggy-js' ? 'export const route=(name,params)=>name+JSON.stringify(params||{});' : 'export const router=globalThis.__proofRouter;' }));
+        b.onLoad({ filter: /.*/, namespace: 'mock' }, a => ({ loader: 'js', contents: a.path === 'ziggy-js' ? 'export const route=(name,params)=>{if(name==="user.myjobbox.entries.proof_request")throw Error("route missing from an older tab");return name+JSON.stringify(params||{});};' : 'export const router=globalThis.__proofRouter;' }));
         b.onLoad({ filter: /\.vue$/ }, a => {
             const source = fs.readFileSync(a.path, 'utf8').replace('</script>', '\nglobalThis.__proofState={form,submitting,errors,submit};\n</script>');
             const { descriptor } = parse(source);
@@ -34,7 +34,7 @@ const renderer = createRenderer({ patchProp() {}, insert() {}, remove() {}, crea
         await nextTick();
         return { app, state: global.__proofState, counts: () => ({ close, sent }) };
     }
-    const quick = await mount({ quickEntryId: 7, projectJobId: 88 });
+    const quick = await mount({ quickEntryId: 7, quickRequestUrl: 'https://example.test/members/myjobbox/work-entries/7/proof-request', projectJobId: 88 });
     const s = quick.state;
     assert.equal(s.form.value.title, '試験_校正');
     s.form.value.deadline_date = '2026-12-01';
@@ -42,7 +42,7 @@ const renderer = createRenderer({ patchProp() {}, insert() {}, remove() {}, crea
     s.submit(); s.submit();
     assert.equal(calls.length, 1, 'double click is ignored while pending');
     let [url, body, options] = calls[0];
-    assert.equal(url, 'user.myjobbox.entries.proof_request{"entry":7}');
+    assert.equal(url, 'https://example.test/members/myjobbox/work-entries/7/proof-request');
     assert.deepEqual(Object.keys(body).sort(), ['deadline', 'note', 'title']);
     assert.equal(body.deadline, '2026-12-01T08:30:00.000Z');
     options.onError({ title: '校正窓口がありません' }); options.onFinish();

@@ -12,7 +12,7 @@ import WorkJobSeries from '@/Components/WorkJobSeries.vue';
 import QuickWorkEntryModal from '@/Components/Calendar/QuickWorkEntryModal.vue';
 import { workCategories, workActivities } from '@/Constants/personalWorkActivities';
 
-const props = defineProps({ proof: { type: Object, default: () => ({ enabled: false }) }, work: Object, time: Object, ancestors: Array, back: Object, series: { type: Object, default: () => ({items:[],operationsEnabled:false,completionTargets:[]}) } });
+const props = defineProps({ proof: { type: Object, default: () => ({ enabled: false }) }, proofRequestUrl: { type: String, default: '' }, work: Object, time: Object, ancestors: Array, back: Object, series: { type: Object, default: () => ({items:[],operationsEnabled:false,completionTargets:[]}) } });
 const editing = ref(false);
 const proofOpen = ref(false);
 const detailsOpen = ref(false);
@@ -144,7 +144,7 @@ async function complete() {
             <WorkJobSeries :series="series" />
 
         </div>
-        <ProofRequestModal :show="proofOpen" :quick-entry-id="work.id" :initial-title="proof.title || ''" @close="proofOpen = false" />
+        <ProofRequestModal :show="proofOpen" :quick-entry-id="work.id" :quick-request-url="proofRequestUrl" :initial-title="proof.title || ''" @close="proofOpen = false" />
         <QuickWorkEntryModal :show="editing || continuing" :entry="work" :continuation-source="continuing ? {id: work.id} : null" :date="work.work_date" entry-point="myjob" @close="editing = false; continuing = false" @saved="saved" @deleted="deleted" />
     </AppLayout>
 </template>
