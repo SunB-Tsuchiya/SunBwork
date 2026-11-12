@@ -89,7 +89,7 @@ const manageHref = () => route(`${props.routePrefix}.portfolio.manage`); // タ�
 <template>
     <AppLayout title="ポートフォリオの利用メンバー設定">
         <template #header>
-            <h2 class="text-base font-semibold leading-tight text-gray-800 sm:text-xl">ポートフォリオ管理</h2>
+            <h2 class="text-base font-semibold leading-tight text-gray-800 sm:text-xl">ポートフォリオ利用設定</h2>
         </template>
         <template #tabs>
             <AdminNavigationTabs active="portfolio" />

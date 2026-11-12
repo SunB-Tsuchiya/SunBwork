@@ -25,6 +25,11 @@ const props = defineProps({
     headerTitle: { type: String, default: '日報（日付別）' },
 });
 
+const page = usePage();
+const isSunbrainAdmin = computed(() => props.routePrefix === 'admin' && page.props.auth?.companyType === 'sunbrain');
+const displayTitle = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.pageTitle);
+const displayHeader = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.headerTitle);
+
 // whether server requested unread-only
 const serverUnread = computed(() =>
     Boolean(props.filters && (props.filters.unread === 1 || props.filters.unread === '1' || props.filters.unread === true)),
@@ -181,14 +186,14 @@ const hasGroupedDiaries = computed(() => groupedByDepartment.value.some((group) 
 </script>
 
 <template>
-    <AppLayout :title="props.pageTitle">
+    <AppLayout :title="displayTitle">
         <template #header>
             <div class="flex items-center gap-3">
                 <Link
                     :href="route(routeForIndex())"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 日報一覧に戻る</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ displayHeader }}</h2>
             </div>
         </template>
 

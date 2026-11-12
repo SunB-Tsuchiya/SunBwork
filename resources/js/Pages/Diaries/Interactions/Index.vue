@@ -2,7 +2,7 @@
 import DiaryTable from '@/Components/Diaries/DiaryTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Inertia } from '@inertiajs/inertia';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 
 function formatDate(d) {
@@ -32,6 +32,11 @@ const props = defineProps({
     pageTitle: { type: String, default: '日報一覧' },
     headerTitle: { type: String, default: '日報一覧' },
 });
+
+const page = usePage();
+const isSunbrainAdmin = computed(() => props.routePrefix === 'admin' && page.props.auth?.companyType === 'sunbrain');
+const displayTitle = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.pageTitle);
+const displayHeader = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.headerTitle);
 
 // For index view we intentionally remove any `unread` flag before passing filters
 // to DiaryTable so the index's table does not behave as an unread-only view.
@@ -240,16 +245,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <AppLayout :title="props.pageTitle">
+    <AppLayout :title="displayTitle">
         <template #header>
             <div v-if="props.date" class="flex items-center gap-3">
                 <Link
                     :href="route(routeForIndex())"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 日報一覧に戻る</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ displayHeader }}</h2>
             </div>
-            <h2 v-else class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
+            <h2 v-else class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ displayHeader }}</h2>
         </template>
 
         <!-- SuperAdmin グローバルモード警告 -->

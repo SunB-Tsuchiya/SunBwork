@@ -1,7 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useUIState } from '@/Composables/useUIState';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -12,6 +12,10 @@ const props = defineProps({
     routePrefix:   { type: String,  default: 'admin' },
     is_superadmin: { type: Boolean, default: false },
 });
+
+const page = usePage();
+const pageTitle = computed(() => props.routePrefix === 'admin' && page.props.auth?.companyType === 'sunbrain'
+    ? '勤務時間閲覧' : '勤務時間管理');
 
 const viewMode      = ref(props.filters?.group === 'month' ? 'month' : 'day');
 const selectedDays  = ref(props.filters?.days ? Number(props.filters.days) : 30);
@@ -80,9 +84,9 @@ const lastPage    = computed(() => props.meta?.last_page ?? 1);
 </script>
 
 <template>
-    <AppLayout title="勤務時間管理">
+    <AppLayout :title="pageTitle">
         <template #header>
-            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">勤務時間管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ pageTitle }}</h2>
         </template>
 
         <!-- SuperAdmin グローバルモード警告 -->

@@ -1,6 +1,8 @@
 # レイアウトと UI（統合ドキュメント）
 最終更新: 2026-05-23
 
+2026-11-12追加（未配備）: SunBrain Adminの上段ナビを会社別部品に分け、SunA/未選択時は従来Adminナビを保持する。SunBrainではダッシュボード直後に日報閲覧、続いて人・組織/記録・分析/権限管理/各種設定の親タブを置き、現行URLと権限を保つ子タブへ進む。`lastTab_admin` の保存URLは変更しない。実装・検証・配備・画面確認の状態は `ADMIN_NAV_MANAGER1.md` を参照する。LeaderとSunAのタブ再編は後日。
+
 2026-10-30追加: 情報出版SuperAdminのUserメニューだけ、`UserNavigationTabs.vue` が「仕事・案件」を上段に表示し、対象画面では `UserWorkHubTabs.vue` で5つの内側タブを表示する。判定はサーバ共有 `userWorkHub.enabled` と会社条件。モバイルとデスクトップは同じ上段定義を使う。内側タブは横スクロールでき、各既存URLを維持して `aria-current` で選択状態を示す。詳細は `USER_WORK_HUB_PLAN1.md`。
 
 `resources/js/app.js` は Vite の `vite:preloadError` を受け、ビルド更新後に古い画面が削除済みの分割 JavaScript を参照した場合、入力中の内容を失う可能性を案内して再読み込みを選べるようにする。古い JavaScript にはこの処理が含まれないため、初回はブラウザでページを再読み込みする。

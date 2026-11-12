@@ -33,9 +33,9 @@ const chip = (active) => ['rounded-full px-3 py-1 text-xs font-medium transition
 </script>
 
 <template>
-    <AppLayout title="ポートフォリオ管理">
+    <AppLayout title="ポートフォリオ閲覧">
         <template #header>
-            <h2 class="text-base font-semibold leading-tight text-gray-800 sm:text-xl">ポートフォリオ管理</h2>
+            <h2 class="text-base font-semibold leading-tight text-gray-800 sm:text-xl">ポートフォリオ閲覧</h2>
         </template>
 
         <div class="mx-auto max-w-5xl">
