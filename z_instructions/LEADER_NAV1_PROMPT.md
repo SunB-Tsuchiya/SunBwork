@@ -6,4 +6,6 @@ SunBrain Leaderの16入口をAdminと同様に整理し、SunA/一般会社の�
 
 コード検証: 一般会社の旧部品は元SHA256と一致。16入口のZiggy名、対象Lintエラー0、`/members` build、manifest参照欠落0を確認。実ブラウザ画面確認ではない。本番read-only SSHで `aa5a28f41`/main/追跡変更なし・既知未追跡5件を確認。
 
-次の一手: `LEADER_NAV_MANAGER1.md` の保存状況を確認し、固定差分を検査する。本番反映には `DEPLOY_SAKURA.md` を読み、正確なSSHコマンドを提示して確認を得る。
+本番状態: 利用者が固定SSH手順を再承認し、最初のawk失敗はmerge前で停止、修正版で本番 `aa5a28f41` から `a86dafa9f` へff-only。manifest494/参照525/欠落0、`/members` baseと追跡変更なしを確認。一般ユーザー公開は行っていない。
+
+次の一手: `LEADER_NAV_MANAGER1.md` に今回依頼したLeader上段・4分類とお知らせ・日報/勤務時間見出しの利用者画面結果を記録する。成功済みAdmin画面は再確認しない。
