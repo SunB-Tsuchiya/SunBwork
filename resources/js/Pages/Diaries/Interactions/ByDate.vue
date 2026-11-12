@@ -26,9 +26,9 @@ const props = defineProps({
 });
 
 const page = usePage();
-const isSunbrainAdmin = computed(() => props.routePrefix === 'admin' && page.props.auth?.companyType === 'sunbrain');
-const displayTitle = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.pageTitle);
-const displayHeader = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.headerTitle);
+const isSunbrainReviewer = computed(() => ['admin', 'leader'].includes(props.routePrefix) && page.props.auth?.companyType === 'sunbrain');
+const displayTitle = computed(() => isSunbrainReviewer.value ? '日報閲覧' : props.pageTitle);
+const displayHeader = computed(() => isSunbrainReviewer.value ? '日報閲覧' : props.headerTitle);
 
 // whether server requested unread-only
 const serverUnread = computed(() =>

@@ -14,7 +14,7 @@ const props = defineProps({
 });
 
 const page = usePage();
-const pageTitle = computed(() => props.routePrefix === 'admin' && page.props.auth?.companyType === 'sunbrain'
+const pageTitle = computed(() => ['admin', 'leader'].includes(props.routePrefix) && page.props.auth?.companyType === 'sunbrain'
     ? '勤務時間閲覧' : '勤務時間管理');
 
 const viewMode      = ref(props.filters?.group === 'month' ? 'month' : 'day');

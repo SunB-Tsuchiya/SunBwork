@@ -34,9 +34,9 @@ const props = defineProps({
 });
 
 const page = usePage();
-const isSunbrainAdmin = computed(() => props.routePrefix === 'admin' && page.props.auth?.companyType === 'sunbrain');
-const displayTitle = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.pageTitle);
-const displayHeader = computed(() => isSunbrainAdmin.value ? '日報閲覧' : props.headerTitle);
+const isSunbrainReviewer = computed(() => ['admin', 'leader'].includes(props.routePrefix) && page.props.auth?.companyType === 'sunbrain');
+const displayTitle = computed(() => isSunbrainReviewer.value ? '日報閲覧' : props.pageTitle);
+const displayHeader = computed(() => isSunbrainReviewer.value ? '日報閲覧' : props.headerTitle);
 
 // For index view we intentionally remove any `unread` flag before passing filters
 // to DiaryTable so the index's table does not behave as an unread-only view.
