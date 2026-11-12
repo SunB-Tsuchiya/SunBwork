@@ -1,7 +1,7 @@
 # レイアウトと UI（統合ドキュメント）
 最終更新: 2026-05-23
 
-2026-11-12追加（未配備）: SunBrain Adminの上段ナビを会社別部品に分け、SunA/未選択時は従来Adminナビを保持する。SunBrainではダッシュボード直後に日報閲覧、続いて人・組織/記録・分析/権限管理/各種設定の親タブを置き、現行URLと権限を保つ子タブへ進む。`lastTab_admin` の保存URLは変更しない。実装・検証・配備・画面確認の状態は `ADMIN_NAV_MANAGER1.md` を参照する。LeaderとSunAのタブ再編は後日。
+2026-11-12追加: SunBrain Adminの上段ナビを会社別部品に分け、SunA/未選択時は従来Adminナビを保持する。SunBrainではダッシュボード直後に日報閲覧、続いて人・組織/記録・分析/権限管理/各種設定の親タブを置き、現行URLと権限を保つ子タブへ進む。`lastTab_admin` の保存URLは変更しない。本番 `aa5a28f41` へ限定配備し、利用者が今回依頼した上段・下段・見出しの3点を画面確認済み。詳細は `ADMIN_NAV_MANAGER1.md`。LeaderとSunAのタブ再編は後日。
 
 2026-10-30追加: 情報出版SuperAdminのUserメニューだけ、`UserNavigationTabs.vue` が「仕事・案件」を上段に表示し、対象画面では `UserWorkHubTabs.vue` で5つの内側タブを表示する。判定はサーバ共有 `userWorkHub.enabled` と会社条件。モバイルとデスクトップは同じ上段定義を使う。内側タブは横スクロールでき、各既存URLを維持して `aria-current` で選択状態を示す。詳細は `USER_WORK_HUB_PLAN1.md`。
 
