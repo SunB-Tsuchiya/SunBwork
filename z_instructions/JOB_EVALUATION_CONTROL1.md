@@ -2223,3 +2223,5 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 **同日SunBrain Admin整理の実装・本番反映:** 隔離ブランチ `feature/admin-navigation-review-20261112` に会社別分離とSunBrain専用の上段6/下段19項目、日報/勤務時間/ポートフォリオの名称を保存。Generalナビはa975元ファイルとSHA256一致。対象ESLintエラー0（従来警告5）、`/members` build、manifest494件/参照548件/欠落0。利用者が正確な読取SSHとpush/配備SSHを承認。本番a975/main/追跡変更なし/既知未追跡5件を固定照合後、許可16ソース資料・新資産467＋manifest・削除0を検査して `aa5a28f41ae74b757ffde45abfbe8b3f0a33a857` へff-only。サーバ最終資産/追跡状態確認成功。ルート/認可/DB/一般ユーザー公開変更なし。**コード検証と配備は完了、今回の利用者画面確認は未実施。** 次の一手はSunBrain Adminの上段順/内側タブ/見出しだけの画面確認。別作業の `origin/main` は保持し、SunA/Leaderの整理は後日。
 
 **同日SunBrain Admin画面確認・確定（前項の回答待ちを置換）:** 利用者「成功」は直前の3点、(1) SunBrain Admin上段の指定順と日報閲覧への遷移、(2) 人・組織/記録・分析/権限管理/各種設定それぞれの下段と該当ページ遷移、(3) 勤務時間閲覧/ポートフォリオ閲覧の見出し、の全てを画面確認済みとする。今回依頼していないSunA/Leaderの実画面や、すべての権限組合せの実機検証へ拡張しない。実装・コード検証・本番配備・依頼画面確認はこのAdmin範囲で完了。次の判断はLeader整理と週末の一般ユーザー公開準備の優先順位。SunAタブ整理は別工程、一般ユーザー公開は未承認。
+
+**同日変更履歴のコード登録・表示は保留:** AGENTSの大規模作業規則に従い `ChangelogSeeder` へ `sunbrain-admin-navigation-1` を `updateOrCreate` で追加。共通Seederは他機能の登録も無条件実行するため、今回のAdminナビ本体配備ではSeederを実行せず、変更履歴の本番表示も未確認。次回の適切なコード反映と個別登録方法を決めるまで保留。Admin画面3点の成功には含めない。

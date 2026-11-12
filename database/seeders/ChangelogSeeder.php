@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-admin-navigation-1') {
+            Changelog::updateOrCreate(['version' => 'sunbrain-admin-navigation-1'], [
+                'title' => 'サン・ブレーンの管理メニューを整理',
+                'released_at' => '2026-11-12',
+                'summary' => 'Admin画面の日報閲覧をダッシュボードの右へ置き、関連する画面を人・組織、記録・分析、権限管理、各種設定のタブにまとめました。',
+                'design_files' => ['z_instructions/ADMIN_NAV_PLAN1.md'],
+                'claude_notes' => 'Codex実装。サン・ブレーンのAdmin画面だけを整理。サンエーとLeaderは従来の表示を維持。画面URL、権限、データは変更しない。',
+                'body' => '<section class="cl-feature"><h3>管理メニュー</h3><ul><li>日報閲覧をダッシュボードのすぐ右へ配置</li><li>関連する設定・権限を4つのまとまりで表示</li><li>勤務時間とポートフォリオの閲覧画面名を明確化</li></ul></section>',
+            ]);
+        }
         (new QuickWorkProofChangelogSeeder())->run();
         (new ProofCompletionNoticeChangelogSeeder())->run();
         (new LegacyReceivedCompletionChangelogSeeder())->run();
