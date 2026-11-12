@@ -85,7 +85,7 @@ const guides = computed(() => {
             key: 'user',
             title: 'ユーザー向けガイド',
             subtitle: 'User',
-            description: 'ジョブの受け取り方、予定表の使い方、日報の書き方など、一般ユーザー向けの説明書です。',
+            description: '新しいマイジョブの簡単入力、大まかな案件、依頼・続き・完了の使い方を説明します。',
             icon: '📋',
             route: 'guide.user',
             bgFrom: 'from-blue-50',

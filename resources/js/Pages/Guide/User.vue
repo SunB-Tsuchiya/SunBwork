@@ -1,333 +1,126 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
+
+const sections = [
+    { id: 'start', label: 'まずはここから' },
+    { id: 'myjob', label: 'マイジョブの作成と確認' },
+    { id: 'projects', label: '大まかな案件' },
+    { id: 'requests', label: '依頼・続き・詳しい入力' },
+    { id: 'finish', label: '完了・校正・日報' },
+    { id: 'help', label: '見つからないとき' },
+];
 </script>
 
 <template>
     <AppLayout title="ユーザー向けガイド">
         <template #header>
-            <div class="flex items-center gap-3">
-                <Link :href="route('guide.index')" class="text-sm text-blue-500 hover:underline">← ガイド一覧</Link>
+            <div class="flex flex-wrap items-center gap-3">
+                <Link :href="route('guide.index')" class="text-sm text-blue-600 hover:underline">← ガイド一覧</Link>
                 <span class="text-gray-300">/</span>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー向けガイド</h2>
+                <h2 class="text-base font-semibold text-gray-800 sm:text-xl">ユーザー向けガイド</h2>
             </div>
         </template>
 
-        <div class="space-y-6">
-            <!-- ヒーローバナー -->
-            <div class="overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500 to-sky-400 p-8 text-white shadow">
-                <div class="flex items-center gap-4">
-                    <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 text-4xl">📋</div>
-                    <div>
-                        <div class="mb-1 text-sm font-medium text-blue-100">User Guide</div>
-                        <h1 class="text-3xl font-bold">ユーザー向けガイド</h1>
-                        <p class="mt-1 text-blue-100">ジョブの受け取り・スケジュール管理・日報の基本的な使い方</p>
-                    </div>
-                </div>
+        <div class="space-y-5">
+            <div class="rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 p-6 text-white shadow-sm sm:p-8">
+                <p class="text-sm font-medium text-blue-100">仕事・案件の使い方</p>
+                <h1 class="mt-1 text-2xl font-bold sm:text-3xl">マイジョブを簡単に登録する</h1>
+                <p class="mt-3 max-w-3xl text-sm leading-7 text-blue-50 sm:text-base">
+                    日付と時間を決め、自分の仕事を登録します。カレンダーから登録した作業も、以前からあるマイジョブも、同じ一覧で確認できます。
+                </p>
             </div>
 
-            <!-- もくじ -->
-            <div class="rounded-xl border border-blue-100 bg-blue-50 p-5">
-                <h3 class="mb-3 font-semibold text-blue-700">📌 もくじ</h3>
-                <ol class="space-y-1 text-sm text-blue-600">
-                    <li><a href="#overview" class="hover:underline">1. SunBWork とは</a></li>
-                    <li><a href="#flow" class="hover:underline">2. 基本的な使い方の流れ</a></li>
-                    <li><a href="#project-jobs" class="hover:underline">3. 案件確認・進行管理表</a></li>
-                    <li><a href="#myjobbox" class="hover:underline">4. マイジョブBOX（自分でジョブを登録する）</a></li>
-                    <li><a href="#jobbox" class="hover:underline">5. 依頼されたジョブ</a></li>
-                    <li><a href="#diary" class="hover:underline">6. 日報一覧</a></li>
-                    <li><a href="#calendar" class="hover:underline">7. カレンダー</a></li>
-                    <li><a href="#proof-status" class="hover:underline">8. 校正状況</a></li>
-                    <li><a href="#proof-jobs" class="hover:underline">9. 校正ジョブ（校正メンバーのみ）</a></li>
-                    <li><a href="#settings" class="hover:underline">10. 設定</a></li>
+            <nav aria-label="このガイドの目次" class="rounded-xl border border-blue-100 bg-blue-50 p-4 sm:p-5">
+                <h2 class="font-semibold text-blue-900">このガイドの内容</h2>
+                <ol class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    <li v-for="(section, index) in sections" :key="section.id">
+                        <a :href="`#${section.id}`" class="block rounded-lg bg-white px-3 py-2 text-blue-700 hover:bg-blue-100">
+                            {{ index + 1 }}. {{ section.label }}
+                        </a>
+                    </li>
                 </ol>
-            </div>
+            </nav>
 
-            <!-- 1. SunBWork とは -->
-            <div id="overview" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">1</span>
-                    SunBWork とは
-                </h2>
-                <p class="mb-5 leading-relaxed text-gray-600">
-                    SunBWork は、日々の仕事（ジョブ）を管理し、スケジュールを立て、作業を記録するための業務支援システムです。<br />
-                    コーディネーターから仕事を受け取るだけでなく、自分で仕事を登録して進めることもできます。
-                </p>
+            <section id="start" class="scroll-mt-20 rounded-xl bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-xl font-bold text-gray-900">1. まずはここから</h2>
+                <p class="mt-3 leading-7 text-gray-700">上部の「仕事・案件」を開きます。中には「マイジョブ」「依頼されたジョブ」「大まかな案件」「案件確認」「校正状況」があります。</p>
+                <ol class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <li class="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                        <span class="text-xs font-bold text-blue-600">STEP 1</span>
+                        <h3 class="mt-1 font-semibold text-gray-900">時間を選ぶ</h3>
+                        <p class="mt-1 text-sm leading-6 text-gray-700">カレンダーで作業する時間帯を選ぶか、「マイジョブ」から「マイジョブ作成」を押します。</p>
+                    </li>
+                    <li class="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                        <span class="text-xs font-bold text-blue-600">STEP 2</span>
+                        <h3 class="mt-1 font-semibold text-gray-900">仕事を登録する</h3>
+                        <p class="mt-1 text-sm leading-6 text-gray-700">日付・開始・終了時刻と大まかな作業区分を確認して保存します。案件や作業名も必要に応じて入れます。</p>
+                    </li>
+                    <li class="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                        <span class="text-xs font-bold text-blue-600">STEP 3</span>
+                        <h3 class="mt-1 font-semibold text-gray-900">詳細から完了にする</h3>
+                        <p class="mt-1 text-sm leading-6 text-gray-700">登録した仕事はマイジョブとカレンダーに表示されます。終わったら詳細を開いて完了にします。</p>
+                    </li>
+                </ol>
+            </section>
 
-                <div class="mb-5 overflow-hidden rounded-xl border border-gray-100">
-                    <div class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500">画面上部のタブメニュー</div>
-                    <div class="divide-y divide-gray-100">
-                        <div v-for="tab in [
-                            { name: '案件確認', desc: '自分が関係する案件と進行管理表を確認' },
-                            { name: 'マイジョブBOX', desc: '自分で登録したジョブの一覧' },
-                            { name: '依頼されたジョブ', desc: 'コーディネーターから割り当てられたジョブの一覧' },
-                            { name: '日報一覧', desc: '作成した日報の履歴・新規作成' },
-                            { name: 'カレンダー', desc: 'カレンダー形式のスケジュール管理' },
-                            { name: '校正状況', desc: '校正依頼の確認・返答' },
-                            { name: '校正ジョブ', desc: '担当する校正ジョブの管理（校正メンバーのみ表示）' },
-                            { name: '設定', desc: '勤務形態・表示設定' },
-                        ]" :key="tab.name" class="flex items-center gap-4 px-4 py-3">
-                            <span class="w-40 rounded-md bg-blue-50 px-2 py-1 text-center text-sm font-medium text-blue-700">{{ tab.name }}</span>
-                            <span class="text-sm text-gray-600">{{ tab.desc }}</span>
-                        </div>
+            <section id="myjob" class="scroll-mt-20 rounded-xl bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-xl font-bold text-gray-900">2. マイジョブの作成と確認</h2>
+                <p class="mt-3 leading-7 text-gray-700">新しい作成画面は、予定の日時と作業区分を先に決める短い入力です。作業区分は前回登録した区分を初期表示します。初めて使う場合は担当に応じた区分が選ばれるので、違うときは変更してください。</p>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-lg border border-gray-200 p-4">
+                        <h3 class="font-semibold text-gray-900">最初に確認する項目</h3>
+                        <p class="mt-2 text-sm leading-6 text-gray-700">日付、開始・終了時刻、大まかな作業区分。案件・作業名・数量・単位は必要に応じて入力します。単位はページ、ファイル、件、枚、点、冊などから選ぶか直接入力できます。</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 p-4">
+                        <h3 class="font-semibold text-gray-900">一覧で確認する</h3>
+                        <p class="mt-2 text-sm leading-6 text-gray-700">行を押すと詳細が開きます。作業名・案件・分類で検索でき、年月や完了の表示も切り替えられます。以前のマイジョブを作り直す必要はありません。</p>
                     </div>
                 </div>
+                <p class="mt-4 rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-900">カレンダーに入っていない以前のマイジョブは「未予定」と表示します。同じジョブに複数日の予定がある場合は、一覧の1行から日付を確認できます。</p>
+            </section>
 
-            </div>
+            <section id="projects" class="scroll-mt-20 rounded-xl bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-xl font-bold text-gray-900">3. 大まかな案件とは</h2>
+                <p class="mt-3 leading-7 text-gray-700">部署で似た仕事をまとめて探すための分類です。例えば「○○テスト」を大グループ、「春季テスト」を中グループにし、個別の「○月○日テスト」は進行管理が作る案件として扱います。大まかな案件を選ぶだけで、個別案件や依頼ジョブが作られるわけではありません。</p>
+                <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-950">
+                    <strong>選び方：</strong>作成画面の「案件を探す」で、個別案件または大まかな案件を選びます。大グループの「＋」で中グループを開き、名前・クライアント・年度で検索できます。よく使う分類には星を付けると、次の入力でも探しやすくなります。星は自分だけのお気に入りです。
+                </div>
+                <p class="mt-4 leading-7 text-gray-700">分類には年度や複数のクライアントを関連付けられます。進行管理は個別案件を大まかな分類に関連付けられます。分類がないときは、似た名前がないか検索してから追加してください。追加した分類は同じ部署の一覧にすぐ表示されます。名前の修正・休止・整理と部署共通の並び替えは管理担当者が行います。</p>
+                <p class="mt-3 text-sm leading-6 text-gray-600">分類の追加を待たずに作業を登録したいときは、「案件がまだない場合の名前」に仮の名前を入力できます。休止中の分類は新しい仕事では選べませんが、過去の記録は残ります。</p>
+            </section>
 
-            <!-- 2. 基本的な流れ -->
-            <div id="flow" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">2</span>
-                    基本的な使い方の流れ
-                </h2>
-                <div class="flex flex-wrap items-center gap-2">
-                    <div v-for="(step, i) in [
-                        { icon: '📨', label: 'コーディネーターがジョブを配置' },
-                        { icon: '📬', label: '「依頼されたジョブ」に通知が届く' },
-                        { icon: '📅', label: 'カレンダーにスケジュールを組む' },
-                        { icon: '⚙️', label: '作業を進める' },
-                        { icon: '📝', label: '日報に作業内容を記録する' },
-                    ]" :key="i" class="flex items-center gap-2">
-                        <div class="flex flex-col items-center rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-center">
-                            <span class="text-2xl">{{ step.icon }}</span>
-                            <span class="mt-1 text-xs text-blue-700">{{ step.label }}</span>
-                        </div>
-                        <span v-if="i < 4" class="text-xl text-gray-300">→</span>
-                    </div>
+            <section id="requests" class="scroll-mt-20 rounded-xl bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-xl font-bold text-gray-900">4. 依頼・続き・詳しい入力</h2>
+                <div class="mt-4 space-y-3 text-sm leading-7 text-gray-700">
+                    <div class="rounded-lg border border-gray-200 p-4"><h3 class="font-semibold text-gray-900">依頼された仕事を登録する</h3><p>「受けた依頼から登録」か「依頼されたジョブ」の詳細から進みます。依頼元の案件や作業情報を引き継ぐ詳しい入力画面が開きます。</p></div>
+                    <div class="rounded-lg border border-gray-200 p-4"><h3 class="font-semibold text-gray-900">前の仕事を使う・続きを作る</h3><p>「過去データから流用」で仕事を選び、同じ系列の「続きとして設定」か、独立した「新規として引用」を選びます。詳細の「続きのマイジョブを作成」からも続けられます。</p></div>
+                    <div class="rounded-lg border border-gray-200 p-4"><h3 class="font-semibold text-gray-900">細かな項目を入力する</h3><p>難易度・見積時間・サイズ・細かな工程や進行表・銀本に関わる作業は「旧形式で作成」を使います。切り替え時は日付と開始・終了時刻を引き継ぎますが、入力途中の案件・作業名・数量などは引き継がれません。</p></div>
                 </div>
-            </div>
+                <p class="mt-4 text-sm leading-6 text-gray-600">登録後の簡単な仕事には、詳細画面の「詳細入力」から説明と作業ファイル情報を追加できます。ファイルを選ぶとファイル名・ページ数・サイズなどを読み取ります。ファイル本体は保存・共有されません。</p>
+            </section>
 
-            <!-- 3. 案件確認・進行管理表 -->
-            <div id="project-jobs" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">3</span>
-                    案件確認・進行管理表
-                </h2>
-                <p class="mb-4 text-gray-600">
-                    <strong class="text-blue-600">「案件確認」タブ</strong>では、自分が関係する案件と進行管理表を閲覧できます。
-                </p>
-                <div class="mb-5 flex gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
-                    <span class="text-2xl">📋</span>
-                    <div>
-                        <div class="mb-1 font-semibold text-blue-700">進行管理表からジョブを自分で登録できます</div>
-                        <p class="text-sm text-blue-600">
-                            Coordinator が作成した進行管理表を開くと、工程セルの「＋ 登録」ボタンから作業を <strong>マイジョブBOX</strong> に登録できます。
-                            登録後は「マイジョブBOX」ページから管理できます。
-                        </p>
-                    </div>
+            <section id="finish" class="scroll-mt-20 rounded-xl bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-xl font-bold text-gray-900">5. 完了・校正・日報</h2>
+                <div class="mt-4 space-y-4 text-sm leading-7 text-gray-700">
+                    <p><strong class="text-gray-900">完了：</strong>仕事が終わったら詳細の「完了にする」を押します。続きの仕事は確認画面に表示される元の仕事への影響を読んでください。依頼から登録した仕事の完了は、元の依頼にも反映されます。</p>
+                    <p><strong class="text-gray-900">校正：</strong>「校正依頼」ボタンがある仕事は詳細から依頼できます。校正管理者が担当者に依頼し、担当者が完了すると依頼者へ通知されます。校正を依頼しただけでは、元のマイジョブは完了になりません。</p>
+                    <p><strong class="text-gray-900">日報：</strong>カレンダーに入れた仕事は、その日の作業を振り返る手がかりになります。日報は「日報一覧」から作成・確認できます。</p>
+                    <p><strong class="text-gray-900">部署への表示：</strong>通常は仕事の内容を表示します。機密の仕事だけ、作成画面の「進みなどを入力する（任意）」で「内容を非公開」にしてください。機密以外は非公開にしないでください。</p>
                 </div>
-                <h3 class="mb-3 font-semibold text-gray-700">進行管理表の使い方</h3>
-                <div class="mb-4 overflow-hidden rounded-xl border border-gray-100">
-                    <div v-for="step in [
-                        { num: '①', action: '案件確認タブを開く', desc: '自分が関係する案件の一覧が表示されます' },
-                        { num: '②', action: '案件名をクリックして開く', desc: '案件詳細ページ内の「進行管理表」タブから開きます' },
-                        { num: '③', action: '担当セルを確認', desc: '🔒マーク付きの担当者欄に自分の名前があれば担当行です' },
-                        { num: '④', action: '「＋ 登録」でジョブを作る', desc: '工程セルのボタンを押してタイトル・期限を確認して登録します' },
-                        { num: '⑤', action: 'マイジョブBOXで完了にする', desc: '作業が終わったらマイジョブBOXページで「完了」を押します' },
-                    ]" :key="step.num" class="flex items-start gap-4 border-b border-gray-50 px-4 py-3 last:border-0">
-                        <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">{{ step.num }}</span>
-                        <div>
-                            <div class="text-sm font-semibold text-gray-700">{{ step.action }}</div>
-                            <div class="text-xs text-gray-500">{{ step.desc }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="rounded-lg border border-yellow-100 bg-yellow-50 p-4 text-sm text-yellow-700">
-                    <strong>✓ 完了にすると：</strong>
-                    進行管理表のセルが「✓ 完了」（黄色）に自動更新されます。Coordinator がリアルタイムで進捗を確認できます。
-                </div>
-            </div>
+            </section>
 
-            <!-- 4. マイジョブBOX -->
-            <div id="myjobbox" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">4</span>
-                    マイジョブBOX（自分でジョブを登録する）
-                </h2>
-                <p class="mb-4 text-gray-600">
-                    コーディネーターからの依頼がなくても、自分の作業を自分で登録して管理できます。進行管理表からの登録だけでなく、直接新規作成も可能です。
-                </p>
-                <div class="rounded-lg border border-dashed border-blue-200 bg-blue-50 p-4 text-sm">
-                    <div class="mb-2 font-semibold text-blue-700">「マイジョブBOX」タブ → 新規登録</div>
-                    <ul class="list-inside list-disc space-y-1 text-blue-600">
-                        <li>作業名・案件名</li>
-                        <li>締め切り日</li>
-                        <li>作業種別・サイズ・ステージ（ワークロード計算に使用）</li>
-                        <li>メモ</li>
-                    </ul>
-                </div>
-            </div>
+            <section id="help" class="scroll-mt-20 rounded-xl bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-xl font-bold text-gray-900">6. 見つからないとき</h2>
+                <dl class="mt-4 space-y-4 text-sm leading-7">
+                    <div><dt class="font-semibold text-gray-900">以前のジョブが見当たらない</dt><dd class="text-gray-700">マイジョブの年月を「全期間」にし、「完了を隠す」を外して探します。予定のない仕事は「未予定」と表示されます。</dd></div>
+                    <div><dt class="font-semibold text-gray-900">選びたい案件がない</dt><dd class="text-gray-700">案件名やクライアント名の一部で検索します。個別案件なら「完了した案件も表示する」も確認してください。見つからなければ仮の案件名で先に登録できます。</dd></div>
+                    <div><dt class="font-semibold text-gray-900">入力項目が足りない</dt><dd class="text-gray-700">新規作成中は「旧形式で作成」、登録後は詳細の「詳細入力」を確認してください。</dd></div>
+                </dl>
+            </section>
 
-            <!-- 5. 依頼されたジョブ -->
-            <div id="jobbox" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">5</span>
-                    依頼されたジョブ
-                </h2>
-                <p class="mb-4 text-gray-600">
-                    コーディネーターからジョブが割り当てられると、<strong class="text-blue-600">「依頼されたジョブ」タブ</strong>に表示されます。
-                </p>
-                <div class="mb-4 rounded-lg bg-blue-50 p-4 text-sm text-blue-700">
-                    <strong>できること：</strong>
-                    <ul class="mt-2 list-inside list-disc space-y-1">
-                        <li>ジョブの内容・締め切り・担当者コメントを確認する</li>
-                        <li>カレンダーにスケジュールをセットする</li>
-                        <li>作業が完了したら「完了」ボタンを押す</li>
-                    </ul>
-                </div>
-                <h3 class="mb-2 font-semibold text-gray-700">ステータスの意味</h3>
-                <div class="overflow-hidden rounded-xl border border-gray-100">
-                    <div v-for="s in [
-                        { status: '未読', badge: 'bg-indigo-100 text-indigo-700', desc: '割り当てられたがまだ確認していない' },
-                        { status: '確認済み', badge: 'bg-green-100 text-green-700', desc: 'ジョブの内容を確認した' },
-                        { status: 'セット済み', badge: 'bg-blue-100 text-blue-700', desc: 'カレンダーにスケジュールを組んだ' },
-                        { status: '完了', badge: 'bg-yellow-100 text-yellow-700', desc: '作業完了' },
-                    ]" :key="s.status" class="flex items-center gap-4 border-b border-gray-50 px-4 py-3 last:border-0">
-                        <span class="w-24 rounded-full px-3 py-1 text-center text-xs font-semibold" :class="s.badge">{{ s.status }}</span>
-                        <span class="text-sm text-gray-600">{{ s.desc }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 6. 日報一覧 -->
-            <div id="diary" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">6</span>
-                    日報一覧
-                </h2>
-
-                <div class="mb-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <span class="text-2xl">✨</span>
-                    <div>
-                        <div class="mb-1 font-semibold text-amber-700">日報を書くとタイムラインが自動表示されます</div>
-                        <p class="text-sm text-amber-600">
-                            日報を作成すると、<strong>その日にカレンダーに登録していたスケジュール</strong>がタイムライン形式で自動的に日報の中に表示されます。
-                        </p>
-                    </div>
-                </div>
-
-                <div class="mb-4 grid gap-3 sm:grid-cols-2">
-                    <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
-                        <div class="mb-2 text-sm font-semibold text-gray-700">📝 日報に含まれるもの</div>
-                        <ul class="space-y-1 text-sm text-gray-600">
-                            <li>・ 本文（Quillエディタで自由記述）</li>
-                            <li>・ <strong>その日のタイムライン（カレンダーの予定が自動反映）</strong></li>
-                            <li>・ 勤務情報バー（始業・終業・休憩時間）</li>
-                            <li>・ コーディネーター・リーダーからのコメント</li>
-                        </ul>
-                    </div>
-                    <div class="rounded-lg border border-blue-100 bg-blue-50 p-4">
-                        <div class="mb-2 text-sm font-semibold text-blue-700">💡 日報を書く習慣のすすめ</div>
-                        <p class="text-sm text-blue-600">
-                            毎日日報を書くことで、リーダーやコーディネーターに作業進捗が伝わり、評価・分析にも活用されます。
-                        </p>
-                    </div>
-                </div>
-
-                <div class="rounded-lg border border-dashed border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-                    <strong>「日報一覧」タブ → 新規作成</strong>　から日報を書き始められます。
-                </div>
-            </div>
-
-            <!-- 7. カレンダー -->
-            <div id="calendar" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">7</span>
-                    カレンダー
-                </h2>
-                <p class="mb-4 text-gray-600">
-                    <strong class="text-blue-600">「カレンダー」タブ</strong>で、カレンダー形式のスケジュール管理ができます。
-                </p>
-                <div class="mb-4 grid gap-3 sm:grid-cols-3">
-                    <div v-for="item in [
-                        { icon: '📌', title: 'スケジュール登録', desc: '日付クリックでイベント・作業予定を登録' },
-                        { icon: '🏢', title: 'シフト確認', desc: '出勤・在宅・休暇などを確認' },
-                        { icon: '🔗', title: 'ジョブと連携', desc: '依頼されたジョブをカレンダーにセット' },
-                    ]" :key="item.title" class="rounded-lg bg-blue-50 p-4 text-center">
-                        <div class="mb-2 text-2xl">{{ item.icon }}</div>
-                        <div class="mb-1 text-sm font-semibold text-blue-700">{{ item.title }}</div>
-                        <div class="text-xs text-blue-500">{{ item.desc }}</div>
-                    </div>
-                </div>
-                <div class="rounded-lg border border-blue-100 p-4 text-sm">
-                    <div class="mb-2 font-semibold text-gray-700">📅 スケジュール登録の手順</div>
-                    <ol class="list-inside list-decimal space-y-1 text-gray-600">
-                        <li>カレンダーの日付をクリックする</li>
-                        <li>「イベントを作成」フォームが開く</li>
-                        <li>タイトル・時間帯・関連ジョブを入力して保存する</li>
-                    </ol>
-                </div>
-            </div>
-
-            <!-- 8. 校正状況 -->
-            <div id="proof-status" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">8</span>
-                    校正状況
-                </h2>
-                <p class="mb-4 text-gray-600">
-                    <strong class="text-blue-600">「校正状況」タブ</strong>では、自分が関係する校正依頼の状況を確認できます。
-                </p>
-                <div class="overflow-hidden rounded-xl border border-gray-100">
-                    <div v-for="item in [
-                        { icon: '📥', title: '校正依頼の確認', desc: '校正管理者（Proof Admin）から届いた依頼を確認できます' },
-                        { icon: '📊', title: '進捗確認', desc: '校正作業の進捗状況をリアルタイムで確認できます' },
-                    ]" :key="item.title" class="flex items-start gap-4 border-b border-gray-50 px-4 py-4 last:border-0">
-                        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xl">{{ item.icon }}</div>
-                        <div>
-                            <div class="text-sm font-semibold text-gray-700">{{ item.title }}</div>
-                            <div class="text-xs text-gray-500">{{ item.desc }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 9. 校正ジョブ -->
-            <div id="proof-jobs" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-100 text-sm font-bold text-pink-600">9</span>
-                    校正ジョブ
-                    <span class="rounded-full bg-pink-100 px-3 py-0.5 text-xs font-semibold text-pink-600">校正メンバーのみ</span>
-                </h2>
-                <div class="mb-4 rounded-lg border border-pink-100 bg-pink-50 p-4 text-sm text-pink-700">
-                    このタブは<strong>校正メンバーとして登録されているユーザーのみ</strong>表示されます。
-                </div>
-                <p class="mb-4 text-gray-600">
-                    <strong class="text-pink-600">「校正ジョブ」タブ</strong>では、担当する校正ジョブの一覧と詳細を確認・管理できます。
-                </p>
-                <div class="overflow-hidden rounded-xl border border-gray-100">
-                    <div v-for="item in [
-                        { icon: '📋', title: '担当ジョブの確認', desc: '自分に割り当てられた校正ジョブの一覧が表示されます' },
-                        { icon: '🔍', title: '詳細・ファイル確認', desc: '校正対象のファイルや指示内容を確認できます' },
-                        { icon: '✅', title: 'ステータス更新', desc: '作業の進捗状況を更新し、Proof Admin に報告できます' },
-                    ]" :key="item.title" class="flex items-start gap-4 border-b border-gray-50 px-4 py-4 last:border-0">
-                        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-pink-50 text-xl">{{ item.icon }}</div>
-                        <div>
-                            <div class="text-sm font-semibold text-gray-700">{{ item.title }}</div>
-                            <div class="text-xs text-gray-500">{{ item.desc }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 10. 設定 -->
-            <div id="settings" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-600">10</span>
-                    設定
-                </h2>
-                <p class="text-gray-600">
-                    <strong class="text-blue-600">「設定」タブ</strong>で、自分のデフォルト勤務形態（出勤・在宅・夜勤など）を設定できます。
-                    設定した勤務形態はカレンダーに反映されます。
-                </p>
-            </div>
-
-            <!-- ガイド一覧に戻る -->
-            <div class="flex justify-center pb-4 pt-2">
-                <Link :href="route('guide.index')" class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-5 py-2 text-sm font-medium text-blue-600 shadow-sm hover:bg-blue-50">
-                    ← ガイド一覧に戻る
-                </Link>
+            <div class="pb-4 text-center">
+                <Link :href="route('guide.index')" class="inline-flex rounded-lg border border-blue-200 bg-white px-5 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">ガイド一覧に戻る</Link>
             </div>
         </div>
     </AppLayout>
