@@ -362,3 +362,9 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 `Guide/User.vue` を旧10節から新6節へ全面置換し、`Guide/Index.vue` のユーザーカード説明を更新。新しい仕事・案件/マイジョブ、簡単入力、大まかな案件、依頼/続き/旧形式、完了/校正/機密、探し方のみ。対象ESLint成功、`VITE_APP_BASE_PATH=/members npm run build` 成功（初回は隔離treeのvendorなしで停止しsymlink追加後に成功）、manifest494件/参照548件/欠落0/旧追跡資産欠落0。機能権限/routes/DB変更なし。コード/検証済み、配備/利用者画面未実施。
 
 AGENTSの正確な読み取り専用SSHを提示し利用者承認。同一コマンドのsandbox DNS失敗後、許可環境でexit0。本番9b6f5a64b/main、追跡変更なし/既知未追跡5件/manifest未変更。次の一手は9b6f固定でガイド変更だけの安全な差分を保存し、正確な配備コマンドの事前確認を得る。一般User機能公開は未承認のまま。
+
+## 2026-11-12 ガイドのみ本番へ反映、表示回答待ち
+
+保存branch `feature/myjob-public-guide-draft-20261112`、固定先 `a975c63e57a2d18a1369356fe95a1c4896a896da` をoriginへpush。固定手順 `/tmp/sunbwork-guide-only-deploy-20261112.sh` SHA256 `59565cba59f6f4ec0c5b8aaa1bf5319005f22751347f547605bd7dee1d4ed1a6`、`sh -n`成功。利用者が提示した正確なSSHを承認し、exit0。本番9b6f/main/追跡変更なし/既知未追跡5件/旧manifestとtarget差分を検査し、ガイドVue2件＋資料4件＋新build資産467/manifest1、削除0だけでa975へff-only。manifest494件/548参照/欠落0/members base。最終追跡変更なし・既知未追跡保持。他のClaude作業・権限・route・DB・migration・seedは変更なし。
+
+実装/対象ESLint/build/限定配備は完了。ガイド一覧と本文の利用者画面は未確認。今回だけ依頼した画面2点は(1) `/members/guide` のユーザー向けカードが新説明、(2) 開いた本文が新6節で旧10節/旧マイジョブBOXの説明なし。両方なら「成功」、違いは番号と内容。マイジョブ・校正の成功済み実操作は再試験しない。一般User新機能の公開は未承認。次の一手は今回2点の回答を記録する。
