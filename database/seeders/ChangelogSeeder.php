@@ -157,6 +157,36 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-superadmin-navigation-1') {
+            Changelog::updateOrCreate(['version' => 'sunbrain-superadmin-navigation-1'], [
+                'title' => 'サン・ブレーンのSuper Adminメニューを整理',
+                'released_at' => '2026-11-13',
+                'summary' => 'Super Admin画面の既存メニューを人・組織、記録・分析、権限管理、各種設定にまとめ、仕事・案件の試用入口を残しました。',
+                'design_files' => ['z_instructions/SUPERADMIN_NAV_PLAN1.md'],
+                'claude_notes' => 'Codex実装。サン・ブレーンのSuper Admin画面だけを整理。現行18入口、試用と分析の表示条件、別タブ、画面URL、権限を維持。サンエーのメニューと一般ユーザー公開範囲は変更しない。利用者が上段、分類、試用と分析入口を画面確認済み。',
+                'body' => '<section class="cl-feature"><h3>Super Adminメニュー</h3><ul><li>関連画面を人・組織、記録・分析、権限管理、各種設定の4つに分類</li><li>仕事・案件（試用）は上段に残す</li><li>作業量分析は従来どおり別タブで開く</li><li>既存にない日報閲覧の入口は追加しない</li></ul></section>',
+            ]);
+        }
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-leader-navigation-1') {
+            Changelog::updateOrCreate(['version' => 'sunbrain-leader-navigation-1'], [
+                'title' => 'サン・ブレーンのLeaderメニューを整理',
+                'released_at' => '2026-11-12',
+                'summary' => 'Leader画面の日報閲覧をダッシュボードの右へ置き、案件、組織、権限、設定の画面をまとまりごとに探せるようにしました。',
+                'design_files' => ['z_instructions/LEADER_NAV_PLAN1.md'],
+                'claude_notes' => 'Codex実装。サン・ブレーンのLeader画面だけを整理。サンエーの従来表示、画面URL、権限、データは変更しない。利用者が上段、内側タブ、日報・勤務時間の見出しを画面確認済み。',
+                'body' => '<section class="cl-feature"><h3>Leaderメニュー</h3><ul><li>日報閲覧をダッシュボードのすぐ右へ配置</li><li>人・組織、記録・分析、権限管理、各種設定に関連画面を分類</li><li>お知らせ通知は独立した入口を保持</li><li>勤務時間と日報の閲覧画面名を明確化</li></ul></section>',
+            ]);
+        }
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-admin-navigation-1') {
+            Changelog::updateOrCreate(['version' => 'sunbrain-admin-navigation-1'], [
+                'title' => 'サン・ブレーンの管理メニューを整理',
+                'released_at' => '2026-11-12',
+                'summary' => 'Admin画面の日報閲覧をダッシュボードの右へ置き、関連する画面を人・組織、記録・分析、権限管理、各種設定のタブにまとめました。',
+                'design_files' => ['z_instructions/ADMIN_NAV_PLAN1.md'],
+                'claude_notes' => 'Codex実装。サン・ブレーンのAdmin画面だけを整理。サンエーとLeaderは従来の表示を維持。画面URL、権限、データは変更しない。',
+                'body' => '<section class="cl-feature"><h3>管理メニュー</h3><ul><li>日報閲覧をダッシュボードのすぐ右へ配置</li><li>関連する設定・権限を4つのまとまりで表示</li><li>勤務時間とポートフォリオの閲覧画面名を明確化</li></ul></section>',
+            ]);
+        }
         (new QuickWorkProofChangelogSeeder())->run();
         (new ProofCompletionNoticeChangelogSeeder())->run();
         (new LegacyReceivedCompletionChangelogSeeder())->run();
