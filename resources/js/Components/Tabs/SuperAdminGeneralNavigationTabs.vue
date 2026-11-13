@@ -1,0 +1,263 @@
+<script setup>
+import { computed } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
+
+const props = defineProps({
+    active: { type: String, default: '' },
+});
+
+const page = usePage();
+const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
+const canAccessWorkRecordTrial = computed(() => page.props.auth?.canAccessWorkRecordTrial ?? false);
+const canAccessWorkHubPreview = computed(() => page.props.auth?.user?.user_role === 'superadmin'
+    && Boolean(page.props.userWorkHub?.enabled) && page.props.auth?.companyType !== 'general');
+
+// SuperAdmin カラー: yellow
+const tab = (key) => [
+    'rounded-md px-3 py-2 text-sm font-medium',
+    props.active === key
+        ? 'bg-yellow-100 text-yellow-700'
+        : 'border border-yellow-200 text-yellow-600 hover:bg-yellow-50 hover:text-yellow-800',
+];
+
+function tryRoute(name) {
+    try { return route(name); } catch { return null; }
+}
+
+const tabs = computed(() => [
+    { key: 'dashboard', href: tryRoute('superadmin.dashboard'), label: 'ダッシュボード' },
+    {
+        key: 'companies',
+        href: tryRoute('superadmin.companies.index'),
+        label: '会社の追加と管理',
+        condition: typeof route === 'function' && route().has('superadmin.companies.index'),
+    },
+    {
+        key: 'company_groups',
+        href: tryRoute('super-admin.company-groups.index'),
+        label: 'グループ会社設定',
+        condition: typeof route === 'function' && route().has('super-admin.company-groups.index'),
+    },
+    {
+        key: 'membership',
+        href: tryRoute('superadmin.membership.edit'),
+        label: '会社・部署設定',
+        condition: typeof route === 'function' && route().has('superadmin.membership.edit'),
+    },
+    { key: 'all_users', href: tryRoute('superadmin.users.index'), label: 'ユーザー管理' },
+    { key: 'users', href: tryRoute('superadmin.adminusers.index'), label: 'Adminユーザー管理' },
+    { key: 'admin_permissions', href: tryRoute('superadmin.admin_permissions.index'), label: 'Admin権限管理' },
+    { key: 'position_titles', href: tryRoute('superadmin.position_titles.index'), label: '役職称号管理' },
+    {
+        key: 'sales_analysis',
+        href: tryRoute('superadmin.sales_analysis.dashboard'),
+        label: '売上分析',
+        condition: canAccessSalesAnalysis.value && typeof route === 'function' && route().has('superadmin.sales_analysis.dashboard'),
+    },
+    {
+        key: 'sales_analysis_permissions',
+        href: tryRoute('superadmin.sales_analysis_permissions.index'),
+        label: '売上分析 利用許可設定',
+        condition: typeof route === 'function' && route().has('superadmin.sales_analysis_permissions.index'),
+    },
+    {
+        key: 'ai',
+        href: tryRoute('superadmin.ai.index'),
+        label: 'AI設定',
+        condition: typeof route === 'function' && route().has('superadmin.ai.index'),
+    },
+    {
+        key: 'workload',
+        href: tryRoute('superadmin.workload_analyzer.index'),
+        label: '作業量分析',
+        newTab: true,
+        condition: typeof route === 'function' && route().has('superadmin.workload_analyzer.index'),
+    },
+    {
+        key: 'work_hub_preview',
+        href: tryRoute('user.myjobbox.index'),
+        label: '仕事・案件（試用）',
+        condition: canAccessWorkHubPreview.value,
+    },
+    {
+        key: 'broad_projects',
+        href: tryRoute('superadmin.broad_projects.index'),
+        label: '大まかな案件',
+        condition: canAccessWorkRecordTrial.value && typeof route === 'function' && route().has('superadmin.broad_projects.index'),
+    },
+    {
+        key: 'applicants',
+        href: tryRoute('admin.applicants.index'),
+        label: '申請者管理',
+        condition: typeof route === 'function' && route().has('admin.applicants.index'),
+    },
+    {
+        key: 'scripts',
+        href: tryRoute('superadmin.scripts.index'),
+        label: 'スクリプト管理',
+        condition: typeof route === 'function' && route().has('superadmin.scripts.index'),
+    },
+    {
+        key: 'demo_pages',
+        href: tryRoute('superadmin.demo_pages.index'),
+        label: 'デモページ管理',
+        condition: typeof route === 'function' && route().has('superadmin.demo_pages.index'),
+    },
+    { key: 'debug', href: tryRoute('debug.api'), label: 'APIデバッグページ' },
+].filter(t => t.condition !== false && t.href));
+
+function onMobileSelect(e) {
+    const href = e.target.value;
+    const selectedTab = tabs.value.find((tab) => tab.href === href);
+    if (selectedTab?.newTab) window.open(href, '_blank', 'noopener,noreferrer');
+    else if (href) router.get(href);
+}
+</script>
+
+<template>
+    <div class="mb-4">
+        <!-- モバイル: ドロップダウン -->
+        <div class="sm:hidden">
+            <select
+                @change="onMobileSelect"
+                class="w-full rounded-md border border-yellow-300 bg-white px-3 py-2 text-sm text-yellow-700 shadow-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+            >
+                <option value="">— ページを選択 —</option>
+                <option
+                    v-for="t in tabs"
+                    :key="t.key"
+                    :value="t.href"
+                    :selected="active === t.key"
+                >{{ t.label }}</option>
+            </select>
+        </div>
+
+        <!-- デスクトップ: タブ -->
+        <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.dashboard')"
+                :href="route('superadmin.dashboard')"
+                :class="tab('dashboard')"
+            >
+                ダッシュボード
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.companies.index')"
+                :href="route('superadmin.companies.index')"
+                :class="tab('companies')"
+            >
+                会社の追加と管理
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('super-admin.company-groups.index')"
+                :href="route('super-admin.company-groups.index')"
+                :class="tab('company_groups')"
+            >
+                グループ会社設定
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.membership.edit')"
+                :href="route('superadmin.membership.edit')"
+                :class="tab('membership')"
+            >
+                会社・部署設定
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.users.index')"
+                :href="route('superadmin.users.index')"
+                :class="tab('all_users')"
+            >
+                ユーザー管理
+            </Link>
+            <Link
+                :href="route('superadmin.adminusers.index')"
+                :class="tab('users')"
+            >
+                Adminユーザー管理
+            </Link>
+            <Link
+                :href="route('superadmin.admin_permissions.index')"
+                :class="tab('admin_permissions')"
+            >
+                Admin権限管理
+            </Link>
+            <Link
+                :href="route('superadmin.position_titles.index')"
+                :class="tab('position_titles')"
+            >
+                役職称号管理
+            </Link>
+            <Link
+                v-if="canAccessSalesAnalysis && typeof route === 'function' && route().has('superadmin.sales_analysis.dashboard')"
+                :href="route('superadmin.sales_analysis.dashboard')"
+                :class="tab('sales_analysis')"
+            >
+                売上分析
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.sales_analysis_permissions.index')"
+                :href="route('superadmin.sales_analysis_permissions.index')"
+                :class="tab('sales_analysis_permissions')"
+            >
+                売上分析 利用許可設定
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.ai.index')"
+                :href="route('superadmin.ai.index')"
+                :class="tab('ai')"
+            >
+                AI設定
+            </Link>
+            <a
+                v-if="typeof route === 'function' && route().has('superadmin.workload_analyzer.index')"
+                :href="route('superadmin.workload_analyzer.index')"
+                target="_blank"
+                rel="noopener noreferrer"
+                :class="tab('workload')"
+            >
+                作業量分析
+            </a>
+            <Link
+                v-if="canAccessWorkHubPreview"
+                :href="route('user.myjobbox.index')"
+                :class="tab('work_hub_preview')"
+            >
+                仕事・案件（試用）
+            </Link>
+            <Link
+                v-if="canAccessWorkRecordTrial && typeof route === 'function' && route().has('superadmin.broad_projects.index')"
+                :href="route('superadmin.broad_projects.index')"
+                :class="tab('broad_projects')"
+            >
+                大まかな案件
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('admin.applicants.index')"
+                :href="route('admin.applicants.index')"
+                :class="tab('applicants')"
+            >
+                申請者管理
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.scripts.index')"
+                :href="route('superadmin.scripts.index')"
+                :class="tab('scripts')"
+            >
+                スクリプト管理
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.demo_pages.index')"
+                :href="route('superadmin.demo_pages.index')"
+                :class="tab('demo_pages')"
+            >
+                デモページ管理
+            </Link>
+            <Link
+                :href="route('debug.api')"
+                :class="tab('debug')"
+            >
+                APIデバッグページ
+            </Link>
+        </nav>
+    </div>
+</template>
