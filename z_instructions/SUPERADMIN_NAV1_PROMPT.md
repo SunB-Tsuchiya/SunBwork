@@ -6,4 +6,6 @@
 
 コード検証: 一般会社用旧部品と元版SHA256一致。18入口の旧新ルート名一致、Ziggy名照合、対象Lintエラー0、`/members` build成功、manifest494/参照525/欠落0、旧資産削除0・新資産467件。実ブラウザ確認ではない。
 
-次の一手: `SUPERADMIN_NAV_MANAGER1.md` の段階を見て、ソースとビルドを保存する。配備時は `DEPLOY_SAKURA.md` に従い、正確なSSHコマンドを提示して確認を得る。
+本番状態: 利用者が固定SSH手順を承認し、本番 `a86dafa9f` から隔離branch `719f0b575` へff-only。manifest494/参照525/欠落0・`/members` base、最終追跡変更なしを確認。一般ユーザー公開は行っていない。
+
+次の一手: `SUPERADMIN_NAV_MANAGER1.md` に今回依頼したSuper Admin上段・4分類・試用入口/別タブの利用者画面結果を記録する。成功済みAdmin/Leader画面は再確認しない。
