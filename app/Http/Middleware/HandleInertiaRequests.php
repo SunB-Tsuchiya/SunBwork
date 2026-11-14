@@ -8,6 +8,7 @@ use App\Models\JobNotification;
 use App\Models\LeaderPermission;
 use App\Models\ProofTeamMember;
 use App\Models\ScheduleNotification;
+use App\Services\BroadProjectTree;
 use App\Services\PersonalWorkSchedule;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -248,6 +249,10 @@ class HandleInertiaRequests extends Middleware
                 'canAccessPortfolio' => $request->user() ? \App\Services\Portfolio\PortfolioAccess::canUse($request->user()) : false,
                 'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()
                     && app(PersonalWorkSchedule::class)->available($request->user()),
+                // Coordinator の分類整理入口は、画面本体と同じ会社・部署・ロール判定で表示する。
+                'canManageCoordinatorBroadProjects' => $request->routeIs('coordinator.*')
+                    && $request->user()
+                    && app(BroadProjectTree::class)->canManage($request->user()),
                 // 校正チームメンバーフラグ
                 'isProofMember' => $request->user()
                     ? ProofTeamMember::where('user_id', $request->user()->id)->exists()

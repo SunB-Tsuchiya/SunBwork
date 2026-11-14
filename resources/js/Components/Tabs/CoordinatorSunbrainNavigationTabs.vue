@@ -19,8 +19,8 @@ const entries = computed(() => [
     { key: 'diaries', group: null, label: '日報閲覧', route: 'diary_manager.diaryinteractions.index', visible: page.props.auth?.isDiaryManager === true },
 
     { key: 'projects', group: 'projects', label: '案件一覧', route: 'coordinator.project_jobs.index', prefix: 'coordinator.project_jobs.' },
+    { key: 'broad_projects', group: 'projects', label: '大まかな案件の整理', route: 'coordinator.broad_projects.index', prefix: 'coordinator.broad_projects.', visible: page.props.auth?.canManageCoordinatorBroadProjects === true },
     { key: 'jobs', group: 'projects', label: 'ジョブ一覧', route: 'coordinator.jobbox' },
-    { key: 'broad_projects', group: 'projects', label: '大まかな案件', route: 'coordinator.broad_projects.index', prefix: 'coordinator.broad_projects.', visible: page.props.auth?.canManageBroadProjects === true },
     { key: 'calendar', group: 'projects', label: '案件カレンダー', route: 'coordinator.project_jobs.calendar' },
     { key: 'progress_sheet_list', group: 'projects', label: '進行表一覧', route: 'coordinator.progress_sheet_list.index', prefix: 'coordinator.progress_sheet_list.' },
     { key: 'workflow_sheet_list', group: 'projects', label: '管理シート一覧', route: 'coordinator.workflow_sheet_list.index', prefix: 'coordinator.workflow_sheet_list.' },
