@@ -1,5 +1,7 @@
 # 部署の作業・一般向け記録表示 管理1
 
+> 2026-11-14後続判断: 利用者は情報出版全員への「部署の作業」公開を明示。従来の「一般公開未承認」はこの範囲で置換された。読取専用guardとカレンダー入力統合の新しい設計正本は `INFO_DEPARTMENT_MYJOB_PLAN1.md` / MANAGER / PROMPT。今回のアプリ実装・追加配備・一般Userの部署画面確認は未実施。次は新設計の確認。
+
 更新: 2026-10-30 JST。設計はDEPARTMENT_RECORDS_PLAN1.md、再開はDEPARTMENT_RECORDS1_PROMPT.md。
 
 ## 現在の一手
