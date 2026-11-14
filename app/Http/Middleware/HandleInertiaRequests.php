@@ -110,6 +110,11 @@ class HandleInertiaRequests extends Middleware
             // セッション移行（login() / regenerate()）後も soft navigation で
             // meta[name="csrf-token"] が更新されるよう AppLayout が参照している。
             'csrf_token' => csrf_token(),
+            // 試用の仕事・案件ナビは、本人の会社コンテキストでだけ共有する。
+            'userWorkHub' => fn () => $request->user() && $contextCompany
+                && (int) $contextCompany->id === (int) $request->user()->company_id
+                    ? app(\App\Services\UserWorkHub::class)->navigation($request->user())
+                    : ['enabled' => false, 'unregisteredRequests' => 0],
             // クラーク系カレンダーのルート名の接頭辞。営業のカレンダー（suna.sales.*）だけ 'suna.sales'、それ以外は 'clerk'
             'clerkCalendarRoutePrefix' => $request->routeIs('suna.sales.*') ? 'suna.sales' : 'clerk',
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
@@ -250,6 +255,10 @@ class HandleInertiaRequests extends Middleware
                 'canAccessPortfolio' => $request->user() ? \App\Services\Portfolio\PortfolioAccess::canUse($request->user()) : false,
                 'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()
                     && app(PersonalWorkSchedule::class)->available($request->user()),
+                // 旧ナビが参照する分類管理権限。会社コンテキストの切り替え時は出さない。
+                'canManageBroadProjects' => $request->user() && $contextCompany
+                    && (int) $contextCompany->id === (int) $request->user()->company_id
+                    && app(BroadProjectTree::class)->canManage($request->user()),
                 // Coordinator の分類整理入口は、画面本体と同じ会社・部署・ロール判定で表示する。
                 'canManageCoordinatorBroadProjects' => $request->routeIs('coordinator.*')
                     && $request->user()
