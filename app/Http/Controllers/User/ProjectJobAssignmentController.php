@@ -63,7 +63,7 @@ class ProjectJobAssignmentController extends Controller
     {
         $myJobModal = $request->boolean('myjob_modal');
         if ($myJobModal) {
-            abort_unless(app(PersonalWorkSchedule::class)->available($request->user()), 403);
+            abort_unless(app(PersonalWorkSchedule::class)->personalAvailable($request->user()), 403);
             $request->validate([
                 'assignments' => ['required', 'array', 'size:1'],
                 'assignments.0.desired_start_date' => ['required', 'date_format:Y-m-d'],

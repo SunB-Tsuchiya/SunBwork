@@ -28,9 +28,10 @@ class BroadProjectController extends Controller
 
     protected function authorizeContext(Request $request): void
     {
-        $this->tree->authorize($request->user());
         if (str_starts_with($this->prefix($request), 'user.')) {
-            abort_unless($this->schedule->available($request->user()), 403);
+            $this->tree->authorizeBrowse($request->user());
+        } else {
+            $this->tree->authorize($request->user());
         }
     }
 
@@ -41,6 +42,7 @@ class BroadProjectController extends Controller
             'projects' => app(BroadProjectFavorites::class)->decorate($request->user(), $this->tree->rows($request->user())),
             'routePrefix' => $this->prefix($request),
             'canManage' => $this->tree->canManage($request->user()),
+            'canCreate' => $this->tree->canBrowse($request->user()),
         ]);
     }
 
@@ -57,7 +59,7 @@ class BroadProjectController extends Controller
     public function store(Request $request)
     {
         $this->authorizeContext($request);
-        $this->tree->save($request->user(), $request->all());
+        $this->tree->save($request->user(), $request->all(), null, str_starts_with($this->prefix($request), 'user.'));
         return to_route($this->prefix($request).'.index')->with('success', '大まかな案件を追加しました。');
     }
 

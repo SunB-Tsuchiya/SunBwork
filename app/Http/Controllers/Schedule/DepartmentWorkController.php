@@ -152,7 +152,7 @@ class DepartmentWorkController extends Controller
     public function options(Request $request)
     {
         $viewer = $request->user();
-        abort_unless($this->schedule->available($viewer), 403);
+        abort_unless($this->schedule->personalAvailable($viewer), 403);
         $params = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'selected_id' => ['nullable', 'integer'],
@@ -242,7 +242,7 @@ class DepartmentWorkController extends Controller
     public function mine(Request $request)
     {
         $user = $request->user();
-        abort_unless($this->schedule->available($user), 403);
+        abort_unless($this->schedule->personalAvailable($user), 403);
         $range = $request->validate([
             'start' => ['required', 'date_format:Y-m-d'],
             'end' => ['required', 'date_format:Y-m-d', 'after_or_equal:start'],
@@ -351,7 +351,7 @@ class DepartmentWorkController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($this->schedule->available($user), 403);
+        abort_unless($this->schedule->personalAvailable($user), 403);
         $data = $this->validatedEntry($request, $user);
         $entry = PersonalWorkEntry::create($data + [
             'user_id' => $user->id,
@@ -364,7 +364,7 @@ class DepartmentWorkController extends Controller
     public function update(Request $request, PersonalWorkEntry $entry)
     {
         $user = $request->user();
-        abort_unless($this->schedule->available($user) && (int) $entry->user_id === (int) $user->id, 403);
+        abort_unless($this->schedule->personalAvailable($user) && (int) $entry->user_id === (int) $user->id, 403);
         abort_if($entry->source_event_id, 422);
         $data = $this->validatedEntry($request, $user, in_array($entry->plan_slot, ['am', 'pm', 'full'], true), $entry);
         abort_if($entry->diary_id && $entry->work_date->toDateString() !== $data['work_date'], 422, '日報へ取り込んだ作業の日付は変更できません。');
@@ -375,7 +375,7 @@ class DepartmentWorkController extends Controller
     public function destroy(Request $request, PersonalWorkEntry $entry)
     {
         $user = $request->user();
-        abort_unless($this->schedule->available($user) && (int) $entry->user_id === (int) $user->id, 403);
+        abort_unless($this->schedule->personalAvailable($user) && (int) $entry->user_id === (int) $user->id, 403);
         DB::transaction(function () use ($entry) {
             $locked = PersonalWorkEntry::whereKey($entry->id)->lockForUpdate()->firstOrFail();
             abort_if($locked->diary_id, 422, '日報へ取り込んだ記録は日報編集画面で変更してください。');

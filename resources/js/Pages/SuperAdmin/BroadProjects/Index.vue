@@ -15,6 +15,7 @@ const props = defineProps({
     projects: { type: Array, default: () => [] },
     routePrefix: { type: String, default: 'superadmin.broad_projects' },
     canManage: { type: Boolean, default: false },
+    canCreate: { type: Boolean, default: false },
 });
 const query = ref('');
 const showInactive = ref(false);
@@ -88,14 +89,14 @@ function toggle(id) {
             <LeaderNavigationTabs v-else active="broad_projects" />
         </template>
         <div class="rounded bg-white p-6 shadow">
-            <p class="text-sm text-gray-600">部署で使う案件の分類です。グループを開くと中の分類を確認できます。大グループと、その中の中グループで整理します。名前の編集・中グループの移動・部署共通の並べ替えは別々に操作できます。</p>
+            <p class="text-sm text-gray-600">部署で使う案件の分類です。グループを開くと中の分類を確認できます。大グループと、その中の中グループで整理します。<span v-if="canManage">名前の編集・中グループの移動・部署共通の並べ替えは別々に操作できます。</span></p>
             <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-3">
                     <input v-model="query" type="search" maxlength="100" placeholder="名前・親グループ・取引先・年度" aria-label="大まかな案件を検索" class="w-full rounded border px-3 py-2 text-sm sm:w-80" />
                     <label class="flex items-center gap-2 text-sm"><input v-model="showInactive" type="checkbox" />休止中も表示</label>
                     <label class="flex items-center gap-2 text-sm"><input v-model="favoritesOnly" type="checkbox" />お気に入りだけ（{{ favoriteIds.size }}）</label>
                 </div>
-                <button v-if="canManage" type="button" class="rounded px-4 py-2 text-sm font-medium" :class="broadProjectColor(routePrefix)" @click="openCreate()">大グループを追加</button>
+                <button v-if="canCreate" type="button" class="rounded px-4 py-2 text-sm font-medium" :class="broadProjectColor(routePrefix)" @click="openCreate()">大グループを追加</button>
             </div>
             <div class="mt-4 flex flex-wrap items-center gap-4 text-sm">
                 <span class="text-gray-500">登録 {{ projects.length }}件 ／ 表示 {{ rows.length }}件</span>
@@ -111,7 +112,7 @@ function toggle(id) {
                 <li v-for="project in rows" :key="project.id" class="flex flex-wrap items-center justify-between gap-3 py-3 hover:bg-gray-50">
                     <div class="min-w-0 flex-1" :style="{ paddingLeft: `${project.depth * 20}px` }">
                         <div class="flex items-start gap-2">
-                            <button v-if="canManage" type="button" :disabled="favoritePending.has(project.id) || (!project.selectable && !favoriteIds.has(project.id))" :aria-pressed="favoriteIds.has(project.id)" :aria-label="`${project.name}をお気に入り${favoriteIds.has(project.id) ? 'から解除' : 'に登録'}`" class="shrink-0 text-lg leading-6 disabled:opacity-30" :class="favoriteIds.has(project.id) ? 'text-yellow-600' : 'text-gray-400'" @click="setFavorite(project)">{{ favoriteIds.has(project.id) ? '★' : '☆' }}</button>
+                            <button type="button" :disabled="favoritePending.has(project.id) || (!project.selectable && !favoriteIds.has(project.id))" :aria-pressed="favoriteIds.has(project.id)" :aria-label="`${project.name}をお気に入り${favoriteIds.has(project.id) ? 'から解除' : 'に登録'}`" class="shrink-0 text-lg leading-6 disabled:opacity-30" :class="favoriteIds.has(project.id) ? 'text-yellow-600' : 'text-gray-400'" @click="setFavorite(project)">{{ favoriteIds.has(project.id) ? '★' : '☆' }}</button>
                             <button v-if="project.childCount" type="button" class="w-6 shrink-0 rounded border text-gray-600" :aria-expanded="project.open" :aria-label="`${project.name}を${project.open ? '閉じる' : '開く'}`" @click="toggle(project.id)">{{ project.open ? '−' : '＋' }}</button>
                             <span v-else class="w-6 shrink-0" aria-hidden="true"></span>
                             <div class="min-w-0 break-words">
@@ -124,11 +125,11 @@ function toggle(id) {
                             </div>
                         </div>
                     </div>
-                    <div v-if="canManage" class="flex shrink-0 flex-wrap gap-4 text-sm">
-                        <button v-if="!project.parent_id" type="button" class="text-blue-700 underline" :aria-label="`${project.name}に中グループを追加`" @click="openCreate(project.id)">中グループを追加</button>
-                        <button v-if="!project.parent_id && siblings(projects, project.id).length > 1" type="button" class="text-blue-700 underline" :aria-label="`${project.name}内の並べ替え`" @click="openOrder(project.id)">中グループの並べ替え</button>
-                        <button v-if="project.parent_id" type="button" class="text-blue-700 underline" :aria-label="`${project.name}を別の大グループへ移動`" @click="openMove(project)">グループ移動</button>
-                        <button type="button" class="text-blue-700 underline" :aria-label="`${project.name}を編集`" @click="openEdit(project)">編集</button>
+                    <div v-if="canCreate || canManage" class="flex shrink-0 flex-wrap gap-4 text-sm">
+                        <button v-if="canCreate && !project.parent_id" type="button" class="text-blue-700 underline" :aria-label="`${project.name}に中グループを追加`" @click="openCreate(project.id)">中グループを追加</button>
+                        <button v-if="canManage && !project.parent_id && siblings(projects, project.id).length > 1" type="button" class="text-blue-700 underline" :aria-label="`${project.name}内の並べ替え`" @click="openOrder(project.id)">中グループの並べ替え</button>
+                        <button v-if="canManage && project.parent_id" type="button" class="text-blue-700 underline" :aria-label="`${project.name}を別の大グループへ移動`" @click="openMove(project)">グループ移動</button>
+                        <button v-if="canManage" type="button" class="text-blue-700 underline" :aria-label="`${project.name}を編集`" @click="openEdit(project)">編集</button>
                     </div>
                 </li>
             </ul>
@@ -139,7 +140,7 @@ function toggle(id) {
                 <button type="button" class="text-sm text-gray-600 underline" @click="modal = null">閉じる</button>
             </div>
             <div class="p-6">
-                <BroadProjectForm v-if="modal === 'edit' || modal === 'create'" :key="`${modal}-${editingProject?.id || initialParentId || 0}`" :project="editingProject" :projects="projects" :initial-parent-id="initialParentId" :route-prefix="routePrefix" @saved="modal = null" @cancel="modal = null" />
+                <BroadProjectForm v-if="modal === 'edit' || modal === 'create'" :key="`${modal}-${editingProject?.id || initialParentId || 0}`" :project="editingProject" :projects="projects" :initial-parent-id="initialParentId" :route-prefix="routePrefix" :allow-status="canManage" @saved="modal = null" @cancel="modal = null" />
                 <form v-if="modal === 'move'" class="space-y-4" @submit.prevent="move">
                     <p class="text-sm">「{{ editingProject.name }}」を別の大グループへ移動します。名前や作業の参照は保持します。</p>
                     <label class="block text-sm">移動先の大グループ

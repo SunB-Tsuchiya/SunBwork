@@ -17,7 +17,7 @@ class DiaryWorkEntries
 
     public function candidates(User $user, string $date): array
     {
-        if (! $this->schedule->available($user)) return [];
+        if (! $this->schedule->personalAvailable($user)) return [];
         $candidates = $this->schedule->ownCandidates($user, $date);
         $saved = PersonalWorkEntry::where('user_id', $user->id)->whereDate('work_date', $date)
             ->whereNotNull('diary_id')->get()->keyBy(fn ($row) => $row->source_event_id ? 'event-'.$row->source_event_id : 'entry-'.$row->id);
@@ -68,7 +68,8 @@ class DiaryWorkEntries
 
     public function sync(Diary $diary, User $user, array $rows): void
     {
-        if (! $this->schedule->available($user) && $rows) abort(403);
+        if ($rows && (int) $diary->user_id !== (int) $user->id) abort(403);
+        if (! $this->schedule->personalAvailable($user) && $rows) abort(403);
         $date = $diary->date->toDateString();
         $validEvents = $rows ? $this->schedule->eventsForUsers([$user->id], $date)
             ->filter(fn (Event $event) => (int) $event->user_id === (int) $user->id && $event->project_job_assignment_id)

@@ -107,7 +107,7 @@ class DiaryController extends Controller
                 'diaries' => $diariesArr,
                 'meta' => null,
                 'filters' => $filters,
-                'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($request->user()),
+                'myJobModalEnabled' => app(PersonalWorkSchedule::class)->personalAvailable($request->user()),
             ]);
         }
 
@@ -145,7 +145,7 @@ class DiaryController extends Controller
                 'diaries' => $diariesArr,
                 'meta' => $meta,
                 'filters' => $filters,
-                'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($request->user()),
+                'myJobModalEnabled' => app(PersonalWorkSchedule::class)->personalAvailable($request->user()),
             ]);
         }
 
@@ -219,7 +219,7 @@ class DiaryController extends Controller
             'diaries' => collect($diariesArr),
             'meta' => $meta,
             'filters' => $filters,
-            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($request->user()),
+            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->personalAvailable($request->user()),
         ]);
     }
 
@@ -249,7 +249,7 @@ class DiaryController extends Controller
             'date'               => $date,
             'worktypes'          => $worktypes,
             'defaultWorktypeId'  => $defaultWorktypeId,
-            'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
+            'personalWorkEnabled' => app(PersonalWorkSchedule::class)->personalAvailable($user),
             'workReminder' => $this->workReminder($user, $date),
         ]);
     }
@@ -347,7 +347,11 @@ class DiaryController extends Controller
         }
 
         $diaryArray = $diary->toArray();
-        if (! Auth::user()->isSuperAdmin()) unset($diaryArray['personal_work_entries']);
+        if (! Auth::user()->isSuperAdmin()
+            && ((int) Auth::id() !== (int) $diary->user_id
+                || ! app(PersonalWorkSchedule::class)->personalAvailable(Auth::user()))) {
+            unset($diaryArray['personal_work_entries']);
+        }
         $diaryArray['read_by_names'] = $readByNames;
         $diaryArray['read_by'] = $readByStructured;
         $diaryArray['comments'] = array_map(function ($c) {
@@ -385,7 +389,7 @@ class DiaryController extends Controller
             'diary'      => $diaryArray,
             'workRecord' => $workRecordData,
             'personalWorkEnabled' => (int) Auth::id() === (int) $diary->user_id
-                && app(PersonalWorkSchedule::class)->available(Auth::user()),
+                && app(PersonalWorkSchedule::class)->personalAvailable(Auth::user()),
         ]);
     }
 
@@ -412,7 +416,9 @@ class DiaryController extends Controller
         $diaryArr = $diary->toArray();
         $diaryArr['date'] = $dateStr;
         $diaryArr['attachments'] = $this->formatDiaryAttachments($diary);
-        $diaryArr['personal_work_entries'] = $user->isSuperAdmin()
+        $diaryArr['personal_work_entries'] = ($user->isSuperAdmin()
+            || ((int) $diary->user_id === (int) $user->id
+                && app(PersonalWorkSchedule::class)->personalAvailable($user)))
             ? $diary->personalWorkEntries()->with(['projectJob', 'broadProject'])->get()
             : [];
 
@@ -424,7 +430,8 @@ class DiaryController extends Controller
                 'start_time'  => substr($workRecord->start_time ?? '', 0, 5),
                 'end_time'    => substr($workRecord->end_time   ?? '', 0, 5),
             ] : null,
-            'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
+            'personalWorkEnabled' => (int) $diary->user_id === (int) $user->id
+                && app(PersonalWorkSchedule::class)->personalAvailable($user),
             'workReminder' => $this->workReminder($user, $dateStr),
         ]);
     }
@@ -436,6 +443,7 @@ class DiaryController extends Controller
         if ($request->input('content') !== null) {
             $workService = app(\App\Services\DiaryWorkEntries::class);
             $workEntries = $workService->validate($request);
+            abort_if($request->exists('work_entries') && (int) $diary->user_id !== (int) Auth::id(), 403);
             // ensure date exists for validation: always use pure date string (Y-m-d)
             $existingDate = $diary->date instanceof \Carbon\Carbon
                 ? $diary->date->toDateString()

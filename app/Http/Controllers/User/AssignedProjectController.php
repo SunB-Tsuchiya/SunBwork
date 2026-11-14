@@ -89,7 +89,7 @@ class AssignedProjectController extends Controller
         $jobs = collect($assignments);
         return Inertia::render('Calendar/Index', [
             'jobs' => $jobs,
-            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->available($user),
+            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->personalAvailable($user),
         ]);
     }
 

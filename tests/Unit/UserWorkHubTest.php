@@ -76,12 +76,13 @@ class UserWorkHubTest extends TestCase
         return (new User)->forceFill($attributes + ['id' => 1, 'user_role' => 'superadmin', 'company_id' => 1, 'department_id' => 1]);
     }
 
-    public function test_only_own_info_superadmin_can_use_preview(): void
+    public function test_info_members_can_use_hub_but_other_departments_and_companies_cannot(): void
     {
-        self::assertTrue($this->hub->available($this->user()));
+        foreach (['superadmin', 'user', 'coordinator', 'leader', 'clerk', 'admin'] as $role) {
+            self::assertTrue($this->hub->available($this->user(['user_role' => $role])));
+        }
         self::assertFalse($this->hub->available(null));
-        foreach ([['user_role' => 'user'], ['user_role' => 'coordinator'], ['user_role' => 'leader'],
-            ['department_id' => 2], ['company_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $attributes) {
+        foreach ([['department_id' => 2], ['company_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $attributes) {
             $user = $this->user($attributes);
             self::assertFalse($this->hub->available($user));
             self::assertSame(['enabled' => false, 'unregisteredRequests' => 0], $this->hub->navigation($user));
@@ -106,13 +107,14 @@ class UserWorkHubTest extends TestCase
         self::assertSame([$project->id], $this->hub->broadProjects($this->user())->pluck('id')->all());
     }
 
-    public function test_all_new_controller_actions_reject_direct_access_by_ordinary_user(): void
+    public function test_member_route_rejects_management_actions(): void
     {
         $controller = new \App\Http\Controllers\User\WorkHubBroadProjectController(new \App\Services\BroadProjectTree, new PersonalWorkSchedule);
-        foreach (['index', 'clients', 'store'] as $action) {
+        $node = (new \App\Models\BroadProject)->forceFill(['id' => 1, 'company_id' => 1, 'department_id' => 1]);
+        foreach (['update', 'move', 'reorder'] as $action) {
             $request = \Illuminate\Http\Request::create('/user/work/broad-projects', 'POST', ['name' => 'Denied']);
             $request->setUserResolver(fn () => $this->user(['user_role' => 'user']));
-            try { $controller->{$action}($request); self::fail('Direct action was allowed'); }
+            try { $action === 'reorder' ? $controller->{$action}($request) : $controller->{$action}($request, $node); self::fail('Management action was allowed'); }
             catch (AuthorizationException) { self::assertSame(0, $this->db->getConnection()->table('broad_projects')->count()); }
         }
     }

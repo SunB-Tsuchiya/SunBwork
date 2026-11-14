@@ -28,6 +28,14 @@ class PersonalWorkSchedule
             ->exists();
     }
 
+    /** Personal input only. Department schedules and trial analysis retain available(). */
+    public function personalAvailable(?User $user): bool
+    {
+        return $user && $user->company?->company_type === 'sunbrain' && $user->department_id
+            && DB::table('departments')->where('id', $user->department_id)
+                ->where('company_id', $user->company_id)->where('code', 'INFO')->exists();
+    }
+
     /** New-entry defaults follow registration order, never the planned work date or later edits. */
     public function defaultCategory(User $user): string
     {
@@ -43,7 +51,7 @@ class PersonalWorkSchedule
 
     public function ownCandidates(User $user, string $date): array
     {
-        if (! $this->available($user)) return ['entries' => [], 'events' => []];
+        if (! $this->personalAvailable($user)) return ['entries' => [], 'events' => []];
 
         $entries = PersonalWorkEntry::where('user_id', $user->id)
             ->whereDate('work_date', $date)

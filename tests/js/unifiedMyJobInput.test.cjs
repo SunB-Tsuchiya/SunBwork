@@ -211,7 +211,7 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     assert.ok(!legacyAssignmentCtx.teleports.body.includes('日時を引き継いで旧形式で続きを入力'));
     const actualPage = await component(page);
     const html = await renderToString(createSSRApp(actualPage, pageProps));
-    for (const text of ['マイジョブ作成', '流用・受けた依頼からの登録', '従来のマイジョブBOXへ']) assert.ok(html.includes(text));
+    for (const text of ['マイジョブ作成', '流用・受けた依頼からの登録', '旧形式のマイジョブBOXへ']) assert.ok(html.includes(text));
     const rowHtml=await renderToString(createSSRApp(actualPage,{...pageProps,rows:[
         {key:'entry:71',entryId:71,title:'New work',slots:[{date:'2026-11-08',start:'09:00',end:'10:00',endDate:'2026-11-08'},{date:'2026-11-09',start:'09:00',end:'10:00',endDate:'2026-11-09'},{date:'2026-11-10',start:'09:00',end:'10:00',endDate:'2026-11-10'}],kind:'新式',status:'未完了'},
         {key:'assignment:81',assignmentId:81,title:'Legacy work',slots:[],kind:'旧形式',status:'未完了'},

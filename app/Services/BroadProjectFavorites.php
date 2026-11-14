@@ -15,7 +15,7 @@ class BroadProjectFavorites
 
     public function ids(User $user): array
     {
-        $this->tree->authorize($user);
+        $this->tree->authorizeBrowse($user);
         return BroadProjectFavorite::where('user_id', $user->id)
             ->whereHas('broadProject', fn ($q) => $q->where('company_id', $user->company_id)->where('department_id', $user->department_id))
             ->pluck('broad_project_id')->map(fn ($id) => (int) $id)->all();
@@ -29,13 +29,13 @@ class BroadProjectFavorites
 
     public function set(User $user, BroadProject $project, bool $enabled): bool
     {
-        $this->tree->authorize($user);
+        $this->tree->authorizeBrowse($user);
         if ((int) $project->company_id !== (int) $user->company_id
             || (int) $project->department_id !== (int) $user->department_id) throw new AuthorizationException;
         return DB::transaction(function () use ($user, $project, $enabled) {
             // Use the same department lock as pause/move edits so additions check the latest tree.
             DB::table('departments')->where('id', $user->department_id)->lockForUpdate()->first();
-            $node = $this->tree->scoped($user)->with('parent')->findOrFail($project->id);
+            $node = $this->tree->browseScoped($user)->with('parent')->findOrFail($project->id);
             $favorite = BroadProjectFavorite::where('user_id', $user->id)->where('broad_project_id', $node->id);
             if ($enabled) {
                 if (! $favorite->exists() && ! $node->activePath()) {

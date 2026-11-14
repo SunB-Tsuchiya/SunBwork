@@ -113,9 +113,9 @@ class UnifiedMyJobCreateTest extends TestCase
         return app(UnifiedMyJobBoxController::class)->store($request, app(UnifiedMyJobBox::class), app(DepartmentWorkController::class));
     }
 
-    public function test_new_route_rejects_roles_company_department_and_changed_context_without_writing(): void
+    public function test_new_route_rejects_other_company_department_and_changed_context_without_writing(): void
     {
-        foreach ([['user_role' => 'user'], ['user_role' => 'admin'], ['user_role' => 'coordinator'], ['user_role' => 'leader'], ['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $data) {
+        foreach ([['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $data) {
             $request = $this->request($this->payload(), $this->user($data));
             self::assertSame('user.myjobbox.unified_store', app('router')->getRoutes()->match($request)->getName());
             try { $this->save($request); self::fail('Unauthorized save'); }
@@ -124,6 +124,27 @@ class UnifiedMyJobCreateTest extends TestCase
         try { $this->save($this->request($this->payload(), $this->user(), 2)); self::fail('Changed context accepted'); }
         catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
         self::assertSame(0, DB::table('personal_work_entries')->count());
+    }
+
+    public function test_info_member_can_save_own_work_while_department_analysis_stays_trial_only(): void
+    {
+        $member = $this->user(['user_role' => 'user']);
+        $schedule = app(\App\Services\PersonalWorkSchedule::class);
+        self::assertTrue($schedule->personalAvailable($member));
+        self::assertFalse($schedule->available($member));
+        $id = $this->save($this->request($this->payload(), $member))->getData(true)['id'];
+        self::assertSame(1, DB::table('personal_work_entries')->find($id)->user_id);
+        self::assertSame('entry:'.$id, app(UnifiedMyJobBox::class)->rows($member)[0]['key']);
+        try { app(DepartmentWorkController::class)->index($this->request(['date' => '2026-12-01'], $member, null, 'GET')); self::fail('Department analysis was opened'); }
+        catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
+    }
+
+    public function test_info_member_cannot_attach_own_work_to_another_persons_diary(): void
+    {
+        $member = $this->user(['user_role' => 'user']);
+        $foreignDiary = (new \App\Models\Diary)->forceFill(['user_id' => 2]);
+        try { app(\App\Services\DiaryWorkEntries::class)->sync($foreignDiary, $member, [['entry_id' => 1]]); self::fail('Foreign diary accepted'); }
+        catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
     }
 
     public function test_saved_work_is_one_owner_fixed_entry_visible_in_box_and_existing_calendar(): void
@@ -175,7 +196,7 @@ class UnifiedMyJobCreateTest extends TestCase
         $row = DB::table('personal_work_entries')->first();
         self::assertSame('Edited', $row->title); self::assertSame('2099-12-02', $row->work_date);
         self::assertNull($row->source_entry_id); self::assertNull($row->completed_at);
-        foreach ([[$this->user(), 2], [$this->user(['user_role' => 'user']), null]] as [$user, $context]) {
+        foreach ([[$this->user(), 2], [$this->user(['department_id' => 2]), null]] as [$user, $context]) {
             try { app(\App\Services\WorkJobReader::class)->detail($user, $id, $context); self::fail('Invalid access'); }
             catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
         }
@@ -288,7 +309,7 @@ class UnifiedMyJobCreateTest extends TestCase
         try { $this->continueWork($root, ['work_date' => '2099-12-03']); self::fail('Changed replay accepted'); }
         catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
         self::assertSame(2, DB::table('personal_work_entries')->count());
-        foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$user, $context]) {
+        foreach ([[$this->user(['department_id' => 2]), null], [$this->user(), 2]] as [$user, $context]) {
             try { $this->continueWork($root, [], $user, $context); self::fail('Unauthorized continuation'); }
             catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
             try { app(\App\Services\WorkJobMutation::class)->completeEntry($user, $root, $context); self::fail('Unauthorized completion'); }
@@ -385,7 +406,7 @@ class UnifiedMyJobCreateTest extends TestCase
         try { app(\App\Http\Controllers\User\MyProjectJobController::class)->destroyAssignment($this->request(), \App\Models\ProjectJobAssignmentByMyself::findOrFail(1)); self::fail('Legacy parent deleted before checking continuation'); }
         catch (HttpException $e) { self::assertSame(422, $e->getStatusCode()); }
         self::assertSame($before, (array) DB::table('project_job_assignments')->find(1));
-        foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$user, $context]) {
+        foreach ([[$this->user(['department_id' => 2]), null], [$this->user(), 2]] as [$user, $context]) {
             try { $mutation->continueEntry($this->request($request->all(), $user, $context), 1, $context, app(DepartmentWorkController::class), 'assignment'); self::fail('Legacy unauthorized continuation'); }
             catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
         }
@@ -412,7 +433,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(['type' => 'assignment', 'id' => 1], $props['workJobContinuation']['source']);
         self::assertCount(2, $props['workJobContinuation']['series']['items']);
         $ordinary = $this->request([], $this->user(['user_role' => 'user']), null, 'GET'); $ordinary->headers->set('X-Inertia', 'true');
-        self::assertArrayNotHasKey('workJobContinuation', $controller->showAssignment($assignment, $ordinary)->toResponse($ordinary)->getData(true)['props']);
+        self::assertSame(['type' => 'assignment', 'id' => 1], $controller->showAssignment($assignment, $ordinary)->toResponse($ordinary)->getData(true)['props']['workJobContinuation']['source']);
     }
 
     public function test_source_schema_extension_preserves_existing_simple_continuation_receipts(): void
@@ -447,9 +468,10 @@ class UnifiedMyJobCreateTest extends TestCase
             self::assertArrayNotHasKey('actual_quantity', $rows['entry:'.$simple]['work_entry']);
             self::assertArrayNotHasKey('result_note', $rows['entry:'.$simple]['work_entry']);
             self::assertArrayNotHasKey('planned_start_time', $rows['entry:'.$simple]['work_entry']);
-            foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$user, $context]) {
-                $ordinary = $past([], $user, $context)['records']; self::assertCount(1, $ordinary); self::assertArrayNotHasKey('source_type', $ordinary[0]);
-            }
+            $memberRows = collect($past([], $this->user(['user_role' => 'user']))['records'])->keyBy('key');
+            self::assertCount(2, $memberRows); self::assertArrayHasKey('entry:'.$simple, $memberRows);
+            $changedContext = $past([], $this->user(), 2)['records'];
+            self::assertCount(1, $changedContext); self::assertArrayNotHasKey('source_type', $changedContext[0]);
             DB::table('personal_work_entries')->where('id', $simple)->update(['completed_at' => '2026-11-03 18:00:00']);
             self::assertCount(1, $past(['hide_completed' => 1])['records']);
             DB::table('personal_work_entries')->where('id', $simple)->update(['user_id' => 2]);
@@ -912,7 +934,7 @@ class UnifiedMyJobCreateTest extends TestCase
     public function test_received_new_completion_rejects_wrong_context_or_role_before_any_write(): void
     {
         $this->receivedFixture();
-        foreach ([[$this->user(), 2], [$this->user(['user_role' => 'user']), null]] as [$user, $context]) {
+        foreach ([[$this->user(), 2], [$this->user(['department_id' => 2]), null]] as [$user, $context]) {
             try { app(\App\Services\WorkJobMutation::class)->completeWork($user, 'assignment', 10, $context); self::fail('Trial scope bypass'); }
             catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertNotNull($e); }
         }
@@ -986,7 +1008,7 @@ class UnifiedMyJobCreateTest extends TestCase
     public function test_received_prefill_and_save_reject_foreign_context_owner_scope_registered_or_completed(): void
     {
         $this->receivedPrefillFixture();
-        foreach ([[$this->user(['user_role' => 'user']), null], [$this->user(), 2], [$this->user(['id' => 2]), null]] as [$actor, $context]) {
+        foreach ([[$this->user(['department_id' => 2]), null], [$this->user(), 2], [$this->user(['id' => 2]), null]] as [$actor, $context]) {
             try { app(\App\Services\ReceivedJobPrefill::class)->seed($this->request([], $actor, $context, 'GET'), 200); self::fail('Foreign prefill'); }
             catch (HttpException|\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
         }
@@ -1134,7 +1156,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(1, DB::table('job_notifications')->count());
         \Illuminate\Support\Facades\Event::assertDispatchedTimes(\App\Events\AssignmentStatusToast::class, 1);
         self::assertSame([0], $this->completionToastLevels);
-        self::assertFalse(app(\App\Services\UnifiedMyJobBox::class)->available($actor));
+        self::assertTrue(app(\App\Services\UnifiedMyJobBox::class)->available($actor));
     }
 
     public static function legacyReceivedEntrypoints(): array
@@ -1160,7 +1182,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertTrue((bool) DB::table('job_assignment_messages')->first()->completed);
         $controller->completeAssignment($this->request([], $actor), \App\Models\ProjectJobAssignment::findOrFail(10));
         self::assertSame(1, DB::table('job_notifications')->count());
-        self::assertFalse(app(\App\Services\UnifiedMyJobBox::class)->available($actor));
+        self::assertTrue(app(\App\Services\UnifiedMyJobBox::class)->available($actor));
     }
 
     public function test_regular_worker_received_notification_deduplicates_requester_leader_and_excludes_actor(): void
@@ -1262,18 +1284,17 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(0, DB::table('job_notifications')->count()); self::assertSame(0, DB::table('work_job_completion_syncs')->count());
     }
 
-    public function test_regular_worker_mixed_parent_is_not_dropped_and_trial_guard_stays_closed(): void
+    public function test_info_worker_mixed_parent_is_completed_without_dropping_source(): void
     {
         $this->regularReceivedCompletionFixture();
         $entry = $this->save($this->request($this->payload()))->getData(true)['id'];
         DB::table('project_job_assignments')->where('id', 10)->update(['source_personal_work_entry_id' => $entry]);
-        try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10); self::fail('User accessed typed trial series'); }
-        catch (ValidationException $e) { self::assertArrayHasKey('source', $e->errors()); }
+        self::assertTrue(app(\App\Services\UnifiedMyJobBox::class)->available($this->user(['user_role' => 'user'])));
         self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
         try { app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(), 10, null, 100); self::fail('Mismatched event binding accepted'); }
         catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertNotNull($e); }
         self::assertNull(DB::table('personal_work_entries')->find($entry)->completed_at);
-        $result = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(), 10, null, 101);
+        $result = app(\App\Services\LegacyReceivedJobCompletion::class)->tryComplete($this->user(['user_role' => 'user']), 10, null, 101);
         self::assertSame(0, $result['pending_syncs']);
         self::assertNotNull(DB::table('personal_work_entries')->find($entry)->completed_at);
         self::assertSame(1, DB::table('job_notifications')->count());
@@ -1422,7 +1443,7 @@ class UnifiedMyJobCreateTest extends TestCase
     {
         $id = $this->save($this->request($this->payload()))->getData(true)['id'];
         $details = app(\App\Services\WorkJobDetails::class);
-        foreach ([[$this->user(['id' => 2]), null], [$this->user(), 2], [$this->user(['user_role' => 'user']), null]] as [$user, $context]) {
+        foreach ([[$this->user(['id' => 2]), null], [$this->user(), 2], [$this->user(['department_id' => 2]), null]] as [$user, $context]) {
             try { $details->save($this->request($this->detailPayload(), $user), $id, $context); self::fail('Unauthorized details'); }
             catch (\Illuminate\Auth\Access\AuthorizationException|\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
         }
@@ -1532,7 +1553,7 @@ class UnifiedMyJobCreateTest extends TestCase
     public function test_simple_to_legacy_rejects_foreign_source_context_role_and_multiple_source_modes(): void
     {
         $source = $this->legacyContinuationFixture();
-        foreach ([[$this->user(['id' => 2]), null], [$this->user(['user_role' => 'user']), null], [$this->user(), 2]] as [$actor, $context]) {
+        foreach ([[$this->user(['id' => 2]), null], [$this->user(['department_id' => 2]), null], [$this->user(), 2]] as [$actor, $context]) {
             try { $this->legacyContinuation($source, [], $actor, $context); self::fail('Unauthorized legacy continuation'); }
             catch (\Illuminate\Auth\Access\AuthorizationException|\Illuminate\Database\Eloquent\ModelNotFoundException $e) { self::assertTrue(true); }
         }
@@ -1581,7 +1602,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(1, DB::table('personal_work_entries')->count()); self::assertSame(0, DB::table('project_job_assignments')->count()); self::assertSame(1, DB::table('events')->count());
         try { app(\App\Http\Controllers\EventController::class)->createJob($this->request(['continue_entry' => $source, 'project_job_id' => 999], null, null, 'GET')); self::fail('Conflicting foreign project option accepted'); }
         catch (ValidationException $e) { self::assertArrayHasKey('project_job_id', $e->errors()); }
-        try { app(\App\Http\Controllers\EventController::class)->createJob($this->request(['continue_entry' => $source], $this->user(['user_role' => 'user']), null, 'GET')); self::fail('General user got trial metadata'); }
+        try { app(\App\Http\Controllers\EventController::class)->createJob($this->request(['continue_entry' => $source], $this->user(['department_id' => 2]), null, 'GET')); self::fail('Other department got continuation metadata'); }
         catch (\Illuminate\Auth\Access\AuthorizationException $e) { self::assertTrue(true); }
     }
 
@@ -1674,10 +1695,11 @@ class UnifiedMyJobCreateTest extends TestCase
     public function test_quick_proof_handoff_without_project_and_replay_are_atomic_and_scoped(): void
     {
         $id = $this->quickProofFixture();
+        $member = $this->user(['user_role' => 'user']);
         $before = (array) DB::table('personal_work_entries')->find($id);
-        $first = $this->sendQuickProof($id);
+        $first = $this->sendQuickProof($id, [], $member);
         self::assertFalse($first['replayed']);
-        self::assertSame(['id' => $first['id'], 'replayed' => true], $this->sendQuickProof($id));
+        self::assertSame(['id' => $first['id'], 'replayed' => true], $this->sendQuickProof($id, [], $member));
         self::assertSame(1, DB::table('proof_requests')->count());
         $proof = DB::table('proof_requests')->first();
         self::assertSame($id, $proof->source_personal_work_entry_id);
@@ -1690,7 +1712,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame($before, (array) DB::table('personal_work_entries')->find($id));
         self::assertSame(0, DB::table('project_job_assignments')->count());
         self::assertSame(1, DB::table('events')->count());
-        self::assertTrue(app(\App\Services\QuickWorkProofRequest::class)->state($this->user(), $id)['requested']);
+        self::assertTrue(app(\App\Services\QuickWorkProofRequest::class)->state($member, $id)['requested']);
     }
 
     public function test_quick_proof_keeps_real_project_and_source_labels_without_exposing_source_body(): void
@@ -1714,7 +1736,7 @@ class UnifiedMyJobCreateTest extends TestCase
     public function test_quick_proof_rejects_role_owner_context_and_injected_source_references(): void
     {
         $id = $this->quickProofFixture();
-        foreach ([['user_role' => 'user'], ['user_role' => 'coordinator'], ['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $attributes) {
+        foreach ([['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $attributes) {
             try { $this->sendQuickProof($id, [], $this->user($attributes)); self::fail('Forbidden proof handoff'); }
             catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
         }
@@ -1872,7 +1894,10 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(['enabled' => true, 'unregisteredRequests' => 1], $props['userWorkHub']);
         self::assertTrue($props['auth']['canManageBroadProjects']);
         self::assertTrue($props['auth']['canAccessPortfolio']);
-        foreach ([['user_role' => 'user'], ['user_role' => 'coordinator'], ['user_role' => 'admin'], ['user_role' => 'leader'], ['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $data) {
+        foreach (['user', 'coordinator', 'admin', 'leader'] as $role) {
+            self::assertSame(['enabled' => true, 'unregisteredRequests' => 1], $share($this->user(['user_role' => $role]))['userWorkHub']);
+        }
+        foreach ([['department_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $data) {
             self::assertSame(['enabled' => false, 'unregisteredRequests' => 0], $share($this->user($data))['userWorkHub']);
         }
         self::assertSame(['enabled' => false, 'unregisteredRequests' => 0], $share($this->user(), 2, true)['userWorkHub']);

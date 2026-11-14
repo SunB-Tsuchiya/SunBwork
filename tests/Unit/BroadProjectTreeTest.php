@@ -109,6 +109,32 @@ class BroadProjectTreeTest extends TestCase
         self::assertEquals(1, $node->company_id); self::assertEquals(1, $node->department_id);
     }
 
+    public function test_info_member_can_add_active_groups_but_cannot_edit_or_add_below_paused_root(): void
+    {
+        $member = $this->user(['user_role' => 'user']);
+        self::assertTrue($this->tree->canBrowse($member));
+        self::assertFalse($this->tree->canManage($member));
+        $root = $this->tree->save($member, [
+            'name' => 'Member root', 'group_type' => 'large', 'is_active' => false,
+            'company_id' => 2, 'department_id' => 3,
+        ], null, true);
+        self::assertTrue($root->is_active);
+        self::assertSame(1, $root->company_id);
+        self::assertSame(1, $root->department_id);
+        $child = $this->tree->save($member, [
+            'name' => 'Member child', 'group_type' => 'middle', 'parent_id' => $root->id,
+        ], null, true);
+        self::assertSame($root->id, $child->parent_id);
+        $this->rejects(fn () => $this->tree->save($member, ['name' => 'Edited', 'is_active' => false], $root), AuthorizationException::class);
+        $root->update(['is_active' => false]);
+        $this->rejects(fn () => $this->tree->save($member, [
+            'name' => 'Blocked', 'group_type' => 'middle', 'parent_id' => $root->id,
+        ], null, true));
+        $this->rejects(fn () => $this->tree->save($this->user(['user_role' => 'user', 'department_id' => 2]), [
+            'name' => 'Other department', 'group_type' => 'large',
+        ], null, true), AuthorizationException::class);
+    }
+
     public function test_two_levels_and_metadata_edits_cannot_change_membership(): void
     {
         $root = $this->save('Root'); $middle = $this->save('Middle', $root->id);

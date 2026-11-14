@@ -441,7 +441,7 @@ class EventController extends Controller
             'date' => $date,
             'user_id' => $baseUserId,
             'jobs' => [],
-            'myJobModalEnabled' => $request->user() ? app(PersonalWorkSchedule::class)->available($request->user()) : false,
+            'myJobModalEnabled' => app(PersonalWorkSchedule::class)->personalAvailable($request->user()),
         ]);
     }
 
@@ -1965,7 +1965,7 @@ class EventController extends Controller
         }
         $myJobModal = $request->boolean('myjob_modal');
         if ($myJobModal) {
-            abort_unless(app(PersonalWorkSchedule::class)->available($request->user()), 403);
+            abort_unless(app(PersonalWorkSchedule::class)->personalAvailable($request->user()), 403);
             $request->validate([
                 'date' => ['nullable', 'date_format:Y-m-d'],
                 'startHour' => ['nullable', 'integer', 'between:0,23'],

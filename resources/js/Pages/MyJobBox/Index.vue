@@ -23,7 +23,7 @@
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
                 <div class="flex items-center gap-2">
-                    <Link v-if="props.unifiedBoxPreviewEnabled" :href="route('user.myjobbox.unified_preview')" class="rounded border border-blue-300 px-3 py-2 text-sm text-blue-700">統合BOX（試用）</Link>
+                    <Link v-if="props.unifiedBoxPreviewEnabled" :href="route('user.myjobbox.unified_preview')" class="rounded border border-blue-300 px-3 py-2 text-sm text-blue-700">新しいマイジョブBOX</Link>
                     <button v-if="myJobModalEnabled" type="button" @click="showMyJobModal = true"
                         class="rounded bg-indigo-600 px-4 py-2 text-sm text-white">マイジョブ作成</button>
                     <Link v-else

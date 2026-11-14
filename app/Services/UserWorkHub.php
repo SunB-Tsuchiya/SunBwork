@@ -18,7 +18,7 @@ class UserWorkHub
 
     public function available(?User $user): bool
     {
-        return $user && $this->schedule->available($user)
+        return $user && $this->schedule->personalAvailable($user)
             && $user->company && $user->company->company_type !== 'general';
     }
 

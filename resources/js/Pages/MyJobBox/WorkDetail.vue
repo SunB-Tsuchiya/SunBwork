@@ -138,7 +138,7 @@ async function complete() {
                     <div><dt class="text-gray-500">昼休憩を除く予定枠</dt><dd class="mt-1">{{ minutes(time.afterLunch) }}</dd></div>
                     <div><dt class="text-gray-500">記録時間</dt><dd class="mt-1 font-medium text-blue-700">{{ minutes(time.recorded) }}</dd></div>
                 </dl>
-                <details class="mt-3 text-xs leading-relaxed text-gray-500"><summary class="cursor-pointer">時間の計算について</summary><p class="mt-1">記録時間は、作業分析の試用V3と同じ条件で、現在までの時間に昼休憩・重複・会議などの配分を反映します。未来の予定枠や完了状態とは別です。</p></details>
+                <details class="mt-3 text-xs leading-relaxed text-gray-500"><summary class="cursor-pointer">時間の計算について</summary><p class="mt-1">記録時間は、現在までの時間に昼休憩・重複・会議などの配分を反映します。未来の予定枠や完了状態とは別です。</p></details>
             </section>
 
             <WorkJobSeries :series="series" />

@@ -11,6 +11,16 @@ use Illuminate\Validation\ValidationException;
 
 class BroadProjectTree
 {
+    public function canBrowse(?User $user): bool
+    {
+        return $this->canManage($user) || app(PersonalWorkSchedule::class)->personalAvailable($user);
+    }
+
+    public function authorizeBrowse(User $user): void
+    {
+        if (! $this->canBrowse($user)) throw new AuthorizationException;
+    }
+
     public function canManage(?User $user): bool
     {
         return $user && in_array($user->user_role, ['superadmin', 'coordinator', 'leader'], true)
@@ -30,6 +40,12 @@ class BroadProjectTree
         return BroadProject::where('company_id', $user->company_id)->where('department_id', $user->department_id);
     }
 
+    public function browseScoped(User $user)
+    {
+        $this->authorizeBrowse($user);
+        return BroadProject::where('company_id', $user->company_id)->where('department_id', $user->department_id);
+    }
+
     private function own(User $user, BroadProject $node): void
     {
         $this->authorize($user);
@@ -39,7 +55,7 @@ class BroadProjectTree
 
     public function rows(User $user): array
     {
-        $nodes = $this->scoped($user)->with('parent')->inDisplayOrder()->get()
+        $nodes = $this->browseScoped($user)->with('parent')->inDisplayOrder()->get()
             ->sortBy(fn ($node) => $node->displayOrderKey())->values();
         $clients = new BroadProjectClients;
         $clients->load($nodes, (int) $user->company_id);
@@ -72,7 +88,7 @@ class BroadProjectTree
 
     private function root(User $user, int $id): BroadProject
     {
-        $parent = $this->scoped($user)->find($id);
+        $parent = $this->browseScoped($user)->find($id);
         if (! $parent || $parent->parent_id !== null) {
             throw ValidationException::withMessages(['parent_id' => '同じ部署の大グループを選んでください。']);
         }
@@ -81,7 +97,7 @@ class BroadProjectTree
 
     private function checkDuplicate(User $user, array $data, ?int $except = null): void
     {
-        if ($this->scoped($user)->where('parent_id', $data['parent_id'])->where('name', $data['name'])
+        if ($this->browseScoped($user)->where('parent_id', $data['parent_id'])->where('name', $data['name'])
             ->where('fiscal_year', $data['fiscal_year'])
             ->when($except, fn ($q) => $q->whereKeyNot($except))->exists()) {
             throw ValidationException::withMessages(['name' => '同じグループ内に同名・同年度の分類があります。休止中も確認してください。']);
@@ -90,12 +106,18 @@ class BroadProjectTree
 
     private function nextOrder(User $user, ?int $parent): int
     {
-        return ((int) $this->scoped($user)->where('parent_id', $parent)->max('sort_order')) + 10;
+        return ((int) $this->browseScoped($user)->where('parent_id', $parent)->max('sort_order')) + 10;
     }
 
-    public function save(User $user, array $input, ?BroadProject $existing = null): BroadProject
+    public function save(User $user, array $input, ?BroadProject $existing = null, bool $memberCreate = false): BroadProject
     {
-        $this->authorize($user);
+        if ($memberCreate) {
+            if ($existing) throw new AuthorizationException;
+            $this->authorizeBrowse($user);
+            $input['is_active'] = true;
+        } else {
+            $this->authorize($user);
+        }
         if ($existing) $this->own($user, $existing);
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -117,11 +139,16 @@ class BroadProjectTree
         $data['fiscal_year'] = $data['fiscal_year'] ?? null;
         if ($data['name'] === '') throw ValidationException::withMessages(['name' => '名前を入力してください。']);
 
-        return DB::transaction(function () use ($user, $data, $existing, $input) {
+        return DB::transaction(function () use ($user, $data, $existing, $input, $memberCreate) {
             $this->lockDepartment($user);
-            $node = $existing ? $this->scoped($user)->findOrFail($existing->id) : new BroadProject;
+            $node = $existing ? $this->browseScoped($user)->findOrFail($existing->id) : new BroadProject;
             $parentId = $existing ? $node->parent_id : ($data['parent_id'] ?? null);
-            if ($parentId !== null) $this->root($user, (int) $parentId);
+            if ($parentId !== null) {
+                $parent = $this->root($user, (int) $parentId);
+                if ($memberCreate && ! $parent->activePath()) {
+                    throw ValidationException::withMessages(['parent_id' => '休止中の大グループには追加できません。']);
+                }
+            }
             $attributes = array_intersect_key($data, array_flip(['name', 'fiscal_year', 'is_active']));
             if (! $existing || $node->name !== $attributes['name'] || (string) $node->fiscal_year !== (string) $attributes['fiscal_year']) {
                 $this->checkDuplicate($user, $attributes + ['parent_id' => $parentId], $node->id);

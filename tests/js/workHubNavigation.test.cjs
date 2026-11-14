@@ -28,7 +28,7 @@ async function component(file) {
     assert.equal(workHubMyJobRoute(trial),preview);
     assert.equal(workHubMyJobRoute({...trial,auth:{...trial.auth,superAdminContextId:'2'}}),preview);
     for(const props of [null,{}, {...trial,userWorkHub:{enabled:false}}, {...trial,auth:{...trial.auth,superAdminContextId:9}}, {...trial,auth:{...trial.auth,companyType:'general'}}, {...trial,auth:{...trial.auth,companyType:undefined}}, {...trial,auth:{...trial.auth,user:{user_role:'superadmin'}}}])assert.equal(workHubMyJobRoute(props),old);
-    for(const role of ['user','coordinator','leader','clerk','admin'])assert.equal(workHubMyJobRoute({...trial,auth:{...trial.auth,user:{company_id:2,user_role:role}}}),old);
+    for(const role of ['user','coordinator','leader','clerk','admin'])assert.equal(workHubMyJobRoute({...trial,auth:{...trial.auth,user:{company_id:2,user_role:role}}}),preview);
     const outer=await component('resources/js/Components/Tabs/UserNavigationTabs.vue');
     const inner=await component('resources/js/Components/Tabs/UserWorkHubTabs.vue');
     async function render(c,props){global.__navProps=props;const app=createSSRApp(c,{active:'myjob'});app.config.globalProperties.route=global.route;return renderToString(app);}
@@ -38,6 +38,7 @@ async function component(file) {
     assert.ok(html.includes('仕事・案件'));assert.ok(html.includes('ポートフォリオ'));assert.ok(html.includes('user.portfolio.manage'));assert.ok(html.includes('未登録の依頼 3件'));assert.ok(html.includes('aria-current="page"'));
     html=await render(inner,{...trial,auth:{...trial.auth,superAdminContextId:9}});assert.ok(html.includes(`href="/members/test/${old}"`));assert.ok(!html.includes(preview));
     html=await render(outer,{...trial,auth:{...trial.auth,user:{user_role:'user',company_id:2}},userWorkHub:{enabled:false}});assert.ok(html.includes(`href="/members/test/${old}"`));assert.ok(!html.includes(preview));
+    html=await render(outer,{...trial,auth:{...trial.auth,user:{user_role:'user',company_id:2,departmentCode:'INFO'}}});assert.ok(html.includes(`href="/members/test/${preview}"`));assert.ok(html.includes('仕事・案件'));assert.ok(!html.includes('部署の作業'));
     html=await render(outer,{...trial,auth:{...trial.auth,companyType:'general'}});assert.ok(!html.includes(preview));assert.ok(!html.includes('仕事・案件'));
     html=await render(outer,{...trial,auth:{...trial.auth,companyType:'general',applicationAccess:['expense'],nenchoAvailable:false}});
     for(const label of ['ダッシュボード','カレンダー','日報一覧','チームルーム','申請','設定']) assert.ok(html.includes(label),`general: ${label}`);

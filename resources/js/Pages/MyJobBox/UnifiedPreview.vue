@@ -51,18 +51,18 @@ function calendar(date) {
 </script>
 
 <template>
-    <AppLayout title="統合BOX（試用）">
-        <template #header><h2 class="text-base font-semibold text-gray-800 sm:text-xl">統合BOX（試用）</h2></template>
+    <AppLayout title="マイジョブBOX">
+        <template #header><h2 class="text-base font-semibold text-gray-800 sm:text-xl">マイジョブBOX</h2></template>
         <template #tabs><UserNavigationTabs active="myjob" /></template>
         <div class="rounded bg-white p-4 shadow sm:p-6">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm text-gray-600">本人の作業をまとめて確認する試用一覧です。</p>
+                <p class="text-sm text-gray-600">簡易入力と従来のマイジョブをまとめて確認できます。</p>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" class="rounded bg-blue-600 px-4 py-2 text-sm text-white" @click="openCreate">マイジョブ作成</button>
-                    <Link :href="route('user.myjobbox.index')" class="rounded border px-3 py-2 text-sm text-blue-700">従来のマイジョブBOXへ</Link>
+                    <Link :href="route('user.myjobbox.index')" class="rounded border px-3 py-2 text-sm text-blue-700">旧形式のマイジョブBOXへ</Link>
                 </div>
             </div>
-            <p class="mb-4 text-xs text-gray-500">流用・受けた依頼からの登録は「マイジョブ作成」から選べます。難易度・見積時間などの入力には、従来のマイジョブBOXを利用できます。</p>
+            <p class="mb-4 text-xs text-gray-500">流用・受けた依頼からの登録は「マイジョブ作成」から選べます。難易度・見積時間などの入力には、旧形式のマイジョブBOXを利用できます。</p>
             <form class="flex flex-wrap items-center gap-3" @submit.prevent="search()">
                 <label class="sr-only" for="unified-search">作業・案件・分類を検索</label>
                 <input id="unified-search" v-model="q" maxlength="200" placeholder="作業名・案件名・分類で検索" class="w-full rounded border px-3 py-2 text-sm sm:w-72" />

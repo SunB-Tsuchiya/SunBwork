@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Trial handoff only: never creates an assignment or completes the source work. */
+/** Proof handoff never creates an assignment or completes the source work. */
 class QuickWorkProofRequest
 {
     public function __construct(private WorkJobReader $reader, private UnifiedMyJobBox $box) {}

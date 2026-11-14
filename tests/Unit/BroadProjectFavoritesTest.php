@@ -122,7 +122,10 @@ class BroadProjectFavoritesTest extends TestCase
     {
         $root = $this->node('Own');
         foreach (['user', 'admin', 'clerk'] as $role) {
-            $this->rejects(fn () => $this->favorites->set($this->actor(['user_role' => $role]), $root, true), AuthorizationException::class);
+            $member = $this->actor(['user_role' => $role]);
+            self::assertTrue($this->favorites->set($member, $root, true));
+            self::assertSame([$root->id], $this->favorites->ids($member));
+            self::assertFalse($this->favorites->set($member, $root, false));
         }
         $foreign = $this->node('Foreign', ['company_id' => 3, 'department_id' => 4]);
         $otherDept = $this->node('Other department', ['department_id' => 2]);
