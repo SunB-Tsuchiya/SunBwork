@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-coordinator-navigation-1') {
+            Changelog::updateOrCreate(['version' => 'sunbrain-coordinator-navigation-1'], [
+                'title' => 'サン・ブレーンの進行管理メニューを整理',
+                'released_at' => '2026-11-14',
+                'summary' => '案件と進行、取引先と担当者、管理と設定を分けて探せるようにしました。日報閲覧は従来の利用権限がある人だけに表示します。',
+                'design_files' => ['z_instructions/COORDINATOR_NAV_PLAN1.md'],
+                'claude_notes' => 'Codex実装。サン・ブレーンの進行管理画面だけを親子タブへ整理。進行レポートは10月8件・11月6件のアクセスを確認後、オペレーターカレンダーとともにメニュー入口だけ外し、画面とURLは保持。日報閲覧は旧日報管理のルートと権限を継続。サンエー、DB、一般ユーザー公開範囲は変更しない。利用者が今回の上段、内側タブ、銀本の別タブ、2入口の非表示を画面確認済み。',
+                'body' => '<section class="cl-feature"><h3>進行管理メニュー</h3><ul><li>案件・進行、取引先・担当者、管理・設定に既存の入口を分類</li><li>日報閲覧は従来の権限がある人だけに表示</li><li>オペレーターカレンダーと進行レポートはメニューから外し、既存の画面とURLは保持</li></ul></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-superadmin-navigation-1') {
             Changelog::updateOrCreate(['version' => 'sunbrain-superadmin-navigation-1'], [
                 'title' => 'サン・ブレーンのSuper Adminメニューを整理',
