@@ -15,7 +15,7 @@
 
 次の一手: 今回の実装・コード検証・本番配備・依頼した画面確認は完了。`ChangelogSeeder` に対象履歴を保存するが、共通Seederは本番未実行。サンエーのタブ整理と一般ユーザー向け新仕様の公開は別判断。
 
-変更履歴: `ChangelogSeeder` に `sunbrain-coordinator-navigation-1` を `updateOrCreate` で追加。Seederコードの本番反映・DB登録は未実施。共通Seeder全体を実行すると別履歴も対象となるため、DB登録時は対象行だけの安全な方法を別途確認する。隔離作業ツリーのホストにPHP実行環境がなく、履歴コードの `php -l` は未実施。`git diff --check` は成功。
+変更履歴: `ChangelogSeeder` に `sunbrain-coordinator-navigation-1` を `updateOrCreate` で追加。2026-11-14の追補配備でSeederコードは本番へ反映済みだがDB登録は未実施。共通Seeder全体を実行すると別履歴も対象となるため、DB登録時は対象行だけの安全な方法を別途確認する。開発コンテナと本番で `php -l` 成功。
 
 ## 2026-11-14 追補: 大まかな案件の整理入口
 
@@ -26,7 +26,7 @@
 | 調査 | 完了 | Coordinatorのリンクは元々あったが、参照する `auth.canManageBroadProjects` は `HandleInertiaRequests` の共有値に存在しない。ページ本体の認可は `BroadProjectTree::canManage`。User試用画面は共通部品だが一般User公開は未承認。 |
 | 実装 | 完了・ローカル | Coordinator専用共有値 `canManageCoordinatorBroadProjects` をページ本体と同じサービス判定で追加し、SunBrain Coordinatorのリンクだけに使用。案件一覧の直後へ移し「大まかな案件の整理」と表示。Leader/一般会社のナビと既存権限・URL・DBは変更しない。 |
 | コード検証 | 完了・ローカル | PHP2ファイルを開発コンテナの `php -l /dev/stdin` で構文確認、対象ESLintエラー0、`/members` build成功、manifest494/参照525/欠落0・base確認。実ブラウザ確認ではない。 |
-| 本番配備 | 未実施 | 本番版と他作業を確認し、固定差分だけ反映する。 |
+| 本番配備 | 完了 | 利用者承認の2コマンド。固定手順SHA256 `c342fbc1cb1f66bb368636a9650a66d229dbd7fbb8af3e073e2d64092156e899` で本番 `e5af77bad`/main/追跡変更なし・既知未追跡5件を検査し、許可差分（PHP1、Vue1、資料5、先に保存した変更履歴コード、生成資産466＋manifest）だけを `78719c114` へff-only。PHP2件構文、config/cache/view clear、manifest494/参照525/欠落0・`/members` base、最終追跡変更なし。Seeder・DB・ルートの実行/変更なし。 |
 | 利用者画面確認 | 未実施 | 進行管理の案件・進行でリンク表示、管理画面への遷移を今回だけ確認する。以前成功した3点を繰り返さない。 |
 
-次の一手: ローカル差分を保存し、許可済みの手順で本番現行版と他作業を調べ、限定反映を準備する。
+次の一手: 本番配備まで完了。今回の「大まかな案件の整理」入口の位置と管理画面への遷移だけを利用者に確認依頼中。前回成功したメニュー全体の3点は繰り返さない。
