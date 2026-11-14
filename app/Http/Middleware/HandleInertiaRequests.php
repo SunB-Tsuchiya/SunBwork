@@ -143,6 +143,7 @@ class HandleInertiaRequests extends Middleware
                                 ? true
                                 : (\App\Models\Department::find($request->user()->department_id)?->module === 'prepress'),
                             'departmentModule'       => \App\Models\Department::find($request->user()->department_id)?->module,
+                            'departmentCode'         => \App\Models\Department::find($request->user()->department_id)?->code,
                         ]
                     )
                     : null,

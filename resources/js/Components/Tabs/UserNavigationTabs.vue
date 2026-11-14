@@ -9,9 +9,13 @@ const props = defineProps({
 });
 
 const isSunbrain = computed(() => usePage().props.auth?.companyType === 'sunbrain');
-// 一般会社（サンエー印刷等）はジョブ系タブを出さない。サン・ブレーンは従来どおり全タブ
+// 製版・オンデマンドのユーザー画面は、ジョブ系入口を使わない簡潔なメニューにする。
+const isSimpleSunbrainDepartment = computed(() => isSunbrain.value
+    && ['SEIHAN', 'ONDEMAND'].includes(usePage().props.auth?.user?.departmentCode));
+// 一般会社（サンエー印刷等）は従来どおりジョブ系タブを出さない。
 const isGeneral = computed(() => usePage().props.auth?.companyType === 'general');
-const hubEnabled = computed(() => Boolean(usePage().props.userWorkHub?.enabled) && !isGeneral.value);
+const hubEnabled = computed(() => Boolean(usePage().props.userWorkHub?.enabled)
+    && !isGeneral.value && !isSimpleSunbrainDepartment.value);
 const hubTab = computed(() => {
     if (hubEnabled.value) {
         try {
@@ -26,13 +30,15 @@ const hubActive = computed(() => ['myjob', 'jobbox', 'broad_projects', 'project_
 const activeKey = computed(() => hubEnabled.value && hubActive.value ? 'work_hub' : props.active);
 // Reuse the existing server-calculated INFO trial gate; do not open the board to other roles.
 const canAccessDepartmentWork = computed(() => usePage().props.auth?.user?.user_role === 'superadmin'
-    && Boolean(usePage().props.auth?.canAccessWorkRecordTrial) && !isGeneral.value);
+    && Boolean(usePage().props.auth?.canAccessWorkRecordTrial) && !isGeneral.value && !isSimpleSunbrainDepartment.value);
 const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings', 'nencho', 'applications'];
+const SIMPLE_SUNBRAIN_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'applications', 'settings'];
 // 「年末調整」タブ: 自分が対象者になっている受付中の受付がある人にだけ表示（会社タイプ問わず。SunA/GeneralAffairs）
 const nenchoAvailable = computed(() => Boolean(usePage().props.auth?.nenchoAvailable));
 // ポートフォリオ（SB専用）: 利用許可をもらったメンバーにだけ表示。サンエー印刷は GENERAL_ALLOWED に含めないので出ない
 const canAccessPortfolio = computed(() => Boolean(usePage().props.auth?.canAccessPortfolio));
-const showTab = (key) => !isGeneral.value || GENERAL_ALLOWED.includes(key);
+const showTab = (key) => isGeneral.value ? GENERAL_ALLOWED.includes(key)
+    : (isSimpleSunbrainDepartment.value ? SIMPLE_SUNBRAIN_ALLOWED.includes(key) : true);
 
 // 「申請」タブ（交通費など）: 申請者管理（Admin が、ユーザーごとにスイッチで決める）で、使える申請が 1 つでもある人にだけ出す
 const showApply = computed(() => (usePage().props.auth?.applicationAccess ?? []).length > 0);

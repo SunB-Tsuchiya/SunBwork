@@ -23,7 +23,7 @@ async function component(file) {
 (async()=>{
     const source=fs.readFileSync(path.join(root,'resources/js/utils/workHubNavigation.js'),'utf8');
     const {workHubMyJobRoute}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
-    const trial={auth:{user:{user_role:'superadmin',company_id:2},companyType:'sunbrain',superAdminContextId:null,canAccessPortfolio:true},userWorkHub:{enabled:true,unregisteredRequests:3}};
+    const trial={auth:{user:{user_role:'superadmin',company_id:2,departmentCode:'INFO'},companyType:'sunbrain',superAdminContextId:null,canAccessPortfolio:true},userWorkHub:{enabled:true,unregisteredRequests:3}};
     const old='user.myjobbox.index', preview='user.myjobbox.unified_preview';
     assert.equal(workHubMyJobRoute(trial),preview);
     assert.equal(workHubMyJobRoute({...trial,auth:{...trial.auth,superAdminContextId:'2'}}),preview);
@@ -39,6 +39,15 @@ async function component(file) {
     html=await render(inner,{...trial,auth:{...trial.auth,superAdminContextId:9}});assert.ok(html.includes(`href="/members/test/${old}"`));assert.ok(!html.includes(preview));
     html=await render(outer,{...trial,auth:{...trial.auth,user:{user_role:'user',company_id:2}},userWorkHub:{enabled:false}});assert.ok(html.includes(`href="/members/test/${old}"`));assert.ok(!html.includes(preview));
     html=await render(outer,{...trial,auth:{...trial.auth,companyType:'general'}});assert.ok(!html.includes(preview));assert.ok(!html.includes('仕事・案件'));
+    html=await render(outer,{...trial,auth:{...trial.auth,companyType:'general',applicationAccess:['expense'],nenchoAvailable:false}});
+    for(const label of ['ダッシュボード','カレンダー','日報一覧','チームルーム','申請','設定']) assert.ok(html.includes(label),`general: ${label}`);
+    assert.equal((html.match(/<a /g) || []).length,6,'general: existing six desktop links');
+    for(const departmentCode of ['SEIHAN','ONDEMAND']) {
+        html=await render(outer,{...trial,auth:{...trial.auth,applicationAccess:['expense'],nenchoAvailable:true,user:{user_role:'user',company_id:2,departmentCode}},userWorkHub:{enabled:true,unregisteredRequests:3}});
+        for(const label of ['ダッシュボード','カレンダー','日報一覧','チームルーム','申請','設定']) assert.ok(html.includes(label),`${departmentCode}: ${label}`);
+        for(const label of ['仕事・案件','案件確認','マイジョブBOX','依頼されたジョブ','校正状況','部署の作業','ポートフォリオ','年末調整']) assert.ok(!html.includes(label),`${departmentCode}: ${label}`);
+        assert.equal((html.match(/<a /g) || []).length,6,`${departmentCode}: six desktop links`);
+    }
     const page=fs.readFileSync(path.join(root,'resources/js/Pages/MyJobBox/UnifiedPreview.vue'),'utf8');assert.ok(page.includes("route('user.myjobbox.index')"));
     console.log('Work hub navigation: trial desktop/mobile/inner targets, own and changed context, ordinary roles/company, active tab, inbox badge and legacy return preserved');
 })().catch(e=>{console.error(e);process.exitCode=1;});
