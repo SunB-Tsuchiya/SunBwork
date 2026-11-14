@@ -68,7 +68,9 @@ class DepartmentWorkController extends Controller
 
     public function index(Request $request)
     {
-        [$viewer, $allowedUserIds] = $this->readContext($request);
+        $viewer = $request->user();
+        $context = $request->session()->get('superadmin_context.company_id');
+        abort_unless($this->schedule->canViewDepartmentWork($viewer, $context === null ? null : (int) $context), 403);
         $params = $request->validate([
             'date' => ['nullable', 'date_format:Y-m-d'],
             'user_id' => ['nullable', 'integer', 'min:1'],
@@ -78,7 +80,6 @@ class DepartmentWorkController extends Controller
 
         $users = User::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
-            ->when($allowedUserIds !== null, fn ($q) => $q->whereIn('id', $allowedUserIds))
             ->when(isset($params['user_id']), fn ($query) => $query->whereKey($params['user_id']))
             ->with(['assignment:id,code', 'userSetting'])
             ->ordered()->get(['id', 'name', 'company_id', 'department_id', 'assignment_id', 'sort_order']);

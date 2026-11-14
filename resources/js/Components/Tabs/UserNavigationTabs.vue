@@ -28,9 +28,8 @@ const hubTab = computed(() => {
 });
 const hubActive = computed(() => ['myjob', 'jobbox', 'broad_projects', 'project_jobs', 'proof_status'].includes(hubTab.value));
 const activeKey = computed(() => hubEnabled.value && hubActive.value ? 'work_hub' : props.active);
-// Reuse the existing server-calculated INFO trial gate; do not open the board to other roles.
-const canAccessDepartmentWork = computed(() => usePage().props.auth?.user?.user_role === 'superadmin'
-    && Boolean(usePage().props.auth?.canAccessWorkRecordTrial) && !isGeneral.value && !isSimpleSunbrainDepartment.value);
+const canAccessDepartmentWork = computed(() => Boolean(usePage().props.auth?.canViewDepartmentWork)
+    && !isGeneral.value && !isSimpleSunbrainDepartment.value);
 const GENERAL_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'settings', 'nencho', 'applications'];
 const SIMPLE_SUNBRAIN_ALLOWED = ['dashboard', 'calendar', 'diaries', 'team_rooms', 'applications', 'settings'];
 // 「年末調整」タブ: 自分が対象者になっている受付中の受付がある人にだけ表示（会社タイプ問わず。SunA/GeneralAffairs）

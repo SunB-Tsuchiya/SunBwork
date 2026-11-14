@@ -56,7 +56,7 @@ function calendar(date) {
         <template #tabs><UserNavigationTabs active="myjob" /></template>
         <div class="rounded bg-white p-4 shadow sm:p-6">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm text-gray-600">簡易入力と従来のマイジョブをまとめて確認できます。</p>
+                <p class="text-sm text-gray-600">マイジョブと旧形式の作業をまとめて確認できます。</p>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" class="rounded bg-blue-600 px-4 py-2 text-sm text-white" @click="openCreate">マイジョブ作成</button>
                     <Link :href="route('user.myjobbox.index')" class="rounded border px-3 py-2 text-sm text-blue-700">旧形式のマイジョブBOXへ</Link>
@@ -76,7 +76,7 @@ function calendar(date) {
                 </label>
                 <label class="flex items-center gap-2 text-sm"><input v-model="hideCompleted" type="checkbox" class="rounded" @change="search()" />完了を隠す</label>
             </form>
-            <p class="mt-3 text-xs leading-relaxed text-gray-500">予定がある作業は作業月、未予定は締切日（なければ登録日）の月で表示します。古い未予定は「全期間」から探せます。簡易入力の「登録済み」は完了を意味しません。</p>
+            <p class="mt-3 text-xs leading-relaxed text-gray-500">予定がある作業は作業月、未予定は締切日（なければ登録日）の月で表示します。古い未予定は「全期間」から探せます。「登録済み」は完了を意味しません。</p>
             <p class="mt-4 text-sm text-gray-600">{{ pagination.total }}件<span v-if="pagination.last > 1"> · {{ pagination.page }} / {{ pagination.last }}ページ</span></p>
             <div class="mt-2 overflow-x-auto">
                 <table class="min-w-full text-left text-sm">

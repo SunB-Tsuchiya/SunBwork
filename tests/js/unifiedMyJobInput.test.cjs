@@ -77,11 +77,11 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     assert.equal(last[2].actual_quantity, null); assert.equal(last[2].actual_unit, null); assert.equal(last[2].project_job_id, null);
     assert.deepEqual(saved, ['2026-12-01']); assert.equal(state.saving.value, false);
     props.show = false; await settle(); props.entryPoint = 'calendar'; props.show = true; await settle();
-    assert.equal(state.heading.value, '簡単な作業予定を追加'); assert.equal(state.form.title, '');
+    assert.equal(state.heading.value, 'マイジョブ作成'); assert.equal(state.form.title, '');
     Object.assign(state.form, { planned_start_time: '10:00', planned_end_time: '10:15' }); await state.save();
     assert.equal(requests.at(-1)[1], 'schedule.department_work.store');
     props.show = false; await settle(); props.entry = { id: 7, work_date: '2026-12-02', planned_start_time: '11:00', planned_end_time: '11:15' }; props.show = true; await settle();
-    assert.equal(state.heading.value, '作業予定を編集'); await state.save();
+    assert.equal(state.heading.value, 'マイジョブを編集'); await state.save();
     assert.equal(requests.at(-1)[0], 'put'); assert.equal(requests.at(-1)[1], 'schedule.department_work.update{"entry":7}');
     props.entryPoint = 'myjob'; await settle(); await state.save();
     assert.equal(requests.at(-1)[1], 'user.myjobbox.entries.update{"entry":7}');
@@ -188,7 +188,7 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
         const ctx = {};
         await renderToString(createSSRApp(actualForm, { show: true, entryPoint }), ctx);
         const html = ctx.teleports.body;
-        assert.ok(html.includes(entryPoint === 'myjob' ? 'マイジョブ作成' : '簡単な作業予定を追加'));
+        assert.ok(html.includes('マイジョブ作成'));
         assert.equal(html.includes('カレンダーで選んだ時刻'), entryPoint === 'calendar');
         for (const unit of ['ページ','ファイル','件','枚','点','冊']) assert.ok(html.includes('>'+unit+'</button>'));
         assert.ok(html.includes('aria-expanded="false"')); assert.ok(html.includes('大まかな案件（42件）'));

@@ -38,7 +38,7 @@ class DepartmentWorkRecordsTest extends TestCase
     private function service(bool $allowed = true): DepartmentWorkRecords
     {
         $schedule = $this->createMock(PersonalWorkSchedule::class);
-        $schedule->method('available')->willReturn($allowed);
+        $schedule->method('canViewDepartmentWork')->willReturn($allowed);
         $analysis = $this->createMock(WorkloadTrialAnalysis::class);
         $holidays = $this->createMock(ClerkCalendarHolidays::class);
         $holidays->method('forCompany')->willReturn([['date' => '2026-11-03', 'name' => 'Synthetic holiday']]);
@@ -54,7 +54,7 @@ class DepartmentWorkRecordsTest extends TestCase
         self::assertSame(['2026-11-01', '2026-10-30', '2026-10-29', '2026-10-28', '2026-10-27'], $this->service()->dates(new User(['company_id' => 1])));
     }
 
-    public function test_preview_rejects_ordinary_users_before_reading_dates_or_analysis(): void
+    public function test_department_records_reject_out_of_scope_viewers_before_reading_dates_or_analysis(): void
     {
         $this->expectException(AuthorizationException::class);
         $this->service(false)->records(new User(['user_role' => 'user']), null);

@@ -36,6 +36,13 @@ class PersonalWorkSchedule
                 ->where('company_id', $user->company_id)->where('code', 'INFO')->exists();
     }
 
+    /** Employee-facing department board. Keep management analysis on available(). */
+    public function canViewDepartmentWork(?User $user, ?int $contextCompany = null): bool
+    {
+        return $this->personalAvailable($user)
+            && ($contextCompany === null || $contextCompany === (int) $user->company_id);
+    }
+
     /** New-entry defaults follow registration order, never the planned work date or later edits. */
     public function defaultCategory(User $user): string
     {

@@ -34,7 +34,7 @@ const activeContinuation = computed(() => historyChoice.value?.kind === 'continu
 const canSelectSource = computed(() => !props.entry?.id && !props.continuationSource
     && (isMyJob.value || page.props.userWorkHub?.enabled));
 const canCreateLegacy = computed(() => canSelectSource.value && !props.entry && !historyChoice.value && !props.reuseEntryId);
-const heading = computed(() => activeContinuation.value ? '続きのマイジョブを作成' : props.entry?.id ? '作業予定を編集' : (isMyJob.value ? 'マイジョブ作成' : '簡単な作業予定を追加'));
+const heading = computed(() => activeContinuation.value ? '続きのマイジョブを作成' : props.entry?.id ? 'マイジョブを編集' : 'マイジョブ作成');
 const projects = ref([]);
 const broadProjects = ref([]);
 const expandedBroadProjects = ref(new Set());

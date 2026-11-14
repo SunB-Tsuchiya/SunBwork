@@ -81,7 +81,7 @@ const pageTitle = computed(() => boardVisible.value ? '部署の作業' : '予�
                 :departments="departments"
                 :worktypes="worktypes"
                 :daily-worktypes="dailyWorktypes"
-                :trial-evaluation-enabled="workEnabled"
+                :trial-evaluation-enabled="Boolean(usePage().props.auth?.canAccessWorkRecordTrial)"
                 :default-worktype="defaultWorktype" />
         </div>
         </template>

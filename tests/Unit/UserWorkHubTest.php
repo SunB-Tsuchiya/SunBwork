@@ -93,6 +93,21 @@ class UserWorkHubTest extends TestCase
         }
     }
 
+    public function test_department_board_read_access_is_info_only_and_does_not_open_trial_analysis(): void
+    {
+        $schedule = new PersonalWorkSchedule;
+        foreach (['superadmin', 'user', 'coordinator', 'leader', 'clerk', 'admin'] as $role) {
+            $member = $this->user(['user_role' => $role]);
+            self::assertTrue($schedule->canViewDepartmentWork($member, 1));
+            self::assertFalse($schedule->canViewDepartmentWork($member, 2));
+            if ($role !== 'superadmin') self::assertFalse($schedule->available($member));
+        }
+        self::assertFalse($schedule->canViewDepartmentWork(null));
+        foreach ([['department_id' => 2], ['company_id' => 2], ['company_id' => 2, 'department_id' => 3]] as $attributes) {
+            self::assertFalse($schedule->canViewDepartmentWork($this->user($attributes)));
+        }
+    }
+
     public function test_creation_fixes_scope_and_lists_only_own_department(): void
     {
         $project = $this->hub->createBroadProject($this->user(), ['name' => '  Example　 work  ', 'company_id' => 2, 'department_id' => 3, 'is_active' => false]);

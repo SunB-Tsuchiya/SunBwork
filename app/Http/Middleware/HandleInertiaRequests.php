@@ -255,6 +255,8 @@ class HandleInertiaRequests extends Middleware
                 'canAccessPortfolio' => $request->user() ? \App\Services\Portfolio\PortfolioAccess::canUse($request->user()) : false,
                 'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()
                     && app(PersonalWorkSchedule::class)->available($request->user()),
+                'canViewDepartmentWork' => $request->user() && $contextCompany
+                    && app(PersonalWorkSchedule::class)->canViewDepartmentWork($request->user(), (int) $contextCompany->id),
                 // 旧ナビが参照する分類管理権限。会社コンテキストの切り替え時は出さない。
                 'canManageBroadProjects' => $request->user() && $contextCompany
                     && (int) $contextCompany->id === (int) $request->user()->company_id

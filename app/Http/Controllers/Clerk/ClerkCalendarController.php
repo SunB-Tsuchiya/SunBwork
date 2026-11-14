@@ -18,7 +18,7 @@ class ClerkCalendarController extends Controller
         abort_unless($companyId, 403, '会社を選択してください。');
 
         return Inertia::render('Clerk/Calendar/Index', [
-            'departmentWorkEnabled' => app(PersonalWorkSchedule::class)->available(Auth::user()),
+            'departmentWorkEnabled' => app(PersonalWorkSchedule::class)->canViewDepartmentWork(Auth::user(), (int) $companyId),
         ]);
     }
 }

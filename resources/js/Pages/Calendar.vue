@@ -19,6 +19,7 @@ defineProps({
     defaultWorktype:    { type: Object, default: null },
     calendarReminders:  { type: Array,  default: () => [] },
     departmentWorkEnabled: { type: Boolean, default: false },
+    personalWorkEnabled: { type: Boolean, default: false },
 });
 </script>
 
@@ -53,6 +54,7 @@ defineProps({
             :default-break="defaultBreak"
             :default-worktype="defaultWorktype"
             :department-work-enabled="departmentWorkEnabled"
+            :personal-work-enabled="personalWorkEnabled"
         />
     </AppLayout>
 </template>

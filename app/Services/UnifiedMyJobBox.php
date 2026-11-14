@@ -74,7 +74,7 @@ class UnifiedMyJobBox
             $rows[] = ['key' => 'assignment:'.$a->id, 'assignmentId' => $own ? (int) $a->id : null,
                 'title' => $a->title, 'project' => $a->projectJob?->title ?? '',
                 'classification' => $a->projectJob?->broadProject?->pathLabel() ?? '',
-                'kind' => $a->job_type === 'proof' ? '校正' : ($a->supersedes_assignment_id ? '依頼から登録' : ($workflowIds->has($a->id) ? '管理表' : ($a->progress_cell_id ? '進行表' : ($own ? 'マイジョブ' : '依頼ジョブ')))),
+                'kind' => $a->job_type === 'proof' ? '校正' : ($a->supersedes_assignment_id ? '依頼から登録' : ($workflowIds->has($a->id) ? '管理表' : ($a->progress_cell_id ? '進行表' : ($own ? 'マイジョブ（旧形式）' : '依頼ジョブ')))),
                 'completed' => (bool) $a->completed, 'status' => $a->completed ? '完了' : ($times ? '予定あり' : '未予定'),
                 'slots' => $times, 'fallbackDate' => $fallback, 'quantity' => null,
                 'months' => $this->months($times, $fallback), 'sortDate' => $times[0]['date'] ?? $fallback ?? ''];
@@ -86,7 +86,7 @@ class UnifiedMyJobBox
             $date = $entry->work_date->format('Y-m-d');
             $rows[] = ['key' => 'entry:'.$entry->id, 'entryId' => (int) $entry->id, 'assignmentId' => null, 'title' => $entry->title,
                 'project' => $entry->projectJob?->title ?? $entry->project_name_text ?? '',
-                'classification' => $entry->broadProject?->pathLabel() ?? '', 'kind' => '簡易入力',
+                'classification' => $entry->broadProject?->pathLabel() ?? '', 'kind' => 'マイジョブ',
                 'completed' => (bool) $entry->completed_at, 'status' => $entry->completed_at ? '完了' : '登録済み', 'slots' => [['date' => $date,
                     'start' => substr($entry->planned_start_time ?? '', 0, 5), 'endDate' => $date,
                     'end' => substr($entry->planned_end_time ?? '', 0, 5)]],

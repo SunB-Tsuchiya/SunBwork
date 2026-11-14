@@ -81,11 +81,14 @@ class UnifiedMyJobBoxTest extends TestCase
         else \Illuminate\Database\Eloquent\Model::unsetConnectionResolver();
     }
 
-    public function test_trial_requires_actual_info_superadmin_and_own_company_context(): void
+    public function test_info_members_and_combined_roles_can_read_only_their_own_company_box(): void
     {
         self::assertTrue($this->box->available($this->user(), 1));
         self::assertFalse($this->box->available(null));
-        foreach ([['user_role' => 'user'], ['user_role' => 'admin'], ['user_role' => 'coordinator'], ['user_role' => 'leader'], ['department_id' => 2], ['company_id' => 2, 'department_id' => 3], ['company_id' => 2]] as $data) {
+        foreach (['user', 'admin', 'coordinator', 'leader', 'clerk'] as $role) {
+            self::assertTrue($this->box->available($this->user(['user_role' => $role])));
+        }
+        foreach ([['department_id' => 2], ['company_id' => 2, 'department_id' => 3], ['company_id' => 2]] as $data) {
             $user = $this->user($data);
             self::assertFalse($this->box->available($user));
             try { $this->box->rows($user); self::fail('Unauthorized listing'); } catch (AuthorizationException $e) { self::assertTrue(true); }
@@ -106,8 +109,10 @@ class UnifiedMyJobBoxTest extends TestCase
         $rows = collect($this->box->rows($this->user()))->keyBy('key');
         self::assertSame(['assignment:1', 'entry:1'], $rows->keys()->all());
         self::assertSame('未予定', $rows['assignment:1']['status']);
+        self::assertSame('マイジョブ（旧形式）', $rows['assignment:1']['kind']);
         self::assertSame(['2026-10'], $rows['assignment:1']['months']);
         self::assertSame('登録済み', $rows['entry:1']['status']);
+        self::assertSame('マイジョブ', $rows['entry:1']['kind']);
         foreach ($this->db->getConnection()->getQueryLog() as $query) self::assertMatchesRegularExpression('/^select /i', $query['query']);
     }
 

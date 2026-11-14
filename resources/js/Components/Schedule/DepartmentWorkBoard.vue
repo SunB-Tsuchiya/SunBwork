@@ -17,7 +17,7 @@ const categories = workCategories;
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ''}`;
 const categoryName = (value) => categories.find(([key]) => key === value)?.[1] || 'その他';
 const slotName = (value) => ({ am: '午前', pm: '午後', full: '終日', hour: '時間指定' })[value] || '';
-const kindName = (item) => ({ my_job: 'マイジョブ', assigned_job: '依頼ジョブ', event: 'その他の予定', quick_work: '簡易予定' })[item.kind] || (item.source === 'entry' ? '簡易予定' : '既存予定');
+const kindName = (item) => ({ my_job: 'マイジョブ（旧形式）', assigned_job: '依頼ジョブ', event: 'その他の予定', quick_work: 'マイジョブ' })[item.kind] || (item.source === 'entry' ? 'マイジョブ' : '既存予定');
 const itemTime = (item) => item.starts_at
     ? `${item.starts_at.slice(11)}–${item.ends_at?.slice(11) || ''}`
     : (item.plan_slot === 'hour' ? `${item.planned_start_time}–${item.planned_end_time}` : slotName(item.plan_slot));

@@ -174,7 +174,8 @@ class CalendarController extends Controller
             'defaultBreak'       => $defaultBreak,
             'defaultWorktype'    => $defaultWorktype,
             'calendarReminders'  => $calendarReminders,
-            'departmentWorkEnabled' => $user ? app(PersonalWorkSchedule::class)->available($user) : false,
+            'personalWorkEnabled' => $user ? app(PersonalWorkSchedule::class)->canViewDepartmentWork($user, $this->contextCompanyId()) : false,
+            'departmentWorkEnabled' => $user ? app(PersonalWorkSchedule::class)->canViewDepartmentWork($user, $this->contextCompanyId()) : false,
         ]);
     }
 }

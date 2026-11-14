@@ -12,7 +12,8 @@ class DepartmentWorkRecordsController extends Controller
     {
         $params = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']]);
 
-        return response()->json($records->records($request->user(), $params['date'] ?? null))
+        $context = $request->session()->get('superadmin_context.company_id');
+        return response()->json($records->records($request->user(), $params['date'] ?? null, $context === null ? null : (int) $context))
             ->header('Cache-Control', 'private, no-store');
     }
 }

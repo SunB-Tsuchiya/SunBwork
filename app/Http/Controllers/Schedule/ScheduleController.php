@@ -88,7 +88,8 @@ class ScheduleController extends Controller
             Log::error('ScheduleController dailyWorktypes: ' . $e->getMessage());
         }
 
-        $departmentWorkEnabled = app(PersonalWorkSchedule::class)->available($user);
+        $context = $request->session()->get('superadmin_context.company_id');
+        $departmentWorkEnabled = app(PersonalWorkSchedule::class)->canViewDepartmentWork($user, $context === null ? null : (int) $context);
 
         return Inertia::render('Schedule/Index', [
             'initialDate'        => $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString(),

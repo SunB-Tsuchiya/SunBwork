@@ -10,7 +10,6 @@ import EventModal       from '@/Components/Schedule/EventModal.vue';
 import EventDetailModal from '@/Components/Schedule/EventDetailModal.vue';
 import ActionSheet      from '@/Components/Calendar/ActionSheet.vue';
 import QuickWorkEntryModal from '@/Components/Calendar/QuickWorkEntryModal.vue';
-import MyJobCreateModal from '@/Components/MyJobCreateModal.vue';
 import UserDayView      from '@/Components/Calendar/UserDayView.vue';
 import { useCalendarCore } from '@/Components/Schedule/useCalendarCore.js';
 
@@ -28,6 +27,7 @@ const props = defineProps({
     defaultBreak:       { type: Object, default: () => ({ start: '12:00', end: '13:00' }) },
     defaultWorktype:    { type: Object, default: null },
     departmentWorkEnabled: { type: Boolean, default: false },
+    personalWorkEnabled: { type: Boolean, default: false },
 });
 
 const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -96,7 +96,7 @@ async function loadEvents() {
             axios.get(route('calendar.events.range'), {
                 params: { start: loadRange.value.start, end: loadRange.value.end },
             }),
-            props.departmentWorkEnabled
+            props.personalWorkEnabled
                 ? axios.get(route('schedule.department_work.mine'), { params: { start: loadRange.value.start, end: loadRange.value.end } })
                 : Promise.resolve({ data: { events: [] } }),
         ]);
@@ -107,7 +107,7 @@ async function loadEvents() {
             diaryDates.value = personalRes.value.data.diaries ?? [];
         }
         if (workRes.status === 'fulfilled') quickWorkEvents.value = workRes.value.data.events ?? [];
-        else if (props.departmentWorkEnabled) calendarError.value = '簡易作業予定を読み込めませんでした。再読み込みしてください。';
+        else if (props.personalWorkEnabled) calendarError.value = 'マイジョブを読み込めませんでした。再読み込みしてください。';
         for (const result of [companyRes, personalRes, workRes]) {
             if (result.status === 'rejected') console.error('カレンダーイベント取得失敗', result.reason);
         }
@@ -156,7 +156,7 @@ const myJobDef = ref({ date: '', startMin: null, endMin: null });
 function onActionMyJob() {
     showActionSheet.value = false;
     const { date, startMin, endMin } = actionSheetDef.value;
-    if (props.departmentWorkEnabled) {
+    if (props.personalWorkEnabled) {
         myJobDef.value = { date, startMin, endMin };
         showMyJobCreate.value = true;
         return;
@@ -188,13 +188,6 @@ function goToDepartmentWork(date = currentDate.value) {
 const showQuickWork = ref(false);
 const quickWorkEntry = ref(null);
 const quickWorkDef = ref({ date: '', startMin: null, endMin: null });
-
-function onActionWork() {
-    quickWorkEntry.value = null;
-    quickWorkDef.value = { ...actionSheetDef.value };
-    showActionSheet.value = false;
-    showQuickWork.value = true;
-}
 
 function onQuickWorkSaved(savedDate) {
     showQuickWork.value = false;
@@ -629,8 +622,8 @@ async function saveWeekBreaks() {
 </script>
 
 <template>
-    <div v-if="departmentWorkEnabled" class="flex flex-wrap gap-x-3 gap-y-1 border-b bg-white px-3 py-1 text-xs text-gray-600">
-        <span class="inline-flex items-center gap-1 font-medium"><i class="h-2.5 w-2.5 rounded-full border border-indigo-600" :style="{ backgroundColor: quickWorkColor }"></i>マイジョブ（簡易入力）</span>
+    <div v-if="personalWorkEnabled" class="flex flex-wrap gap-x-3 gap-y-1 border-b bg-white px-3 py-1 text-xs text-gray-600">
+        <span class="inline-flex items-center gap-1 font-medium"><i class="h-2.5 w-2.5 rounded-full border border-indigo-600" :style="{ backgroundColor: quickWorkColor }"></i>マイジョブ</span>
         <span v-if="calendarError" class="text-red-700" role="alert">{{ calendarError }}</span>
     </div>
     <CalendarShell
@@ -707,7 +700,7 @@ async function saveWeekBreaks() {
             :daily-breaks="localDailyBreaks"
             :default-break="defaultBreak"
             :has-diary="hasDiaryToday"
-            :overlap-layout-enabled="departmentWorkEnabled"
+            :overlap-layout-enabled="personalWorkEnabled"
             @create="openActionSheet"
             @update="onUpdate"
             @event-click="openDetail"
@@ -743,7 +736,6 @@ async function saveWeekBreaks() {
 
     <ActionSheet
         :show="showActionSheet"
-        :show-work-action="departmentWorkEnabled"
         :date="actionSheetDef.date"
         :start-min="actionSheetDef.startMin"
         :end-min="actionSheetDef.endMin"
@@ -751,11 +743,11 @@ async function saveWeekBreaks() {
         @add-event="onActionAddEvent"
         @my-job="onActionMyJob"
         @sheet-job="onActionSheetJob"
-        @diary="onActionDiary"
-        @work="onActionWork" />
+        @diary="onActionDiary" />
 
     <QuickWorkEntryModal
         :show="showQuickWork"
+        entry-point="myjob"
         :date="quickWorkDef.date"
         :start-min="quickWorkDef.startMin"
         :end-min="quickWorkDef.endMin"
@@ -763,8 +755,9 @@ async function saveWeekBreaks() {
         @close="showQuickWork = false"
         @saved="onQuickWorkSaved" />
 
-    <MyJobCreateModal
+    <QuickWorkEntryModal
         :show="showMyJobCreate"
+        entry-point="myjob"
         :date="myJobDef.date"
         :start-min="myJobDef.startMin"
         :end-min="myJobDef.endMin"

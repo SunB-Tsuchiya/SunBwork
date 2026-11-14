@@ -36,9 +36,9 @@ class DepartmentWorkRecords
         return $dates;
     }
 
-    public function records(User $viewer, ?string $date): array
+    public function records(User $viewer, ?string $date, ?int $contextCompany = null): array
     {
-        if (! $this->schedule->available($viewer)) {
+        if (! $this->schedule->canViewDepartmentWork($viewer, $contextCompany)) {
             throw new AuthorizationException;
         }
         $dates = $this->dates($viewer);
