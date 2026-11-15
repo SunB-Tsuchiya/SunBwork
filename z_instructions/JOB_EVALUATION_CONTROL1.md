@@ -2348,3 +2348,7 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-15利用者の明示依頼でお知らせ下書き保存: 既存ユーザーガイド /members/guide/user を案内先とし、「マイジョブの入力が簡単になりました」の短文を情報出版所属者向けに作成。利用者が正確なSSHと手順SHA256 4eb077fbbe3f042e7956e2a802ca1a37edd0d728a18c4b1c9ce48ea5adcd2dee を承認。既存モデルのdraftとindividual宛先で保存、結果id73/status draft/対象38件。送信処理・通知は実行せず。次は利用者がClerkお知らせ下書きから内容を確認し送信判断。
 
 2026-11-15お知らせ73更新不具合: 利用者は本文を書き換えて更新すると元内容のeditへ戻ると報告。Clerk/Editのfetchがvalidation redirectも成功としてwindow遷移する実装を確認。標準Inertia post+PUT spoofへ変更して入力保持/validation全項目表示、target_company_idの編集初期値欠落も補完。本文/宛先の本番データは未変更、送信なし。今回配備/再更新は未確認。
+
+2026-11-15お知らせ編集の反映: 利用者承認の固定手順74b0c2891b47819e96a290719b2ffd30f1e617fddf343a9032289f5ad1529f44で本番d472570b3へ配備exit0、build/PHP構文/manifest494・525欠落0。本文/宛先の業務データは変更なし・送信なし。元のvalidation応答を取得していないため保存停止の具体項目は未確定。次は利用者が73/editを再読込して本文更新、保存された内容保持又は具体的validation表示を確認。まだ実更新成功とはしない。
+
+2026-11-15お知らせ73のガイドリンク欠落: 利用者が復元を依頼。config/htmlpurifier.richとRichTextViewの双方がaタグを除去することを確認。保存/表示のリンク許可と編集toolbarのlinkを追加する。危険URIは既存Purifier/DOMPurifyで除去。73の現在本文を読取確認後、他の文章を保ちガイドリンクのみ復元予定。配備/本文修復は未実施。

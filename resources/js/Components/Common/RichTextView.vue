@@ -8,8 +8,8 @@ const props = defineProps({ content: { type: String, default: '' } });
 const isHtml = computed(() => /<[a-z][\s\S]*>/i.test(props.content ?? ''));
 const safeHtml = computed(() =>
     DOMPurify.sanitize(props.content ?? '', {
-        ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'span', 'ul', 'ol', 'li'],
-        ALLOWED_ATTR: ['style'],
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'span', 'ul', 'ol', 'li', 'a'],
+        ALLOWED_ATTR: ['style', 'href', 'title'],
     })
 );
 </script>
@@ -20,6 +20,7 @@ const safeHtml = computed(() =>
 </template>
 
 <style scoped>
+.rich-text-view :deep(a) { color: #2563eb; text-decoration: underline; }
 .rich-text-view :deep(p) { margin: 0; min-height: 1em; }
 .rich-text-view :deep(ul) { list-style: disc; padding-left: 1.5rem; }
 .rich-text-view :deep(ol) { list-style: decimal; padding-left: 1.5rem; }

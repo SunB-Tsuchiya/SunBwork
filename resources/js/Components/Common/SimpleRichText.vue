@@ -14,6 +14,7 @@ const toolbar = [
     ['bold', 'italic', 'underline', 'strike'],
     [{ color: [] }, { background: [] }],
     [{ list: 'ordered' }, { list: 'bullet' }],
+    ['link'],
     ['clean'],
 ];
 
@@ -21,6 +22,7 @@ let quill = null;
 
 // ツールバーのボタンに付けるマウスオーバー表示（Quill は標準では付けない）
 const TOOLBAR_TITLES = {
+    '.ql-link': 'リンクを挿入・編集',
     '.ql-bold': '太字',
     '.ql-italic': '斜体',
     '.ql-underline': '下線',
