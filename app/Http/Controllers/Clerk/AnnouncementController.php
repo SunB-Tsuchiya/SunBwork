@@ -229,6 +229,7 @@ class AnnouncementController extends Controller
                 'title'   => $announcement->title,
                 'content' => $announcement->content,
                 'status'  => $announcement->status,
+                'target_company_id' => $announcement->target_company_id,
                 'target_type' => $announcement->target_type,
                 'target_block' => $announcement->target_block ?? 'all',
                 'attachments' => $announcement->attachments->map(fn ($a) => [

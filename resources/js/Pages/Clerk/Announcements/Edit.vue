@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import RecipientPicker from '@/Components/Clerk/RecipientPicker.vue';
 import SimpleRichText from '@/Components/Common/SimpleRichText.vue';
@@ -20,7 +20,7 @@ const isDraft = computed(() => props.announcement.status === 'draft');
 const page = usePage();
 const canCrossCompany = computed(() => page.props.auth?.featureFlags?.crossCompanyAnnouncement ?? false);
 
-const selectedCompanyIds = ref([]);
+const selectedCompanyIds = ref(props.announcement.target_company_id ? [props.announcement.target_company_id] : []);
 const targetType = ref(props.announcement.target_type ?? 'all');
 const targetBlock = ref(props.announcement.target_block ?? 'all');
 const selectedUserIds = ref([...(props.announcement.recipient_ids ?? [])]);
@@ -109,14 +109,13 @@ function buildFormData() {
 function submit() {
     errors.value = {};
     submitting.value = true;
-    fetch(route('clerk.announcements.update', { announcement: props.announcement.id }), {
-        method: 'POST',
-        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '' },
-        body: buildFormData(),
-    }).then(async res => {
-        if (res.redirected) { window.location.href = res.url; return; }
-        if (!res.ok) { const json = await res.json().catch(() => ({})); errors.value = json.errors ?? {}; }
-    }).finally(() => { submitting.value = false; });
+    router.post(route('clerk.announcements.update', { announcement: props.announcement.id }), buildFormData(), {
+        forceFormData: true,
+        preserveScroll: true,
+        preserveState: true,
+        onError: (validationErrors) => { errors.value = validationErrors; },
+        onFinish: () => { submitting.value = false; },
+    });
 }
 </script>
 
@@ -139,6 +138,10 @@ function submit() {
                     ※ 送信先（受信者）は変更できません。タイトル・本文・添付ファイルのみ編集できます。
                 </p>
 
+                <div v-if="Object.keys(errors).length" role="alert" class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    <p class="font-semibold">保存できませんでした。入力内容を確認してください。</p>
+                    <ul class="mt-1 list-inside list-disc"><li v-for="(message, key) in errors" :key="key">{{ message }}</li></ul>
+                </div>
                 <!-- 宛先（下書きのみ） -->
                 <template v-if="isDraft">
                     <!-- cross-company -->
