@@ -442,3 +442,8 @@ SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSe
 ProofRequestCompletionが校正依頼行をロックし、完了状態・元割当のproof_completed_at・proof_completed通知を同じtransactionで保存する。既存の各入口の認可は維持し、旧カレンダー/本人旧BOX/混在系列/校正専用画面を接続。通知失敗を握り潰して完了だけ確定しない。既に完了した依頼への再操作では過去通知を補正しない。校正元の新式作業は自動完了しない。
 
 旧割当の推定参照は同案件/担当/窓口/会社と作成時刻を照合し、複数候補はlatestで選ばず確認エラーとする。直接proofのsyncは通常依頼supersedesの検証と区別。通常依頼・自己割当通知・新式公開範囲を変更しない。実配備/実受信状態はPROOF_COMPLETION_NOTICE_MANAGER1末尾を参照。
+
+## 新しいマイジョブの競合・再送対策（2026-11-15実装、配備前）
+
+通常編集はWorkJobInputの通常項目ハッシュをedit_versionとして詳細/個人カレンダーへ渡す。更新時は行ロック後に比較し、古い画面は409で拒否。詳細ファイル版や完了の独立更新とは干渉しない。旧会社NULL案件は認可済み既存entryの同じproject ID保持だけ例外を使う。
+通常新規/独立引用はrequest_token必須。work_job_creation_receiptsにuser+tokenのキー、検証済みpayload/sourceのhash、作成IDを保存。本人ロックで直列化し再送は同じID、内容違いは422、削除済みは410。別tokenの同名作業は別件。続きの既存receiptは変更しない。新migrationだけを--path指定で配備時に実行し、他の未適用migrationをまとめて実行しない。状態はMYJOB_REVIEW_FIX_MANAGER1.md。

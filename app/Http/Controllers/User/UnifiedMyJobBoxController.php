@@ -22,8 +22,8 @@ class UnifiedMyJobBoxController extends Controller
             $source = app(\App\Services\WorkJobReader::class)->resolve($request->user(), $field === 'reuse_entry_id' ? 'entry' : 'assignment', (int) $id, $context === null ? null : (int) $context);
             $user = $request->user();
             $data = $entries->validatedEntry($request, $user, false, null, $source->project_job_id ? (int) $source->project_job_id : null);
-            $entry = \App\Models\PersonalWorkEntry::create($data + ['user_id' => $user->id, 'company_id' => $user->company_id, 'department_id' => $user->department_id]);
-            return response()->json(['id' => $entry->id], 201);
+            $result = app(\App\Services\WorkJobInput::class)->create($request, $data, [$field, (int) $id]);
+            return response()->json($result, $result['replayed'] ? 200 : 201);
         }
 
         // Reuse the calendar's validation and owner-fixed save without copying work.

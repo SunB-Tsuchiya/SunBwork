@@ -54,6 +54,7 @@ class UnifiedMyJobCreateTest extends TestCase
             $t->integer('project_job_assignment_id')->nullable(); $t->integer('diary_id')->nullable(); $t->timestamps();
         });
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_120001_add_work_job_core_fields.php')->up();
+        (require dirname(__DIR__, 2).'/database/migrations/2026_11_15_180001_create_work_job_creation_receipts.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_150001_create_work_job_continuations_table.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_03_180001_support_legacy_work_continuation_sources.php')->up();
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_05_120001_create_work_job_completion_syncs.php')->up();
@@ -90,7 +91,7 @@ class UnifiedMyJobCreateTest extends TestCase
         return (new User)->forceFill($data + ['id' => 1, 'user_role' => 'superadmin', 'company_id' => 1, 'department_id' => 1])->setRelation('userSetting', null);
     }
 
-    private function request(array $payload = [], ?User $user = null, ?int $context = null, string $method = 'POST'): Request
+    protected function request(array $payload = [], ?User $user = null, ?int $context = null, string $method = 'POST'): Request
     {
         $request = Request::create('/myjobbox/unified-preview', $method, $payload);
         $session = new \Illuminate\Session\Store('test', new \Illuminate\Session\ArraySessionHandler(120));
@@ -101,14 +102,14 @@ class UnifiedMyJobCreateTest extends TestCase
         return $request;
     }
 
-    private function payload(array $data = []): array
+    protected function payload(array $data = []): array
     {
-        return $data + ['work_date' => '2026-12-01', 'work_category' => 'other', 'plan_slot' => 'hour',
+        return $data + ['request_token' => (string) \Illuminate\Support\Str::uuid(), 'work_date' => '2026-12-01', 'work_category' => 'other', 'plan_slot' => 'hour',
             'planned_start_time' => '09:00', 'planned_end_time' => '09:30', 'title' => 'BOX入力',
             'entry_visibility' => 'department', 'actual_quantity' => 2, 'actual_unit' => 'ページ', 'broad_project_id' => 1];
     }
 
-    private function save(Request $request)
+    protected function save(Request $request)
     {
         return app(UnifiedMyJobBoxController::class)->store($request, app(UnifiedMyJobBox::class), app(DepartmentWorkController::class));
     }
@@ -135,7 +136,7 @@ class UnifiedMyJobCreateTest extends TestCase
         $id = $this->save($this->request($this->payload(), $member))->getData(true)['id'];
         self::assertSame(1, DB::table('personal_work_entries')->find($id)->user_id);
         self::assertSame('entry:'.$id, app(UnifiedMyJobBox::class)->rows($member)[0]['key']);
-        try { app(DepartmentWorkController::class)->index($this->request(['date' => '2026-12-01'], $member, null, 'GET')); self::fail('Department analysis was opened'); }
+        try { app(DepartmentWorkController::class)->analysis($this->request(['date' => '2026-12-01', 'period'=>'day'], $member, null, 'GET')); self::fail('Department analysis was opened'); }
         catch (HttpException $e) { self::assertSame(403, $e->getStatusCode()); }
     }
 
@@ -190,7 +191,7 @@ class UnifiedMyJobCreateTest extends TestCase
         $page = $response->toResponse($request)->getData(true);
         self::assertSame('MyJobBox/WorkDetail', $page['component']); self::assertSame('before', $page['props']['back']['q']);
         self::assertSame($id, $page['props']['work']['id']); self::assertSame(0, $page['props']['time']['recorded']);
-        $update = $this->request($this->payload(['work_date' => '2099-12-02', 'title' => 'Edited', 'source_entry_id' => 999, 'completed_at' => '2026-11-01']));
+        $update = $this->request($this->payload(['edit_version' => app(\App\Services\WorkJobInput::class)->version(\App\Models\PersonalWorkEntry::findOrFail($id)), 'work_date' => '2099-12-02', 'title' => 'Edited', 'source_entry_id' => 999, 'completed_at' => '2026-11-01']));
         $result = app(\App\Http\Controllers\User\WorkJobDetailController::class)->update($update, $id, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class));
         self::assertSame($id, $result->getData(true)['id']); self::assertSame(1, DB::table('personal_work_entries')->count());
         $row = DB::table('personal_work_entries')->first();
@@ -1428,7 +1429,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertSame(1, $details->save($this->request($body), $id, null)['details_version']);
         try { $details->save($this->request($this->detailPayload(['detail_note' => '古い画面の変更'])), $id, null); self::fail('Lost update allowed'); }
         catch (HttpException $e) { self::assertSame(409, $e->getStatusCode()); }
-        app(\App\Http\Controllers\User\WorkJobDetailController::class)->update($this->request($this->payload(['title' => '通常編集', 'detail_note' => '改ざん', 'file_info' => null, 'details_version' => 99])), $id, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class));
+        app(\App\Http\Controllers\User\WorkJobDetailController::class)->update($this->request($this->payload(['edit_version' => app(\App\Services\WorkJobInput::class)->version(\App\Models\PersonalWorkEntry::findOrFail($id)), 'title' => '通常編集', 'detail_note' => '改ざん', 'file_info' => null, 'details_version' => 99])), $id, app(\App\Services\WorkJobReader::class), app(DepartmentWorkController::class));
         $row = \App\Models\PersonalWorkEntry::findOrFail($id);
         self::assertSame('通常編集', $row->title); self::assertSame('作業説明', $row->detail_note); self::assertSame(1, $row->details_version); self::assertNotNull($row->file_info);
         $child = $this->continueWork($id, ['work_date' => '2099-12-02'])->getData(true)['id'];

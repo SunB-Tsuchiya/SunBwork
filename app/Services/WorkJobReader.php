@@ -224,7 +224,7 @@ class WorkJobReader
         }
         $clock = fn ($minute) => ($minute >= 1440 ? '翌日 ' : '').sprintf('%02d:%02d', intdiv($minute, 60) % 24, $minute % 60);
         return ['work' => [
-            'id' => (int) $entry->id, 'title' => $entry->title,
+            'id' => (int) $entry->id, 'edit_version' => app(WorkJobInput::class)->version($entry), 'title' => $entry->title,
             'project' => $entry->projectJob?->title ?? $entry->project_name_text,
             'classification' => $entry->broadProject?->pathLabel(),
             'display_start' => $range ? $clock($range[0]) : null, 'display_end' => $range ? $clock($range[1]) : null,

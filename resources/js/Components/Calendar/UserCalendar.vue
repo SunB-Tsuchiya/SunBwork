@@ -293,7 +293,7 @@ async function onUpdate({ id, starts_at, ends_at }) {
                 planned_start_time: startTime.slice(0, 5), planned_end_time: endTime.slice(0, 5),
                 project_job_id: entry.project_job_id || null,
             });
-        } catch { alert('作業予定の移動に失敗しました。'); }
+        } catch (err) { alert(err.response?.data?.message || '作業予定の移動に失敗しました。'); }
         loadEvents();
         return;
     }

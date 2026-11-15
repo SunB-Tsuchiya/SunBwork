@@ -168,6 +168,7 @@ function clearProject() {
 watch(() => props.show, async (show) => {
     if (!show) { showTitleSuggestions.value = false; projectPickerOpen.value = false; return; }
     error.value = '';
+    requestToken.value = globalThis.crypto.randomUUID();
     sourcePickerOpen.value = false; historyChoice.value = null; handingOff.value = false;
     clearTimeout(searchTimer);
     projectSearch.value = '';
@@ -272,7 +273,7 @@ async function save() {
     error.value = '';
     try {
         const payload = {
-            ...form, ...(historyChoice.value?.kind === 'new' ? { [historyChoice.value.type === 'entry' ? 'reuse_entry_id' : 'reuse_assignment_id']: historyChoice.value.id } : (!historyChoice.value && props.reuseEntryId ? { reuse_entry_id: props.reuseEntryId } : {})), project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
+            ...form, request_token: requestToken.value, edit_version: props.entry?.edit_version, ...(historyChoice.value?.kind === 'new' ? { [historyChoice.value.type === 'entry' ? 'reuse_entry_id' : 'reuse_assignment_id']: historyChoice.value.id } : (!historyChoice.value && props.reuseEntryId ? { reuse_entry_id: props.reuseEntryId } : {})), project_job_id: form.project_job_id || null, broad_project_id: form.broad_project_id || null,
             actual_quantity: form.actual_quantity === '' ? null : form.actual_quantity,
             actual_unit: form.actual_quantity === '' && !activeContinuation.value && !historyChoice.value ? null : form.actual_unit,
         };

@@ -288,7 +288,7 @@ class DepartmentWorkController extends Controller
                 '_custom_text_color' => PersonalWorkActivities::TEXT_COLOR,
                 '_custom_border_color' => PersonalWorkActivities::BORDER_COLOR,
                 '_work_entry' => [
-                    'id' => $entry->id, 'work_date' => $date,
+                    'id' => $entry->id, 'edit_version' => app(\App\Services\WorkJobInput::class)->version($entry), 'work_date' => $date,
                     'work_category' => $entry->work_category, 'plan_slot' => $entry->plan_slot,
                     'activity_type' => $entry->activity_type,
                     'planned_start_time' => $entry->planned_start_time ? substr($entry->planned_start_time, 0, 5) : null,
@@ -369,12 +369,8 @@ class DepartmentWorkController extends Controller
         $user = $request->user();
         abort_unless($this->schedule->personalAvailable($user), 403);
         $data = $this->validatedEntry($request, $user);
-        $entry = PersonalWorkEntry::create($data + [
-            'user_id' => $user->id,
-            'company_id' => $user->company_id,
-            'department_id' => $user->department_id,
-        ]);
-        return response()->json(['id' => $entry->id], 201);
+        $result = app(\App\Services\WorkJobInput::class)->create($request, $data);
+        return response()->json($result, $result['replayed'] ? 200 : 201);
     }
 
     public function update(Request $request, PersonalWorkEntry $entry)
@@ -382,10 +378,17 @@ class DepartmentWorkController extends Controller
         $user = $request->user();
         abort_unless($this->schedule->personalAvailable($user) && (int) $entry->user_id === (int) $user->id, 403);
         abort_if($entry->source_event_id, 422);
-        $data = $this->validatedEntry($request, $user, in_array($entry->plan_slot, ['am', 'pm', 'full'], true), $entry);
-        abort_if($entry->diary_id && $entry->work_date->toDateString() !== $data['work_date'], 422, '日報へ取り込んだ作業の日付は変更できません。');
-        $entry->update($data);
-        return response()->json(['id' => $entry->id]);
+        $version = $request->validate(['edit_version' => ['required', 'string', 'size:64']])['edit_version'];
+        return DB::transaction(function () use ($request, $entry, $user, $version) {
+            $locked = PersonalWorkEntry::whereKey($entry->id)->lockForUpdate()->firstOrFail();
+            abort_unless((int) $locked->user_id === (int) $user->id, 403);
+            $input = app(\App\Services\WorkJobInput::class);
+            abort_unless(hash_equals($input->version($locked), $version), 409, 'ほかの画面で更新されています。入力内容を控えてから再読み込みしてください。');
+            $data = $this->validatedEntry($request, $user, in_array($locked->plan_slot, ['am','pm','full'], true), $locked, $locked->project_job_id ? (int) $locked->project_job_id : null);
+            abort_if($locked->diary_id && $locked->work_date->toDateString() !== $data['work_date'], 422, '日報へ取り込んだ作業の日付は変更できません。');
+            $locked->update($data);
+            return response()->json(['id' => $locked->id, 'edit_version' => $input->version($locked->fresh())]);
+        }, 3);
     }
 
     public function destroy(Request $request, PersonalWorkEntry $entry)

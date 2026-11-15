@@ -73,7 +73,7 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     failSave = true; await state.save();
     assert.equal(state.error.value, '保存の検証エラー'); assert.equal(saved.length, 0); assert.equal(state.form.title, '試用作業');
     failSave = false; await state.save();
-    let last = requests.at(-1); assert.equal(last[0], 'post'); assert.equal(last[1], 'user.myjobbox.unified_store');
+    let last = requests.at(-1); assert.match(last[2].request_token,/^[0-9a-f-]{36}$/); assert.equal(last[0], 'post'); assert.equal(last[1], 'user.myjobbox.unified_store');
     assert.equal(last[2].actual_quantity, null); assert.equal(last[2].actual_unit, null); assert.equal(last[2].project_job_id, null);
     assert.deepEqual(saved, ['2026-12-01']); assert.equal(state.saving.value, false);
     props.show = false; await settle(); props.entryPoint = 'calendar'; props.show = true; await settle();
