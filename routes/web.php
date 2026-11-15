@@ -456,6 +456,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     // 日報機能（作成、保存、表示、編集、更新、削除）
     // past-data は静的ルートなので resource より前に定義する
+    Route::get('diaries/work-reminder', [App\Http\Controllers\DiaryController::class, 'workReminderApi'])->name('diaries.work_reminder');
     Route::get('diaries/past-data', [App\Http\Controllers\DiaryController::class, 'pastData'])->name('diaries.past_data');
     Route::resource('diaries', App\Http\Controllers\DiaryController::class)
         ->only(['create', 'store', 'show', 'edit', 'update', 'destroy', 'index']);

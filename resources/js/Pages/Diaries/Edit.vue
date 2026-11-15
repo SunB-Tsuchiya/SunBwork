@@ -30,6 +30,7 @@ const props = defineProps({
     workRecord: { type: Object, default: null },
     personalWorkEnabled: { type: Boolean, default: false },
     workReminder: { type: Object, default: null },
+    workReminderUrl: { type: String, default: null },
 });
 const content = ref('');
 let editorInstance = null;
@@ -525,7 +526,7 @@ const back = () => {
                         </div>
                     </div>
                 </div>
-                <DiaryWorkReminder v-if="personalWorkEnabled" :reminder="workReminder" @open-calendar="openWorkCalendar" />
+                <DiaryWorkReminder v-if="personalWorkEnabled" :reminder="workReminder" :date="form.date" :reminder-url="workReminderUrl" @open-calendar="openWorkCalendar" />
                 <div class="mb-4">
                     <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>
                     <QuillEditor

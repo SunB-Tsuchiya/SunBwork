@@ -25,33 +25,48 @@ class DiaryController extends Controller
     private function workReminder(User $user, string $date): ?array
     {
         $schedule = app(PersonalWorkSchedule::class);
-        if (! $schedule->available($user)) return null;
+        $context = request()->session()->get('superadmin_context.company_id');
+        if (! app(\App\Services\UnifiedMyJobBox::class)->available($user, $context === null ? null : (int) $context)) return null;
+        $issues = app(\App\Services\DiaryRecordAdvice::class)->issues($user, $date);
 
         $window = $schedule->workWindow($user, $date);
-        // 勤務形態が未設定の試用者は、A日程の7時間30分を目安として案内する。
+        // 勤務形態不明時は不足を推測しない。当日は現在までを対象とする。
         $expectedMinutes = $window
             ? max(0, $window['end'] - $window['start']
                 - max(0, min($window['end'], $window['break_end']) - max($window['start'], $window['break_start'])))
-            : 450;
+            : 0;
+        if ($window && $date === now('Asia/Tokyo')->toDateString()) {
+            $until = min($window['end'], now('Asia/Tokyo')->hour * 60 + now('Asia/Tokyo')->minute);
+            $expectedMinutes = max(0, $until - $window['start']
+                - max(0, min($until, $window['break_end']) - max($window['start'], $window['break_start'])));
+        }
         $recordedMinutes = 0;
         if ($expectedMinutes > 0 && $date <= now('Asia/Tokyo')->toDateString()) {
             $day = Carbon::parse($date, 'Asia/Tokyo')->startOfDay();
-            $analysis = app(WorkloadTrialAnalysis::class)->analyze($user, collect([$user]), $day, $day);
+            $analysis = app(WorkloadTrialAnalysis::class)->analyze($user, collect([$user]), $day, $day->copy()->endOfDay(), false, 'trial_time_v3');
             $recordedMinutes = min($expectedMinutes, (int) ($window
                 ? ($analysis[0]['scheduled_covered_minutes'] ?? 0)
                 : ($analysis[0]['minutes'] ?? 0)));
         }
         $missingMinutes = $expectedMinutes > 0 && $date <= now('Asia/Tokyo')->toDateString()
             ? $expectedMinutes - $recordedMinutes : 0;
-        if ($missingMinutes < 30) return null;
+        if ($missingMinutes < 30 && ! $issues) return null;
 
         return [
             'date' => $date,
+            'issues' => $issues,
             'scheduled_minutes' => $expectedMinutes,
             'recorded_minutes' => $recordedMinutes,
             'missing_minutes' => $missingMinutes,
             'approximate' => $window === null,
         ];
+    }
+
+    public function workReminderApi(Request $request)
+    {
+        $date = $request->validate(['date' => ['required', 'date_format:Y-m-d']])['date'];
+        return response()->json(['reminder' => $this->workReminder($request->user(), $date)])
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function index(Request $request)
@@ -251,6 +266,7 @@ class DiaryController extends Controller
             'defaultWorktypeId'  => $defaultWorktypeId,
             'personalWorkEnabled' => app(PersonalWorkSchedule::class)->personalAvailable($user),
             'workReminder' => $this->workReminder($user, $date),
+            'workReminderUrl' => route('diaries.work_reminder'),
         ]);
     }
 
@@ -432,7 +448,8 @@ class DiaryController extends Controller
             ] : null,
             'personalWorkEnabled' => (int) $diary->user_id === (int) $user->id
                 && app(PersonalWorkSchedule::class)->personalAvailable($user),
-            'workReminder' => $this->workReminder($user, $dateStr),
+            'workReminder' => (int) $diary->user_id === (int) $user->id ? $this->workReminder($user, $dateStr) : null,
+            'workReminderUrl' => (int) $diary->user_id === (int) $user->id ? route('diaries.work_reminder') : null,
         ]);
     }
 

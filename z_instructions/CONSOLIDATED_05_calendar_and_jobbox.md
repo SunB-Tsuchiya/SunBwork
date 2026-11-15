@@ -449,3 +449,7 @@ ProofRequestCompletionが校正依頼行をロックし、完了状態・元割�
 通常新規/独立引用はrequest_token必須。work_job_creation_receiptsにuser+tokenのキー、検証済みpayload/sourceのhash、作成IDを保存。本人ロックで直列化し再送は同じID、内容違いは422、削除済みは410。別tokenの同名作業は別件。続きの既存receiptは変更しない。新migrationだけを--path指定で配備時に実行し、他の未適用migrationをまとめて実行しない。状態はMYJOB_REVIEW_FIX_MANAGER1.md。
 
 2026-11-15再レビュー追加（実装/合成検証済み、配備前）: PersonalWorkEntry::ownedWorkは本人/現在会社/現在部署/source_event_idなしに固定。詳細Readerと個人カレンダー取得で共用し、カレンダー更新/削除は会社コンテキストと関連案件をReaderで認可、行ロック後も再検証する。異動前の別会社/部署記録をカレンダー経由で扱える不一致を閉じ、データ一括移動は行わない。
+
+## 日報作成・編集時の記録方法の注意（2026-11-15実装、配備前）
+
+情報出版本人の対象日に新形式のマイジョブも旧ジョブ予定もなく、通常予定のother/personal_otherがある場合、本人の作成/編集に注意を表示。DiaryRecordAdviceは他人・キャンセル・日付外を除き、新MyJobのwork_category=otherとは混同しない。会議/外出の併存は可。私用を業務へ変更させず、業務ならマイジョブ、会議/外出は個別予定で記録する案内とする。日報保存は妨げない。GET diaries.work_reminderは認証本人・実所属INFO・会社コンテキスト一致でのみ情報を返し、user_id指定は使わない。日付変更に追随し遅い古い応答は破棄。既存の時間不足はV3/現在まで/勤務設定がある場合だけに揃える。進捗DIARY_RECORD_ALERT_MANAGER1。

@@ -31,6 +31,7 @@ const props = defineProps({
     defaultWorktypeId: { type: Number, default: null },
     personalWorkEnabled: { type: Boolean, default: false },
     workReminder: { type: Object, default: null },
+    workReminderUrl: { type: String, default: null },
 });
 
 function parseTime(t) {
@@ -558,7 +559,7 @@ function applyPastDiary(rec) {
                             </div>
                         </div>
                     </div>
-                    <DiaryWorkReminder v-if="personalWorkEnabled" :reminder="workReminder" @open-calendar="openWorkCalendar" />
+                    <DiaryWorkReminder v-if="personalWorkEnabled" :reminder="workReminder" :date="form.date" :reminder-url="workReminderUrl" @open-calendar="openWorkCalendar" />
                     <div class="mb-4">
                         <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>
                         <div @drop.prevent="handleDrop" @dragover.prevent="handleDragOver" class="rounded border bg-white p-1">
