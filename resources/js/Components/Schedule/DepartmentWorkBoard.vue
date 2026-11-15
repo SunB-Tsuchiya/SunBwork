@@ -11,6 +11,9 @@ const props = defineProps({ initialDate: { type: String, default: '' } });
 const emit = defineEmits(['date-change']);
 const date = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
 const people = ref([]);
+const previousDate = ref('');
+const nextDate = ref('');
+const explicitDate = ref(new URLSearchParams(window.location.search).has('date'));
 const loading = ref(false);
 const error = ref('');
 const categories = workCategories;
@@ -40,9 +43,8 @@ const currentTimePosition = computed(() => {
 const currentTimeLabel = computed(() => `${String(now.value.getHours()).padStart(2, '0')}:${String(now.value.getMinutes()).padStart(2, '0')}`);
 
 function changeDay(offset) {
-    const next = new Date(`${date.value}T12:00:00`);
-    next.setDate(next.getDate() + offset);
-    date.value = next.toLocaleDateString('sv-SE');
+    const target = offset < 0 ? previousDate.value : nextDate.value;
+    if (target) { explicitDate.value = true; date.value = target; }
 }
 
 function minuteOf(item, boundary) {
@@ -89,8 +91,12 @@ async function load() {
     loading.value = true;
     error.value = '';
     try {
-        const { data } = await axios.get(route('schedule.department_work.index'), { params: { date: date.value } });
+        const { data } = await axios.get(route('schedule.department_work.index'), { params: explicitDate.value ? { date: date.value } : {} });
         people.value = data.people || [];
+        previousDate.value = data.previous_date;
+        nextDate.value = data.next_date;
+        explicitDate.value = true;
+        if (date.value !== data.date) date.value = data.date;
     } catch {
         error.value = '作業予定を読み込めませんでした。';
     } finally {
@@ -111,7 +117,7 @@ onUnmounted(() => window.clearInterval(clockInterval));
         <div class="overflow-hidden rounded-lg bg-white shadow">
             <div class="flex flex-wrap items-center gap-2 border-b px-4 py-3">
                 <h3 class="mr-auto font-semibold">部署の作業予定</h3>
-                <input v-model="date" type="date" aria-label="表示日" class="rounded border px-2 py-1 text-sm" />
+                <input v-model="date" @change="explicitDate = true" type="date" aria-label="表示日" class="rounded border px-2 py-1 text-sm" />
                 <button type="button" class="rounded border px-3 py-1 text-sm" @click="changeDay(-1)">◀ 前日</button>
                 <span class="min-w-44 text-center text-sm font-medium">{{ dayLabel }}</span>
                 <button type="button" class="rounded border px-3 py-1 text-sm" @click="changeDay(1)">翌日 ▶</button>

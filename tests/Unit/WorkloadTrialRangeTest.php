@@ -374,6 +374,7 @@ class WorkloadTrialRangeTest extends TestCase
         $this->insert('departments', ['id' => 2, 'company_id' => 1, 'code' => 'OTHER']);
         $schedule = new PersonalWorkSchedule();
         $this->user->user_role = 'superadmin';
+        $this->user->setRelation('company', (new \App\Models\Company)->forceFill(['id' => 1, 'company_type' => 'sunbrain']));
         self::assertTrue($schedule->available($this->user));
         $this->user->company_id = 2;
         self::assertFalse($schedule->available($this->user));
@@ -471,6 +472,7 @@ class WorkloadTrialRangeTest extends TestCase
         $this->insert('users', ['id' => 2, 'name' => 'Other department', 'company_id' => 1, 'department_id' => 2]);
         $this->insert('users', ['id' => 3, 'name' => 'Other company', 'company_id' => 2, 'department_id' => 1]);
         $this->user->user_role = 'superadmin';
+        $this->user->setRelation('company', (new \App\Models\Company)->forceFill(['id' => 1, 'company_type' => 'sunbrain']));
         $this->insert('event_item_types', ['id' => 2, 'slug' => 'other']);
         $this->insert('events', ['id' => 1, 'user_id' => 1, 'event_item_type_id' => 2,
             'starts_at' => '2026-10-29 09:00:00', 'ends_at' => '2026-10-29 10:00:00', 'visibility' => 'private']);

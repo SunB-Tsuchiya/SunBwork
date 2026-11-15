@@ -77,6 +77,19 @@ class DepartmentWorkController extends Controller
             'score_version' => ['nullable', Rule::in(['trial_time_v2', 'trial_time_v3'])],
         ]);
         $date = $params['date'] ?? now()->toDateString();
+        $holidays = array_column(app(\App\Services\ClerkCalendarHolidays::class)
+            ->forCompany((int) $viewer->company_id, (int) substr($date, 0, 4)), 'date');
+        $businessDay = function ($day, int $offset) use ($holidays) {
+            do { $day->addDays($offset); }
+            while ($day->isWeekend() || in_array($day->toDateString(), $holidays, true));
+            return $day->toDateString();
+        };
+        $selected = Carbon::parse($date, 'Asia/Tokyo');
+        if (!isset($params['date']) && ($selected->isWeekend() || in_array($date, $holidays, true))) {
+            $date = $businessDay($selected->copy(), -1);
+            $selected = Carbon::parse($date, 'Asia/Tokyo');
+        }
+
 
         $users = User::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
@@ -147,6 +160,8 @@ class DepartmentWorkController extends Controller
         return response()->json([
             'date' => $date,
             'people' => $people,
+            'previous_date' => $businessDay($selected->copy(), -1),
+            'next_date' => $businessDay($selected->copy(), 1),
         ]);
     }
 

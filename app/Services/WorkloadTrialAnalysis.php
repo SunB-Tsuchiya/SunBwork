@@ -468,6 +468,19 @@ class WorkloadTrialAnalysis
             }
             $people[] = $person;
         }
+        if ($withDaily) {
+            $activeDates = [];
+            foreach ($people as $person) {
+                foreach ($person['daily'] ?? [] as $day) {
+                    if ($day['minutes'] > 0) $activeDates[$day['date']] = true;
+                }
+            }
+            foreach ($people as &$person) {
+                $person['daily'] = array_values(array_filter($person['daily'] ?? [],
+                    fn ($day) => isset($activeDates[$day['date']])));
+            }
+            unset($person);
+        }
         return $people;
     }
 

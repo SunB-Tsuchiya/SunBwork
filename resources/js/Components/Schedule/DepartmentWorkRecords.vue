@@ -77,7 +77,7 @@ onBeforeUnmount(() => { ++sequence; controller?.abort(); });
                     </select>
                 </label>
             </div>
-            <p class="mt-2 text-xs text-gray-600">今日と直近4営業日を確認できます。過去日は土日・登録祝日を除きます。休日の今日も表示します。</p>
+            <p class="mt-2 text-xs text-gray-600">直近5営業日を確認できます。その期間に記録がある土日・登録祝日も選べます。</p>
             <p class="mt-1 text-xs text-gray-600">終了した予定などの記録時間です。休憩と重複を除きます。時間の長さは成果や評価を示すものではありません。</p>
         </div>
         <div v-if="loading" role="status" class="flex items-center gap-2 rounded-lg border bg-white p-6 text-blue-700 lg:col-span-2">
@@ -85,7 +85,7 @@ onBeforeUnmount(() => { ++sequence; controller?.abort(); });
         </div>
         <div v-else-if="error" role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 lg:col-span-2">
             {{ error }} <button type="button" class="ml-2 underline" @click="load(date)">再試行</button>
-            <button type="button" class="ml-2 underline" @click="load(null)">今日を表示</button>
+            <button type="button" class="ml-2 underline" @click="load(null)">最新の対象日を表示</button>
         </div>
         <template v-else>
             <div v-if="mine" class="min-w-0 rounded-lg border border-blue-200 bg-blue-50 p-4">

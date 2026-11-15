@@ -25,13 +25,23 @@ class DepartmentWorkRecords
     {
         $today = Carbon::now('Asia/Tokyo')->startOfDay();
         $holidays = array_column($this->holidays->forCompany((int) $viewer->company_id, $today->year), 'date');
-        // Always allow today, including a weekend/holiday; the other four are business dates.
-        $dates = [$today->toDateString()];
-        for ($day = $today->copy()->subDay(); count($dates) < 5; $day->subDay()) {
+        $dates = [];
+        for ($day = $today->copy(); count($dates) < 5; $day->subDay()) {
             if (! $day->isWeekend() && ! in_array($day->toDateString(), $holidays, true)) {
                 $dates[] = $day->toDateString();
             }
         }
+        $users = User::where('company_id', $viewer->company_id)
+            ->where('department_id', $viewer->department_id)->get();
+        $from = Carbon::parse(end($dates), 'Asia/Tokyo');
+        $rows = $this->analysis->analyze($viewer, $users, $from, $today->copy()->endOfDay(), true, 'trial_time_v3', false);
+        foreach ($rows as $row) {
+            foreach ($row['daily'] ?? [] as $day) {
+                if ($day['minutes'] > 0) $dates[] = $day['date'];
+            }
+        }
+        $dates = array_values(array_unique($dates));
+        rsort($dates);
 
         return $dates;
     }
@@ -44,7 +54,7 @@ class DepartmentWorkRecords
         $dates = $this->dates($viewer);
         $date ??= $dates[0];
         if (! in_array($date, $dates, true)) {
-            throw ValidationException::withMessages(['date' => '今日と直近4営業日から選択してください。']);
+            throw ValidationException::withMessages(['date' => '直近5営業日と記録のある休日から選択してください。']);
         }
         $day = Carbon::createFromFormat('!Y-m-d', $date, 'Asia/Tokyo');
         $users = User::where('company_id', $viewer->company_id)
