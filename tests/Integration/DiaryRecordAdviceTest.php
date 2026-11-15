@@ -21,13 +21,14 @@ class DiaryRecordAdviceTest extends UnifiedMyJobCreateTest
         $schedule=$this->createMock(PersonalWorkSchedule::class);
         $schedule->method('personalAvailable')->willReturn($allowed);
         $schedule->method('eventsForUsers')->willReturn(collect($events));
+        $schedule->method('slotInterval')->willReturnCallback(fn ($entry, $window) => (new PersonalWorkSchedule)->slotInterval($entry,$window));
         return (new DiaryRecordAdvice($schedule))->issues($this->request()->user(),'2026-12-01');
     }
     public function test_advice_only_other_and_other_with_outing_warn_without_assessing_performance(): void
     {
         foreach (['other','personal_other'] as $slug) {
             $rows=$this->advice([$this->event($slug),$this->event('outing',['id'=>102])]);
-            self::assertCount(1,$rows);
+            self::assertCount(2,$rows);
             self::assertSame('other_without_myjob',$rows[0]['code']);
             self::assertStringContainsString('私用の予定は変更不要',$rows[0]['message']);
             self::assertStringNotContainsString('不利',$rows[0]['message']);
@@ -77,5 +78,36 @@ class DiaryRecordAdviceTest extends UnifiedMyJobCreateTest
             self::assertSame(60,$data['scheduled_minutes']);
             self::assertSame(30,$data['missing_minutes']);
         } finally { \Carbon\Carbon::setTestNow(); }
+    }
+    public function test_advice_long_work_overlap_is_independent_of_myjob_presence(): void
+    {
+        $this->save($this->request($this->payload(['planned_start_time'=>'09:00','planned_end_time'=>'12:00'])));
+        $rows=$this->advice([$this->event('outing',['starts_at'=>'2026-12-01 10:00:00','ends_at'=>'2026-12-01 11:00:00'])]);
+        self::assertSame(['long_work_overlaps_appointment'],array_column($rows,'code'));
+        $rows=$this->advice([$this->event('outing',['starts_at'=>'2026-12-01 12:00:00','ends_at'=>'2026-12-01 13:00:00'])]);
+        self::assertSame([],$rows);
+    }
+    public function test_advice_long_work_boundary_cancellation_and_nonoverlap(): void
+    {
+        $code='long_work_overlaps_appointment';
+        $meeting=$this->event('meeting_internal',['id'=>102,'starts_at'=>'2026-12-01 10:00:00','ends_at'=>'2026-12-01 11:00:00']);
+        $short=$this->event('work_schedule',['ends_at'=>'2026-12-01 11:59:00']);
+        self::assertNotContains($code,array_column($this->advice([$short,$meeting]),'code'));
+        $long=$this->event('work_schedule',['ends_at'=>'2026-12-01 12:00:00']);
+        self::assertContains($code,array_column($this->advice([$long,$meeting]),'code'));
+        $cancelled=$meeting->replicate()->forceFill(['cancelled_at'=>'2026-12-01 08:00:00'])->syncOriginal();
+        self::assertNotContains($code,array_column($this->advice([$long,$cancelled]),'code'));
+        self::assertNotContains($code,array_column($this->advice([$meeting]),'code'));
+        self::assertNotContains($code,array_column($this->advice([$this->event('work_schedule',['user_id'=>2]),$meeting]),'code'));
+    }
+    public function test_advice_proof_utc_is_compared_in_jst_and_accepted_meetings_are_supported(): void
+    {
+        $proof=$this->event('other',['project_job_assignment_id'=>10,'starts_at'=>'2026-12-01 00:00:00','ends_at'=>'2026-12-01 03:00:00'])
+            ->setRelation('projectJobAssignment',(new \App\Models\ProjectJobAssignment)->forceFill(['id'=>10,'job_type'=>'proof']));
+        // Another owner's meeting returned by eventsForUsers is an accepted invitation.
+        $meeting=$this->event('meeting_internal',['id'=>102,'user_id'=>2,'starts_at'=>'2026-12-01 10:00:00','ends_at'=>'2026-12-01 11:00:00']);
+        self::assertSame(['long_work_overlaps_appointment'],array_column($this->advice([$proof,$meeting]),'code'));
+        $night=$this->event('work_schedule',['starts_at'=>'2026-11-30 22:00:00','ends_at'=>'2026-12-01 01:00:00']);
+        self::assertNotContains('long_work_overlaps_appointment',array_column($this->advice([$night,$meeting]),'code'));
     }
 }
