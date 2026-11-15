@@ -447,3 +447,5 @@ ProofRequestCompletionが校正依頼行をロックし、完了状態・元割�
 
 通常編集はWorkJobInputの通常項目ハッシュをedit_versionとして詳細/個人カレンダーへ渡す。更新時は行ロック後に比較し、古い画面は409で拒否。詳細ファイル版や完了の独立更新とは干渉しない。旧会社NULL案件は認可済み既存entryの同じproject ID保持だけ例外を使う。
 通常新規/独立引用はrequest_token必須。work_job_creation_receiptsにuser+tokenのキー、検証済みpayload/sourceのhash、作成IDを保存。本人ロックで直列化し再送は同じID、内容違いは422、削除済みは410。別tokenの同名作業は別件。続きの既存receiptは変更しない。新migrationだけを--path指定で配備時に実行し、他の未適用migrationをまとめて実行しない。状態はMYJOB_REVIEW_FIX_MANAGER1.md。
+
+2026-11-15再レビュー追加（実装/合成検証済み、配備前）: PersonalWorkEntry::ownedWorkは本人/現在会社/現在部署/source_event_idなしに固定。詳細Readerと個人カレンダー取得で共用し、カレンダー更新/削除は会社コンテキストと関連案件をReaderで認可、行ロック後も再検証する。異動前の別会社/部署記録をカレンダー経由で扱える不一致を閉じ、データ一括移動は行わない。

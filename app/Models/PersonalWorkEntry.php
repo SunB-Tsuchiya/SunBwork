@@ -27,6 +27,13 @@ class PersonalWorkEntry extends Model
         'actual_minutes' => 'integer',
     ];
 
+    /** Personal input rows visible in the owner's current company and department. */
+    public function scopeOwnedWork(\Illuminate\Database\Eloquent\Builder $query, User $user): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where('user_id', $user->id)->where('company_id', $user->company_id)
+            ->where('department_id', $user->department_id)->whereNull('source_event_id');
+    }
+
     public function projectJob()
     {
         return $this->belongsTo(ProjectJob::class);

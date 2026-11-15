@@ -22,8 +22,7 @@ class WorkJobReader
     {
         if (! $this->box->available($user, $context)) throw new AuthorizationException;
         if ($type === 'entry') {
-            $job = PersonalWorkEntry::where('user_id', $user->id)->where('company_id', $user->company_id)
-                ->where('department_id', $user->department_id)->whereNull('source_event_id')->findOrFail($id);
+            $job = PersonalWorkEntry::ownedWork($user)->findOrFail($id);
         } elseif ($type === 'assignment') {
             $job = ProjectJobAssignment::where('user_id', $user->id)->selfAssigned()
                 ->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', $user->company_id))

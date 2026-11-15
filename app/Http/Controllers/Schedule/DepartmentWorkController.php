@@ -258,15 +258,21 @@ class DepartmentWorkController extends Controller
     public function mine(Request $request)
     {
         $user = $request->user();
-        abort_unless($this->schedule->personalAvailable($user), 403);
+        $context = $request->session()->get('superadmin_context.company_id');
+        abort_unless(app(\App\Services\UnifiedMyJobBox::class)->available($user, $context === null ? null : (int) $context), 403);
         $range = $request->validate([
             'start' => ['required', 'date_format:Y-m-d'],
             'end' => ['required', 'date_format:Y-m-d', 'after_or_equal:start'],
         ]);
         abort_if(Carbon::parse($range['start'])->diffInDays(Carbon::parse($range['end'])) > 62, 422);
-        $entries = PersonalWorkEntry::where('user_id', $user->id)
+        $entries = PersonalWorkEntry::ownedWork($user)
             ->whereBetween('work_date', [$range['start'], $range['end']])
-            ->whereNull('source_event_id')->with(['projectJob:id,title', 'broadProject:id,name'])
+            ->where(fn ($q) => $q->whereNull('project_job_id')->orWhereHas('projectJob', fn ($p) => $p->whereNull('company_id')->orWhere('company_id', $user->company_id)))
+            ->where(fn ($q) => $q->whereNull('broad_project_id')->orWhereHas('broadProject', fn ($b) => $b
+                ->where('company_id', $user->company_id)->where('department_id', $user->department_id)
+                ->where(fn ($b) => $b->whereNull('parent_id')->orWhereHas('parent', fn ($parent) => $parent
+                    ->where('company_id', $user->company_id)->where('department_id', $user->department_id)))))
+            ->with(['projectJob:id,title', 'broadProject:id,name'])
             ->orderBy('work_date')->get();
 
         $windows = [];
@@ -376,11 +382,15 @@ class DepartmentWorkController extends Controller
     public function update(Request $request, PersonalWorkEntry $entry)
     {
         $user = $request->user();
-        abort_unless($this->schedule->personalAvailable($user) && (int) $entry->user_id === (int) $user->id, 403);
+        $context = $request->session()->get('superadmin_context.company_id');
+        $context = $context === null ? null : (int) $context;
+        $reader = app(\App\Services\WorkJobReader::class);
+        $reader->resolve($user, 'entry', (int) $entry->id, $context);
         abort_if($entry->source_event_id, 422);
         $version = $request->validate(['edit_version' => ['required', 'string', 'size:64']])['edit_version'];
-        return DB::transaction(function () use ($request, $entry, $user, $version) {
-            $locked = PersonalWorkEntry::whereKey($entry->id)->lockForUpdate()->firstOrFail();
+        return DB::transaction(function () use ($request, $entry, $user, $version, $reader, $context) {
+            $locked = PersonalWorkEntry::ownedWork($user)->whereKey($entry->id)->lockForUpdate()->firstOrFail();
+            $reader->resolve($user, 'entry', (int) $locked->id, $context);
             abort_unless((int) $locked->user_id === (int) $user->id, 403);
             $input = app(\App\Services\WorkJobInput::class);
             abort_unless(hash_equals($input->version($locked), $version), 409, 'ほかの画面で更新されています。入力内容を控えてから再読み込みしてください。');
@@ -394,9 +404,13 @@ class DepartmentWorkController extends Controller
     public function destroy(Request $request, PersonalWorkEntry $entry)
     {
         $user = $request->user();
-        abort_unless($this->schedule->personalAvailable($user) && (int) $entry->user_id === (int) $user->id, 403);
-        DB::transaction(function () use ($entry) {
-            $locked = PersonalWorkEntry::whereKey($entry->id)->lockForUpdate()->firstOrFail();
+        $context = $request->session()->get('superadmin_context.company_id');
+        $context = $context === null ? null : (int) $context;
+        $reader = app(\App\Services\WorkJobReader::class);
+        $reader->resolve($user, 'entry', (int) $entry->id, $context);
+        DB::transaction(function () use ($entry, $user, $reader, $context) {
+            $locked = PersonalWorkEntry::ownedWork($user)->whereKey($entry->id)->lockForUpdate()->firstOrFail();
+            $reader->resolve($user, 'entry', (int) $locked->id, $context);
             abort_if($locked->diary_id, 422, '日報へ取り込んだ記録は日報編集画面で変更してください。');
             abort_if(app(\App\Services\WorkJobReader::class)->hasEntryChildren((int) $locked->id), 422, '続きがあるため、この仕事は削除できません。');
             abort_if(\App\Models\ProofRequest::withoutGlobalScopes()->where('source_personal_work_entry_id', $locked->id)->exists(), 422, '校正依頼の元になっているため、この仕事は削除できません。');
