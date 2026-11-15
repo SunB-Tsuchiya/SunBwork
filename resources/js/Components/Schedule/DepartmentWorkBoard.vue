@@ -1,5 +1,6 @@
 <script setup>
 import axios from 'axios';
+import Modal from '@/Components/Modal.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import { usePage } from '@inertiajs/vue3';
@@ -20,13 +21,18 @@ const categories = workCategories;
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ''}`;
 const categoryName = (value) => categories.find(([key]) => key === value)?.[1] || 'その他';
 const slotName = (value) => ({ am: '午前', pm: '午後', full: '終日', hour: '時間指定' })[value] || '';
-const kindName = (item) => ({ my_job: 'マイジョブ（旧形式）', assigned_job: '依頼ジョブ', event: 'その他の予定', quick_work: 'マイジョブ' })[item.kind] || (item.source === 'entry' ? 'マイジョブ' : '既存予定');
+const kindName = (item) => ({ my_job: 'マイジョブ（旧形式）', assigned_job: '依頼ジョブ', event: 'その他の予定', quick_work: 'マイジョブ（新形式）' })[item.kind] || (item.source === 'entry' ? 'マイジョブ（新形式）' : '既存予定');
 const itemTime = (item) => item.starts_at
     ? `${item.starts_at.slice(11)}–${item.ends_at?.slice(11) || ''}`
     : (item.plan_slot === 'hour' ? `${item.planned_start_time}–${item.planned_end_time}` : slotName(item.plan_slot));
 const myId = Number(usePage().props.auth?.user?.id || 0);
 const own = computed(() => people.value.find((person) => person.id === myId));
 const selectedPersonId = ref(myId);
+const detailsOpen = ref(false);
+function openPersonDetails(id) {
+    selectedPersonId.value = id;
+    detailsOpen.value = true;
+}
 const selectedPerson = computed(() => people.value.find((person) => person.id === selectedPersonId.value) || own.value || people.value[0]);
 const stageLabel = (value) => ({ unknown: '未登録・不明', light: '少なめ', medium: '半日程度', full: 'ほぼ埋まっている' })[value] || '';
 const dayLabel = computed(() => new Date(`${date.value}T12:00:00`).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }));
@@ -124,7 +130,7 @@ onUnmounted(() => window.clearInterval(clockInterval));
                 <a :href="route('diaries.create', { date })" class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700">日報作成</a>
             </div>
             <p v-if="error" class="px-4 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
-            <p class="px-4 py-2 text-xs text-gray-500">人ごとに時間を横並びで表示します。未登録は「暇」を意味しません。灰色の予定は件名を非公開にしています。</p>
+            <p class="px-4 py-2 text-xs text-gray-500">担当者名や予定を押すと、その人の予定・結果を表示します。未登録は「暇」を意味しません。灰色の予定は件名を非公開にしています。</p>
             <TooltipProvider :delay-duration="250">
             <div class="overflow-x-auto border-t">
                 <div class="min-w-[1100px]">
@@ -136,7 +142,7 @@ onUnmounted(() => window.clearInterval(clockInterval));
                         </div>
                     </div>
                     <div v-for="person in people" :key="person.id" class="flex border-b" :class="person.id === myId ? 'bg-blue-50/50' : 'bg-white'">
-                        <button type="button" class="sticky left-0 z-10 w-48 shrink-0 border-r px-3 py-2 text-left" :class="person.id === myId ? 'bg-blue-50' : 'bg-white'" @click="selectedPersonId = person.id">
+                        <button type="button" class="sticky left-0 z-10 w-48 shrink-0 border-r px-3 py-2 text-left" :class="person.id === myId ? 'bg-blue-50' : 'bg-white'" @click="openPersonDetails(person.id)">
                             <span class="block truncate text-sm font-medium">{{ person.name }}<span v-if="person.id === myId" class="ml-1 text-xs text-blue-700">自分</span></span>
                             <span v-if="stageLabel(person.occupancy.stage)" class="text-xs text-gray-500">{{ stageLabel(person.occupancy.stage) }}<span v-if="person.occupancy.percent !== null"> {{ person.occupancy.percent }}%</span></span>
                         </button>
@@ -148,7 +154,7 @@ onUnmounted(() => window.clearInterval(clockInterval));
                                     <button type="button"
                                         class="absolute z-10 overflow-hidden truncate rounded border px-2 text-left text-xs shadow-sm"
                                         :style="blockStyle(item)" :aria-label="`${kindName(item)}：${item.title} ${itemTime(item)}`"
-                                        @click="selectedPersonId = person.id">{{ item.title }}</button>
+                                        @click="openPersonDetails(person.id)">{{ item.title }}</button>
                                 </TooltipTrigger>
                                 <TooltipContent class="max-w-80 whitespace-normal break-words bg-white text-gray-900 shadow-lg" side="top">
                                     <div class="space-y-1 text-xs">
@@ -173,8 +179,13 @@ onUnmounted(() => window.clearInterval(clockInterval));
                 </div>
             </div>
             </TooltipProvider>
-            <div v-if="selectedPerson" class="p-4">
-                <h4 class="font-semibold">{{ selectedPerson.name }}の予定・結果</h4>
+            <Modal :show="detailsOpen" max-width="2xl" @close="detailsOpen = false">
+            <section v-if="selectedPerson" class="p-4 sm:p-6" aria-labelledby="department-person-details-title">
+                <div class="flex items-center justify-between gap-3 border-b pb-3">
+                    <h4 id="department-person-details-title" class="font-semibold">{{ selectedPerson.name }}の予定・結果</h4>
+                    <button type="button" class="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50" @click="detailsOpen = false">閉じる</button>
+                </div>
+                <p class="mt-2 text-sm text-gray-500">{{ dayLabel }}</p>
                 <div v-if="Object.keys(selectedPerson.results || {}).length" class="mt-2 flex flex-wrap items-center gap-1 text-xs">
                     <span class="text-gray-600">進みメモ：</span>
                     <span v-for="(result, category) in selectedPerson.results" :key="category" class="rounded bg-blue-50 px-2 py-1 text-blue-900">{{ categoryName(category) }} {{ result.count }}件<span v-for="(quantity, unit) in result.quantities" :key="unit" class="ml-1">・{{ quantity }}{{ unit }}</span></span>
@@ -189,7 +200,8 @@ onUnmounted(() => window.clearInterval(clockInterval));
                         <p v-if="item.activity_type || item.actual_quantity !== null" class="mt-1 text-xs text-gray-600"><span v-if="item.activity_type" class="text-blue-700">{{ activityLabel(item.activity_type, item.work_category) }}</span><span v-if="item.actual_quantity !== null" class="ml-2">{{ item.actual_quantity }} {{ item.actual_unit }}</span></p>
                     </li>
                 </ul>
-            </div>
+            </section>
+            </Modal>
         </div>
 
     </div>

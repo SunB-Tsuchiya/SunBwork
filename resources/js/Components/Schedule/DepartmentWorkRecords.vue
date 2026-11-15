@@ -10,8 +10,8 @@ const loading = ref(true);
 const error = ref('');
 const sort = ref('configured');
 const groups = [
-    { key: 'job', label: 'ジョブ', color: '#6366f1' },
-    { key: 'quick', label: '簡易作業', color: '#ec4899' },
+    { key: 'job', label: 'ジョブ（旧形式・依頼）', color: '#6366f1' },
+    { key: 'quick', label: 'マイジョブ（新形式）', color: '#ec4899' },
     { key: 'meeting', label: '会議・外出', color: '#10b981' },
     { key: 'other', label: 'その他業務', color: '#64748b' },
 ];
