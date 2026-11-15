@@ -77,7 +77,7 @@ onBeforeUnmount(() => { ++sequence; controller?.abort(); });
                     </select>
                 </label>
             </div>
-            <p class="mt-2 text-xs text-gray-600">直近5営業日を確認できます。その期間に記録がある土日・登録祝日も選べます。</p>
+            <p class="mt-2 text-xs text-gray-600">直近5営業日を確認できます。土日・登録祝日は表示しません。</p>
             <p class="mt-1 text-xs text-gray-600">終了した予定などの記録時間です。休憩と重複を除きます。時間の長さは成果や評価を示すものではありません。</p>
         </div>
         <div v-if="loading" role="status" class="flex items-center gap-2 rounded-lg border bg-white p-6 text-blue-700 lg:col-span-2">

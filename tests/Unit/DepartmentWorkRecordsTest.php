@@ -64,11 +64,11 @@ class DepartmentWorkRecordsTest extends TestCase
         self::assertSame(['2026-10-30', '2026-10-29', '2026-10-28', '2026-10-27', '2026-10-26'], $this->service()->dates(new User(['company_id' => 1])));
     }
 
-    public function test_recorded_holiday_remains_selectable(): void
+    public function test_recorded_holiday_is_not_selectable(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-11-01 12:00:00', 'Asia/Tokyo'));
         $rows = [['daily' => [['date' => '2026-11-01', 'minutes' => 30], ['date' => '2026-10-31', 'minutes' => 0]]]];
-        self::assertSame(['2026-11-01', '2026-10-30', '2026-10-29', '2026-10-28', '2026-10-27', '2026-10-26'],
+        self::assertSame(['2026-10-30', '2026-10-29', '2026-10-28', '2026-10-27', '2026-10-26'],
             $this->service(true, $rows)->dates(new User(['company_id' => 1])));
     }
 
