@@ -312,7 +312,7 @@ async function remove() {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4" @click.self="!saving && !handingOff && emit('close')">
+        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4">
             <div role="dialog" aria-modal="true" :aria-label="heading" :class="sourcePickerOpen ? 'max-w-3xl' : 'max-w-lg'" class="max-h-[90vh] w-full overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div class="flex items-center justify-between gap-2">
                     <h2 class="text-lg font-semibold">{{ heading }}</h2>
@@ -398,7 +398,7 @@ async function remove() {
                 </form>
             </div>
         </div>
-        <div v-if="show && projectPickerOpen" class="fixed inset-0 z-[2200] flex items-center justify-center bg-black/50 px-4" @click.self="projectPickerOpen = false">
+        <div v-if="show && projectPickerOpen" class="fixed inset-0 z-[2200] flex items-center justify-center bg-black/50 px-4">
             <div role="dialog" aria-modal="true" aria-label="案件を探す" class="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div class="flex items-center justify-between gap-3">
                     <h3 class="text-lg font-semibold">案件を探す</h3>
