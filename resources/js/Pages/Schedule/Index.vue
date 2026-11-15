@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import Modal from '@/Components/Modal.vue';
 import ScheduleCalendar from '@/Components/Schedule/ScheduleCalendar.vue';
 import DepartmentWorkBoard from '@/Components/Schedule/DepartmentWorkBoard.vue';
 import DepartmentWorkRecords from '@/Components/Schedule/DepartmentWorkRecords.vue';
@@ -34,6 +35,7 @@ function selectDepartmentTab(value, today = false) {
     if (today) url.searchParams.delete('record_date');
     window.history.replaceState(window.history.state, '', url);
 }
+const pageGuideOpen = ref(false);
 const pageTitle = computed(() => boardVisible.value ? '部署の作業' : '予定表');
 </script>
 
@@ -42,12 +44,37 @@ const pageTitle = computed(() => boardVisible.value ? '部署の作業' : '予�
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ pageTitle }}</h2>
-                <Link v-if="!isGeneral" :href="route('guide.schedule')" class="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">
+                <button v-if="boardVisible" type="button" class="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100" @click="pageGuideOpen = true">📖 このページの見方</button>
+                <Link v-else-if="!isGeneral" :href="route('guide.schedule')" class="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">
                     📖 使い方ガイド
                 </Link>
             </div>
         </template>
 
+        <Modal :show="pageGuideOpen" max-width="2xl" @close="pageGuideOpen = false">
+            <section class="p-4 sm:p-6" aria-labelledby="department-page-guide-title">
+                <div class="flex items-center justify-between gap-3 border-b pb-3">
+                    <h3 id="department-page-guide-title" class="text-lg font-semibold">このページの見方</h3>
+                    <button type="button" class="rounded border px-3 py-1 text-sm hover:bg-gray-50" @click="pageGuideOpen = false">閉じる</button>
+                </div>
+                <div class="mt-4 space-y-5 text-sm leading-relaxed text-gray-700">
+                    <section>
+                        <h4 class="font-semibold text-blue-800">部署の作業予定</h4>
+                        <p class="mt-2">同じ部署の予定を、担当者ごとに横向きの時間表で確認できます。予定が重なる場合は段を分けて表示します。</p>
+                        <p class="mt-2">担当者名や予定バーを押すと、その人の予定・結果が開きます。バーにマウスを重ねても予定の内容を確認できます。灰色の予定は件名を非公開にしています。</p>
+                        <p class="mt-2">「前日」「翌日」は土日・登録祝日を飛ばします。別の日を見たいときは日付欄で指定してください。</p>
+                        <p class="mt-2">予定枠の埋まり具合は予定を登録した範囲の目安です。「未登録・不明」や空いている時間は、仕事がないことを意味しません。</p>
+                    </section>
+                    <section class="border-t pt-4">
+                        <h4 class="font-semibold text-blue-800">みんなの作業記録</h4>
+                        <p class="mt-2">直近5営業日の記録時間を確認できます。土日・登録祝日は対象日に表示しません。</p>
+                        <p class="mt-2">時間のバーは「ジョブ（旧形式・依頼）」「マイジョブ（新形式）」「会議・外出」「その他業務」の内訳です。休憩や重複を除いた記録時間を表示します。</p>
+                        <p class="mt-2">「並び替え」で設定順・名前順・総時間や内訳の多い順へ切り替えられます。時間の長さは成果や評価点・順位を示すものではありません。</p>
+                        <p class="mt-2">「自分の記録を確認」では、自分の記録時間、作業種類の未指定、勤務時間内の予定の空きを確認できます。空きは未就労を意味しません。「この日の記録を確認・入力」から自分のカレンダーを開いて確認・入力してください。</p>
+                    </section>
+                </div>
+            </section>
+        </Modal>
         <div v-if="boardVisible">
             <div role="group" aria-label="部署の作業の表示" class="mb-3 flex flex-wrap gap-2 border-b border-gray-200">
                 <button v-for="item in [['plans', '部署の作業予定'], ['records', 'みんなの作業記録']]" :key="item[0]" type="button" :aria-pressed="departmentTab === item[0]" class="rounded-t px-4 py-2 text-sm font-semibold" :class="departmentTab === item[0] ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="selectDepartmentTab(item[0])">{{ item[1] }}</button>
