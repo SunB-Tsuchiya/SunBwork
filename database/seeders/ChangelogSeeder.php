@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-info-myjob-unified-1') {
+            Changelog::updateOrCreate(['version' => 'sunbrain-info-myjob-unified-1'], [
+                'title' => '情報出版の部署の作業とマイジョブ入力を統一',
+                'released_at' => '2026-11-15',
+                'summary' => '情報出版の皆さんが部署の作業を確認できるようになり、カレンダーからのマイジョブ登録を新しい簡単な入力に統一しました。旧形式の入力と過去の記録も使えます。',
+                'design_files' => ['z_instructions/archived/INFO_DEPARTMENT_MYJOB_PLAN1.md', 'z_instructions/archived/INFO_DEPARTMENT_MYJOB_MANAGER1.md'],
+                'claude_notes' => 'Codex実装。サン・ブレーン情報出版の一般UserとUser画面兼用者に部署予定/直近記録の閲覧だけを公開。管理分析と評価点/順位の権限は保持。個人カレンダーのマイジョブ登録をPersonalWorkEntryの入力に接続し、旧形式選択・過去記録・進行表/管理表の既存経路を保持。新旧は統合BOXで投影し一括移行しない。PHP 35件177断言、Vue入力テスト、/membersビルド、固定差分でd579a6f99へ配備。一般Userの部署表示/新入力/旧形式引継ぎとカレンダー起点の保存/カレンダー・BOX一致を利用者が画面確認済み。サンエー、製版、オンデマンドは対象外。',
+                'body' => '<section class="cl-feature"><h3>情報出版の仕事・案件</h3><ul><li>「部署の作業」で同じ部署の予定と直近の作業記録を確認できます</li><li>カレンダーの「マイジョブ登録」から新しい入力画面を使えます</li><li>必要なときは「旧形式で作成」を選べます。過去のマイジョブも統合BOXで確認できます</li><li>評価点や順位は一般ユーザー画面には表示しません</li></ul></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-coordinator-navigation-1') {
             Changelog::updateOrCreate(['version' => 'sunbrain-coordinator-navigation-1'], [
                 'title' => 'サン・ブレーンの進行管理メニューを整理',
