@@ -67,6 +67,15 @@ const titleSuggestions = computed(() => recentTitles.value
         - Number(a.project_job_id && String(a.project_job_id) === String(form.project_job_id)))
     .slice(0, 8));
 const time = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+// Match legacy input: use JST and preserve the current minute without rounding.
+function setCurrentTime(target) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date());
+    const hour = parts.find(part => part.type === 'hour').value;
+    const minute = parts.find(part => part.type === 'minute').value;
+    form[target === 'start' ? 'planned_start_time' : 'planned_end_time'] = `${hour}:${minute}`;
+}
 const projectLabel = (project) => [project.title, project.jobcode, project.client_name].filter(Boolean).join(' / ');
 const broadProjectLabel = (project, full = false) => [project.path || project.name, project.display_clients?.length ? (full ? project.display_clients.map(client => client.name).join('・') : `${project.display_clients.slice(0, 2).map(client => client.name).join('・')}${project.display_clients.length > 2 ? `・ほか${project.display_clients.length - 2}社` : ''}`) : project.client_name, !project.path && project.fiscal_year ? `${project.fiscal_year}年度` : null].filter(Boolean).join(' / ');
 const matchingBroadProjects = computed(() => broadProjects.value.filter(project => {
@@ -333,9 +342,19 @@ async function remove() {
                         この記録は以前の「{{ { am: '午前', pm: '午後', full: '終日' }[form.plan_slot] || '予定枠' }}」形式です。
                         <button type="button" class="ml-1 underline" @click="form.plan_slot = 'hour'">開始・終了時刻を指定する</button>
                     </div>
-                    <div v-if="form.plan_slot === 'hour'" class="grid grid-cols-2 gap-3">
-                        <label class="text-sm">開始時刻<input v-model="form.planned_start_time" type="time" step="60" required class="mt-1 w-full rounded border p-2" /></label>
-                        <label class="text-sm">終了時刻<input v-model="form.planned_end_time" type="time" step="60" required class="mt-1 w-full rounded border p-2" /></label>
+                    <div v-if="form.plan_slot === 'hour'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label class="text-sm">開始時刻
+                            <span class="mt-1 flex items-center gap-2">
+                                <input v-model="form.planned_start_time" type="time" step="60" required class="min-w-0 flex-1 rounded border p-2" />
+                                <button type="button" :disabled="saving || handingOff" class="shrink-0 rounded border border-gray-300 bg-gray-50 px-2 py-2 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50" aria-label="開始時刻を現在時刻にする" @click="setCurrentTime('start')">現在時刻</button>
+                            </span>
+                        </label>
+                        <label class="text-sm">終了時刻
+                            <span class="mt-1 flex items-center gap-2">
+                                <input v-model="form.planned_end_time" type="time" step="60" required class="min-w-0 flex-1 rounded border p-2" />
+                                <button type="button" :disabled="saving || handingOff" class="shrink-0 rounded border border-gray-300 bg-gray-50 px-2 py-2 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50" aria-label="終了時刻を現在時刻にする" @click="setCurrentTime('end')">現在時刻</button>
+                            </span>
+                        </label>
                     </div>
                     <label class="block text-sm">大まかな作業区分
                         <select v-model="form.work_category" required class="mt-1 w-full rounded border p-2" @change="changeWorkCategory"><option v-for="[key, label] in categories" :key="key" :value="key">{{ label }}</option></select>
