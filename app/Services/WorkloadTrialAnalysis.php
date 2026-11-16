@@ -34,13 +34,13 @@ class WorkloadTrialAnalysis
 
     public function __construct(private PersonalWorkSchedule $schedule) {}
 
-    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false, string $scoreVersion = 'trial_time_v2', bool $separateOvertime = true, bool $withRecordMinutes = false): array
+    public function analyze(User $viewer, Collection $users, Carbon $start, Carbon $end, bool $withDaily = false, string $scoreVersion = 'trial_time_v2', bool $separateOvertime = true, bool $withRecordMinutes = false, ?Carbon $asOf = null): array
     {
         $v3 = $scoreVersion === 'trial_time_v3';
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
         $startDate = $start->toDateString();
         $endDate = $end->toDateString();
-        $now = now('Asia/Tokyo');
+        $now = $asOf?->copy() ?? now('Asia/Tokyo');
         $today = $now->toDateString();
         $currentTime = $now->format('H:i:s');
         $userById = $users->keyBy('id');
@@ -345,7 +345,7 @@ class WorkloadTrialAnalysis
                         'minutes' => $ledger['minutes'],
                         'base_points' => round($ledger['points'], 1),
                         ...$dailyBreakdown,
-                        ...($withRecordMinutes ? ['record_minutes' => $ledger['record_minutes']] : []),
+                        ...($withRecordMinutes ? ['record_minutes' => $ledger['record_minutes'], 'record_adjustments' => $ledger['record_adjustments']] : []),
                     ];
                 }
                 if ($ledger['minutes'] > 0) $recordedDays++;

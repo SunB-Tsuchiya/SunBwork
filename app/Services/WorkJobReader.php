@@ -142,16 +142,21 @@ class WorkJobReader
         return array_values(array_unique(array_merge($ids, $originals)));
     }
 
-    private function recordsForDay(User $user, string $date, array &$days): array
+    private function recordsForDay(User $user, string $date, array &$days, ?Carbon $asOf = null): array
     {
         if (! array_key_exists($date, $days)) {
             if (count($days) >= 366) throw ValidationException::withMessages(['source' => '対象の日数が多いため確認が必要です。']);
-            if ($date > Carbon::now('Asia/Tokyo')->toDateString()) return $days[$date] = [];
+            $asOf ??= Carbon::now('Asia/Tokyo');
+            if ($date > $asOf->toDateString()) {
+                $days[$date] = ['minutes' => [], 'adjustments' => [], 'asOf' => $asOf];
+                return [];
+            }
             $day = Carbon::parse($date, 'Asia/Tokyo');
-            $people = $this->analysis->analyze($user, collect([$user]), $day->copy()->startOfDay(), $day->copy()->endOfDay(), true, 'trial_time_v3', true, true);
-            $days[$date] = collect($people[0]['daily'] ?? [])->firstWhere('date', $date)['record_minutes'] ?? [];
+            $people = $this->analysis->analyze($user, collect([$user]), $day->copy()->startOfDay(), $day->copy()->endOfDay(), true, 'trial_time_v3', true, true, $asOf);
+            $daily = collect($people[0]['daily'] ?? [])->firstWhere('date', $date) ?? [];
+            $days[$date] = ['minutes' => $daily['record_minutes'] ?? [], 'adjustments' => $daily['record_adjustments'] ?? [], 'asOf' => $asOf];
         }
-        return $days[$date];
+        return $days[$date]['minutes'];
     }
 
     private function assignmentTime(User $user, ProjectJobAssignment $job, array &$days): array
@@ -217,10 +222,20 @@ class WorkJobReader
         $range = $this->schedule->slotInterval($entry, $window);
         $planned = $range ? max(0, $range[1] - $range[0]) : 0;
         $lunch = $range ? max(0, min($range[1], $window['break_end'] ?? 780) - max($range[0], $window['break_start'] ?? 720)) : 0;
-        $recorded = 0.0;
-        if ($date <= Carbon::now('Asia/Tokyo')->toDateString()) {
-            $recorded = (float) ($this->recordsForDay($user, $date, $recordDays)['quick-'.$entry->id] ?? 0);
+        $now = Carbon::now('Asia/Tokyo');
+        $recorded = (float) ($this->recordsForDay($user, $date, $recordDays, $now)['quick-'.$entry->id] ?? 0);
+        $now = $recordDays[$date]['asOf'];
+        $adjustments = $recordDays[$date]['adjustments']['quick-'.$entry->id] ?? [];
+        $priority = (float) ($adjustments['priority'] ?? 0);
+        $overlap = (float) ($adjustments['overlap'] ?? 0);
+        $future = 0;
+        if ($range && $date >= $now->toDateString()) {
+            $futureStart = $date > $now->toDateString() ? $range[0] : max($range[0], $now->hour * 60 + $now->minute);
+            $futureEnd = max($futureStart, $range[1]);
+            $futureLunch = max(0, min($futureEnd, $window['break_end'] ?? 780) - max($futureStart, $window['break_start'] ?? 720));
+            $future = max(0, $futureEnd - $futureStart - $futureLunch);
         }
+        $other = max(0, $planned - $lunch - $future - $priority - $overlap - $recorded);
         $clock = fn ($minute) => ($minute >= 1440 ? '翌日 ' : '').sprintf('%02d:%02d', intdiv($minute, 60) % 24, $minute % 60);
         return ['work' => [
             'id' => (int) $entry->id, 'edit_version' => app(WorkJobInput::class)->version($entry), 'title' => $entry->title,
@@ -235,7 +250,8 @@ class WorkJobReader
             'actual_quantity' => $entry->actual_quantity, 'actual_unit' => $entry->actual_unit, 'diary_id' => $entry->diary_id,
             'completed' => (bool) $entry->completed_at,
             'detail_note' => $entry->detail_note, 'file_info' => $entry->file_info, 'details_version' => (int) $entry->details_version,
-        ], 'time' => ['planned' => $planned, 'lunch' => $lunch, 'afterLunch' => max(0, $planned - $lunch), 'recorded' => $recorded],
+        ], 'time' => ['planned' => $planned, 'lunch' => $lunch, 'afterLunch' => max(0, $planned - $lunch), 'recorded' => $recorded,
+            'future' => $future, 'priority' => $priority, 'overlap' => $overlap, 'other' => $other],
             'ancestors' => $withAncestors ? $this->ancestors($user, 'entry', $id, $context) : []];
     }
 }

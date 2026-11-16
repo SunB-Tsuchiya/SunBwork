@@ -13,6 +13,7 @@ class WorkMinuteLedger
         $lunchTo = $window['break_end'] ?? 780;
         $activities = [];
         $recordMinutes = [];
+        $recordAdjustments = [];
         $covered = [];
         $points = 0.0;
         $timeBreakdown = ['job' => 0.0, 'quick' => 0.0, 'meeting' => 0.0, 'other' => 0.0];
@@ -22,11 +23,21 @@ class WorkMinuteLedger
             $active = array_values(array_filter($items, fn ($item) => $item['from'] <= $minute && $item['to'] > $minute));
             if (! $active) continue;
             $priority = max(array_column($active, 'priority'));
+            if ($withRecords) {
+                foreach ($active as $item) {
+                    if ($item['priority'] < $priority) {
+                        $recordAdjustments[$item['key']]['priority'] = ($recordAdjustments[$item['key']]['priority'] ?? 0) + 1;
+                    }
+                }
+            }
             $active = array_values(array_filter($active, fn ($item) => $item['priority'] === $priority));
             $covered[] = $minute;
             $share = 1 / count($active);
             foreach ($active as $item) {
-                if ($withRecords) $recordMinutes[$item['key']] = ($recordMinutes[$item['key']] ?? 0) + $share;
+                if ($withRecords) {
+                    $recordMinutes[$item['key']] = ($recordMinutes[$item['key']] ?? 0) + $share;
+                    $recordAdjustments[$item['key']]['overlap'] = ($recordAdjustments[$item['key']]['overlap'] ?? 0) + 1 - $share;
+                }
                 $timeBreakdown[$item['time_group'] ?? 'other'] += $share;
                 if ($overtimeRange && $minute >= $overtimeRange[0] && $minute < $overtimeRange[1]) {
                     $overtimeBreakdown[$item['time_group'] ?? 'other'] += $share;
@@ -45,6 +56,6 @@ class WorkMinuteLedger
             'time_breakdown_minutes' => $timeBreakdown,
             'overtime_breakdown_minutes' => $overtimeBreakdown,
             'covered' => $covered,
-            ...($withRecords ? ['record_minutes' => $recordMinutes] : [])];
+            ...($withRecords ? ['record_minutes' => $recordMinutes, 'record_adjustments' => $recordAdjustments] : [])];
     }
 }

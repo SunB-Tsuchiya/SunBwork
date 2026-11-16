@@ -19,6 +19,8 @@ const detailsOpen = ref(false);
 const continuing = ref(false);
 const completing = ref(false);
 const completeError = ref('');
+const deleting = ref(false);
+const deleteError = ref('');
 const confirmationOpen = ref(false);
 const backHref = computed(() => props.back?.from === 'calendar'
     ? route('calendar.index', { date: props.work.work_date, view: 'day' })
@@ -47,6 +49,21 @@ function saved(date, id) {
     editing.value = false;
     router.reload({ only: ['work', 'time', 'ancestors', 'series'], preserveScroll: true });
 }
+async function remove() {
+    if (deleting.value || props.work.diary_id || !confirm('このマイジョブを削除しますか？この操作は取り消せません。')) return;
+    deleting.value = true;
+    deleteError.value = '';
+    try {
+        await axios.delete(route('user.myjobbox.entries.destroy', { entry: props.work.id }), {
+            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'), Accept: 'application/json' },
+        });
+        router.visit(backHref.value);
+    } catch (err) {
+        deleteError.value = err.response?.data?.message || '削除できませんでした。';
+    } finally {
+        deleting.value = false;
+    }
+}
 async function complete() {
     if (completing.value) return;
     completing.value = true; completeError.value = '';
@@ -65,10 +82,17 @@ async function complete() {
 <template>
     <AppLayout title="マイジョブ詳細">
         <template #header>
-            <div class="flex flex-wrap items-center gap-3"><Link :href="backHref" class="rounded border bg-white px-3 py-2 text-sm text-blue-700">戻る</Link><h2 class="text-base font-semibold text-gray-800 sm:text-xl">マイジョブ詳細</h2></div>
+            <div class="flex flex-wrap items-center gap-3"><Link :href="backHref" class="whitespace-nowrap rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 戻る</Link><h2 class="text-base font-semibold text-gray-800 sm:text-xl">マイジョブ詳細</h2></div>
+        </template>
+        <template #headerExtras>
+            <div class="flex items-center gap-2">
+                <button type="button" :disabled="deleting" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50" @click="editing = true">編集</button>
+                <button v-if="!work.diary_id" type="button" :disabled="deleting" class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50" @click="remove">{{ deleting ? '削除中…' : '削除' }}</button>
+            </div>
         </template>
         <template #tabs><UserNavigationTabs active="myjob" /></template>
         <div class="space-y-4">
+            <p v-if="deleteError" role="alert" class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ deleteError }}</p>
             <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" aria-label="マイジョブ概要と操作">
                 <div class="flex items-start justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4">
                     <div><h3 class="text-base font-semibold text-gray-900">{{ work.title || '（作業名なし）' }}</h3><p class="mt-1 text-sm text-gray-500">{{ work.classification || work.project || '案件未指定' }}</p></div>
@@ -90,7 +114,6 @@ async function complete() {
                     <button type="button" :disabled="detailsOpen" class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" @click="detailsOpen = true">詳細入力</button>
                     <button v-if="series.canContinue ?? series.operationsEnabled" type="button" class="rounded border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700" @click="continuing = true">続きのマイジョブを作成</button>
                     <Link :href="route('calendar.index', { date: work.work_date, view: 'day' })" class="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">この日のカレンダー</Link>
-                    <button type="button" class="rounded bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" @click="editing = true">予定を編集</button>
                     <button v-if="series.operationsEnabled && !work.completed" type="button" class="rounded bg-yellow-700 px-3 py-2 text-sm font-semibold text-white" @click="completeError = ''; confirmationOpen = true">完了にする</button>
                     <span v-if="work.completed" class="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">完了済み</span>
                 </div>
@@ -138,7 +161,17 @@ async function complete() {
                     <div><dt class="text-gray-500">昼休憩を除く予定枠</dt><dd class="mt-1">{{ minutes(time.afterLunch) }}</dd></div>
                     <div><dt class="text-gray-500">記録時間</dt><dd class="mt-1 font-medium text-blue-700">{{ minutes(time.recorded) }}</dd></div>
                 </dl>
-                <details class="mt-3 text-xs leading-relaxed text-gray-500"><summary class="cursor-pointer">時間の計算について</summary><p class="mt-1">記録時間は、現在までの時間に昼休憩・重複・会議などの配分を反映します。未来の予定枠や完了状態とは別です。</p></details>
+                <div v-if="time.future !== undefined" class="mt-4 border-t border-gray-100 pt-3">
+                    <h4 class="text-xs font-medium text-gray-600">予定枠から差し引いた時間</h4>
+                    <dl class="mt-2 grid gap-3 text-sm sm:grid-cols-3">
+                        <div><dt class="text-gray-500">まだ経過していない時間（昼休憩を除く）</dt><dd class="mt-1">{{ minutes(time.future) }}</dd></div>
+                        <div><dt class="text-gray-500">会議・外出などを優先した時間</dt><dd class="mt-1">{{ minutes(time.priority) }}</dd></div>
+                        <div><dt class="text-gray-500">重複作業との等分で減った時間</dt><dd class="mt-1">{{ minutes(time.overlap) }}</dd></div>
+                        <div v-if="time.other > 0.01"><dt class="text-gray-500">その他の算定対象外の時間</dt><dd class="mt-1">{{ minutes(time.other) }}</dd></div>
+                    </dl>
+                    <p class="mt-3 text-xs leading-relaxed text-gray-600">予定枠 {{ minutes(time.planned) }} − 昼休憩 {{ minutes(time.lunch) }} − 未経過 {{ minutes(time.future) }} − 会議・外出等 {{ minutes(time.priority) }} − 等分による減少 {{ minutes(time.overlap) }}<template v-if="time.other > 0.01"> − その他 {{ minutes(time.other) }}</template> ＝ 記録時間 {{ minutes(time.recorded) }}</p>
+                </div>
+                <details class="mt-3 text-xs leading-relaxed text-gray-500"><summary class="cursor-pointer">時間の計算について</summary><p class="mt-1">会議・外出などが重なった時間はそちらを優先し、作業同士の重複は等分します。昼休憩は除き、未来の時間はまだ記録に含めません。重複分を二重に差し引くことはありません。完了状態とは別の計算です。</p></details>
             </section>
 
             <WorkJobSeries :series="series" />

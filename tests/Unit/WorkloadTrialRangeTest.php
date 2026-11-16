@@ -512,7 +512,7 @@ class WorkloadTrialRangeTest extends TestCase
             $detailed = $service->analyze($this->user, collect([$this->user]), $start, $start->copy()->endOfDay(), true, $version, true, true);
             self::assertSame(150.0, $detailed[0]['daily'][0]['record_minutes']['quick-1']);
             self::assertSame(150.0, $detailed[0]['daily'][0]['record_minutes']['quick-2']);
-            foreach ($detailed[0]['daily'] as &$day) unset($day['record_minutes']);
+            foreach ($detailed[0]['daily'] as &$day) unset($day['record_minutes'], $day['record_adjustments']);
             unset($day);
             self::assertSame($normal, $detailed);
         }
@@ -532,13 +532,13 @@ class WorkloadTrialRangeTest extends TestCase
         $reader = new \App\Services\WorkJobReader(new \App\Services\UnifiedMyJobBox(new \App\Services\UserWorkHub($schedule)), $schedule, new WorkloadTrialAnalysis($schedule));
         $connection = $this->database->getConnection(); $connection->enableQueryLog();
         $detail = $reader->detail($this->user, 1, 1);
-        self::assertSame(['planned' => 360, 'lunch' => 60, 'afterLunch' => 300, 'recorded' => 150.0], $detail['time']);
+        self::assertSame(['planned' => 360, 'lunch' => 60, 'afterLunch' => 300, 'recorded' => 150.0, 'future' => 0, 'priority' => 0.0, 'overlap' => 150.0, 'other' => 0], $detail['time']);
         foreach ($connection->getQueryLog() as $query) self::assertMatchesRegularExpression('/^select /i', $query['query']);
         $this->insert('personal_work_entries', ['id' => 3, 'user_id' => 1, 'company_id' => 1, 'department_id' => 1,
             'work_date' => '2026-10-31', 'actual_minutes' => 60, 'work_category' => 'other', 'plan_slot' => 'hour',
             'planned_start_time' => '09:00', 'planned_end_time' => '10:00', 'entry_visibility' => 'private']);
         $future = $reader->detail($this->user, 3, 1);
-        self::assertSame(60, $future['time']['planned']); self::assertSame(0.0, $future['time']['recorded']);
+        self::assertSame(60, $future['time']['planned']); self::assertSame(0.0, $future['time']['recorded']); self::assertSame(60, $future['time']['future']); self::assertSame(0, $future['time']['other']);
         self::assertSame('private', $future['work']['entry_visibility']);
         foreach (['source_entry_id', 'source_assignment_id', 'completed_at'] as $column) $connection->statement('alter table personal_work_entries add column '.$column.' integer');
         $connection->statement('alter table project_job_assignments add column source_personal_work_entry_id integer');
@@ -602,6 +602,43 @@ class WorkloadTrialRangeTest extends TestCase
     {
         return (new WorkloadTrialAnalysis(new PersonalWorkSchedule()))->analyze($this->user, collect([$this->user]),
             Carbon::parse($from, 'Asia/Tokyo')->startOfDay(), Carbon::parse($to, 'Asia/Tokyo')->endOfDay(), true, $version)[0];
+    }
+
+    public function test_detail_separates_meeting_priority_equal_sharing_lunch_and_future_without_changing_totals(): void
+    {
+        $this->insert('departments', ['id' => 1, 'company_id' => 1, 'code' => 'INFO']);
+        $this->user->forceFill(['user_role' => 'superadmin']);
+        $this->user->setRelation('company', new \App\Models\Company(['company_type' => 'sunbrain']));
+        $base = ['user_id'=>1,'company_id'=>1,'department_id'=>1,'work_date'=>'2026-10-30','work_category'=>'dtp','activity_type'=>'revision','plan_slot'=>'hour','entry_visibility'=>'department'];
+        $this->insert('personal_work_entries', ['id'=>1,'actual_minutes'=>240,'planned_start_time'=>'11:00','planned_end_time'=>'15:00'] + $base);
+        $this->insert('personal_work_entries', ['id'=>2,'actual_minutes'=>30,'planned_start_time'=>'11:00','planned_end_time'=>'11:30'] + $base);
+        $this->insert('event_item_types', ['id'=>2,'slug'=>'meeting_internal']);
+        $this->insert('events', ['id'=>1,'user_id'=>1,'event_item_type_id'=>2,'starts_at'=>'2026-10-30 11:30:00','ends_at'=>'2026-10-30 12:00:00']);
+        $schedule = new PersonalWorkSchedule;
+        $reader = new \App\Services\WorkJobReader(new \App\Services\UnifiedMyJobBox(new \App\Services\UserWorkHub($schedule)), $schedule, new WorkloadTrialAnalysis($schedule));
+        foreach (['10:00'=>[180,0,0,0], '13:30'=>[90,30,15,45], '16:00'=>[0,30,15,135]] as $clock=>$expected) {
+            Carbon::setTestNow(Carbon::parse('2026-10-30 '.$clock, 'Asia/Tokyo'));
+            $time = $reader->detail($this->user,1,1)['time'];
+            self::assertSame(240,$time['planned']); self::assertSame(60,$time['lunch']);
+            foreach (['future','priority','overlap','recorded'] as $i=>$field) self::assertEqualsWithDelta($expected[$i],$time[$field],0.00001,$clock.' '.$field.' '.json_encode($time));
+            self::assertEqualsWithDelta($time['planned'],$time['lunch']+$time['future']+$time['priority']+$time['overlap']+$time['other']+$time['recorded'],0.00001);
+            self::assertEquals(0,$time['other']);
+        }
+    }
+
+    public function test_ledger_diagnostics_preserve_existing_results_and_do_not_double_subtract(): void
+    {
+        $item = fn ($key,$from,$to,$priority=0) => ['key'=>$key,'from'=>$from,'to'=>$to,'priority'=>$priority,'work_category'=>'dtp','activity_type'=>'revision','time_group'=>'quick','coefficient'=>1.0];
+        $items=[$item('a',660,810),$item('b',660,690),$item('c',660,690),$item('meeting',675,735,1)];
+        $ledger=new \App\Services\WorkMinuteLedger;
+        $normal=$ledger->calculate($items,null);
+        $detailed=$ledger->calculate($items,null,null,true);
+        $minutes=$detailed['record_minutes'];$adjustments=$detailed['record_adjustments'];
+        unset($detailed['record_minutes'],$detailed['record_adjustments']); self::assertSame($normal,$detailed);
+        self::assertEquals(45,$adjustments['a']['priority']); self::assertEqualsWithDelta(10,$adjustments['a']['overlap'],0.00001);
+        self::assertEqualsWithDelta(35,$minutes['a'],0.00001);
+        self::assertEqualsWithDelta(90,$minutes['a']+$adjustments['a']['priority']+$adjustments['a']['overlap'],0.00001);
+        self::assertEqualsWithDelta($normal['minutes'],array_sum($minutes),0.00001);
     }
 
     private function insert(string $table, array $row): void

@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'myjob-time-details-1') {
+            Changelog::updateOrCreate(['version' => 'myjob-time-details-1'], [
+                'title' => 'マイジョブの時間内訳と詳細操作を整理',
+                'released_at' => '2026-11-16',
+                'summary' => '会議・外出や重複作業で配分された時間、未経過の時間を詳細に表示し、編集・削除をページ右上へ揃えました。',
+                'design_files' => ['z_instructions/MYJOB_TIME_DETAIL_PLAN1.md'],
+                'claude_notes' => 'Codex実装。既存Ledgerの計算式は維持し、優先配分と等分差分を本人詳細へ渡す。未経過は同じ計算時刻で分離。DB変更なし。',
+                'body' => '<section class="cl-feature"><h3>時間の内訳</h3><p>予定枠から昼休憩・未経過・会議等への優先配分・重複作業の等分を差し引いた記録時間を確認できます。編集・削除はページ右上に配置しました。</p></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'sunbrain-info-myjob-unified-1') {
             Changelog::updateOrCreate(['version' => 'sunbrain-info-myjob-unified-1'], [
                 'title' => '情報出版の部署の作業とマイジョブ入力を統一',
