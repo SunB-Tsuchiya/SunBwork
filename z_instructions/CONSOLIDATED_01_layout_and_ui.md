@@ -395,3 +395,5 @@ AppLayout 内にグローバル配置済み。各ページで重複させない�
 2026-11-16新形式MyJob詳細（実装・検証済み、未配備）: WorkDetailもL-02の灰色戻るリンクをheader左、編集（indigo）/削除（red）をheaderExtras右へ配置。カード内の予定編集を移動し、校正/完了/続き等は上部カードに保持。削除は確認・二重送信防止・失敗表示を備え既存destroyで認可/日報/続き/校正元の制約を守る。時間の差引理由は常時表示し、詳しい計算の説明はdetailsで開く。MYJOB_TIME_DETAIL_PLAN1/MANAGER1参照。
 
 2026-11-16追補: 新MyJob時間内訳/ヘッダー修正は本番0fa7dade5へ配備し、利用者が会議優先30分/記録120分の表示と戻る/右上編集削除/編集遷移の2条件を確認済み。今回の保存・削除実行は確認対象外。詳細はarchived/MYJOB_TIME_DETAIL_MANAGER1.md。
+
+2026-11-16案件検索内追加モーダル（未配備）: 新MyJob本体z2100→案件検索z2200→分類追加z2300。追加中は本体/検索をinertにし、最前面のフォーカスを制限。背景/ドラッグ/Escで入力本体を閉じない。取消時は追加ボタン、成功時は選択済み分類へフォーカスを戻す。HTML formはTeleportで分離し入れ子にしない。共通BroadProjectFormのinlineCreateだけ追加区分/有効大グループ選択とJSON保存を表示、既存管理画面のInertia保存は維持。MYJOB_INLINE_BROAD_PLAN1参照。

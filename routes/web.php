@@ -339,6 +339,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::post('/presence/{user}', [App\Http\Controllers\UserPresenceController::class, 'update'])->name('presence.update');
 
     // 情報出版の仕事・案件ハブ。閲覧・追加と分類管理の権限はControllerで分離する。
+    Route::get('/user/work/broad-projects/quick-options', [App\Http\Controllers\User\QuickBroadProjectController::class, 'options'])->name('user.work.broad_projects.quick_options');
+    Route::post('/user/work/broad-projects/quick-create', [App\Http\Controllers\User\QuickBroadProjectController::class, 'store'])->name('user.work.broad_projects.quick_store');
     Route::get('/user/work/broad-projects/clients', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'clients'])->name('user.work.broad_projects.clients');
     Route::get('/user/work/broad-projects', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'index'])->name('user.work.broad_projects.index');
     Route::post('/user/work/broad-projects', [App\Http\Controllers\User\WorkHubBroadProjectController::class, 'store'])->name('user.work.broad_projects.store');

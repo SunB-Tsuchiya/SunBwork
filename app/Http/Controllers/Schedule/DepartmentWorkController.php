@@ -252,6 +252,7 @@ class DepartmentWorkController extends Controller
                 ->limit(100)->pluck('actual_unit')->map(fn ($unit) => trim($unit))
                 ->filter()->unique()->take(10)->values(),
             'default_category' => $this->schedule->defaultCategory($viewer),
+            'can_create_broad_project' => $this->schedule->canViewDepartmentWork($viewer, $request->session()->get('superadmin_context.company_id')),
         ]);
     }
 

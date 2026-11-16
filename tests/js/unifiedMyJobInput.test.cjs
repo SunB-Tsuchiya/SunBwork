@@ -33,7 +33,7 @@ async function component(file, behavior = false) {
         b.onLoad({ filter: /\.vue$/ }, a => {
             let source = fs.readFileSync(a.path, 'utf8');
             if (behavior && a.path === path.join(root, file)) source = source.replace('</script>', (file === modal
-                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyCreate,canCreateLegacy,changeWorkCategory,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff};'
+                ? '\nglobalThis.__unifiedModal={form,save,remove,heading,error,saving,broadTreeRows,toggleBroadProject,projectSearch,openProjectPicker,chooseBroadProject,chooseHistory,openRequests,openLegacyCreate,canCreateLegacy,changeWorkCategory,openLegacyContinuation,historyChoice,activeContinuation,sourcePickerOpen,canSelectSource,handingOff,openBroadCreate,cancelBroadCreate,broadCreated,newBroadProjectOpen,projectPickerOpen};'
                 : file === 'resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue' ? '\nglobalThis.__legacyForm={assignments,save,workDate,startTimeHour,startTimeMin,endTimeHour,endTimeMin};' : file === 'resources/js/Pages/MyJobBox/Show.vue' ? '\nglobalThis.__legacyComplete={submitComplete,isSubmittingComplete};' : file === 'resources/js/Components/MyJobHistoryInput.vue' ? '\nglobalThis.__historyInput={entry,source};' : file === 'resources/js/Components/MyJobCreateModal.vue' ? '\nglobalThis.__createHistory={onSourceSelected,historySelection,options,formAssignments,receivedPrefill,picker};' : file === 'resources/js/Pages/Events/Create_Job.vue' ? '\nglobalThis.__pageHistory={applyContinuation,applyAsNew,pendingRecord,historySelection,showRequestModal,requestRecords,applyRequestJob,formAssignments,prefillEvent,projectJob,userClients,userProjects,receivedPrefill};' : file === 'resources/js/Pages/MyJobBox/Create_user.vue' ? '\nglobalThis.__oldRequestPage={applyRequestJob,formAssignments,projectJob,userClients,userProjects,receivedPrefill,showRequestModal};' : file === 'resources/js/Components/LegacyWorkJobContinuation.vue' ? '\nglobalThis.__legacyContinuation={saved,show};' : file === page ? '\nglobalThis.__unifiedPage={openCreate,onSaved,createDate,showCreate,detailHref,openDetails};' : '\nglobalThis.__detailState={saved,deleted,editing,backHref,continuing,complete,confirmationOpen,completing,completeError,detailsOpen,detailsSaved,remove,deleting,deleteError};') + '\n</script>');
             if (!behavior && a.path === path.join(root, file) && file === 'resources/js/Pages/MyJobBox/Show.vue' && globalThis.__legacyLayoutEvents) source = source.replace('</script>', '\nevents.value=globalThis.__legacyLayoutEvents;eventsLoaded.value=true;\n</script>');
             if (!behavior && file === modal && globalThis.__pickerFixture) source = source.replace('</script>', '\nbroadProjects.value=globalThis.__pickerFixture; projectPickerOpen.value=true;\n</script>');
@@ -59,6 +59,17 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     app.mount({}); props.show = true; await settle();
     let state = globalThis.__unifiedModal;
     assert.equal(state.heading.value, 'マイジョブ作成');
+    {
+        const original={...state.form};Object.assign(state.form,{planned_start_time:'08:17',planned_end_time:'10:03',title:'保持する作業',actual_quantity:'12',actual_unit:'ページ',result_note:'保持する結果'});
+        state.projectPickerOpen.value=true;state.projectSearch.value='足りない分類';
+        const before={...state.form};state.openBroadCreate();assert.equal(state.newBroadProjectOpen.value,true);
+        await state.cancelBroadCreate();assert.equal(state.projectSearch.value,'足りない分類');assert.deepEqual({...state.form},before);assert.equal(state.projectPickerOpen.value,true);
+        state.openBroadCreate();await state.broadCreated({id:777,name:'追加した分類',path:'大 ／ 追加した分類',selectable:true});
+        assert.equal(state.form.broad_project_id,777);assert.equal(state.form.project_job_id,'');assert.equal(state.newBroadProjectOpen.value,false);assert.equal(state.projectPickerOpen.value,false);
+        for(const key of ['work_date','planned_start_time','planned_end_time','work_category','title','actual_quantity','actual_unit','result_note'])assert.equal(state.form[key],before[key],key);
+        Object.assign(state.form,original);
+    }
+
     state.openProjectPicker(); await settle();
     assert.deepEqual(state.broadTreeRows.value.map(p=>p.id),[1,100]);
     state.toggleBroadProject(1); assert.equal(state.broadTreeRows.value.length,42);

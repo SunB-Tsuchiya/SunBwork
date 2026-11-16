@@ -1,8 +1,9 @@
 <script setup>
 import axios from 'axios';
 import { router, usePage } from '@inertiajs/vue3';
+import QuickBroadProjectModal from '@/Components/QuickBroadProjectModal.vue';
 import MyJobSourcePicker from '@/Components/MyJobSourcePicker.vue';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import { treeRows } from '@/utils/broadProjectTree';
 import { workCategories, workActivities } from '@/Constants/personalWorkActivities';
@@ -45,6 +46,28 @@ const projectSearch = ref('');
 const selectedProject = ref(null);
 const selectedBroadProject = ref(null);
 const projectPickerOpen = ref(false);
+const newBroadProjectOpen = ref(false);
+const canCreateBroadProject = ref(false);
+const addBroadButton = ref(null);
+const selectedProjectButton = ref(null);
+const newBroadProjectName = ref('');
+function openBroadCreate() {
+    clearTimeout(searchTimer); searchRequest++; loading.value = false;
+    newBroadProjectName.value = projectSearch.value.trim();
+    newBroadProjectOpen.value = true;
+}
+async function cancelBroadCreate() {
+    newBroadProjectOpen.value = false;
+    await nextTick(); addBroadButton.value?.focus();
+    loadProjects();
+}
+async function broadCreated(project) {
+    clearTimeout(searchTimer); searchRequest++; loading.value = false;
+    newBroadProjectOpen.value = false;
+    broadProjects.value = [...broadProjects.value.filter(p => p.id !== project.id), project];
+    chooseBroadProject(project);
+    await nextTick(); selectedProjectButton.value?.focus();
+}
 const includeCompleted = ref(false);
 const showMore = ref(false);
 let searchTimer;
@@ -112,6 +135,7 @@ async function loadProjects(applyDefaultCategory = false) {
             },
         });
         if (request !== searchRequest) return;
+        canCreateBroadProject.value = Boolean(data.can_create_broad_project);
         projects.value = data.projects || [];
         broadProjects.value = data.broad_projects || [];
         recentUnits.value = data.recent_units || [];
@@ -130,7 +154,7 @@ async function loadProjects(applyDefaultCategory = false) {
 }
 
 watch(projectSearch, () => {
-    if (!props.show || !projectPickerOpen.value) return;
+    if (!props.show || !projectPickerOpen.value || newBroadProjectOpen.value) return;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(loadProjects, 250);
 });
@@ -175,7 +199,7 @@ function clearProject() {
 }
 
 watch(() => props.show, async (show) => {
-    if (!show) { showTitleSuggestions.value = false; projectPickerOpen.value = false; return; }
+    if (!show) { newBroadProjectOpen.value = false; searchRequest++; clearTimeout(searchTimer); showTitleSuggestions.value = false; projectPickerOpen.value = false; return; }
     error.value = '';
     requestToken.value = globalThis.crypto.randomUUID();
     sourcePickerOpen.value = false; historyChoice.value = null; handingOff.value = false;
@@ -321,7 +345,7 @@ async function remove() {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4">
+        <div v-if="show" :inert="projectPickerOpen || newBroadProjectOpen" class="fixed inset-0 z-[2100] flex items-center justify-center bg-black/40 px-4">
             <div role="dialog" aria-modal="true" :aria-label="heading" :class="sourcePickerOpen ? 'max-w-3xl' : 'max-w-lg'" class="max-h-[90vh] w-full overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div class="flex items-center justify-between gap-2">
                     <h2 class="text-lg font-semibold">{{ heading }}</h2>
@@ -368,7 +392,7 @@ async function remove() {
                                 <button type="button" class="text-blue-700 underline" @click="clearProject">解除</button>
                             </div>
                         </div>
-                        <div v-else-if="selectedBroadProject" class="mt-1 flex items-center justify-between gap-2 rounded border border-yellow-200 bg-yellow-50 p-2">
+                        <div v-else-if="selectedBroadProject" tabindex="-1" ref="selectedProjectButton" class="mt-1 flex items-center justify-between gap-2 rounded border border-yellow-200 bg-yellow-50 p-2">
                             <span class="min-w-0 truncate">大まかな案件：{{ broadProjectLabel(selectedBroadProject) }}</span>
                             <div class="flex shrink-0 gap-2">
                                 <button type="button" class="text-blue-700 underline" @click="openProjectPicker">変更</button>
@@ -417,19 +441,20 @@ async function remove() {
                 </form>
             </div>
         </div>
-        <div v-if="show && projectPickerOpen" class="fixed inset-0 z-[2200] flex items-center justify-center bg-black/50 px-4">
+        <div v-if="show && projectPickerOpen" :inert="newBroadProjectOpen" class="fixed inset-0 z-[2200] flex items-center justify-center bg-black/50 px-4">
             <div role="dialog" aria-modal="true" aria-label="案件を探す" class="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div class="flex items-center justify-between gap-3">
                     <h3 class="text-lg font-semibold">案件を探す</h3>
                     <button type="button" class="text-sm text-gray-600 underline" @click="projectPickerOpen = false">閉じる</button>
                 </div>
+                <button v-if="canCreateBroadProject" ref="addBroadButton" type="button" class="mt-3 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-800 hover:bg-blue-100" @click="openBroadCreate">＋ 大まかな案件を追加</button>
                 <label for="quick-work-project-search" class="mt-4 block text-sm">大まかな案件名・案件名・番号・取引先名
                     <input id="quick-work-project-search" v-model="projectSearch" type="search" autocomplete="off" placeholder="入力して検索" class="mt-1 w-full rounded border p-2" />
                 </label>
                 <label class="mt-3 flex items-center gap-2 text-sm"><input v-model="includeCompleted" type="checkbox" />完了した案件も表示する</label>
                 <div class="mt-3 max-h-80 overflow-y-auto rounded border" aria-label="案件候補">
                     <p v-if="loading" class="p-3 text-sm text-gray-500">検索中...</p>
-                    <p v-else-if="!projectGroups.length && !matchingBroadProjects.length" class="p-3 text-sm text-gray-500">該当する案件がありません。閉じて仮の案件名を入力できます。</p>
+                    <p v-else-if="!projectGroups.length && !matchingBroadProjects.length" class="p-3 text-sm text-gray-500">該当する案件がありません。大まかな案件を追加するか、戻って仮の案件名を入力できます。</p>
                     <div v-for="group in broadProjectGroups" :key="group.key">
                         <p class="bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800">{{ group.label }}</p>
                         <button v-for="project in group.items" :key="project.id" type="button" class="flex w-full items-center justify-between gap-3 border-t px-3 py-2 text-left text-sm hover:bg-yellow-50" @click="chooseBroadProject(project)">
@@ -458,4 +483,5 @@ async function remove() {
             </div>
         </div>
     </Teleport>
+    <QuickBroadProjectModal v-if="show && newBroadProjectOpen" :initial-name="newBroadProjectName" @cancel="cancelBroadCreate" @saved="broadCreated" />
 </template>

@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { broadProjectColor } from '@/utils/broadProjectTree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { route } from 'ziggy-js';
 import { useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -9,9 +10,14 @@ const props = defineProps({
     projects: { type: Array, default: () => [] },
     initialParentId: { type: Number, default: null },
     routePrefix: { type: String, default: 'superadmin.broad_projects' },
+    inlineCreate: { type: Boolean, default: false },
+    initialName: { type: String, default: '' },
+    scope: { type: Object, default: null },
     allowStatus: { type: Boolean, default: true },
 });
-const emit = defineEmits(['saved', 'cancel']);
+const emit = defineEmits(['saved', 'cancel', 'busy', 'existing']);
+const inlineSaving = ref(false);
+const inlineError = ref('');
 const isEditing = computed(() => Boolean(props.project?.id));
 const clientSearch = ref('');
 const selectedClients = ref([...(props.project?.clients ?? (props.project?.client ? [props.project.client] : []))]);
@@ -22,8 +28,8 @@ const clientPickerRef = ref(null);
 const clientInputId = isEditing.value ? 'broad-project-edit-client' : 'broad-project-create-client';
 const clientOptionsId = `${clientInputId}-options`;
 const form = useForm({
-    name: props.project?.name || '',
-    ...(!props.project?.id ? {group_type: props.initialParentId ? 'middle' : 'large', parent_id: props.initialParentId} : {}),
+    name: props.project?.name || props.initialName,
+    ...(!props.project?.id ? {group_type: props.initialParentId || (props.inlineCreate && props.projects.some(p => p.parent_id === null && p.selectable)) ? 'middle' : 'large', parent_id: props.initialParentId} : {}),
     client_ids: selectedClients.value.map(client => client.id),
     fiscal_year: props.project?.fiscal_year ?? null,
     is_active: props.project?.is_active ?? true,
@@ -102,7 +108,36 @@ function removeClient(id) {
     form.client_ids = form.client_ids.filter(clientId => clientId !== id);
 }
 
-function save() {
+function cancel() {
+    if (inlineSaving.value) return;
+    if (props.inlineCreate && form.isDirty && !confirm('追加内容を破棄して案件検索に戻りますか？')) return;
+    emit('cancel');
+}
+const similarProjects = computed(() => {
+    const name = form.name.normalize('NFKC').trim().toLocaleLowerCase();
+    if (!props.inlineCreate || !name) return [];
+    return props.projects.filter(p => p.name.normalize('NFKC').toLocaleLowerCase().includes(name)).slice(0, 5);
+});
+async function save() {
+    if (props.inlineCreate) {
+        if (inlineSaving.value) return;
+        inlineSaving.value = true; inlineError.value = ''; form.clearErrors(); emit('busy', true);
+        try {
+            const { data } = await axios.post(route('user.work.broad_projects.quick_store'), {
+                name: form.name, group_type: form.group_type,
+                ...(form.group_type === 'middle' ? { parent_id: form.parent_id } : {}),
+                fiscal_year: form.fiscal_year || null, client_ids: form.client_ids, scope: props.scope,
+            }, { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'), Accept: 'application/json' } });
+            if (data.scope?.company_id !== props.scope?.company_id || data.scope?.department_id !== props.scope?.department_id || !data.project?.id || !data.project.selectable) throw Error('scope');
+            emit('saved', data.project);
+        } catch (err) {
+            for (const [key, value] of Object.entries(err.response?.data?.errors || {})) form.setError(key, Array.isArray(value) ? value[0] : value);
+            inlineError.value = err.response?.data?.message || '保存結果を確認できませんでした。入力は残っています。重複を避けるため、案件検索で登録済みか確認してください。';
+        } finally {
+            inlineSaving.value = false; emit('busy', false);
+        }
+        return;
+    }
     const options = {
         preserveScroll: true,
         onSuccess: () => {
@@ -124,7 +159,17 @@ function save() {
 
 <template>
     <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="save">
-        <p class="text-sm text-gray-600 sm:col-span-2">
+        <fieldset class="contents" :disabled="inlineSaving">
+        <p v-if="inlineError" role="alert" class="text-sm text-red-700 sm:col-span-2">{{ inlineError }}</p>
+        <div v-if="inlineCreate" class="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+            <label class="text-sm">追加する区分
+                <select v-model="form.group_type" :disabled="inlineSaving" class="mt-1 w-full rounded border p-2"><option value="middle" :disabled="!projects.some(p => p.parent_id === null && p.selectable)">中グループ</option><option value="large">大グループを新しく追加</option></select>
+            </label>
+            <label v-if="form.group_type === 'middle'" class="text-sm">追加先の大グループ（必須）
+                <select v-model="form.parent_id" :disabled="inlineSaving" required class="mt-1 w-full rounded border p-2"><option :value="null">選択してください</option><option v-for="parent in projects.filter(p => p.parent_id === null && p.selectable)" :key="parent.id" :value="parent.id">{{ parent.path || parent.name }}</option></select>
+            </label>
+        </div>
+        <p v-else class="text-sm text-gray-600 sm:col-span-2">
             {{ (project?.parent_id || initialParentId) ? '中グループ' : '大グループ' }}
             <span v-if="project?.parent_id || initialParentId"> ／ {{ projects.find(p => p.id === (project?.parent_id || initialParentId))?.name }}</span>
         </p>
@@ -168,9 +213,14 @@ function save() {
             <label class="flex items-center gap-2"><input v-model="isPaused" type="checkbox" />休止にする</label>
             <p class="mt-1 text-xs text-gray-500">休止すると、新しい作業や案件登録の選択候補から外れます。過去の記録は残ります。大グループを休止すると、その中の中グループも候補から外れます。</p>
         </div>
-        <div class="flex justify-end gap-3 sm:col-span-2">
-            <button v-if="isEditing" type="button" class="text-sm text-gray-600 underline" @click="emit('cancel')">キャンセル</button>
-            <button type="submit" :disabled="form.processing" class="rounded px-4 py-2 text-sm font-medium disabled:opacity-50" :class="broadProjectColor(routePrefix)">{{ isEditing ? '変更を保存' : '登録する' }}</button>
+        <div v-if="similarProjects.length" class="rounded border border-blue-100 bg-blue-50 p-3 text-sm sm:col-span-2">
+            <p class="font-medium">登録済みの似た名前</p>
+            <div v-for="candidate in similarProjects" :key="candidate.id" class="mt-2 flex items-center justify-between gap-2"><span>{{ candidate.path || candidate.name }} {{ candidate.fiscal_year ? `（${candidate.fiscal_year}年度）` : '' }}{{ candidate.selectable ? '' : '（休止中）' }}</span><button v-if="candidate.selectable" type="button" :disabled="inlineSaving" class="shrink-0 text-blue-700 underline" @click="emit('existing', candidate)">これを選択</button></div>
         </div>
+        <div class="flex justify-end gap-3 sm:col-span-2">
+            <button v-if="isEditing || inlineCreate" type="button" :disabled="inlineSaving" class="text-sm text-gray-600 underline disabled:opacity-50" @click="cancel">キャンセル</button>
+            <button type="submit" :disabled="form.processing || inlineSaving" class="rounded px-4 py-2 text-sm font-medium disabled:opacity-50" :class="broadProjectColor(routePrefix)">{{ inlineSaving ? '保存中…' : inlineCreate ? '追加して選択' : isEditing ? '変更を保存' : '登録する' }}</button>
+        </div>
+        </fieldset>
     </form>
 </template>

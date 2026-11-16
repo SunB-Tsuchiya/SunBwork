@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'myjob-inline-broad-project-1') {
+            Changelog::updateOrCreate(['version' => 'myjob-inline-broad-project-1'], [
+                'title' => 'マイジョブの案件検索から大まかな案件を追加',
+                'released_at' => '2026-11-16',
+                'summary' => '案件検索の画面から大まかな案件を追加し、そのまま選択できます。マイジョブの入力内容は保持されます。',
+                'design_files' => ['z_instructions/MYJOB_INLINE_BROAD_PLAN1.md'],
+                'claude_notes' => 'Codex実装。本人INFOの会社部署境界を検証するJSON経路で既存BroadProjectTreeの追加・重複・部署ロックを共用。共通フォームはinlineCreateの場合だけJSONで保存し、既存管理一覧のInertia保存を維持。分類だけを保存しMyJobは自動保存しない。DB変更なし。',
+                'body' => '<section class="cl-feature"><h3>入力を続けながら分類を追加</h3><p>「案件を探す」の「大まかな案件を追加」から追加し、「追加して選択」で元の入力へ戻れます。追加した分類は共有され、マイジョブを取り消しても残ります。</p></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'myjob-time-details-1') {
             Changelog::updateOrCreate(['version' => 'myjob-time-details-1'], [
                 'title' => 'マイジョブの時間内訳と詳細操作を整理',
