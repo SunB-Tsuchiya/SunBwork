@@ -464,3 +464,5 @@ Adminの権限管理「部署の作業の表示対象」で、情報出版の人
 2026-11-16追補: 新MyJob時間内訳/ヘッダー修正は本番0fa7dade5へ配備し、利用者が会議優先30分/記録120分の表示と戻る/右上編集削除/編集遷移の2条件を確認済み。今回の保存・削除実行は確認対象外。詳細はarchived/MYJOB_TIME_DETAIL_MANAGER1.md。
 
 2026-11-16案件検索内追加（実装/合成確認済み、未配備）: QuickWorkEntryModalの「案件を探す」からQuickBroadProjectModalを開き、共通BroadProjectFormをinlineCreateで使う。専用JSON quick_options/quick_storeで本人INFOと会社コンテキスト・取得時scopeを再確認し、Treeの一般User追加/重複/有効親/取引先検証と部署ロックを共用。保存行のIDで即選択し日時・作業名・数量等を保持。分類は即共有、MyJobの保存とは別。既存一覧/旧形式入力/管理権限は維持。MYJOB_INLINE_BROAD_MANAGER1参照。
+
+2026-11-16追補: 案件検索内の大まかな案件追加は本番a16fd1e9aへ反映済み。利用者が取消時の検索/本体入力保持と、追加保存→自動選択/本体入力保持の2条件を確認済み。今回MyJob本体の保存は確認対象外。詳細はarchived/MYJOB_INLINE_BROAD_MANAGER1.md。
