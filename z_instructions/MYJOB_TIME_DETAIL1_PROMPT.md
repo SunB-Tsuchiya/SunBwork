@@ -1,11 +1,3 @@
-# 時間内訳とヘッダー 再開
+# 完了資料への参照
 
-AGENTS.md/JOB_EVALUATION_CONTROL1、MYJOB_TIME_DETAIL_PLAN1/MANAGER1を読む。基準acb55eb45、本番54ade1704。隔離worktree /tmp/sunbwork-myjob-time-breakdown-header-20261116、branch feature/myjob-time-breakdown-header-20261116。主mainのClaude変更を保護。
-利用者の依頼は差引分の説明と、戻る/編集/削除の共通配置。計算式変更ではない。作業24=150分から会議30分を優先し記録120分は確認済み。理由は同じLedgerから取り、未来時間を分離。headerExtrasに編集/削除、確認と既存削除制約維持。
-次: 設計承認後に実装。今回コード未変更・配備未実施。前回現在時刻ボタンの画面確認は未回答で、今回要望から成功と推定しない。SSHは正確なコマンドを提示し事前承認。既確認作業の画面反復を依頼しない。
-
-2026-11-16利用者が具体設計を承認。Ledgerの既存配分を変えずpriority/overlap減少を記録し、本人の日別内訳経由でReaderへ受渡し。未経過は同じasOfで区別。WorkDetailヘッダーに戻る/編集/削除と削除確認/失敗表示、内訳式を実装。今回の検証/配備/画面確認は未実施。次は合成境界と旧系列の回帰。
-
-2026-11-16コード検証完了、未配備: PHP関連136件1421断言成功（既存mixed-series fixture警告1件）。会議優先/三重同順位重複/昼休憩/未開始・進行中・終了後、総時間・元点数不変、旧新混在系列と未来を確認。実Vueでヘッダー編集削除配置、内訳表示、削除確認キャンセル/CSRF/重複送信防止/失敗表示/成功遷移、既存入力回帰成功。/members Vite build成功。ChangelogSeederへidempotentコード追加、Seederは実行しない。次は固定差分配備手順を提示して承認を得る。本番画面は未確認。
-
-2026-11-16本番配備成功、画面確認待ち: 利用者承認の固定手順SHA256 48ec904008ff02f0f16df0cc5c051690f3501643b4fb8394bcddb712c552f822で54ade1704→0fa7dade5、exit0。変更PHP構文/キャッシュ更新/manifest495・参照526・欠落0・/members、追跡変更なし確認。DB/migration/Seeder実行なし。次は作業24の会議優先30分・記録120分とヘッダー戻る/編集/削除（削除実行不要）の今回範囲だけを利用者確認。現在時刻ボタンの未回答チェックと混同しない。
+2026-11-16 本番0fa7dade5反映・依頼画面2条件の利用者確認完了。本文は [archived/MYJOB_TIME_DETAIL1_PROMPT.md](archived/MYJOB_TIME_DETAIL1_PROMPT.md) に保存。次の作業は利用者と相談する。
