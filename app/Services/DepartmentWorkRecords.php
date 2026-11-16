@@ -46,13 +46,17 @@ class DepartmentWorkRecords
             throw ValidationException::withMessages(['date' => '直近5営業日から選択してください。']);
         }
         $day = Carbon::createFromFormat('!Y-m-d', $date, 'Asia/Tokyo');
-        $users = User::where('company_id', $viewer->company_id)
-            ->where('department_id', $viewer->department_id)
+        $users = (new DepartmentWorkDisplaySettings)->visible(
+            User::where('company_id', $viewer->company_id)->where('department_id', $viewer->department_id), 'show_records')
             ->with(['assignment:id,code,name', 'userSetting', 'employmentSetting'])
             ->ordered()->get();
         // Keep overtime in its work category; never expose a separate overtime gauge.
         $rows = $this->analysis->analyze($viewer, $users, $day, $day->copy()->endOfDay(), false, 'trial_time_v3', false);
         $own = collect($rows)->firstWhere('id', (int) $viewer->id);
+        if (! $users->contains('id', $viewer->id)) {
+            $own = $this->analysis->analyze($viewer, collect([$viewer->loadMissing(['assignment','userSetting','employmentSetting'])]),
+                $day, $day->copy()->endOfDay(), false, 'trial_time_v3', false)[0] ?? null;
+        }
 
         return [
             'date' => $date,

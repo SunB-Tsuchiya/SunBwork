@@ -38,6 +38,7 @@ const entries = computed(() => [
     { key: 'admin_permissions', group: 'permissions', label: 'Admin権限', route: 'admin.admin_permissions.index', matches: ['admin.admin_permissions.'], visible: isRepresentative.value },
     { key: 'leader_permissions', group: 'permissions', label: 'Leader権限', route: 'admin.leader_permissions.index', matches: ['admin.leader_permissions.'] },
     { key: 'diary_teams', group: 'permissions', label: '日報閲覧権限', route: 'admin.diary_teams.index', matches: ['admin.diary_teams.'], visible: can('diary_management') },
+    { key: 'department_work_display', group: 'permissions', label: '部署の作業の表示対象', route: 'admin.department_work_display.index', matches: ['admin.department_work_display.'] },
     { key: 'applicants', group: 'permissions', label: '申請利用者', route: 'admin.applicants.index', matches: ['admin.applicants.'] },
     { key: 'schedule_settings', group: 'permissions', label: '予定表権限', route: 'admin.schedule-settings.edit', matches: ['admin.schedule-settings.'] },
 

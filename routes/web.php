@@ -578,6 +578,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Ziggy用: 明示的にadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
+        Route::get('department-work-display', [App\Http\Controllers\Admin\DepartmentWorkDisplayController::class, 'index'])->name('department_work_display.index');
+        Route::post('department-work-display', [App\Http\Controllers\Admin\DepartmentWorkDisplayController::class, 'update'])->name('department_work_display.update');
+
         // 申請者管理（Admin / SuperAdmin）: 申請の種類のカード → ユーザーごとのスイッチ（在席ボード管理と同じ構造）
         Route::get('applicants', [App\Http\Controllers\Admin\ApplicantController::class, 'index'])->name('applicants.index');
         Route::get('applicants/{feature}', [App\Http\Controllers\Admin\ApplicantController::class, 'show'])->name('applicants.show');

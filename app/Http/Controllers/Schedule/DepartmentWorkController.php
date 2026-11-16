@@ -91,8 +91,8 @@ class DepartmentWorkController extends Controller
         }
 
 
-        $users = User::where('company_id', $viewer->company_id)
-            ->where('department_id', $viewer->department_id)
+        $users = (new \App\Services\DepartmentWorkDisplaySettings)->visible(
+            User::where('company_id', $viewer->company_id)->where('department_id', $viewer->department_id), 'show_schedule')
             ->when(isset($params['user_id']), fn ($query) => $query->whereKey($params['user_id']))
             ->with(['assignment:id,code', 'userSetting'])
             ->ordered()->get(['id', 'name', 'company_id', 'department_id', 'assignment_id', 'sort_order']);
