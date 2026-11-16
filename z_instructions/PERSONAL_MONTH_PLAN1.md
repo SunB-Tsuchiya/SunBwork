@@ -42,3 +42,7 @@ TODOのstart_dateは期限日を意味し、UIでは期限日と表示。deadlin
 合成: 本人/他人/別会社/INFO以外/会社コンテキスト、作成再送/古い版/全操作認可、期限未定/終日/複数日/月跨ぎ/日付のみ締切/取消完了/削除、注入文字列、範囲/ページ上限。既存点数/作業時間の不変。
 実Vue: 月・一覧の同一ID更新、ジョブ初期OFF/切替/週日へ戻る、未完了の別月・無期限TODO、保存失敗/競合で入力保持、二重操作、狭幅/フォーカス、旧ジョブ/会議/日報を混同しない。/members build/Ziggy/manifest欠落、本番は今回専用migrationだけ--path --forceで適用。
 未決（利用者確認）: 最初の公開は情報出版でよいか/本人専用でよいか、第1版を月+TODOまでに絞り、通知・繰返し・TODO→MyJob連携を後段とするか。本計画の確認前にコード変更はしない。SSHの正確なコマンド事前確認を守る。
+
+2026-11-16承認後の実装経路訂正: 現行の個人画面はPages/Calendar.vue→Calendar/UserCalendar.vue→Schedule/MonthView.vueの独自UI。旧Components/Calendar.vueとPages/Calendar/Index.vueは今回変更しない。PersonalMonthPlannerがMonthViewを再利用し、第1版の期間選択はopt-inのrange-selectイベントとして独自月表示に追加。データは日別表示に展開し月跨ぎを含む各日へ示すため、FullCalendarの排他end変換は今回不要。週日/共有月表示の既定操作は保持。
+
+2026-11-16実装補足: 新テーブルにdeleted_atを持たせ、削除後に届いた同一request_keyの再送は410で拒否し、削除済みレコードを復活させない。個人データを月へ渡す際は独自MonthView用に対象日ごとの表示を組み立てる。日時指定の期間と日付のみ締切は分離し、作業時間への自動計上なし。

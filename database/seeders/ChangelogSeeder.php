@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'personal-month-calendar-preview-1') {
+            Changelog::updateOrCreate(['version' => 'personal-month-calendar-preview-1'], [
+                'title' => '個人の月カレンダー・TODOを試用',
+                'released_at' => '2026-11-16',
+                'summary' => '月表示で個人イベント・締め切りとTODOをまとめて管理する機能を、情報出版のSuper Admin限定で試用します。',
+                'design_files' => ['z_instructions/PERSONAL_MONTH_PLAN1.md'],
+                'claude_notes' => 'Codex実装。本人と実会社で所有範囲を限定した専用テーブル/API。月と一覧は同一ID、日付未定/期間/完了、再送キーと版照合を持つ。週日・作業評価・Clerk共有カレンダーは維持。一般公開は別承認。',
+                'body' => '<section class="cl-feature"><h3>個人の月予定・TODO（試用）</h3><p>月表示のジョブは切替表示にし、個人予定・締め切り・期限未定を含むTODOを確認できます。本人専用のメモで、作業時間には計上されません。</p></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'myjob-inline-broad-project-1') {
             Changelog::updateOrCreate(['version' => 'myjob-inline-broad-project-1'], [
                 'title' => 'マイジョブの案件検索から大まかな案件を追加',

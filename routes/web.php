@@ -338,6 +338,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     Route::post('/presence/{user}', [App\Http\Controllers\UserPresenceController::class, 'update'])->name('presence.update');
 
+    Route::prefix('personal-calendar/items')->name('personal_calendar.items.')->group(function () {
+        Route::get('/', [App\Http\Controllers\User\PersonalCalendarController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\User\PersonalCalendarController::class, 'store'])->name('store');
+        Route::put('/{item}', [App\Http\Controllers\User\PersonalCalendarController::class, 'update'])->whereNumber('item')->name('update');
+        Route::patch('/{item}/complete', [App\Http\Controllers\User\PersonalCalendarController::class, 'complete'])->whereNumber('item')->name('complete');
+        Route::delete('/{item}', [App\Http\Controllers\User\PersonalCalendarController::class, 'destroy'])->whereNumber('item')->name('destroy');
+    });
     // 情報出版の仕事・案件ハブ。閲覧・追加と分類管理の権限はControllerで分離する。
     Route::get('/user/work/broad-projects/quick-options', [App\Http\Controllers\User\QuickBroadProjectController::class, 'options'])->name('user.work.broad_projects.quick_options');
     Route::post('/user/work/broad-projects/quick-create', [App\Http\Controllers\User\QuickBroadProjectController::class, 'store'])->name('user.work.broad_projects.quick_store');

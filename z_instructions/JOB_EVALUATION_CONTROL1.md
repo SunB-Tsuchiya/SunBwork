@@ -2428,3 +2428,9 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-16個人カレンダーの新要望（確定/設計相談）: 利用者は週/日のジョブ入力を維持し、月表示をイベント・TODO・締め切りを記載/連動できる個人向け画面にしたい。Clerkの利用例を参考にする。調査: ClerkScheduleCalendarは色分け/終日・期間/完了/週間プランナー、ClerkEventは会社+calendar_kind単位であり、個人のuser_idだけで隔離する既存閲覧ではない。個人CalendarはFullCalendar月/週/日を持ち、Clerkの会社向けリマインダー表示もある。app/resources/routes内のTODO/to-do直接表記と名前付きTask/Todo実装は今回検索で見つからず、TODO不存在を断定せず既存画面名を質問中。提案（未確定）は本人専用の月間イベント/締め切り/未完了TODO、週/日は現行作業入力維持、TODOからMyJob作業枠へ明示連携。月のジョブ初期表示を隠して切替にするかと、新設TODOか既存TODO連動かの2点を相談中。公開対象範囲、共有、通知、自動評価連携は未決。アプリ/DB/本番未変更。次は2点の回答を受け具体設計3資料へまとめる。
 
 2026-11-16月表示の回答確定: 利用者は「ジョブは初期非表示、切替で表示」「新しい個人用TODO一覧と連動」を選択。既存TODO画面の探索は終了。PERSONAL_MONTH_PLAN1/MANAGER1/PROMPTへ、月/一覧同一データ、本人専用の専用テーブル、週日・時間評価不変、再送/版競合、JST終日/期限の具体案を作成。提案（未承認）はINFOのSuperAdmin確認から進め、通知/繰返し/TODO→MyJob連携は後段へ分ける。公開範囲と段階は利用者確認待ちであり、確定要望へ昇格しない。アプリ/DB/本番未変更。次は具体設計の範囲確認。
+
+2026-11-16再開・実装中: 利用者が第1版の範囲（本人専用月+新TODO、INFO SuperAdmin確認、一般公開別承認、通知/繰返し/MyJob連携後段）を承認。現在の本番経路はCalendarController→Pages/Calendar.vue→Components/Calendar/UserCalendar.vue→独自Schedule/MonthView.vueであると実装前調査で判明。旧Calendar.vue/FullCalendarを編集する候補を撤回し、この現行経路へ限定して設計を具体化。専用table/API/Service、版・再送、月/一覧/モーダルと月だけのジョブ切替を実装中。週日イベント配列は維持。実装/コード検証/配備/画面確認は別状態。次は合成境界テスト。
+
+2026-11-16実装・合成確認: PHP142件1499断言成功（既存mixed-series警告1件）。新規6ケースで本人/他人/別会社/INFO以外/一般User拒否、再送/409/削除410、無期限TODOと過去期限の月非依存一覧/完了/取消/ページング、JST締切/期間/検証を確認。関連旧新MyJob/時間配分も失敗なし。実Vueで月のjob切替/保存二重送信・CSRF/通信不明再送制限/409入力保持/期間表示・選択/旧月のdrag非介入/一覧と月同一ID/古い取得レスポンス排除/文字列escapeを確認。5ルートを一時生成しZiggyの追加定義だけ反映、他不変。ChangelogSeederコード追加、Seeder未実行。次は/members最終buildと本番版の照合。配備/画面確認は未実施。
+
+2026-11-16配備準備完了: 最終/members build成功、manifest全参照欠落0・本番baseを確認。ChangelogSeeder構文成功、Seederは実行しない。コードはSuperAdminかつSunBrain INFO実所属・会社context一致だけ有効で、一般User APIは403。専用migration以外を適用せず、既存データのコピー/変換はしない。次は直近確認本番a16fd1e9aを固定元とする差分検査付き手順への承認。版や作業中ファイルが違えば変更前に停止。今回の本番画面確認はまだ未実施。

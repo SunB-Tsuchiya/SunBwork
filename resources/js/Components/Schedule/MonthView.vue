@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useJapaneseHolidays } from '@/Composables/useJapaneseHolidays';
 
 const props = defineProps({
+    selectableRange: { type: Boolean, default: false },
     year:         { type: Number, required: true },
     month:        { type: Number, required: true },  // 1-12
     events:       { type: Array,  default: () => [] },
@@ -10,10 +11,29 @@ const props = defineProps({
     rooms:        { type: Array,  default: () => [] },
 });
 
-const emit = defineEmits(['date-click', 'event-click', 'room-click']);
+const emit = defineEmits(['date-click', 'event-click', 'room-click', 'range-select']);
 
 const { isHoliday, holidayName, fetchHolidays } = useJapaneseHolidays();
 onMounted(fetchHolidays);
+
+const dragStart = ref('');
+const dragEnd = ref('');
+let suppressClick = false;
+function beginRange(day, event) {
+    if (!props.selectableRange || !day || event.button !== 0 || event.pointerType === 'touch') return;
+    event.preventDefault(); dragStart.value = dateStr(day); dragEnd.value = dragStart.value;
+}
+function finishRange(day) {
+    if (!props.selectableRange || !dragStart.value || !day) return;
+    const date = dateStr(day);
+    if (date !== dragStart.value) { const sorted = [dragStart.value,date].sort(); suppressClick = true; emit('range-select',{start:sorted[0],end:sorted[1]}); }
+    dragStart.value='';dragEnd.value='';
+}
+function clearRange() { dragStart.value='';dragEnd.value=''; }
+function dateKey(day,event) { if(props.selectableRange && day && event.key === 'Enter' && event.target === event.currentTarget){event.preventDefault();emit('date-click',dateStr(day));} }
+function clickDate(day) { if(suppressClick){suppressClick=false;return;} if(day)emit('date-click',dateStr(day)); }
+onMounted(()=>document.addEventListener('pointerup',clearRange));
+onUnmounted(()=>document.removeEventListener('pointerup',clearRange));
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -123,8 +143,11 @@ function fmtResTime(isoStr) {
                 :class="[
                     day ? 'cursor-pointer hover:bg-blue-50' : 'bg-gray-50',
                     isToday(day) ? 'bg-blue-50' : '',
+                    selectableRange && day && dragStart && dateStr(day) >= [dragStart,dragEnd].sort()[0] && dateStr(day) <= [dragStart,dragEnd].sort()[1] ? 'bg-blue-100' : '',
                 ]"
-                @click="day && $emit('date-click', dateStr(day))">
+                @pointerdown="beginRange(day,$event)" @pointerenter="dragStart && day && (dragEnd=dateStr(day))" @pointerup="finishRange(day)"
+                :tabindex="selectableRange && day ? 0 : undefined" @keydown="dateKey(day,$event)"
+                @click="clickDate(day)">
                 <!-- 日付番号 -->
                 <div v-if="day" class="mb-1 flex h-6 w-6 items-center justify-center text-xs font-medium"
                     :class="[
@@ -141,7 +164,7 @@ function fmtResTime(isoStr) {
                     class="mb-0.5 cursor-pointer truncate rounded px-1 text-xs"
                     :class="eventColor(ev)"
                     :style="eventStyle(ev)"
-                    @click.stop="$emit('event-click', ev)">
+                    @pointerdown.stop @click.stop="$emit('event-click', ev)">
                     {{ ev.title }}
                 </div>
                 <div v-if="remainingEventsOnDate(day)" class="text-[10px] text-gray-500">ほか {{ remainingEventsOnDate(day) }} 件</div>

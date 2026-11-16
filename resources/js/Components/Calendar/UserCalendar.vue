@@ -4,6 +4,7 @@ import { personalWorkColors } from '@/Constants/personalWorkActivities';
 import axios from 'axios';
 import { router, usePage } from '@inertiajs/vue3';
 import CalendarShell    from '@/Components/Schedule/CalendarShell.vue';
+import PersonalMonthPlanner from '@/Components/Calendar/PersonalMonthPlanner.vue';
 import MonthView        from '@/Components/Schedule/MonthView.vue';
 import WeekView         from '@/Components/Schedule/WeekView.vue';
 import EventModal       from '@/Components/Schedule/EventModal.vue';
@@ -27,6 +28,7 @@ const props = defineProps({
     defaultBreak:       { type: Object, default: () => ({ start: '12:00', end: '13:00' }) },
     defaultWorktype:    { type: Object, default: null },
     departmentWorkEnabled: { type: Boolean, default: false },
+    personalMonthEnabled: { type: Boolean, default: false },
     personalWorkEnabled: { type: Boolean, default: false },
 });
 
@@ -674,7 +676,11 @@ async function saveWeekBreaks() {
         </template>
 
         <!-- ── カレンダー本体 ──────────────────────────────────────── -->
-        <MonthView v-if="viewMode === 'month'"
+        <PersonalMonthPlanner v-if="viewMode === 'month' && personalMonthEnabled"
+            :year="viewYear" :month="viewMonth" :events="allEvents"
+            :owner-key="`${page.props.auth?.user?.id}:${page.props.auth?.user?.company_id}`"
+            @event-click="openDetail" />
+        <MonthView v-else-if="viewMode === 'month'"
             :year="viewYear" :month="viewMonth"
             :events="allEvents"
             @date-click="onMonthDateClick"
