@@ -2386,3 +2386,5 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-16利用者要望確定: 簡易予定の入力中にモーダル内から外へドラッグしてマウスを離すと閉じる問題。新MyJob共通QuickWorkEntryModalの背景click.selfによるcloseを撤去し、明示的な保存/閉じる等のボタンでのみ閉じる。案件選択の背景閉じも撤去して操作を揃える。前回/tmp worktreeは消失、保存済み563000583からfeature/myjob-modal-explicit-close-20261116へ隔離復元。アプリ変更済み、build/配備/今回画面確認は未実施。共有mainのClaude/ユーザー変更には触れない。
 
 2026-11-16モーダル明示閉じの検証: QuickWorkEntryModal本体と案件選択窓の背景@click.selfを撤去、各「閉じる」/保存等の明示ボタンを保持。実Vue入力テスト成功、/members build成功、manifest494/参照525欠落0。新worktreeでvendor参照不足の最初のbuildは停止し、既存vendor参照を接続後に成功。今回の配備/画面確認は未実施。次は本番版照合後に固定差分配備。本人注意の前段画面確認は後日予定のまま別件として保持。
+
+2026-11-16モーダル明示閉じの配備成功: 利用者承認の固定手順abcc7e97be383e57b9b3058dd6d95662fe11486c6565d90b16b68f77934cad72で本番dd741a4e0→9c187136cへ反映exit0。config/cache/view clear、manifest494/参照525欠落0・/members base、追跡変更なし。DB/権限変更なし。次は今回のみの入力中ドラッグ終了/背景クリックで閉じない、明示的な閉じるボタンでは閉じる、の2条件を利用者画面確認。まだ画面成功扱いにしない。前段の日報注意の後日確認とは別に管理。
