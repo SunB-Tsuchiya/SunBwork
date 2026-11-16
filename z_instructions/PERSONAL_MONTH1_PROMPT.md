@@ -18,3 +18,5 @@ AGENTS.md/JOB_EVALUATION_CONTROL1、PERSONAL_MONTH_PLAN1/MANAGER1を読む。bra
 2026-11-17サイドバー変更の実装/コード検証完了: UserCalendar所有のusePersonalCalendarStateへAPI/一覧/編集状態を分離。CalendarShell既存sidebarへPersonalTodoListを差込み月週日共通にし、月右の一覧を撤去。狭幅はtoolbarのTODO件数ボタンでインライン開閉。本人+会社別キーで開閉状態保存、読取不能は開く既定。状態は月パネルのアンマウント/ビュー切替/カレンダー読み込み中も保持し、GETの古い応答と試用無効化時の遅延応答を無効化する。実Vueで上記/モバイル開閉/無効ユーザーAPI非呼出/保存・競合等の既存テスト成功、従来新旧MyJob入力も成功。DB/API/ルート/権限変更なし。次は最終build/資産参照と固定差分配備手順の提示。今回の配備/画面確認は未実施。
 
 2026-11-17最終build成功: /members manifest495/参照526/欠落0、差分検査成功。今回アプリ変更はVue/JSの表示と状態管理のみ。変更履歴コードのローカルPHP構文確認はDocker DesktopのWSLコマンドが使えず未実施のため、配備手順で対象コミットのSeederコードをgit showからPHP lintし、成功するまで本番ソースを更新しない。Seeder自体は実行しない。次は固定元96070007dから今回差分だけを検査する配備承認。
+
+2026-11-17サイドバー修正配備成功、画面確認待ち: 利用者承認の固定手順SHA256 008d9ffaff5f25da26f7da09d58ce93e05db7c50904da6bbc66e5474878fd03bで96070007d→fffe0275d、exit0。更新前に対象SeederのPHP lint成功、固定差分/追跡変更/既知未追跡6件照合、cache更新、manifest495・参照526・欠落0・/members、更新後追跡変更なしを確認。DB/API/権限・migration/Seeder実行なし。次は①左ミニカレンダー下TODOが月週日共通で、右一覧が消え月が広い、②TODO見出しの開閉と再読込後の状態維持、③狭幅TODO件数ボタンの開閉、を今回範囲だけ利用者確認する。前工程で確認済みのTODO保存・期日・完了は反復不要。一般公開は未承認。
