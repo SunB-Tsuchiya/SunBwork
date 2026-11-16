@@ -468,3 +468,5 @@ Adminの権限管理「部署の作業の表示対象」で、情報出版の人
 2026-11-16追補: 案件検索内の大まかな案件追加は本番a16fd1e9aへ反映済み。利用者が取消時の検索/本体入力保持と、追加保存→自動選択/本体入力保持の2条件を確認済み。今回MyJob本体の保存は確認対象外。詳細はarchived/MYJOB_INLINE_BROAD_MANAGER1.md。
 
 2026-11-16個人月カレンダー試用（実装/合成検証済み、未配備）: 現行Pages/Calendar.vue→UserCalendarのmonth分岐だけPersonalMonthPlannerへ。INFO実所属SuperAdmin/実会社context一致だけenabled。専用personal_calendar_itemsを本人+会社で隔離、月/期限未定を含むTODO一覧は同一データ。週/日の配列と日報/分析/Clerk DBは維持し、予定登録だけで作業時間に計上しない。作成はkey/hashと本人ロック、更新完了削除はversion照合、削除後の再送は410。date:Y-m-d/JST期限、期間は独自MonthViewへ日別表示。PERSONAL_MONTH_MANAGER1参照。一般公開は別承認。
+
+2026-11-17試用TODOサイドバー（未配備）: usePersonalCalendarStateを個人カレンダー全体で共有し、月の個人予定と月週日共通TODOは同じ取得データ/編集/完了処理を利用。月ビュー切替や既存予定読み込みで一覧状態を失わない。新DB/移行/保存API/一般公開は変更せず、表示・状態管理だけを更新。PERSONAL_MONTH_MANAGER1参照。

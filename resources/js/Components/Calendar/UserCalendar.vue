@@ -4,6 +4,9 @@ import { personalWorkColors } from '@/Constants/personalWorkActivities';
 import axios from 'axios';
 import { router, usePage } from '@inertiajs/vue3';
 import CalendarShell    from '@/Components/Schedule/CalendarShell.vue';
+import { usePersonalCalendarState } from '@/Composables/usePersonalCalendarState';
+import PersonalTodoList from '@/Components/Calendar/PersonalTodoList.vue';
+import PersonalCalendarItemModal from '@/Components/Calendar/PersonalCalendarItemModal.vue';
 import PersonalMonthPlanner from '@/Components/Calendar/PersonalMonthPlanner.vue';
 import MonthView        from '@/Components/Schedule/MonthView.vue';
 import WeekView         from '@/Components/Schedule/WeekView.vue';
@@ -48,6 +51,7 @@ const loading        = ref(false);
 const calendarError = ref('');
 const quickWorkColor = personalWorkColors.bg;
 const page = usePage();
+const personalState = usePersonalCalendarState({year:viewYear,month:viewMonth,enabled:computed(()=>props.personalMonthEnabled),ownerKey:computed(()=>`${page.props.auth?.user?.id}:${page.props.auth?.user?.company_id}`)});
 let loadSequence = 0;
 
 // 日報マーカーをイベント形式に変換（MonthView 表示用）
@@ -629,6 +633,7 @@ async function saveWeekBreaks() {
         <span v-if="calendarError" class="text-red-700" role="alert">{{ calendarError }}</span>
     </div>
     <CalendarShell
+        :inert="Boolean(personalState.editor)"
         :current-date="currentDate"
         :view-mode="viewMode"
         :view-label="viewLabel"
@@ -638,8 +643,11 @@ async function saveWeekBreaks() {
         @view-mode-change="viewMode = $event"
         @mini-cal-select="currentDate = $event; viewMode = 'day'">
 
+        <template v-if="personalMonthEnabled" #sidebar><PersonalTodoList :state="personalState" /></template>
+
         <!-- ── ツールバー追加ボタン ──────────────────────────────── -->
         <template #toolbar-extra>
+            <button v-if="personalMonthEnabled" type="button" :aria-expanded="personalState.mobileOpen" class="rounded border border-blue-300 px-3 py-1.5 text-sm text-blue-700 md:hidden" @click="personalState.openMobile">TODO {{ personalState.data.todo_total }}件</button>
             <button v-if="departmentWorkEnabled"
                 class="rounded border border-blue-500 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
                 @click="goToDepartmentWork(currentDate)">今日の作業・部署一覧</button>
@@ -676,9 +684,10 @@ async function saveWeekBreaks() {
         </template>
 
         <!-- ── カレンダー本体 ──────────────────────────────────────── -->
+        <div v-if="personalMonthEnabled && personalState.mobileOpen" class="mb-3 md:hidden"><PersonalTodoList :state="personalState" /></div>
         <PersonalMonthPlanner v-if="viewMode === 'month' && personalMonthEnabled"
             :year="viewYear" :month="viewMonth" :events="allEvents"
-            :owner-key="`${page.props.auth?.user?.id}:${page.props.auth?.user?.company_id}`"
+            :state="personalState"
             @event-click="openDetail" />
         <MonthView v-else-if="viewMode === 'month'"
             :year="viewYear" :month="viewMonth"
@@ -713,6 +722,7 @@ async function saveWeekBreaks() {
             @diary-click="goToDiary" />
 
     </CalendarShell>
+    <PersonalCalendarItemModal v-if="personalMonthEnabled && personalState.editor" v-bind="personalState.editor" @close="personalState.editor=null" @saved="personalState.saved" />
 
     <!-- ── Schedule EventModal（案件打合せ・外出 / 社内予定） ──── -->
     <EventModal

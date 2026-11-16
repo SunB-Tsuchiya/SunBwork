@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'personal-todo-sidebar-preview-1') {
+            Changelog::updateOrCreate(['version' => 'personal-todo-sidebar-preview-1'], [
+                'title' => '個人TODOをカレンダーの左側へ整理',
+                'released_at' => '2026-11-17',
+                'summary' => '試用中の個人TODO・締め切りをミニカレンダーの下へ移し、月・週・日で共通に確認できるようにしました。',
+                'design_files' => ['z_instructions/PERSONAL_MONTH_PLAN1.md'],
+                'claude_notes' => 'Codex実装。UserCalendarが共有状態と編集モーダルを保持し、既存sidebarスロットへ開閉式一覧を配置。月右側の一覧は撤去。開閉は本人・会社別、狭幅はボタンから表示。既存API/DB/試用限定権限は維持。',
+                'body' => '<section class="cl-feature"><h3>月を広く、TODOはいつでも確認</h3><p>TODO・締切は左側で開閉でき、週・日でも追加・編集・完了ができます。狭い画面ではTODOボタンから開けます。</p></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'personal-month-calendar-preview-1') {
             Changelog::updateOrCreate(['version' => 'personal-month-calendar-preview-1'], [
                 'title' => '個人の月カレンダー・TODOを試用',

@@ -46,3 +46,5 @@ TODOのstart_dateは期限日を意味し、UIでは期限日と表示。deadlin
 2026-11-16承認後の実装経路訂正: 現行の個人画面はPages/Calendar.vue→Calendar/UserCalendar.vue→Schedule/MonthView.vueの独自UI。旧Components/Calendar.vueとPages/Calendar/Index.vueは今回変更しない。PersonalMonthPlannerがMonthViewを再利用し、第1版の期間選択はopt-inのrange-selectイベントとして独自月表示に追加。データは日別表示に展開し月跨ぎを含む各日へ示すため、FullCalendarの排他end変換は今回不要。週日/共有月表示の既定操作は保持。
 
 2026-11-16実装補足: 新テーブルにdeleted_atを持たせ、削除後に届いた同一request_keyの再送は410で拒否し、削除済みレコードを復活させない。個人データを月へ渡す際は独自MonthView用に対象日ごとの表示を組み立てる。日時指定の期間と日付のみ締切は分離し、作業時間への自動計上なし。
+
+2026-11-17画面確認成功と追加変更の承認: 利用者「成功」は直前①SuperAdmin月/ジョブ切替・週日維持、②期限未定TODO保存→期限設定で月/一覧へ反映→完了時両方非表示、の全条件。96070007dの限定試用はこの範囲確認済み。続いてTODOをミニカレンダー下へ移し月を広げたいと要望。提案の左TODO/締切の開閉・本人別状態保存/月週日共通・狭幅ボタン開閉を「そのようにしましょう」で承認。右の一覧案をこの配置に置換。既存API/DB/試用権限は維持し、UserCalendar所有の共通状態を月パネルとTODO部品に渡し、CalendarShell既存sidebarスロットを利用する。今回再保存・移行は不要。次は状態分離と配置変更を実装し、ビュー切替でも一覧と編集状態が失われないことを検証。
