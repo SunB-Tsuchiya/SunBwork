@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'diary-record-advice-seven-hours-1') {
+            Changelog::updateOrCreate(['version' => 'diary-record-advice-seven-hours-1'], [
+                'title' => '日報の記録確認メッセージを改善',
+                'released_at' => '2026-11-17',
+                'summary' => '日報をそのまま保存できることを注意欄の先頭に明記し、内容を箇条書きへ整理しました。一日をまとめた作業枠の注意は、昼休憩を含む7時間以上の枠を対象にします。',
+                'design_files' => ['z_instructions/DIARY_RECORD_ALERT_PLAN1.md'],
+                'claude_notes' => 'Codex修正。3時間以上を420分以上の予定枠へ置換。会議・外出との正の重複と本人INFOの既存条件を維持。共通DiaryWorkReminderで作成/編集とも先頭の太字と短い箇条書きを表示。保存処理・評価値・DB変更なし。',
+                'body' => '<section class="cl-feature"><h3>日報はそのまま保存できます</h3><p>注意は記録を見直す案内です。3時間程度の重複は長い作業枠の注意に含めず、昼休憩を含む7時間以上で会議・外出が重なる場合に案内します。</p></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'personal-todo-sidebar-preview-1') {
             Changelog::updateOrCreate(['version' => 'personal-todo-sidebar-preview-1'], [
                 'title' => '個人TODOをカレンダーの左側へ整理',

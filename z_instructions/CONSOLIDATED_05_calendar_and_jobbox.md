@@ -470,3 +470,5 @@ Adminの権限管理「部署の作業の表示対象」で、情報出版の人
 2026-11-16個人月カレンダー試用（実装/合成検証済み、未配備）: 現行Pages/Calendar.vue→UserCalendarのmonth分岐だけPersonalMonthPlannerへ。INFO実所属SuperAdmin/実会社context一致だけenabled。専用personal_calendar_itemsを本人+会社で隔離、月/期限未定を含むTODO一覧は同一データ。週/日の配列と日報/分析/Clerk DBは維持し、予定登録だけで作業時間に計上しない。作成はkey/hashと本人ロック、更新完了削除はversion照合、削除後の再送は410。date:Y-m-d/JST期限、期間は独自MonthViewへ日別表示。PERSONAL_MONTH_MANAGER1参照。一般公開は別承認。
 
 2026-11-17試用TODOサイドバー（未配備）: usePersonalCalendarStateを個人カレンダー全体で共有し、月の個人予定と月週日共通TODOは同じ取得データ/編集/完了処理を利用。月ビュー切替や既存予定読み込みで一覧状態を失わない。新DB/移行/保存API/一般公開は変更せず、表示・状態管理だけを更新。PERSONAL_MONTH_MANAGER1参照。
+
+2026-11-17日報注意の条件訂正（実装検証中）: 一日まとめ枠の注意は昼休憩を含む予定幅420分以上＋会議/外出との正の重複。旧180分基準を置換し3時間/6時間59分は当該注意の対象外。本人向けのその他登録/時間不足の条件は維持。共通注意欄の先頭に「このままでも日報を保存できます。」を太字表示し、本文を短い箇条書きへ整理。日報保存/作業時間・点数は変更しない。DIARY_RECORD_ALERT_MANAGER1参照。TODO左配置の画面確認は別件で待機中。

@@ -9,7 +9,7 @@ class DiaryRecordAdvice
 {
     use \App\Http\Controllers\Concerns\CalculatesEventTime;
 
-    private const LONG_WORK_MINUTES = 180;
+    private const LONG_WORK_MINUTES = 420;
 
     public function __construct(private PersonalWorkSchedule $schedule) {}
 
@@ -63,15 +63,25 @@ class DiaryRecordAdvice
         $issues = [];
         if (! $hasJob && $others) $issues[] = [
             'code' => 'other_without_myjob',
-            'title' => '業務の予定はマイジョブで記録してください',
-            'message' => 'この日はマイジョブの登録がなく、「その他」の予定が'.$others.'件あります。業務を登録した予定であれば、作業内容に合うマイジョブとして記録してください。私用の予定は変更不要です。',
-            'hint' => '会議・外出はそれぞれの予定で登録し、作業時間と分けてください。長い一本の予定にまとめると仕事内容が伝わりにくくなります。重複時間は両方へそのまま加算されず、「その他（私用）」は作業時間の集計対象外です。',
+            'title' => '作業の登録方法をご確認ください',
+            'message' => 'マイジョブがなく、「その他」の予定が'.$others.'件あります。',
+            'hint' => '私用の予定は変更不要です。',
+            'bullets' => [
+                'マイジョブがなく、「その他」の予定が'.$others.'件あります。',
+                '業務はマイジョブ、会議・外出はそれぞれの予定で登録してください。',
+                '私用の予定は変更不要です。',
+            ],
         ];
         if ($longOverlaps) $issues[] = [
             'code' => 'long_work_overlaps_appointment',
-            'title' => '長い作業枠と会議・外出の時間が重なっています',
-            'message' => 'この日は、3時間以上の作業枠と会議・外出が重なる予定が'.$longOverlaps.'件あります。業務を一本の枠にまとめている場合は、会議・外出の時間に合わせて作業枠を分け、実際の仕事内容で記録してください。',
-            'hint' => '重複時間は両方にそのまま加算されません。予定の長さだけで成果や評価が決まるわけではありません。私用や目印だけの予定なら変更は不要です。',
+            'title' => '1日をまとめた作業枠をご確認ください',
+            'message' => '昼休憩を含む7時間以上の作業枠と、会議・外出が重なる予定が'.$longOverlaps.'件あります。',
+            'hint' => '1日の業務をまとめた枠なら、実際の作業ごとに分けてください。',
+            'bullets' => [
+                '昼休憩を含む7時間以上の作業枠と、会議・外出が重なる予定が'.$longOverlaps.'件あります。',
+                '1日の業務をまとめた枠なら、実際の作業ごとに分けてください。',
+                '私用や目印だけの予定は変更不要です。',
+            ],
         ];
         return $issues;
     }

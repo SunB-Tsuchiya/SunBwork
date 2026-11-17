@@ -31,24 +31,24 @@ const duration = (minutes) => {
     <div v-if="activeReminder || loadError" class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="status">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <strong class="font-semibold">この日の作業記録を確認してください</strong>
-                <p v-if="loadError" class="mt-1">記録の確認情報を取得できませんでした。カレンダーで予定をご確認ください。日報は保存できます。</p>
-                <div v-for="issue in activeReminder?.issues || []" :key="issue.code" class="mt-2">
+                <strong class="block text-base font-bold">このままでも日報を保存できます。</strong>
+                <p class="mt-1 text-xs text-amber-800">以下は記録の見直し案内です。必要な項目は、あとからカレンダーで修正できます。</p>
+                <ul v-if="loadError" class="mt-2 list-disc space-y-1 pl-5"><li>確認情報を取得できませんでした。必要に応じてカレンダーをご確認ください。</li></ul>
+                <div v-for="issue in activeReminder?.issues || []" :key="issue.code" class="mt-3">
                     <p class="font-semibold">{{ issue.title }}</p>
-                    <p class="mt-1">{{ issue.message }}</p>
-                    <p class="mt-1 text-xs">{{ issue.hint }}</p>
+                    <ul class="mt-1 list-disc space-y-1 pl-5"><li v-for="(line,index) in (issue.bullets || [issue.message,issue.hint]).filter(Boolean)" :key="index">{{ line }}</li></ul>
                 </div>
-                <p v-if="activeReminder?.missing_minutes >= 30" class="mt-1">
-                    {{ activeReminder.approximate ? 'A日程を仮に使った勤務時間の目安' : '勤務枠（当日は現在まで）' }} {{ duration(activeReminder.scheduled_minutes) }} のうち、予定表に記録された時間は
-                    {{ duration(activeReminder.recorded_minutes) }}。記録のない時間が {{ duration(activeReminder.missing_minutes) }} あります。
-                </p>
-                <p class="mt-1 text-xs text-amber-800">
-                    必要ならカレンダーで予定を追加・修正してください。日報はこのまま保存できます。
-                </p>
-                <p v-if="activeReminder?.approximate" class="mt-1 text-xs text-amber-800">勤務形態が未設定のため、時間不足は判定していません。</p>
+                <div v-if="activeReminder?.missing_minutes >= 30" class="mt-3">
+                    <p class="font-semibold">記録されていない時間があります</p>
+                    <ul class="mt-1 list-disc space-y-1 pl-5">
+                        <li>勤務枠{{ activeReminder.approximate ? 'の目安' : '（当日は現在まで）' }}：{{ duration(activeReminder.scheduled_minutes) }}</li>
+                        <li>記録済み：{{ duration(activeReminder.recorded_minutes) }}／記録なし：{{ duration(activeReminder.missing_minutes) }}</li>
+                    </ul>
+                </div>
+                <p v-if="activeReminder?.approximate" class="mt-2 text-xs text-amber-800">勤務形態が未設定のため、時間不足は判定していません。</p>
             </div>
             <button type="button" class="shrink-0 rounded border border-amber-500 bg-white px-3 py-1.5 font-medium text-amber-900 hover:bg-amber-100" @click="$emit('open-calendar')">
-                カレンダーで追記
+                カレンダーを確認
             </button>
         </div>
     </div>
