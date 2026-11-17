@@ -22,3 +22,5 @@ AGENTS.md/JOB_EVALUATION_CONTROL1、PERSONAL_TODO_WORKSPACE_PLAN1/MANAGER1、PER
 2026-11-17利用者が追加/検索一覧ブロックの分離を「成功」で確認。追加の確定要望は並び順の文字と選択矢印の重なり解消。保存版6a11e5bc5を新隔離worktree /tmp/sunbwork-todo-sort-width-20261117（branch feature/personal-todo-sort-width-20261117）へ復元し、一覧の並び順selectのみ最小幅7rem・左3/右9の余白へ変更する。旧/tmp作業場所は消失、共有主作業のziggy等は保護。本番直近確認f3dae4b89。次はビルド後、差分固定のSSH事前確認。保存/API/DB/権限は変更なし、成功済み機能の再確認不要。
 
 2026-11-17並び順の幅修正: 実Vue操作テスト成功、本番用/membersビルド32.86秒成功、manifest参照欠損なし。実装/検証済み、今回未配備・画面未確認。
+
+2026-11-17並び順select幅の本番反映完了: 利用者がSSH正確コマンドとSHA256 8c0e32f101124fd5c0c5394410c11acbf13f09e5441f6f44ce72bbd2ab884afbを承認、固定元f3dae4b89→b74dd5594。差分/未追跡保護/追跡clean/cache clear成功。manifest497 refs528 missing0 base=/members、SSH終了0。今回画面未確認。次の1手は再読み込みで並び順の文字と矢印が重ならないことだけ利用者確認。DB/保存処理/試用限定変更なし。
