@@ -51,15 +51,31 @@ onBeforeUnmount(()=>{seq++;selectionSeq++;window.removeEventListener('beforeunlo
         <p v-if="error" role="alert" class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{error}}</p><p v-if="notice" role="status" class="text-sm text-blue-800">{{notice}}</p>
         <div v-if="tab==='todo'" class="grid items-start gap-4 lg:grid-cols-[11rem_minmax(0,1fr)] xl:grid-cols-[11rem_minmax(0,1fr)_22rem]">
             <aside :class="selected?'hidden lg:block':''" class="rounded border bg-white p-3"><button v-for="(label,key) in views" :key="key" type="button" class="flex w-full justify-between rounded px-2 py-2 text-left text-sm" :class="data.view===key?'bg-blue-50 font-semibold text-blue-800':'hover:bg-gray-50'" @click="changeView(key)"><span>{{label}}</span><span class="text-xs text-gray-500">{{data.counts[key]||0}}</span></button><h3 class="mt-4 px-2 text-xs font-semibold text-gray-500">マイリスト</h3><button v-for="list in data.lists.filter(l=>!l.archived)" :key="list.id" type="button" class="mt-1 w-full break-words rounded px-2 py-2 text-left text-sm hover:bg-blue-50" :class="data.view==='list'&&data.list_id===list.id?'bg-blue-50 text-blue-800':''" @click="changeView('list',list.id)"><span class="mr-2 inline-block h-2 w-2 rounded-full" :style="{backgroundColor:personalItemColors[list.color_key]?.hex}"></span>{{list.name}}</button></aside>
-            <section :class="selected?'hidden xl:block':''" class="min-w-0 rounded border bg-white p-4">
-                <h3 class="mb-3 font-semibold">{{data.view==='list'?(data.lists.find(l=>l.id===data.list_id)?.name||'マイリスト'):views[data.view]}}（{{data.total}}）</h3>
-                <form class="mb-3 flex gap-2" @submit.prevent="load({page:1})"><input v-model="query" type="search" maxlength="100" placeholder="名前・メモで検索" aria-label="TODOを検索" class="min-w-0 flex-1 rounded border p-2 text-sm" /><button class="rounded border px-3 py-2 text-sm">検索</button></form>
-                <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs"><select v-model="sort" aria-label="TODOの並び順" class="rounded border p-1.5" @change="load({page:1})"><option value="due">期限順</option><option value="important">重要順</option><option value="created">追加順</option></select><label class="flex items-center gap-1"><input type="checkbox" :checked="data.show_completed" @change="load({show_completed:$event.target.checked?1:0,page:1})" />完了も表示</label></div>
-                <form v-if="data.view!=='completed'" class="mb-3 flex gap-2" @submit.prevent="quickAdd"><input v-model="newTitle" :disabled="busy" required maxlength="255" placeholder="TODOを追加（名前だけで登録）" aria-label="新しいTODO" class="min-w-0 flex-1 rounded border p-2 text-sm" /><button :disabled="busy" class="rounded bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50">追加</button></form>
+            <div :class="selected?'hidden xl:block':''" class="min-w-0 space-y-4">
+                <section v-if="data.view!=='completed'" aria-labelledby="todo-add-heading" class="rounded border border-blue-200 bg-blue-50 p-4">
+                    <h3 id="todo-add-heading" class="mb-1 font-semibold text-blue-900">新しいTODOを追加</h3>
+                    <p class="mb-3 text-xs text-blue-800">名前だけで登録できます。期限やメモは追加後に設定できます。</p>
+                    <form class="flex flex-wrap gap-2" @submit.prevent="quickAdd">
+                        <label for="todo-new-title" class="sr-only">新しいTODOの名前</label>
+                        <input id="todo-new-title" v-model="newTitle" :disabled="busy" required maxlength="255" placeholder="例：会議の資料を準備する" class="min-w-0 flex-1 rounded border bg-white p-2 text-sm" />
+                        <button :disabled="busy" class="whitespace-nowrap rounded bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50">TODOを追加</button>
+                    </form>
+                </section>
+                <section aria-labelledby="todo-list-heading" class="min-w-0 rounded border bg-white p-4">
+                    <h3 id="todo-list-heading" class="mb-4 font-semibold">{{data.view==='list'?(data.lists.find(l=>l.id===data.list_id)?.name||'マイリスト'):views[data.view]}}の一覧（{{data.total}}）</h3>
+                    <form class="mb-3" @submit.prevent="load({page:1})">
+                        <label for="todo-search" class="mb-1 block text-xs font-medium text-gray-600">一覧から検索</label>
+                        <div class="flex gap-2"><input id="todo-search" v-model="query" type="search" maxlength="100" placeholder="名前・メモで絞り込み" class="min-w-0 flex-1 rounded border p-2 text-sm" /><button class="whitespace-nowrap rounded border px-3 py-2 text-sm">検索</button></div>
+                    </form>
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b pb-3 text-xs">
+                        <label class="flex items-center gap-2 text-gray-600">並び順<select v-model="sort" class="rounded border p-1.5 text-gray-800" @change="load({page:1})"><option value="due">期限順</option><option value="important">重要順</option><option value="created">追加順</option></select></label>
+                        <label class="flex items-center gap-1"><input type="checkbox" :checked="data.show_completed" @change="load({show_completed:$event.target.checked?1:0,page:1})" />完了も表示</label>
+                    </div>
                 <p v-if="!data.items.length" class="py-6 text-sm text-gray-500">該当するTODOはありません。</p>
                 <ul class="divide-y"><li v-for="item in data.items" :key="item.id" class="flex items-start gap-2 py-3"><input type="checkbox" :checked="item.completed" :disabled="busy" :aria-label="item.title+'の完了切替'" class="mt-1" @change="patch(item,{},true)" /><button type="button" class="min-w-0 flex-1 text-left" @click="choose(item)"><span class="block break-words text-sm" :class="item.completed?'text-gray-400 line-through':''">{{item.title}}</span><span class="mt-1 block text-xs" :class="item.overdue?'text-red-700':'text-gray-500'">{{item.overdue?'期限超過・':''}}{{item.start_date||'期限未定'}} {{item.start_time||''}} {{item.is_my_day?'・今日やる':''}} {{item.steps.length?'・'+item.steps_done+'/'+item.steps.length:''}}</span></button><div class="flex gap-1"><button type="button" :disabled="busy" :aria-label="item.title+'の今日やる切替'" class="rounded px-1 text-sm" :class="item.is_my_day?'text-blue-700':'text-gray-400'" @click="patch(item,{today:!item.is_my_day})">☀</button><button type="button" :disabled="busy" :aria-label="item.title+'の重要切替'" class="rounded px-1 text-lg" :class="item.is_important?'text-amber-600':'text-gray-400'" @click="patch(item,{is_important:!item.is_important})">{{item.is_important?'★':'☆'}}</button></div></li></ul>
                 <div v-if="data.last_page>1" class="mt-4 flex items-center justify-between text-sm"><button type="button" :disabled="data.page<=1" class="text-blue-700 disabled:text-gray-400" @click="load({page:data.page-1})">前へ</button><span>{{data.page}} / {{data.last_page}}</span><button type="button" :disabled="data.page>=data.last_page" class="text-blue-700 disabled:text-gray-400" @click="load({page:data.page+1})">次へ</button></div>
-            </section>
+                </section>
+            </div>
             <PersonalTodoEditor v-if="selected" :key="selected.id" :item="selected" :lists="data.lists" :today="data.today" @dirty="dirty=$event" @saved="saved" @deleted="deleted" @close="closeDetail" /><p v-else class="hidden rounded border bg-white p-5 text-sm text-gray-500 xl:block">TODOを選ぶと、ここで詳しく編集できます。</p>
         </div>
         <section v-else-if="tab==='lists'" class="grid items-start gap-4 md:grid-cols-2">
