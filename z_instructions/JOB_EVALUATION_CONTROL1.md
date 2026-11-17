@@ -2494,3 +2494,6 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-17実装・コード検証完了（今回未配備）: 毎日/平日/週/月/年と終了日、完了時の未来次回1件、基準日保持、チェックUUID再発行と未チェック/今日解除、未編集次回だけの取り下げと同一ID復元を実装。内部anchor/後続IDはクライアントから設定不可。共通ownerロック→元回→後続回とself unique/versionで再送/競合を保護。旧hash/未送信ルール保持、旧modal完了の次回案内も接続。
 コード検証: 合成SQLite memoryのPersonalTodoRecurrenceTest/WorkspaceTest/MonthCalendarTest（継承回帰含む）356件3731断言成功。初回回帰の4エラーはWorkspace合成DBが今回カラム未適用だったため、専用migration適用をfixtureへ揃え再実行成功。実Vue3スクリプト成功（ルール明示保存/409保持/次回案内/チェック独立/旧modal・月週日共有/旧MyJob入力）。変更PHP5件構文成功。/membersビルド29.45秒、manifest497 refs528 missing0成功。
 状態: 実装/コード検証済み、本番未反映・今回利用者画面未確認。次の1手は固定元b74dd5594から今回差分だけの配備を正確SSHコマンド/SHA256で確認すること。今回専用2026_11_17_200001 migrationだけ--path --force、Seeder/一般公開/通知は行わない。
+
+2026-11-17本番試用反映完了: 利用者が正確SSHコマンドとSHA256 6ed3475f728f072bdaebbcda9b786f4233f85167e055cb34ce0c641f77db961bを承認。固定元b74dd5594→971f5359f、差分/本番版/既知未追跡保護/追跡clean照合成功。今回専用2026_11_17_200001 migration 66.16ms DONE、cache clear、manifest497 refs528 missing0 base=/members、SSH終了0。一般公開/通知/Seeder/既存TODO一括変更なし。
+状態: 実装・コード検証・本番SuperAdmin限定反映は完了。今回利用者画面は未確認。次の1手は①毎日のルール保存、②完了で次回1件/チェックと今日解除、③未編集次回の取り消し・再完了でも1件、④次回編集後は元の完了取り消しを拒否し保護、の新規4条件だけ確認。既確認のレイアウト/旧保存/リスト・設定は再依頼しない。
