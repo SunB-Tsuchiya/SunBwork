@@ -338,6 +338,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     Route::post('/presence/{user}', [App\Http\Controllers\UserPresenceController::class, 'update'])->name('presence.update');
 
+    Route::prefix('personal-todo')->name('personal_todo.')->group(function () {
+        Route::get('/', [App\Http\Controllers\User\PersonalTodoController::class, 'index'])->name('index');
+        Route::get('/lists', [App\Http\Controllers\User\PersonalTodoController::class, 'lists'])->name('lists');
+        Route::get('/settings', [App\Http\Controllers\User\PersonalTodoController::class, 'settings'])->name('settings');
+        Route::get('/data', [App\Http\Controllers\User\PersonalTodoController::class, 'data'])->name('data');
+        Route::get('/items/{item}', [App\Http\Controllers\User\PersonalTodoController::class, 'show'])->whereNumber('item')->name('items.show');
+        Route::patch('/items/{item}/meta', [App\Http\Controllers\User\PersonalTodoController::class, 'meta'])->whereNumber('item')->name('items.meta');
+        Route::post('/lists', [App\Http\Controllers\User\PersonalTodoController::class, 'storeList'])->name('lists.store');
+        Route::put('/lists/{list}', [App\Http\Controllers\User\PersonalTodoController::class, 'updateList'])->whereNumber('list')->name('lists.update');
+        Route::post('/lists/reorder', [App\Http\Controllers\User\PersonalTodoController::class, 'reorder'])->name('lists.reorder');
+        Route::put('/settings', [App\Http\Controllers\User\PersonalTodoController::class, 'updateSettings'])->name('settings.update');
+    });
     Route::prefix('personal-calendar/items')->name('personal_calendar.items.')->group(function () {
         Route::get('/', [App\Http\Controllers\User\PersonalCalendarController::class, 'index'])->name('index');
         Route::post('/', [App\Http\Controllers\User\PersonalCalendarController::class, 'store'])->name('store');

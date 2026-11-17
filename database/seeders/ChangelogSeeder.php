@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'personal-todo-workspace-preview-1') {
+            Changelog::updateOrCreate(['version' => 'personal-todo-workspace-preview-1'], [
+                'title' => '個人TODOの整理画面を試用追加',
+                'released_at' => '2026-11-17',
+                'summary' => '個人TODOに専用ページ、今日やる、重要、マイリスト、チェック項目と表示設定を追加します。',
+                'design_files' => ['z_instructions/PERSONAL_TODO_WORKSPACE_PLAN1.md'],
+                'claude_notes' => '情報出版SuperAdmin限定。既存personal_calendar_itemsを同じIDで共用し旧hash再送と未送信メタ保持を維持。本人リスト/設定と4メタ列を専用migrationで追加。通知/一般公開/作業実績連動なし。',
+                'body' => '<section class="cl-feature"><h3>本人専用のTODO整理</h3><p>期限と今日やるを分け、個人リストやチェック項目で整理できます。リストをアーカイブしてもTODOは残り、チェック項目の完了だけでは親TODOは完了しません。</p></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'diary-record-advice-seven-hours-1') {
             Changelog::updateOrCreate(['version' => 'diary-record-advice-seven-hours-1'], [
                 'title' => '日報の記録確認メッセージを改善',

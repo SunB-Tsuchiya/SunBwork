@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { personalWorkColors } from '@/Constants/personalWorkActivities';
 import axios from 'axios';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import CalendarShell    from '@/Components/Schedule/CalendarShell.vue';
 import { usePersonalCalendarState } from '@/Composables/usePersonalCalendarState';
 import PersonalTodoList from '@/Components/Calendar/PersonalTodoList.vue';
@@ -51,7 +51,7 @@ const loading        = ref(false);
 const calendarError = ref('');
 const quickWorkColor = personalWorkColors.bg;
 const page = usePage();
-const personalState = usePersonalCalendarState({year:viewYear,month:viewMonth,enabled:computed(()=>props.personalMonthEnabled),ownerKey:computed(()=>`${page.props.auth?.user?.id}:${page.props.auth?.user?.company_id}`)});
+const personalState = usePersonalCalendarState({year:viewYear,month:viewMonth,currentDate,viewMode,enabled:computed(()=>props.personalMonthEnabled),ownerKey:computed(()=>`${page.props.auth?.user?.id}:${page.props.auth?.user?.company_id}`)});
 let loadSequence = 0;
 
 // 日報マーカーをイベント形式に変換（MonthView 表示用）
@@ -647,6 +647,7 @@ async function saveWeekBreaks() {
 
         <!-- ── ツールバー追加ボタン ──────────────────────────────── -->
         <template #toolbar-extra>
+            <Link v-if="personalMonthEnabled" :href="personalState.todoHref" class="rounded border border-blue-300 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-50">個人TODO</Link>
             <button v-if="personalMonthEnabled" type="button" :aria-expanded="personalState.mobileOpen" class="rounded border border-blue-300 px-3 py-1.5 text-sm text-blue-700 md:hidden" @click="personalState.openMobile">TODO {{ personalState.data.todo_total }}件</button>
             <button v-if="departmentWorkEnabled"
                 class="rounded border border-blue-500 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
