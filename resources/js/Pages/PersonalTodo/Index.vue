@@ -68,7 +68,7 @@ onBeforeUnmount(()=>{seq++;selectionSeq++;window.removeEventListener('beforeunlo
                         <div class="flex gap-2"><input id="todo-search" v-model="query" type="search" maxlength="100" placeholder="名前・メモで絞り込み" class="min-w-0 flex-1 rounded border p-2 text-sm" /><button class="whitespace-nowrap rounded border px-3 py-2 text-sm">検索</button></div>
                     </form>
                     <div class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b pb-3 text-xs">
-                        <label class="flex items-center gap-2 text-gray-600">並び順<select v-model="sort" class="rounded border p-1.5 text-gray-800" @change="load({page:1})"><option value="due">期限順</option><option value="important">重要順</option><option value="created">追加順</option></select></label>
+                        <label class="flex items-center gap-2 text-gray-600">並び順<select v-model="sort" class="min-w-[7rem] rounded border py-1.5 pl-3 pr-9 text-gray-800" @change="load({page:1})"><option value="due">期限順</option><option value="important">重要順</option><option value="created">追加順</option></select></label>
                         <label class="flex items-center gap-1"><input type="checkbox" :checked="data.show_completed" @change="load({show_completed:$event.target.checked?1:0,page:1})" />完了も表示</label>
                     </div>
                 <p v-if="!data.items.length" class="py-6 text-sm text-gray-500">該当するTODOはありません。</p>
