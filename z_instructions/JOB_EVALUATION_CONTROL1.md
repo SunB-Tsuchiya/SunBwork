@@ -2470,3 +2470,6 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-17具体設計を利用者承認。itemsのメタ4列・本人リスト/表示設定の専用migration、所有scope、旧hashと未送信メタ保持、専用ページ/JSON APIの実装を開始。既存ID/期限/メモ/完了は保持、試用対象を変更しない。実装途中、今回検証/配備/画面確認は未実施。次は認可/後方互換と画面を接続する。
 
 2026-11-17個人TODOワークスペース: 具体設計を利用者承認し、専用整理ページ/今日やると期限の分離/重要/本人リスト/チェック項目/表示設定を実装・合成230件2426断言と実Vue3スクリプト検証。既存カレンダーと同じitemsを本人scopeで共用し旧メタ省略を保持。実装とビルド済み、今回未配備・利用者画面未確認、INFO SuperAdmin限定/一般公開別承認。PERSONAL_TODO_WORKSPACE_MANAGER1.md参照。
+
+2026-11-17本番試用反映完了: 利用者が正確コマンド/SHA256 edc4854c2079f38c94157b058f8dc60f4b7eeb7f8b6ad8444b216c88875df3edを承認。固定元ff17e8671→1d7977e08を配備、専用2026_11_17_160001 migration DONE、personal_todo 10 routes、cache clear、manifest497/refs528/missing0/base=/members、最終HEAD/追跡clean照合成功（SSH終了0）。既知未追跡6件を保護、Seeder/一般公開/通知なし。
+状態: 実装・コード検証・本番SuperAdmin限定反映は完了。今回利用者画面は未確認。次の1手は、専用ページへの遷移とカレンダー戻り、今日やる/重要/チェックと親完了の独立、リスト・設定の保存を今回追加範囲だけ確認する。既存カレンダー配置/MyJob/日報の成功済みチェックは繰り返さない。
