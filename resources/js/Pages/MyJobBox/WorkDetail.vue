@@ -1,4 +1,5 @@
 <script setup>
+import { recordedTime } from '@/utils/recordedTime';
 import axios from 'axios';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import WorkJobDetailsEditor from '@/Components/WorkJobDetailsEditor.vue';
@@ -159,7 +160,7 @@ async function complete() {
                     <div><dt class="text-gray-500">予定枠</dt><dd class="mt-1 font-medium">{{ minutes(time.planned) }}</dd></div>
                     <div><dt class="text-gray-500">昼休憩との重なり</dt><dd class="mt-1">{{ minutes(time.lunch) }}</dd></div>
                     <div><dt class="text-gray-500">昼休憩を除く予定枠</dt><dd class="mt-1">{{ minutes(time.afterLunch) }}</dd></div>
-                    <div><dt class="text-gray-500">記録時間</dt><dd class="mt-1 font-medium text-blue-700">{{ minutes(time.recorded) }}</dd></div>
+                    <div><dt class="text-gray-500">記録時間</dt><dd class="mt-1 font-medium text-blue-700">{{ recordedTime(time.recorded) }}</dd></div>
                 </dl>
                 <div v-if="time.future !== undefined" class="mt-4 border-t border-gray-100 pt-3">
                     <h4 class="text-xs font-medium text-gray-600">予定枠から差し引いた時間</h4>
@@ -169,7 +170,7 @@ async function complete() {
                         <div><dt class="text-gray-500">重複作業との等分で減った時間</dt><dd class="mt-1">{{ minutes(time.overlap) }}</dd></div>
                         <div v-if="time.other > 0.01"><dt class="text-gray-500">その他の算定対象外の時間</dt><dd class="mt-1">{{ minutes(time.other) }}</dd></div>
                     </dl>
-                    <p class="mt-3 text-xs leading-relaxed text-gray-600">予定枠 {{ minutes(time.planned) }} − 昼休憩 {{ minutes(time.lunch) }} − 未経過 {{ minutes(time.future) }} − 会議・外出等 {{ minutes(time.priority) }} − 等分による減少 {{ minutes(time.overlap) }}<template v-if="time.other > 0.01"> − その他 {{ minutes(time.other) }}</template> ＝ 記録時間 {{ minutes(time.recorded) }}</p>
+                    <p class="mt-3 text-xs leading-relaxed text-gray-600">予定枠 {{ minutes(time.planned) }} − 昼休憩 {{ minutes(time.lunch) }} − 未経過 {{ minutes(time.future) }} − 会議・外出等 {{ minutes(time.priority) }} − 等分による減少 {{ minutes(time.overlap) }}<template v-if="time.other > 0.01"> − その他 {{ minutes(time.other) }}</template> ＝ 記録時間 {{ recordedTime(time.recorded) }}</p>
                 </div>
                 <details class="mt-3 text-xs leading-relaxed text-gray-500"><summary class="cursor-pointer">時間の計算について</summary><p class="mt-1">会議・外出などが重なった時間はそちらを優先し、作業同士の重複は等分します。昼休憩は除き、未来の時間はまだ記録に含めません。重複分を二重に差し引くことはありません。完了状態とは別の計算です。</p></details>
             </section>

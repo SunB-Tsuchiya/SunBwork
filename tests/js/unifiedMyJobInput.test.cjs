@@ -275,6 +275,7 @@ async function settle() { await nextTick(); await Promise.resolve(); await nextT
     for(const text of ['まだ経過していない時間','会議・外出などを優先した時間','重複作業との等分で減った時間','予定枠から差し引いた時間']) assert.ok(detailHtml.includes(text),text);
     assert.ok(detailHtml.indexOf('>編集</button>') < detailHtml.indexOf('aria-label="マイジョブ概要と操作"'));
     assert.ok(detailHtml.indexOf('>削除</button>') < detailHtml.indexOf('aria-label="マイジョブ概要と操作"'));
+    assert.ok(detailHtml.includes('150分（2時間30分）'));
     const topCard = detailHtml.slice(detailHtml.indexOf('aria-label="マイジョブ概要と操作"'), detailHtml.indexOf('</section>'));
     for (const text of ['日時','2026-11-03 09:00','2026-11-03 15:00','360分','校正依頼','詳細入力','続きのマイジョブを作成','この日のカレンダー','完了にする']) assert.ok(topCard.includes(text), text);
     assert.ok(detailHtml.indexOf('マイジョブの操作') < detailHtml.indexOf('案件情報'));

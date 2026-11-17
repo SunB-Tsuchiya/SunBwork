@@ -1,4 +1,5 @@
 <script setup>
+import { recordedTime } from '@/utils/recordedTime';
 import { Link } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
 defineProps({ series: { type: Object, required: true } });
@@ -18,10 +19,10 @@ const minutes = value => `${Number(Number(value || 0).toFixed(1))}分`;
                             <p v-for="(slot, slotIndex) in item.slots || []" :key="slotIndex" class="mt-1 text-xs text-gray-500">{{ slot.date }} {{ slot.start }}〜{{ slot.endDate !== slot.date ? slot.endDate + ' ' : '' }}{{ slot.end }}</p><p v-if="!(item.slots || []).length" class="mt-1 text-xs text-gray-500">未予定</p>
                             <p v-if="item.parentKey" class="mt-1 text-xs text-orange-800">続き元：{{ series.items.findIndex(parent => parent.key === item.parentKey) + 1 }}. {{ series.items.find(parent => parent.key === item.parentKey)?.title || '（作業名なし）' }}</p>
                         </div>
-                        <div v-if="item.time" class="text-right text-xs"><p>休憩を除く予定 {{ minutes(item.time.afterLunch) }}</p><p class="mt-1 text-blue-700">記録 {{ minutes(item.time.recorded) }}</p></div><span v-else class="text-xs text-gray-500">時間は旧詳細で確認</span>
+                        <div v-if="item.time" class="text-right text-xs"><p>休憩を除く予定 {{ minutes(item.time.afterLunch) }}</p><p class="mt-1 text-blue-700">記録 {{ recordedTime(item.time.recorded) }}</p></div><span v-else class="text-xs text-gray-500">時間は旧詳細で確認</span>
                     </li>
                 </ol>
-                <div v-if="series.totals" class="flex flex-wrap justify-between gap-2 border-t border-orange-200 px-5 py-3 text-sm font-semibold text-orange-800"><span>シリーズ合計</span><span>休憩を除く予定 {{ minutes(series.totals.afterLunch) }} ／ 記録 {{ minutes(series.totals.recorded) }}</span></div>
+                <div v-if="series.totals" class="flex flex-wrap justify-between gap-2 border-t border-orange-200 px-5 py-3 text-sm font-semibold text-orange-800"><span>シリーズ合計</span><span>休憩を除く予定 {{ minutes(series.totals.afterLunch) }} ／ 記録 {{ recordedTime(series.totals.recorded) }}</span></div>
                 <p class="px-5 pb-3 text-xs text-gray-500">予定は各枠の合計、記録は同じ日の他の仕事も含めた重複・会議等の配分後の合計です。</p>
             </section>
 </template>
