@@ -17,6 +17,7 @@ class PersonalTodoWorkspaceTest extends UnifiedMyJobCreateTest
         parent::setUp();Carbon::setTestNow(Carbon::parse('2026-11-17 10:00:00','Asia/Tokyo'));
         (require dirname(__DIR__,2).'/database/migrations/2026_11_16_180001_create_personal_calendar_items.php')->up();
         (require dirname(__DIR__,2).'/database/migrations/2026_11_17_160001_add_personal_todo_workspace.php')->up();
+        (require dirname(__DIR__,2).'/database/migrations/2026_11_17_200001_add_personal_todo_recurrence.php')->up();
     }
     protected function tearDown():void {Carbon::setTestNow();parent::tearDown();}
     private function actor(array $extra=[]):User {return (new User)->forceFill($extra+['id'=>1,'company_id'=>1,'department_id'=>1,'user_role'=>'superadmin']);}

@@ -1,5 +1,6 @@
 <script setup>
 import axios from 'axios';
+import { personalTodoDeleteQuestion } from '@/utils/personalTodoRecurrence';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { route } from 'ziggy-js';
 import { personalItemTypes, personalItemColors } from '@/utils/personalMonthCalendar';
@@ -37,11 +38,11 @@ async function toggleComplete() {
     if (busy.value || !props.item) return;
     if (JSON.stringify(form) !== initial && !confirm('編集内容は保存せず、完了状態だけ変更しますか？')) return;
     busy.value=true;error.value='';
-    try {await axios.patch(route('personal_calendar.items.complete',{item:props.item.id}),{version:props.item.version,completed:!props.item.completed},{headers:headers()});emit('saved');}
+    try {const res=await axios.patch(route('personal_calendar.items.complete',{item:props.item.id}),{version:props.item.version,completed:!props.item.completed},{headers:headers()});emit('saved',res?.data?.item);}
     catch(e){error.value=e.response?.data?.message || '完了状態を保存できませんでした。';}finally{busy.value=false;}
 }
 async function remove() {
-    if (busy.value || !props.item || !confirm('この個人予定・TODOを削除しますか？')) return;
+    if (busy.value || !props.item || !confirm(props.item.item_type==='event'?'この個人予定を削除しますか？':personalTodoDeleteQuestion(props.item))) return;
     busy.value=true;error.value='';
     try {await axios.delete(route('personal_calendar.items.destroy',{item:props.item.id}),{data:{version:props.item.version},headers:headers()});emit('saved');}
     catch(e){error.value=e.response?.data?.message || '削除できませんでした。';}finally{busy.value=false;}
@@ -63,6 +64,7 @@ onUnmounted(()=>{document.body.style.overflow=overflow;document.removeEventListe
         <div class="flex items-center justify-between gap-3"><h3 id="personal-item-heading" class="font-semibold">{{ item ? '個人予定・TODOを編集' : '個人予定・TODOを追加' }}</h3><div class="flex flex-wrap gap-3"><button v-if="item" type="button" :disabled="busy" class="rounded border border-blue-300 px-3 py-2 text-sm text-blue-700 disabled:opacity-50" @click="toggleComplete">{{ item.completed ? '未完了に戻す' : '完了にする' }}</button><button v-if="item" type="button" :disabled="busy" class="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50" @click="remove">削除</button><button type="button" :disabled="busy" class="text-sm text-gray-600 underline" @click="close">閉じる</button></div></div>
         <p class="my-3 text-xs text-gray-500">本人だけの予定・メモです。作業時間や日報には計上されません。</p>
         <p v-if="error" role="alert" class="mb-3 text-sm text-red-700">{{ error }}</p>
+        <p v-if="item?.repeat_label" class="mb-3 rounded bg-blue-50 p-2 text-xs text-blue-800">繰り返し：{{item.repeat_label}}。設定変更は「個人TODO」画面で行えます。保存しても繰り返し設定は維持されます。</p>
         <form @submit.prevent="save"><fieldset :disabled="busy" class="space-y-3">
             <label class="block text-sm">種類<select v-model="form.item_type" class="mt-1 w-full rounded border p-2" @change="changeType"><option v-for="(label,key) in personalItemTypes" :key="key" :value="key">{{ label }}</option></select></label>
             <label class="block text-sm">名前（必須）<input v-model="form.title" required maxlength="255" class="mt-1 w-full rounded border p-2" /></label>

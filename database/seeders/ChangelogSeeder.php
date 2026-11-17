@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'personal-todo-repeat-preview-1') {
+            Changelog::updateOrCreate(['version' => 'personal-todo-repeat-preview-1'], [
+                'title' => '個人TODOに繰り返しを追加（試用）',
+                'released_at' => '2026-11-17',
+                'summary' => '毎日・平日・毎週・毎月・毎年のTODOを、完了時に次の1件へ引き継げるようにします。',
+                'design_files' => ['z_instructions/PERSONAL_TODO_REPEAT_PLAN1.md'],
+                'claude_notes' => 'INFO SuperAdmin限定。基準日を保持し月末/閏年のずれを回避。次回unique/本人ロック/versionで重複防止、未編集次回のみ完了取り消しと同一ID復元。旧hash/旧画面省略保持、通知/公開/MyJob集計変更なし。専用migrationのみ。',
+                'body' => '<section class="cl-feature"><h3>定期TODO</h3><p>完了すると次の未来1件を作成し、チェックと今日やるをリセットします。次回が編集済みなら、完了の取り消しで内容を消すことはありません。</p></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'personal-todo-workspace-preview-1') {
             Changelog::updateOrCreate(['version' => 'personal-todo-workspace-preview-1'], [
                 'title' => '個人TODOの整理画面を試用追加',

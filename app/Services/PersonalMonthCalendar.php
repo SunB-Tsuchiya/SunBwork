@@ -24,6 +24,7 @@ class PersonalMonthCalendar
             'end_date'=>['nullable','date_format:Y-m-d','after_or_equal:start_date'],
             'start_time'=>['nullable','date_format:H:i'],'end_time'=>['nullable','date_format:H:i'],
             'todo_list_id'=>['sometimes','nullable','integer','min:1'],'is_important'=>['sometimes','boolean'],'focus_date'=>['sometimes','nullable','date_format:Y-m-d'],
+            'repeat_rule'=>['sometimes','nullable','array:frequency,until_date','required_array_keys:frequency'],'repeat_rule.frequency'=>['required_with:repeat_rule',Rule::in(array_keys(PersonalTodoRecurrence::LABELS))],'repeat_rule.until_date'=>['nullable','date_format:Y-m-d'],
             'steps'=>['sometimes','array','list','max:50'],'steps.*'=>['array:id,title,completed'],'steps.*.id'=>['required','uuid','distinct'],'steps.*.title'=>['required','string','max:255'],'steps.*.completed'=>['required','boolean'],
             'all_day'=>['required','boolean'],'color_key'=>['required',Rule::in(CalendarColors::KEYS)],
         ])->validate();
@@ -57,6 +58,9 @@ class PersonalMonthCalendar
         foreach(['start_date','end_date'] as $key) $row[$key]=$item->$key?->format('Y-m-d');
         foreach(['start_time','end_time'] as $key) $row[$key]=$item->$key ? substr($item->$key,0,5) : null;
         $row['completed']=(bool)$item->completed_at;
+        $rule=$item->repeat_rule;$row['repeat_rule']=$rule?['frequency'=>$rule['frequency'],'until_date'=>$rule['until_date']??null]:null;
+        $row['repeat_label']=$rule?(PersonalTodoRecurrence::LABELS[$rule['frequency']]??'繰り返し'):null;
+        $row['repeat_has_next']=$item->repeat_next_version!==null;
         $row['todo_list_id']=$item->todo_list_id ? (int)$item->todo_list_id : null;
         $row['is_important']=(bool)$item->is_important;$row['focus_date']=$item->focus_date?->format('Y-m-d');$row['is_my_day']=$row['focus_date']===Carbon::now('Asia/Tokyo')->toDateString();
         $row['steps']=$item->steps??[];$row['steps_done']=count(array_filter($row['steps'],fn($s)=>$s['completed']));
@@ -76,7 +80,7 @@ class PersonalMonthCalendar
             'todos'=>array_map(fn($i)=>$this->row($i),$todos->items()),'todo_total'=>$todos->total(),'todo_page'=>$todos->currentPage(),'todo_last_page'=>$todos->lastPage(),...($sidebar??[])];
     }
     public function create(User $user,?int $context,array $input): array {
-        $this->authorize($user,$context);$d=$this->validate($input);
+        $this->authorize($user,$context);$d=$this->validate($input);$d=app(PersonalTodoRecurrence::class)->prepare($d);
         $key=Validator::make($input,['request_key'=>['required','uuid']])->validate()['request_key'];
         $hash=hash('sha256',json_encode($d,JSON_THROW_ON_ERROR));
         return DB::transaction(function()use($user,$d,$key,$hash){
@@ -95,12 +99,18 @@ class PersonalMonthCalendar
         $data=$operation==='update'?$this->validate($input):[];
         $completed=$operation==='complete'?Validator::make($input,['completed'=>['required','boolean']])->validate()['completed']:null;
         return DB::transaction(function()use($user,$id,$v,$operation,$data,$completed){
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $item=$this->owned($user)->whereKey($id)->lockForUpdate()->firstOrFail();
             abort_unless($item->version===(int)$v,409,'ほかの画面で更新されています。入力を控えて再読み込みしてください。');
             if($operation==='delete'){$item->delete();return null;}
-            if($operation==='complete')$item->completed_at=$completed?Carbon::now('Asia/Tokyo'):null;
-            else {$this->checkMetadata($user,$data,$item);$item->fill($data);}
-            $item->version++;$item->save();return $this->row($item);
+            if($operation==='complete'){
+                $receipt=app(PersonalTodoRecurrence::class)->complete($item,(bool)$completed);
+                $item->completed_at=$completed?($item->completed_at??Carbon::now('Asia/Tokyo')):null;
+            } else {
+                $changes=app(PersonalTodoRecurrence::class)->prepare($data,$item);
+                $this->checkMetadata($user,$changes,$item);$item->fill($changes);
+            }
+            $item->version++;$item->save();return $this->row($item)+['repeat_result'=>$receipt??null];
         },3);
     }
 }
