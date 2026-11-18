@@ -162,7 +162,7 @@ class ChangelogSeeder extends Seeder
                 'title' => 'カレンダーから休暇・遅刻・早退を予定登録（試用）',
                 'released_at' => '2026-11-18',
                 'summary' => '有休・午前休・午後休・遅刻・早退をカレンダーへ登録し、該当時間の在席ボード表示へ連動します。',
-                'design_files' => ['z_instructions/CALENDAR_ABSENCE_PLAN1.md'],
+                'design_files' => ['z_instructions/archived/CALENDAR_ABSENCE_PLAN1.md'],
                 'claude_notes' => 'INFO SuperAdmin本人登録だけの試用。専用予定DBを読み取り投影し、後の手動状態/既存コメントを保護。日報/勤怠/ジョブ/時間集計/通知は変更せず、本人ログイン不要で同社ボードへ反映。',
                 'body' => '<section class="cl-feature"><h3>休暇等の予定を共有</h3><p>日報入力の上から任意登録できます。在席ボードでは予定であることを明示し、日報の勤務時刻は自動変更しません。</p></section>',
             ]);
