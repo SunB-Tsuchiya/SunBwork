@@ -19,6 +19,7 @@ defineProps({
     defaultWorktype:    { type: Object, default: null },
     calendarReminders:  { type: Array,  default: () => [] },
     departmentWorkEnabled: { type: Boolean, default: false },
+    absencePlansEnabled: {type:Boolean,default:false},
     personalMonthEnabled: { type: Boolean, default: false },
     personalWorkEnabled: { type: Boolean, default: false },
 });
@@ -33,6 +34,7 @@ defineProps({
         <CalendarReminderBanner :reminders="calendarReminders" />
 
         <UserCalendar
+            :absence-plans-enabled="absencePlansEnabled"
             :personal-month-enabled="personalMonthEnabled"
             :initial-date="initialDate"
             :initial-view="initialView"

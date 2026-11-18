@@ -8,7 +8,7 @@
         >
             <span class="text-base leading-none pointer-events-none">🐬</span>
             <span class="h-2 w-2 rounded-full shrink-0 pointer-events-none" :class="statusInfo.dot" />
-            <span class="hidden sm:inline max-w-[80px] truncate pointer-events-none" :class="currentStatus ? 'text-gray-600' : 'text-gray-400'">{{ statusInfo.label }}</span>
+            <span class="hidden sm:inline max-w-[80px] truncate pointer-events-none" :class="currentStatus ? 'text-gray-600' : 'text-gray-400'">{{ statusInfo.label }}{{planned?'（予定）':''}}</span>
         </button>
 
         <!-- ステータスモーダル -->
@@ -33,6 +33,7 @@ const authUser = inject('authUser', null);
 
 const currentStatus  = ref(null); // null = ロード中（退社で一瞬チカチカするのを防ぐ）
 const currentComment = ref('');
+const planned=ref(false);
 const showModal      = ref(false);
 const statuses       = ref(null); // DB順のステータスリスト
 
@@ -60,6 +61,7 @@ async function fetchSelf() {
         const me  = res.data.find(u => u.id === authUser?.id);
         if (me) {
             currentStatus.value  = me.status;
+            planned.value=me.status_source==='absence_plan';
             currentComment.value = me.comment ?? '';
         }
     } catch (_) {}
@@ -76,6 +78,7 @@ async function handleSave({ userId, status, comment }) {
     try {
         await window.axios.post(`/presence/${userId}`, { status, comment });
         currentStatus.value  = status;
+        planned.value=false;
         currentComment.value = comment ?? '';
         showModal.value = false;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
@@ -86,6 +89,7 @@ async function handleClear() {
     try {
         await window.axios.post('/presence/self/clear');
         currentStatus.value  = 'left';
+        planned.value=false;
         currentComment.value = '';
         showModal.value = false;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));

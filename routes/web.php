@@ -350,6 +350,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('/lists/reorder', [App\Http\Controllers\User\PersonalTodoController::class, 'reorder'])->name('lists.reorder');
         Route::put('/settings', [App\Http\Controllers\User\PersonalTodoController::class, 'updateSettings'])->name('settings.update');
     });
+    Route::prefix('personal-absence-plans')->name('personal_absence.')->group(function () {
+        Route::get('/', [App\Http\Controllers\User\PersonalAbsencePlanController::class, 'index'])->name('index');
+        Route::get('/defaults', [App\Http\Controllers\User\PersonalAbsencePlanController::class, 'defaults'])->name('defaults');
+        Route::post('/', [App\Http\Controllers\User\PersonalAbsencePlanController::class, 'store'])->name('store');
+        Route::put('/{plan}', [App\Http\Controllers\User\PersonalAbsencePlanController::class, 'update'])->whereNumber('plan')->name('update');
+        Route::delete('/{plan}', [App\Http\Controllers\User\PersonalAbsencePlanController::class, 'destroy'])->whereNumber('plan')->name('destroy');
+    });
     Route::prefix('personal-calendar/items')->name('personal_calendar.items.')->group(function () {
         Route::get('/', [App\Http\Controllers\User\PersonalCalendarController::class, 'index'])->name('index');
         Route::post('/', [App\Http\Controllers\User\PersonalCalendarController::class, 'store'])->name('store');

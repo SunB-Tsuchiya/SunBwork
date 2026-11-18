@@ -151,6 +151,7 @@ function onGridMousedown(e) {
 }
 
 function onEventMousedown(ev, type, e) {
+    if(ev._source==='absence-plan'){e.stopPropagation();return;}
     if (!ev.is_own) return;
     if (e.button !== 0) return;
     e.preventDefault();

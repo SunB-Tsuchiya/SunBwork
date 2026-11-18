@@ -1,12 +1,14 @@
 <script setup>
+import {computed} from 'vue';
 const props = defineProps({
+    absenceEnabled: {type:Boolean,default:false},
     show:     { type: Boolean, default: false },
     date:     { type: String,  default: '' },
     startMin: { type: Number,  default: null },
     endMin:   { type: Number,  default: null },
 });
 
-defineEmits(['close', 'add-event', 'my-job', 'sheet-job', 'diary']);
+defineEmits(['close', 'add-event', 'my-job', 'sheet-job', 'absence', 'diary']);
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function hm(min) { return `${pad(Math.floor(min / 60))}:${pad(min % 60)}`; }
@@ -25,8 +27,10 @@ const ACTIONS = [
     { key: 'add-event', icon: '📅', label: '会議などの予定を追加', color: 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' },
     { key: 'my-job',    icon: '💼', label: 'マイジョブ登録',     color: 'border-indigo-400  bg-indigo-50  text-indigo-800  hover:bg-indigo-100'  },
     { key: 'sheet-job', icon: '📋', label: '進行表・管理表ジョブ', color: 'border-violet-400  bg-violet-50  text-violet-800  hover:bg-violet-100'  },
+    { key: 'absence', icon: '🌿', label: '休暇・遅刻・早退', color: 'border-pink-400 bg-pink-50 text-pink-800 hover:bg-pink-100' },
     { key: 'diary',     icon: '📝', label: '日報入力',            color: 'border-orange-400  bg-orange-50  text-orange-800  hover:bg-orange-100'  },
 ];
+const visibleActions=computed(()=>ACTIONS.filter(action=>action.key!=='absence'||props.absenceEnabled));
 </script>
 
 <template>
@@ -49,7 +53,7 @@ const ACTIONS = [
                     <!-- アクション一覧 -->
                     <div class="py-1">
                         <button
-                            v-for="action in ACTIONS"
+                            v-for="action in visibleActions"
                             :key="action.key"
                             class="flex w-full items-center gap-3 border-l-4 px-5 py-3 text-left text-sm font-medium transition-colors"
                             :class="action.color"

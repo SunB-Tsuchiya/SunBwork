@@ -37,7 +37,7 @@
                     <div class="flex items-center gap-1 shrink-0">
                         <span class="h-2 w-2 rounded-full shrink-0" :class="resolveStatusDisplay(u.status).dot" />
                         <span class="text-sm font-medium" :class="resolveStatusDisplay(u.status).textColor">
-                            {{ resolveStatusDisplay(u.status).label }}
+                            {{ resolveStatusDisplay(u.status).label }}<span v-if="u.status_source==='absence_plan'" class="ml-1 text-[10px]">（予定）</span>
                         </span>
                     </div>
                     <span class="text-xs text-black/80 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
@@ -64,7 +64,7 @@
                     <div class="flex items-center gap-1 shrink-0">
                         <span class="h-2 w-2 rounded-full shrink-0" :class="resolveStatusDisplay(u.status).dot" />
                         <span class="text-sm font-medium" :class="resolveStatusDisplay(u.status).textColor">
-                            {{ resolveStatusDisplay(u.status).label }}
+                            {{ resolveStatusDisplay(u.status).label }}<span v-if="u.status_source==='absence_plan'" class="ml-1 text-[10px]">（予定）</span>
                         </span>
                     </div>
                     <span class="text-xs text-black/80 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>

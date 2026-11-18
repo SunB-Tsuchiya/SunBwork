@@ -12,6 +12,7 @@ import MonthView        from '@/Components/Schedule/MonthView.vue';
 import WeekView         from '@/Components/Schedule/WeekView.vue';
 import EventModal       from '@/Components/Schedule/EventModal.vue';
 import EventDetailModal from '@/Components/Schedule/EventDetailModal.vue';
+import AbsencePlanModal from '@/Components/Calendar/AbsencePlanModal.vue';
 import ActionSheet      from '@/Components/Calendar/ActionSheet.vue';
 import QuickWorkEntryModal from '@/Components/Calendar/QuickWorkEntryModal.vue';
 import UserDayView      from '@/Components/Calendar/UserDayView.vue';
@@ -31,6 +32,7 @@ const props = defineProps({
     defaultBreak:       { type: Object, default: () => ({ start: '12:00', end: '13:00' }) },
     defaultWorktype:    { type: Object, default: null },
     departmentWorkEnabled: { type: Boolean, default: false },
+    absencePlansEnabled: {type:Boolean,default:false},
     personalMonthEnabled: { type: Boolean, default: false },
     personalWorkEnabled: { type: Boolean, default: false },
 });
@@ -47,6 +49,7 @@ const companyEvents  = ref([]); // Schedule と共有（is_company_event=true）
 const personalEvents = ref([]); // 個人専用（ジョブ・旧カレンダーイベント）
 const quickWorkEvents = ref([]); // 簡易作業予定
 const diaryDates     = ref([]); // 日報マーカー [{ id, date: 'YYYY-MM-DD' }]
+const absenceEvents=ref([]),absenceEditor=ref(null);
 const loading        = ref(false);
 const calendarError = ref('');
 const quickWorkColor = personalWorkColors.bg;
@@ -84,18 +87,19 @@ const allEvents = computed(() => {
         ...personalEvents.value,
         ...quickWorkEvents.value,
         ...diaryEvents.value,
+        ...absenceEvents.value,
     ];
 });
 
 // WeekView/DayView では日報マーカーを除外（時刻グリッドでは不要）
-const timedEvents = computed(() => allEvents.value.filter(e => !e._is_diary));
+const timedEvents = computed(() => allEvents.value.filter(e => !e._is_diary && !(e._source==='absence-plan'&&e.all_day)));
 
 async function loadEvents() {
     const sequence = ++loadSequence;
     loading.value = true;
     calendarError.value = '';
     try {
-        const [companyRes, personalRes, workRes] = await Promise.allSettled([
+        const [companyRes, personalRes, workRes, absenceRes] = await Promise.allSettled([
             axios.get(route('schedule.events.range'), {
                 params: { start: loadRange.value.start, end: loadRange.value.end },
             }),
@@ -105,6 +109,7 @@ async function loadEvents() {
             props.personalWorkEnabled
                 ? axios.get(route('schedule.department_work.mine'), { params: { start: loadRange.value.start, end: loadRange.value.end } })
                 : Promise.resolve({ data: { events: [] } }),
+            props.absencePlansEnabled ? axios.get(route('personal_absence.index'),{params:{start:loadRange.value.start,end:loadRange.value.end}}) : Promise.resolve({data:{events:[]}}),
         ]);
         if (sequence !== loadSequence) return;
         if (companyRes.status === 'fulfilled') companyEvents.value = companyRes.value.data.events ?? companyRes.value.data;
@@ -112,9 +117,11 @@ async function loadEvents() {
             personalEvents.value = personalRes.value.data.events ?? [];
             diaryDates.value = personalRes.value.data.diaries ?? [];
         }
+        if(absenceRes.status==='fulfilled')absenceEvents.value=absenceRes.value.data.events??[];
+        else if(props.absencePlansEnabled)calendarError.value='休暇・遅刻・早退の予定を読み込めませんでした。再読み込みしてください。';
         if (workRes.status === 'fulfilled') quickWorkEvents.value = workRes.value.data.events ?? [];
         else if (props.personalWorkEnabled) calendarError.value = 'マイジョブを読み込めませんでした。再読み込みしてください。';
-        for (const result of [companyRes, personalRes, workRes]) {
+        for (const result of [companyRes, personalRes, workRes, absenceRes]) {
             if (result.status === 'rejected') console.error('カレンダーイベント取得失敗', result.reason);
         }
     } catch (e) {
@@ -181,6 +188,9 @@ function onActionSheetJob() {
     openJobSheetModal();
 }
 
+function onActionAbsence(){showActionSheet.value=false;if(props.absencePlansEnabled)absenceEditor.value={date:actionSheetDef.value.date};}
+async function onAbsenceSaved(date){absenceEditor.value=null;if(date)currentDate.value=date;await loadEvents();window.dispatchEvent(new CustomEvent('iruka:refresh'));}
+
 function onActionDiary() {
     showActionSheet.value = false;
     router.get(route('diaries.create', { date: actionSheetDef.value.date }));
@@ -222,6 +232,8 @@ function openEdit(ev) {
 }
 
 function openDetail(ev) {
+    if(ev._source==='absence-plan'){if(props.absencePlansEnabled)absenceEditor.value={date:ev._absence_plan.date,item:ev._absence_plan};return;}
+
     if (ev._is_diary) {
         goToDiary(ev._diary_date);
         return;
@@ -286,6 +298,8 @@ function onMonthDateClick(date) {
 
 // ── ドラッグ更新（会社イベント・個人イベント両対応） ──────────
 async function onUpdate({ id, starts_at, ends_at }) {
+    if(String(id).startsWith('absence-plan-')){const ev=absenceEvents.value.find(e=>e.id===id);if(ev)openDetail(ev);return;}
+
     if (String(id).startsWith('personal-work-')) {
         const existing = quickWorkEvents.value.find((event) => event.id === id);
         if (!existing?._work_entry) return;
@@ -633,7 +647,7 @@ async function saveWeekBreaks() {
         <span v-if="calendarError" class="text-red-700" role="alert">{{ calendarError }}</span>
     </div>
     <CalendarShell
-        :inert="Boolean(personalState.editor)"
+        :inert="Boolean(personalState.editor)||Boolean(absenceEditor)"
         :current-date="currentDate"
         :view-mode="viewMode"
         :view-label="viewLabel"
@@ -686,6 +700,7 @@ async function saveWeekBreaks() {
 
         <!-- ── カレンダー本体 ──────────────────────────────────────── -->
         <div v-if="personalMonthEnabled && personalState.mobileOpen" class="mb-3 md:hidden"><PersonalTodoList :state="personalState" /></div>
+        <div v-if="viewMode!=='month'&&absenceEvents.some(e=>e.all_day)" class="mb-3 flex flex-wrap gap-2 rounded border border-pink-200 bg-pink-50 p-2" aria-label="終日の休暇予定"><button v-for="event in absenceEvents.filter(e=>e.all_day)" :key="event.id" type="button" class="rounded bg-white px-3 py-1.5 text-sm text-pink-800" @click="openDetail(event)">{{event._absence_plan.date}} {{event.title}}・終日</button></div>
         <PersonalMonthPlanner v-if="viewMode === 'month' && personalMonthEnabled"
             :year="viewYear" :month="viewMonth" :events="allEvents"
             :state="personalState"
@@ -723,6 +738,7 @@ async function saveWeekBreaks() {
             @diary-click="goToDiary" />
 
     </CalendarShell>
+    <AbsencePlanModal v-if="absencePlansEnabled&&absenceEditor" v-bind="absenceEditor" @close="absenceEditor=null" @saved="onAbsenceSaved" />
     <PersonalCalendarItemModal v-if="personalMonthEnabled && personalState.editor" v-bind="personalState.editor" @close="personalState.editor=null" @saved="personalState.saved" />
 
     <!-- ── Schedule EventModal（案件打合せ・外出 / 社内予定） ──── -->
@@ -752,6 +768,8 @@ async function saveWeekBreaks() {
         @materialized="() => { showDetail = false; loadEvents(); }" />
 
     <ActionSheet
+        :absence-enabled="absencePlansEnabled"
+        @absence="onActionAbsence"
         :show="showActionSheet"
         :date="actionSheetDef.date"
         :start-min="actionSheetDef.startMin"

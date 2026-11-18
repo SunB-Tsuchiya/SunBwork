@@ -7,7 +7,7 @@
         >
             <span class="text-base leading-none pointer-events-none">🐬</span>
             <span class="h-2.5 w-2.5 rounded-full shrink-0 pointer-events-none" :class="statusInfo.dot" />
-            <span class="max-w-[90px] truncate pointer-events-none">{{ statusInfo.label }}</span>
+            <span class="max-w-[90px] truncate pointer-events-none">{{ statusInfo.label }}{{planned?'（予定）':''}}</span>
         </button>
 
         <IrukaStatusModal
@@ -34,6 +34,7 @@ const authUser = inject('authUser', null);
 
 const currentStatus  = ref('left');
 const currentComment = ref('');
+const planned=ref(false);
 const showModal      = ref(false);
 const modalTarget    = ref(null);
 const statuses       = ref(null);
@@ -55,6 +56,7 @@ async function fetchSelf() {
         const me  = res.data.find(u => u.id === authUser?.id);
         if (me) {
             currentStatus.value  = me.status;
+            planned.value=me.status_source==='absence_plan';
             currentComment.value = me.comment ?? '';
             if (modalTarget.value) {
                 modalTarget.value = { ...modalTarget.value, status: me.status, comment: me.comment ?? '' };

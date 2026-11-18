@@ -70,6 +70,8 @@ class UserPresenceController extends Controller
             ->whereNull('ghost_owner_id')
             ->get();
 
+        $absenceStatuses = app(\App\Services\PersonalAbsencePlans::class)->presenceFor((int)$presenceCompanyId, $users->filter(fn($u)=>!($u->presenceStatus?->is_hidden??false)));
+
         // BoardSettings と同じ優先順: sort_order → 役職順 → 雇用形態 → 名前
         $employmentPriority = ['regular' => 1, 'contract' => 2, 'dispatch' => 3, 'outsource' => 4];
         $data = $users
@@ -81,14 +83,16 @@ class UserPresenceController extends Controller
                 fn($a, $b) => $a->name <=> $b->name,
             ])
             ->values()
-            ->map(function (User $u) {
+            ->map(function (User $u) use ($absenceStatuses) {
                 $ps = $u->presenceStatus;
                 return [
                     'id'            => $u->id,
                     'name'          => $u->name,
                     'department_id' => $u->department_id,
                     'department'    => $u->department?->name ?? '未所属',
-                    'status'        => $ps?->status ?? 'left',
+                    'status'        => $absenceStatuses[$u->id]['status'] ?? $ps?->status ?? 'left',
+                    'status_source' => $absenceStatuses[$u->id]['status_source'] ?? $ps?->status_source,
+                    'scheduled_until' => $absenceStatuses[$u->id]['scheduled_until'] ?? null,
                     'comment'       => $ps?->comment ?? '',
                     'updated_at'    => $ps?->updated_at?->toDateTimeString() ?? null,
                     'updated_by_id' => $ps?->updated_by_id ?? null,
