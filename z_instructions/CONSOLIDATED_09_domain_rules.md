@@ -898,5 +898,7 @@ class MyNSystemTest extends TestCase
 - **mediabunny は変換できないトラックを黙って捨てる**ため、変換後に映像が残ったか（`utilizedTracks`）を必ず確認する。
 - Web 側のアップロード上限（さくら: upload 5MB / post 8MB）対策として、分割は 2MB 固定。
 - 途中で失敗・離脱した作品（`status` が `uploading` / `processing` / `failed`）は、`portfolio:prune-stale` が**毎時**、更新から 24 時間経過分を実体ごと削除する。
+- **色の扱い（2026-11-18 修正）**: Imagick の `setImageColorspace()` は**名前を付け替えるだけで色は変換しない**。CMYK の PDF/JPEG に使うと白黒・色がネガポジ反転する。PDF は **読み込み前に `setColorspace(SRGB)`**（Ghostscript が RGB で描画）、画像は読み込み後に **`transformImageColorspace(SRGB)`** で実変換する（`PdfRasterizer` / `ImageProcessor`。テスト `PortfolioColorTest`）。
+- 修正前に取り込んだ PDF は、原本が残っているため `php artisan portfolio:regenerate-pdf-pages [--item=ID] [--dry-run]` でページ画像・サムネを作り直せる（全ページ成功してから書き込む）。**画像は原本を保存していない**ので、反転していたら本人が再アップロードする。
 
 **未了（本番反映前）**: さくらでの PDF 変換・動画配信の実機確認（MANAGER D-6 / D-7）、HEVC 動画の確認（D-8。社用スマホ刷新後）。本番は `migrate --force` が 2 本必要。

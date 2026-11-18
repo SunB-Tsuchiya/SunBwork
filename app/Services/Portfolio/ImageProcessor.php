@@ -31,7 +31,8 @@ class ImageProcessor
         // 透過 PNG は白背景に敷く（JPEG 化のため）
         $im->setImageBackgroundColor(new ImagickPixel('white'));
         $im = $im->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
-        $im->setImageColorspace(Imagick::COLORSPACE_SRGB);
+        // 実際に色変換する。setImageColorspace は名前の付け替えだけで、CMYK の JPEG がネガポジ反転する
+        $im->transformImageColorspace(Imagick::COLORSPACE_SRGB);
 
         if (max($im->getImageWidth(), $im->getImageHeight()) > self::MAX_EDGE) {
             $im->thumbnailImage(self::MAX_EDGE, self::MAX_EDGE, true);

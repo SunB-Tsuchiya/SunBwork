@@ -53,13 +53,17 @@ class PdfRasterizer
 
         $im = new Imagick();
         $im->setResolution(self::DPI, self::DPI);
+        // 読み込み前に sRGB を指定し、Ghostscript に RGB で描画させる。
+        // 指定しないと CMYK の PDF が CMYK のまま読まれ、後の setImageColorspace（名前の付け替えだけで色は変換しない）でネガポジ反転する
+        $im->setColorspace(Imagick::COLORSPACE_SRGB);
         $im->readImage($absolutePath . '[' . $index . ']');
 
         // 透過のあるページは白背景に敷く（JPEG 化のため）
         $im->setImageBackgroundColor(new ImagickPixel('white'));
         $flat = $im->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
         $im->clear();
-        $flat->setImageColorspace(Imagick::COLORSPACE_SRGB);
+        // 念のため CMYK のまま読まれた場合も、実際に色変換する（setImageColorspace は付け替えだけなので使わない）
+        $flat->transformImageColorspace(Imagick::COLORSPACE_SRGB);
 
         if (max($flat->getImageWidth(), $flat->getImageHeight()) > self::MAX_EDGE) {
             $flat->thumbnailImage(self::MAX_EDGE, self::MAX_EDGE, true);
