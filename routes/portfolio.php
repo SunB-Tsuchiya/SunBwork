@@ -51,6 +51,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('items/{item}/chunk', [PdfUploadController::class, 'chunk'])->name('items.chunk'); // PDF・動画共通
         Route::post('items/{item}/complete', [PdfUploadController::class, 'complete'])->name('pdf.complete');
         Route::post('items/{item}/process', [PdfUploadController::class, 'process'])->name('pdf.process');
+        // ブラウザ（PDF.js）で画像化したページを 1 枚ずつ受け取り、最後に完了処理（さくらの gs が古いため）
+        Route::post('items/{item}/pages/{page}', [PdfUploadController::class, 'page'])->whereNumber('page')->name('pdf.page');
+        Route::post('items/{item}/pages-complete', [PdfUploadController::class, 'finishPages'])->name('pdf.pages_complete');
 
         // 動画取り込み（init → chunk × N → video-complete。圧縮はブラウザ側で済ませてから送る）
         Route::post('items/video/init', [VideoUploadController::class, 'init'])->name('video.init');

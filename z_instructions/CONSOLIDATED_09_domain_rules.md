@@ -899,6 +899,8 @@ class MyNSystemTest extends TestCase
 - Web 側のアップロード上限（さくら: upload 5MB / post 8MB）対策として、分割は 2MB 固定。
 - 途中で失敗・離脱した作品（`status` が `uploading` / `processing` / `failed`）は、`portfolio:prune-stale` が**毎時**、更新から 24 時間経過分を実体ごと削除する。
 - **色の扱い（2026-11-18 修正）**: Imagick の `setImageColorspace()` は**名前を付け替えるだけで色は変換しない**。CMYK の PDF/JPEG に使うと白黒・色がネガポジ反転する。PDF は **読み込み前に `setColorspace(SRGB)`**（Ghostscript が RGB で描画）、画像は読み込み後に **`transformImageColorspace(SRGB)`** で実変換する（`PdfRasterizer` / `ImageProcessor`。テスト `PortfolioColorTest`）。
+- **PDF のページ画像化はブラウザ（PDF.js）が行う（2026-11-18 変更）**: さくらの Ghostscript 9.52 は印刷用 PDF（InDesign 書き出し・JPEG2000・透明・CID フォント等）を描画できず、白紙や欠けになる（直接 gs を実行しても同じ。再書き出しでも欠けが残る）。そのため `complete` 後は、ブラウザが `pdfjs-dist`（`lib/portfolio/pdfRender.js`。長辺 2000px・150dpi 相当・JPEG 0.8）で 1 ページずつ画像化し、`POST items/{item}/pages/{n}`（`pdf.page`）で送り、最後に `pages-complete`（`pdf.pages_complete`）でサムネイル・実サイズ・「完了」を確定する。サーバーは JPEG か・寸法（長辺 4000px 以内）・容量を自分で検証し、同じページの再送は上書き。**ブラウザ変換が失敗したときだけ、従来のサーバー変換（`process`）に自動で切り替わる**（送れたページは引き継ぐ）。
+- PDF.js の CMap・標準フォント・wasm（JPEG2000 等のデコーダ）は `import.meta.glob` で `public/build/assets` に出力し、自前の `BinaryDataFactory` で取得する（`/members` の基準パスが付く）。ワーカーは `?worker` で `.js` として出力（さくらの Apache が `.mjs` を JavaScript として返さない場合に備える）。**`pdfjs-dist` はプロジェクト共通の依存（お知らせ・ファイル解析と共用。5.6.x）なので、版を勝手に変えない**（4.x へ下げると他機能が壊れる）。
 - 修正前に取り込んだ PDF は、原本が残っているため `php artisan portfolio:regenerate-pdf-pages [--item=ID] [--dry-run]` でページ画像・サムネを作り直せる（全ページ成功してから書き込む）。**画像は原本を保存していない**ので、反転していたら本人が再アップロードする。
 
 **未了（本番反映前）**: さくらでの PDF 変換・動画配信の実機確認（MANAGER D-6 / D-7）、HEVC 動画の確認（D-8。社用スマホ刷新後）。本番は `migrate --force` が 2 本必要。

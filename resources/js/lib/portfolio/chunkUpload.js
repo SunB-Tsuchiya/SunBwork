@@ -1,8 +1,11 @@
 import axios from 'axios';
+import { openPdf } from './pdfRender';
 
 // PDF・動画の分割アップロード。
 // さくらの Web 側アップロード上限（5MB）に収まるよう 2MB ずつ送る。
-//   PDF : init → chunk × N → complete（PDF 検証・ページ数確定）→ process × N（ページ画像化）
+//   PDF : init → chunk × N → complete（PDF 検証・ページ数確定）→ ページ画像化
+//         画像化は、まずブラウザ（PDF.js）で行い 1 ページずつ送る（pages/{n} × N → pages-complete）。
+//         さくらの Ghostscript が古く印刷用 PDF を正しく描画できないため。ブラウザで失敗したら、従来のサーバー変換（process × N）に切り替える
 //   動画: init → chunk × N → video-complete（MP4 検証・ポスター保存）。圧縮は送る前にブラウザで済ませておく
 const CHUNK_SIZE = 2 * 1024 * 1024;
 const MAX_RETRY = 3;
@@ -65,6 +68,38 @@ async function discard(id) {
     }
 }
 
+/** ブラウザで PDF を 1 ページずつ画像化し、すぐ送る（全ページ分のメモリを抱えない）。完成した作品を返す */
+async function convertInBrowser(id, file, total, onProgress) {
+    const pdf = await openPdf(file);
+    try {
+        if (pdf.numPages !== total) throw new Error(`ページ数が一致しません（サーバー ${total} / ブラウザ ${pdf.numPages}）`);
+        for (let n = 1; n <= total; n++) {
+            const blob = await pdf.renderPage(n);
+            await sendPage(id, n, blob);
+            onProgress({ phase: 'convert', ratio: n / total, done: n, total });
+        }
+    } finally {
+        pdf.destroy();
+    }
+    const { data } = await axios.post(route('portfolio.api.pdf.pages_complete', { item: id }));
+    return data.item;
+}
+
+/** 1 ページ分の JPEG を送る。通信エラーは数回再試行する（同じページ番号は上書きされる） */
+async function sendPage(id, n, blob) {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            const form = new FormData();
+            form.append('image', blob, `p${n}.jpg`);
+            await axios.post(route('portfolio.api.pdf.page', { item: id, page: n }), form);
+            return;
+        } catch (e) {
+            if (attempt >= MAX_RETRY || (e?.response && e.response.status < 500)) throw e;
+            await sleep(800 * attempt);
+        }
+    }
+}
+
 /**
  * PDF をアップロードしてページ画像に変換する。
  * @param {File} file PDF ファイル
@@ -81,7 +116,16 @@ export async function uploadPdf(file, meta, onProgress = () => {}) {
         const total = completed.page_count;
         onProgress({ phase: 'convert', ratio: 0, done: 0, total });
 
-        // ページ画像化（サーバーが数ページずつ処理するので、完了するまで呼び続ける）
+        // ① ブラウザ（PDF.js）でページ画像化して 1 ページずつ送る
+        try {
+            return await convertInBrowser(id, file, total, onProgress);
+        } catch (e) {
+            // 容量超過・権限などサーバーが意図して返した拒否（4xx）はそのまま中断する。PDF.js の失敗・通信エラーはサーバー変換に切り替える
+            if (e?.response && e.response.status < 500) throw e;
+            console.warn('ブラウザでのページ画像化に失敗したため、サーバー変換に切り替えます', e);
+        }
+
+        // ② サーバー変換（従来）。ブラウザで送れたページはそのまま使い、残りから続ける。完了するまで呼び続ける
         for (;;) {
             const { data: res } = await axios.post(route('portfolio.api.pdf.process', { item: id }));
             onProgress({ phase: 'convert', ratio: res.processed / res.total, done: res.processed, total: res.total });

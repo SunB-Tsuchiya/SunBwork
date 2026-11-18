@@ -28,6 +28,9 @@ class PdfUploadController extends Controller
     /** PDF 原本の上限 */
     private const MAX_BYTES = 300 * 1024 * 1024;
 
+    /** ブラウザから届くページ画像の長辺の上限（通常は 2000px。余裕を見て） */
+    private const MAX_PAGE_EDGE = 4000;
+
     public function init(Request $request)
     {
         $data = $request->validate([
@@ -180,6 +183,67 @@ class PdfUploadController extends Controller
             'total' => $model->page_count,
             'item' => $model->status === 'ready' ? PortfolioData::item($model->load('tags')) : null,
         ]);
+    }
+
+    /**
+     * ブラウザ（PDF.js）で画像化した 1 ページ分の JPEG を受け取る。
+     * さくらの Ghostscript が古く、印刷用 PDF（JPEG2000・透明・CID フォント等）を正しく描画できないため、画像化は利用者のブラウザで行う。
+     * 同じページ番号の再送は上書き（通信エラー時の再試行用）。サーバーは中身を信用せず、JPEG か・寸法・容量を自分で確かめる。
+     */
+    public function page(Request $request, int $item, int $page)
+    {
+        $model = $this->own($request, $item, 'processing');
+        abort_unless($page >= 1 && $page <= (int) $model->page_count, 422, 'ページ番号が不正です。');
+        $request->validate(['image' => 'required|file|max:5120']);
+
+        $file = $request->file('image');
+        $info = @getimagesize($file->getRealPath());
+        abort_unless($info && $info[2] === IMAGETYPE_JPEG, 422, 'ページ画像は JPEG のみ受け付けます。');
+        [$w, $h] = $info;
+        abort_unless($w >= 1 && $h >= 1 && max($w, $h) <= self::MAX_PAGE_EDGE, 422, 'ページ画像の大きさが不正です。');
+
+        $disk = PortfolioStorage::disk();
+        $bytes = file_get_contents($file->getRealPath());
+        $path = sprintf('%s_p%03d.jpg', preg_replace('/\.pdf$/', '', $model->file_path), $page);
+
+        // 実際の増加分（このページを除く既存ページ分＋今回）で、書き込む前に容量を確認する
+        $others = (int) $model->pages()->where('page_no', '!=', $page)->get()
+            ->sum(fn ($p) => $disk->exists($p->path) ? $disk->size($p->path) : 0);
+        if (! PortfolioStorage::hasRoom($model->user_id, $others + strlen($bytes))) {
+            $this->discard($model);
+            abort(422, '保存容量の上限（10GB）を超えるため、このPDFは取り込めません。');
+        }
+
+        $disk->put($path, $bytes);
+        PortfolioItemPage::updateOrCreate(
+            ['item_id' => $model->id, 'page_no' => $page],
+            ['path' => $path, 'width' => $w, 'height' => $h],
+        );
+
+        return response()->json(['processed' => $model->pages()->count(), 'total' => $model->page_count]);
+    }
+
+    /** ブラウザからの全ページ送信が済んだら、完了処理（サムネイル・サイズ集計・「完了」）をする */
+    public function finishPages(Request $request, int $item, PdfRasterizer $rasterizer)
+    {
+        $model = $this->own($request, $item, 'processing');
+        $disk = PortfolioStorage::disk();
+        $pages = $model->pages()->get();
+
+        $complete = $pages->count() === (int) $model->page_count
+            && $pages->pluck('page_no')->sort()->values()->all() === range(1, (int) $model->page_count)
+            && $pages->every(fn ($p) => $disk->exists($p->path));
+        abort_unless($complete, 422, 'すべてのページが届いていません。もう一度お試しください。');
+
+        try {
+            $this->finish($model, $rasterizer);
+        } catch (\Throwable $e) {
+            report($e);
+            $model->update(['status' => 'failed']);
+            abort(422, 'PDF の仕上げ処理に失敗しました。もう一度お試しください。');
+        }
+
+        return response()->json(['item' => PortfolioData::item($model->refresh()->load('tags'))]);
     }
 
     /** 全ページ変換後: サムネイル（1 ページ目）・寸法・実サイズを確定して「完了」にする */
