@@ -2516,3 +2516,7 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 休暇予定の完了資料は archived/CALENDAR_ABSENCE_PLAN1.md / archived/CALENDAR_ABSENCE_MANAGER1.md / archived/CALENDAR_ABSENCE1_PROMPT.md を参照する。
 
 2026-11-19確定: 利用者が新マイジョブの深夜自動完了不一致を優先修正するよう指示。調査で既存auto-complete:my-jobsは毎日00:05/旧自己割当だけで新保存先の対象漏れを確認。MYJOB_NIGHTLY_PLAN1/MANAGER1/1_PROMPTへ、昨日以前の新形式追加・当日未来と派生除外・続き巻込/通知なし・dryrun確認の具体案を記録。アプリ未実装、次は設計確認。TODO繰り返し画面4条件は引き続き保留、休暇の成功済み4条件は再依頼しない。
+
+2026-11-19具体方針を利用者承認。既存コマンドへの新形式追加/両方0件return/日ごと独立/通知なしとJST明示を実装中。合成再現テストはDocker未起動で未実行、利用者へ起動依頼中。修正前コマンドを/tmp/sunbwork-nightly-before-20261119.phpへ保存し、起動後に対象漏れの失敗を同じテストで再現する。配備/今回画面確認は未実施。
+
+2026-11-19作成済み・検証待ち: AutoCompleteMyJobsへINFO本人の過去分追加、旧0件early-return修正、件数/--dry-run、JST時刻明示を実装。合成テスト5条件群と更新履歴/統合資料を作成、diff --check成功。Docker Desktop未起動のためPHPテスト・構文確認は実行できていない（docker WSL連携のエラー）。利用者へ起動を依頼し、本番版/作業中ファイルの読み取り専用SSHも正確コマンドで確認中。実装を未検証として保存し、配備はしない。次の1手はDocker起動後に修正前の新形式漏れ再現→修正後5ケースと既存手動完了回帰。修正前コマンドはgit show dbacf8381:app/Console/Commands/AutoCompleteMyJobs.phpで再取得可能。

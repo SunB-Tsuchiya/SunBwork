@@ -61,7 +61,7 @@
 **2026-05 追記: マイジョブ自動完了バッチ**
 
 - `app/Console/Commands/AutoCompleteMyJobs.php` — 自己割当ジョブのうち日付超過（`scheduled_at` 優先、`desired_end_date` 次候補）かつ未完了のものを `completed = true` にするバッチ
-- `app/Console/Kernel.php` — 毎日 `00:05` に `auto-complete:my-jobs` を実行するよう登録
+- `routes/console.php` — 毎日 `00:05` JST に `auto-complete:my-jobs` を実行（Laravel 11の登録元）
 - さくらサーバーでは `crontab -e` で `* * * * * cd ~/SunBWork && php artisan schedule:run >> /dev/null 2>&1` が必要（未登録の場合は手動追加）
 
 ---

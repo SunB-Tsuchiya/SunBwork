@@ -11,7 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('ghost:cleanup')->daily();
 
 // マイジョブ（自己割当）で日付を過ぎたものを毎日深夜0:05に自動完了
-Schedule::command('auto-complete:my-jobs')->dailyAt('00:05');
+Schedule::command('auto-complete:my-jobs')->dailyAt('00:05')->timezone('Asia/Tokyo');
 
 // AIサマリーのディスパッチを5分毎に実行
 Schedule::command('ai:dispatch-summaries')->everyFiveMinutes();

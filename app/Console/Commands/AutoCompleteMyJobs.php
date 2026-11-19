@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use App\Models\Event;
+use Illuminate\Database\Query\Builder;
 
 /**
  * マイジョブ（自己割当ジョブ）自動完了バッチ
@@ -16,7 +16,8 @@ use App\Models\Event;
  *       どちらの日付もない場合は対象外
  *
  * 実行: php artisan auto-complete:my-jobs
- * スケジュール: 毎日 00:05 に自動実行（Kernel.php に登録済み）
+ * 新形式: INFO本人入力の work_date が昨日以前かつ completed_at=NULL（元イベント派生は除外）
+ * スケジュール: 毎日 00:05 JST（routes/console.php）
  */
 class AutoCompleteMyJobs extends Command
 {
@@ -25,7 +26,7 @@ class AutoCompleteMyJobs extends Command
 
     public function handle(): int
     {
-        $today     = Carbon::today();   // 今日の 00:00:00（JST）
+        $today     = Carbon::today('Asia/Tokyo');   // 今日の 00:00:00（JST）
         $isDryRun  = $this->option('dry-run');
 
         // ── 対象クエリ ──────────────────────────────────────────────────────
@@ -49,13 +50,16 @@ class AutoCompleteMyJobs extends Command
             });
 
         $count = $query->count();
+        $entries = $this->newEntries($today->toDateString());
+        $entryCount = $entries->count();
+        $this->info("旧形式の対象: {$count} 件 / 新形式の対象: {$entryCount} 件");
 
-        if ($count === 0) {
+        if ($count + $entryCount === 0) {
             $this->info('自動完了対象のマイジョブはありません。');
             return self::SUCCESS;
         }
 
-        $this->info("自動完了対象: {$count} 件");
+        $this->info("自動完了対象: ".($count + $entryCount)." 件");
 
         if ($isDryRun) {
             $this->warn('--dry-run モード: 更新はスキップしました。');
@@ -63,7 +67,7 @@ class AutoCompleteMyJobs extends Command
         }
 
         // ── 更新 ────────────────────────────────────────────────────────────
-        $now     = Carbon::now();
+        $now     = Carbon::now('Asia/Tokyo');
 
         // 対象IDを取得してから更新（イベント更新に使うため）
         $targetIds = (clone $query)->pluck('id')->toArray();
@@ -97,6 +101,28 @@ class AutoCompleteMyJobs extends Command
             $this->info("カレンダーイベントに【完了】を付加: {$eventCount} 件");
         }
 
+        // Do not invoke interactive completion: it follows ancestors and sends notifications.
+        // Recheck every eligibility predicate at UPDATE time (e.g. a rescheduled future row).
+        $entryUpdated = (clone $entries)->update(['completed_at' => $now, 'updated_at' => $now]);
+        $this->info("新形式を完了に更新しました: {$entryUpdated} 件");
+
         return self::SUCCESS;
+    }
+
+    private function newEntries(string $today): Builder
+    {
+        return DB::table('personal_work_entries')
+            ->whereNull('personal_work_entries.completed_at')
+            ->whereNull('personal_work_entries.source_event_id')
+            ->where('personal_work_entries.work_date', '<', $today)
+            ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('companies')
+                ->whereColumn('companies.id', 'personal_work_entries.company_id')->where('companies.company_type', 'sunbrain'))
+            ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('departments')
+                ->whereColumn('departments.id', 'personal_work_entries.department_id')
+                ->whereColumn('departments.company_id', 'personal_work_entries.company_id')->where('departments.code', 'INFO'))
+            ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('users')
+                ->whereColumn('users.id', 'personal_work_entries.user_id')
+                ->whereColumn('users.company_id', 'personal_work_entries.company_id')
+                ->whereColumn('users.department_id', 'personal_work_entries.department_id'));
     }
 }
