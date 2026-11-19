@@ -2532,3 +2532,5 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 利用者が新しい作業を希望したため、次の1手は新依頼内容を確認して調査する。TODO繰り返し4条件は本件の成功には含めず保留を維持。前/tmp消失のため保存4af9b18b9から隔離 /tmp/sunbwork-nightly-confirm-20261120 / feature/myjob-nightly-confirmed-20261120を復元して記録、共有主作業の変更は保護。
 
 本件の完了資料は archived/MYJOB_NIGHTLY_PLAN1.md / archived/MYJOB_NIGHTLY_MANAGER1.md / archived/MYJOB_NIGHTLY1_PROMPT.md を参照。
+
+2026-11-20確定: 利用者が進行表233でオペレーター完了後も緑/進捗へ反映されない件の現状調査を依頼。ピンクと校正との関係は利用者の仮説として保持し、原因確定とはしない。PROGRESS_SHEET_233_AUDIT_20261120.mdへ資料/コード候補/読み取りSSH承認待ちを記録。修正・データ補正・配備は未承認。次は対象データと本番版の読み取り照合。TODO繰り返し確認は別件の保留を維持。

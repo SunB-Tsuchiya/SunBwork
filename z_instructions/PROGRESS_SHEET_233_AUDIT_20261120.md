@@ -1,0 +1,7 @@
+# 進行表233 完了色・進捗不一致 調査
+2026-11-20 JST。利用者対象: /members/coordinator/progress-sheets/233?back_tab=progress。オペレーター完了後も緑にならず進捗が増えず、ピンク表示から校正との関係を疑うとの報告。指示は現状調査であり修正/データ補正/完了操作/配備は未承認。
+参照: AGENTS、最新保存4af9b18b9のJOB_EVALUATION_CONTROL1と関連手動完了/進行表/校正コード、archived/PROGRESS_SHEET_V2_DESIGN.md・PROGRESS_LINK_PLAN.md、ProgressSheetController/ProgressCell.vue/ProgressTable.vue/Show.vue/ProgressLinkService/ProgressCellモデル/WorkJobLegacyCompletion。資料はz_instructions（利用者表記z_instruction）で確認。共有主作業985e6fffbのClaude/ziggy等は未編集。
+Git fetch origin mainでb1d57e1dd取得。進行表Controller/表示3部品は4af保存版と差分なし。ただしorigin/mainにはWorkJobLegacyCompletionが無く、本番と同版とはみなさない。本番最新版と対象233の実データはSSH前確認待ち。
+コードからの候補（未確定）: workerセル本文はcompleted_atまたはassignment_completedで完了表示する一方、背景と一部進捗はcompleted_atだけ。表の行/グループ/シート全体の判定も統一されていない。ProgressLinkServiceのリンク進捗はセルcompleted_atを参照。校正セルは校正割当/校正完了を別に扱うので、単にピンクだから校正が原因とは確定しない。どの列・セルがどのジョブを参照し、手動/自動/続きによる完了情報がどこまで反映されたかを照合する必要がある。
+読み取りスクリプト /tmp/sunbwork-progress233-read-20261120.sh、SHA256 bd00830fd3c6cf88eb581105250756a94952a9b20d032fc234aa97ed93eb5b38。正確SSHコマンドを利用者へ提示済み・承認待ち。対象233の行/列/セル、関連割当/新形式記録/校正依頼/リンク予定のIDと完了状態だけ。ジョブ本文・添付・売上DBは読まない。Controller実行/再計算/データ変更/通知はしない。結果はローカル/tmpの限定ログへ保存して照合する。
+次の1手: 読み取り承認後に本番HEAD/対象データを取得し、その版のソースを使って原因と影響範囲を報告する。修正する場合はその後別に設計確認。深夜自動完了は利用者の2条件成功で完了、TODO繰り返し4条件は本件優先で保留を維持。
