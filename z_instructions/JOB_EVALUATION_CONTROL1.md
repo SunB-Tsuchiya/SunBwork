@@ -2514,3 +2514,5 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-18利用者画面確認成功: 直前の4条件（日報直上の入口/5区分、未来有休保存で今日の在席不変、今日へ編集で有給休暇（予定）表示とコメント保持、削除で予定表示解除）を利用者が「成功」で確認。休暇予定の実装/コード検証/本番7e2652606反映/今回画面確認まで完了。午前午後休/遅刻/早退の実保存や日報への自動反映を今回の画面確認成功に拡張しない。INFO SuperAdmin登録限定、一般公開は別承認。次の1手は保留していた繰り返しTODOの未確認4条件へ戻る。
 
 休暇予定の完了資料は archived/CALENDAR_ABSENCE_PLAN1.md / archived/CALENDAR_ABSENCE_MANAGER1.md / archived/CALENDAR_ABSENCE1_PROMPT.md を参照する。
+
+2026-11-19確定: 利用者が新マイジョブの深夜自動完了不一致を優先修正するよう指示。調査で既存auto-complete:my-jobsは毎日00:05/旧自己割当だけで新保存先の対象漏れを確認。MYJOB_NIGHTLY_PLAN1/MANAGER1/1_PROMPTへ、昨日以前の新形式追加・当日未来と派生除外・続き巻込/通知なし・dryrun確認の具体案を記録。アプリ未実装、次は設計確認。TODO繰り返し画面4条件は引き続き保留、休暇の成功済み4条件は再依頼しない。
