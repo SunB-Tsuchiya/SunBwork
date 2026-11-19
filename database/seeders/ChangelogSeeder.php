@@ -162,7 +162,7 @@ class ChangelogSeeder extends Seeder
                 'title' => '新マイジョブも深夜に自動完了',
                 'released_at' => '2026-11-19',
                 'summary' => '旧形式と同じ毎日0:05の処理で、昨日以前の新マイジョブも自動で完了になります。当日以降の続きは残ります。',
-                'design_files' => ['z_instructions/MYJOB_NIGHTLY_PLAN1.md'],
+                'design_files' => ['z_instructions/archived/MYJOB_NIGHTLY_PLAN1.md'],
                 'claude_notes' => '旧対象/タイトル処理を維持し、情報出版本人のsource_event_idなし・work_date<今日JST・completed_at NULLを追加。新形式だけの日も処理。完了日時/更新日時のみ変更、通知/祖先連動/数量時間/DB追加なし。dry-run両形式対応。',
                 'body' => '<section class="cl-feature"><h3>日付が過ぎた作業の整理</h3><p>新マイジョブも昨日以前の予定が深夜に完了表示になります。未来の続き、TODO、休暇予定をまとめて完了にはしません。</p></section>',
             ]);

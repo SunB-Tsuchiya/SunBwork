@@ -2527,3 +2527,8 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 
 2026-11-19本番反映完了: 利用者が正確SSHコマンドとSHA256 340869f4cc02fa978a1695195e1323d9ba9ae31b2c033c0d46858186e9df00e5を承認。固定元7e2652606→0c20cba6b、版/差分/未追跡保護/追跡clean/PHP構文/manifest同一を確認しSSH終了0。config/cache clear後の--dry-runは旧0件/新234件、更新スキップを明示。schedule:listで5 0 * * * auto-complete:my-jobs登録確認。実更新コマンド/migration/Seeder/ビルドは実行していない。
 状態: 実装・コード検証・本番反映・件数確認/スケジュール確認まで完了。次回0:05 JSTの実行結果と利用者画面は未確認。次の1手は定期時刻後に①過去日の新マイジョブが完了表示、②当日/未来の続きは未完了、の2条件だけ確認する。234件は配備時点の対象数であり次回実行件数と同じとは断定しない。TODO繰り返し4条件は別件の未確認のまま維持。
+
+2026-11-20利用者確認成功: 直前に依頼した2条件（定期時刻後に過去日の新マイジョブが完了表示、当日/未来の続きは未完了）を利用者が「成功」で確認。実装/合成115件1218断言/本番0c20cba6b反映/定期時刻後の表示確認まで本件完了。実際の処理件数やサーバー実行ログは追加読取しておらず、配備時dry-run234件を実処理数とは断定しない。
+利用者が新しい作業を希望したため、次の1手は新依頼内容を確認して調査する。TODO繰り返し4条件は本件の成功には含めず保留を維持。前/tmp消失のため保存4af9b18b9から隔離 /tmp/sunbwork-nightly-confirm-20261120 / feature/myjob-nightly-confirmed-20261120を復元して記録、共有主作業の変更は保護。
+
+本件の完了資料は archived/MYJOB_NIGHTLY_PLAN1.md / archived/MYJOB_NIGHTLY_MANAGER1.md / archived/MYJOB_NIGHTLY1_PROMPT.md を参照。
