@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\{Artisan,DB,Schema};
 require_once __DIR__.'/UnifiedMyJobCreateTest.php';
 class MyJobNightlyCompletionTest extends UnifiedMyJobCreateTest
 {
-    protected function setUp():void {parent::setUp();Carbon::setTestNow(Carbon::parse('2026-11-19 00:05:00','Asia/Tokyo'));Schema::table('project_job_assignments',function(Blueprint $t){$t->dateTime('scheduled_at')->nullable();});}
+    protected function setUp():void {parent::setUp();if(str_starts_with($this->name(),'test_nightly_')){Carbon::setTestNow(Carbon::parse('2026-11-19 00:05:00','Asia/Tokyo'));Schema::table('project_job_assignments',function(Blueprint $t){$t->dateTime('scheduled_at')->nullable();});}}
     protected function tearDown():void {Carbon::setTestNow();parent::tearDown();}
     private function entry(array $d=[]):int {return DB::table('personal_work_entries')->insertGetId($d+['user_id'=>1,'company_id'=>1,'department_id'=>1,'work_date'=>'2026-11-18','work_category'=>'other','plan_slot'=>'hour','planned_start_time'=>'08:00','planned_end_time'=>'09:00','entry_visibility'=>'department','title'=>'新マイジョブ','actual_minutes'=>60,'created_at'=>'2026-11-18 08:00:00','updated_at'=>'2026-11-18 08:00:00']);}
     private function old(array $d=[]):int {return DB::table('project_job_assignments')->insertGetId($d+['user_id'=>1,'sender_id'=>1,'project_job_id'=>1,'company_id'=>1,'department_id'=>1,'completed'=>false,'title'=>'旧','scheduled_at'=>'2026-11-18 08:00:00','created_at'=>'2026-11-18 08:00:00','updated_at'=>'2026-11-18 08:00:00']);}
@@ -33,4 +33,21 @@ class MyJobNightlyCompletionTest extends UnifiedMyJobCreateTest
     public function test_nightly_continuations_are_independent_and_utc_clock_uses_jst_date():void {
         Carbon::setTestNow(Carbon::parse('2026-11-18 15:05:00','UTC'));$root=$this->entry();$child=$this->entry(['work_date'=>'2026-11-19','source_entry_id'=>$root]);$this->runBatch();self::assertNotNull(PersonalWorkEntry::findOrFail($root)->completed_at);self::assertNull(PersonalWorkEntry::findOrFail($child)->completed_at);
     }
+    public function test_nightly_rechecks_rows_rescheduled_or_manually_completed_after_count():void {
+        foreach(['future','completed'] as $mode){
+            $id=$this->entry();$state=(object)['changed'=>false];
+            DB::listen(function($query)use($id,$mode,$state){
+                if(!$state->changed&&str_contains($query->sql,'count(*)')&&str_contains($query->sql,'personal_work_entries')){
+                    $state->changed=true;DB::table('personal_work_entries')->where('id',$id)->update($mode==='future'?['work_date'=>'2026-11-20']:['completed_at'=>'2026-11-19 00:01:00']);
+                }
+            });
+            $this->runBatch();self::assertTrue($state->changed);$entry=PersonalWorkEntry::findOrFail($id);
+            if($mode==='future')self::assertNull($entry->completed_at);else self::assertSame('2026-11-19 00:01:00',$entry->completed_at->format('Y-m-d H:i:s'));
+        }
+    }
+    public function test_nightly_imported_request_reference_does_not_complete_original_or_notify():void {
+        $original=$this->old(['sender_id'=>2,'job_type'=>'proof']);$id=$this->entry(['source_assignment_id'=>$original,'project_job_assignment_id'=>$original]);
+        $this->runBatch();self::assertNotNull(PersonalWorkEntry::findOrFail($id)->completed_at);self::assertFalse((bool)DB::table('project_job_assignments')->where('id',$original)->value('completed'));self::assertSame(0,DB::table('job_notifications')->count());self::assertSame(0,DB::table('work_job_completion_syncs')->count());
+    }
+
 }
