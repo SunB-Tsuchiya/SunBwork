@@ -1,0 +1,13 @@
+# 再開: 進行表 工程完了の明示確定
+AGENTS→JOB_EVALUATION_CONTROL1→PROGRESS_STAGE_CONFIRM_PLAN1/MANAGER1→PROGRESS_SHEET_233_AUDIT_20261120を読む。
+
+2026-11-20 実装・コード検証完了（未配備）
+- 利用者が具体設計4点を承認済み。作業branch feature/progress-stage-confirmation-20261120、隔離worktree /tmp/sunbwork-nightly-confirm-20261120。基準df37f7e0d、当日承認SSHで本番0c20cba6b/main・既知未追跡6件・manifest差分なしを再確認。
+- ProgressStageCompletionで既存セル日時を明示確定とし、会社/案件/担当関係、割当→案件→セルとリンク予定のロック、再送時の日時維持、同一DBの進捗/通知失敗rollbackを実装。夜間コマンドは無変更。WorkJob/旧本人/通常依頼/Coordinatorセル入口を接続し、作業完了済みからも本人が確定可能。
+- worker/joblinkと校正の専用実績を区別し、本文/背景/期日/行/工程/全体/共有/印刷/リンク進捗を揃えた。見出し行など分母は変更なし。確定済み工程の後続作業では同じ工程の通知を再送しない。校正の明示完了は校正セルだけを確定し一般完了通知を重ねない。
+- 検証: SQLite :memory:限定の関連回帰233件2438断言成功。共有/印刷DTOを加えた工程確定11件95断言も成功。実Vueでセル本文/緑/行/工程/全体、専用校正、旧新MyJobと予定詳細の確定ボタンをコンパイル・描画して成功。PHP構文19件成功、追加した共有/校正窓口PHP2件は別途構文確認。/members本番用build34.98秒、manifest887・参照1135・欠損0。新資産468+manifest、旧資産は削除せず保持。
+- 初回の回帰は共有vendorの最適化クラスマップが別checkoutを参照していたため、その結果を本件の検証根拠にしない。tests/Integration/bootstrap-isolated.phpで実パスを正規化して隔離ソースへ対応させ、共有vendorを変更せず全件を再実行して上記成功。MySQL本番での並列送信試験は未実施で、合成の再送/失敗rollbackとロック実装の確認まで。
+- 本番へのコード反映/今回の利用者画面/実通知受信は未実施。既存233の2セルの補正や通知再送は行わない。migration/Seeder/一般公開はしない。TODO繰り返しの未確認4件は別件の保留のまま。
+次の1手: 保存・pushした固定差分とSHA256の配備スクリプトを提示し、正確SSHの承認後に本番へ反映する。
+
+配備承認前にアプリを本番へ反映しない。旧先行提案の「汎用完了旗fallbackで緑」「深夜バッチからセル同期」は利用者決定で置換済み。復元時はこのbranchの最新コミットと本番の版を照合し、origin/mainを本番と決めつけない。共有主作業のClaude/ziggy/売上等の変更は保護。今回のbuildは隔離worktreeで一回の環境変数指定により/members化し、主作業.env/ローカルbuildは変更していない。既確認の夜間処理/休暇/TODO配置等の画面試験は繰り返さない。

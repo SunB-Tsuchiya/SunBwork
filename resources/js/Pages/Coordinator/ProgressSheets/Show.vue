@@ -896,6 +896,7 @@
 </template>
 
 <script setup>
+import { isStageConfirmed } from '@/utils/progressStage';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -1357,6 +1358,7 @@ async function adminCompleteAssignment() {
   try {
     await callAssignmentApi(route('coordinator.progress_sheets.assignments.complete', { assignment: id }));
     updateLocalCellCompleted(id, true);
+    router.reload({ only: ['cells'], preserveScroll: true });
     jobLinkDetailModal.value.open = false;
   } catch { /* ignore */ }
   finally { jobLinkDetailModal.value.completing = false; }
@@ -1427,6 +1429,7 @@ async function onCompleteAssignmentFromCell({ assignmentId }) {
   try {
     await callAssignmentApi(route('coordinator.progress_sheets.assignments.complete', { assignment: assignmentId }));
     updateLocalCellCompleted(assignmentId, true);
+    router.reload({ only: ['cells'], preserveScroll: true });
   } catch { /* ignore */ }
 }
 
@@ -1575,9 +1578,7 @@ const sheetCompletion = computed(() => {
       total++;
       const c = cellMap[`${row.id}_${col.key}`];
       if (!c) continue;
-      if (col.type === 'joblink') { if (c.assignment_completed) done++; }
-      else if (col.type === 'proof_user') { if (c.completed_at || c.assignment_completed || c.assignment_proof_completed || c.proof_assignment_completed) done++; }
-      else { if (c.completed_at || c.assignment_completed) done++; }
+      if (isStageConfirmed(c, col.type)) done++;
     }
   }
   return { done, total };
@@ -2466,7 +2467,7 @@ function onWorkerJobDetail({ assignmentId, rowId, colKey }) {
     assigneeUserId: cell?.assignment_user_id ?? cell?.value_user_id ?? null,
     assigneeSubcontractorId: cell?.assignment_subcontractor_id ?? cell?.value_subcontractor_id ?? null,
     endDate: cell?.assignment_end_date ?? cell?.cell_deadline ?? null,
-    completed: !!(cell?.completed_at || cell?.assignment_completed),
+    completed: isStageConfirmed(cell, cell?.cell_type ?? 'worker'),
     rowId,
     colKey,
   });

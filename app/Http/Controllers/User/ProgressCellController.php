@@ -23,17 +23,7 @@ class ProgressCellController extends Controller
         // 自分が担当するセル（value_user_id）のみ完了可能
         abort_unless((int)$cell->value_user_id === (int)$user->id, 403);
 
-        $now = Carbon::now();
-        $cell->completed_at = $now;
-        $cell->save();
-
-        // schedlink型の場合、紐づいたスケジュールも完了にする
-        if ($cell->cell_type === 'schedlink' && $cell->schedule_id) {
-            \App\Models\ProjectSchedule::where('id', $cell->schedule_id)
-                ->update(['completed_at' => $now]);
-        }
-
-        ProgressLinkService::recalculate($cell);
+        $cell = app(\App\Services\ProgressStageCompletion::class)->confirmCell($user, $cell);
 
         return response()->json(['success' => true, 'completed_at' => $cell->completed_at->toDateTimeString()]);
     }

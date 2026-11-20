@@ -35,6 +35,7 @@ class ProgressSheetProofController extends Controller
             ->whereIn('col_key', $proofKeys)
             ->with([
                 'proofAssignment:id,title,completed,proof_completed_at,user_id',
+                'assignment:id,proof_completed_at',
                 'proofAssignment.user:id,name',
             ])
             ->get();
@@ -59,9 +60,8 @@ class ProgressSheetProofController extends Controller
             'proof_assignment_title'     => $c->proofAssignment?->title,
             'proof_assignment_user_id'   => $c->proofAssignment?->user_id,
             'proof_assignment_user_name' => $c->proofAssignment?->user?->name,
-            'proof_assignment_completed' => $c->proofAssignment
-                ? ($c->proofAssignment->completed || $c->proofAssignment->proof_completed_at !== null)
-                : false,
+            'proof_assignment_completed' => $c->completed_at !== null
+                || $c->assignment?->proof_completed_at !== null || $c->proofAssignment?->proof_completed_at !== null,
             'proof_request_id'           => $pendingProofRequests[$c->id] ?? null,
         ])->values();
 

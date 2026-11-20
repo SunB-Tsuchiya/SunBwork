@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'progress-stage-confirmation-1') {
+            Changelog::updateOrCreate(['version' => 'progress-stage-confirmation-1'], [
+                'title' => '進行表の工程完了と日々の作業記録を区別',
+                'released_at' => '2026-11-20',
+                'summary' => '深夜の作業記録の完了は工程を確定せず、本人が工程完了を確定すると色・進捗・通知へ反映します。',
+                'design_files' => ['z_instructions/PROGRESS_STAGE_CONFIRM_PLAN1.md'],
+                'claude_notes' => '既存progress_cells.completed_atを明示工程確定とする。旧新詳細で作業完了済みからの工程確定可。型別の表示/集計とリンク予定を統一、案件/割当/セルのロックと通知遷移で再送重複を防止。校正専用記録と通知を維持し一般通知を重ねない。DB/migration/過去セル一括補正なし、夜間バッチは変更なし。',
+                'body' => '<section class="cl-fix"><h3>進行表の工程完了</h3><ul><li>深夜の自動完了は日々の作業記録を締める処理です。工程完了の通知は送りません。</li><li>工程が終わったら「完了にする」、作業記録が完了済みの場合は「工程完了を確定」を押します。</li><li>確定した工程の色・進捗・完了通知を揃えました。</li></ul></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'new-myjob-nightly-completion-1') {
             Changelog::updateOrCreate(['version' => 'new-myjob-nightly-completion-1'], [
                 'title' => '新マイジョブも深夜に自動完了',

@@ -20,7 +20,11 @@ class LegacyReceivedJobCompletion
         $root = ProjectJobAssignment::findOrFail($id);
         if ($eventId !== null && (int) $root->user_id !== (int) $user->id) throw new AuthorizationException;
         // Keep non-proof direct requests and privileged proxies in their existing handlers.
-        if ((int) $root->user_id !== (int) $user->id || ((int) $root->sender_id !== (int) $user->id && $root->job_type !== 'proof')) return null;
+        if ((int) $root->user_id !== (int) $user->id) return null;
+        if ((int) $root->sender_id !== (int) $user->id && $root->job_type !== 'proof') {
+            if (\App\Models\ProgressCell::where('assignment_id', $root->id)->exists()) return $this->completeDirectProgress($user, $root, $context, $eventId);
+            return null;
+        }
         if (! $this->hasCandidate($user, $id)) return null;
         if ($context !== null && $context !== (int) $user->company_id) throw new AuthorizationException;
         $tree = $this->inspect($user, $id);
@@ -29,12 +33,12 @@ class LegacyReceivedJobCompletion
             if (! app(UnifiedMyJobBox::class)->available($user, $context)) $this->invalid('この系列は専用のマイジョブ詳細から完了してください。');
             return app(WorkJobMutation::class)->completeWork($user, 'assignment', $id, $context, $eventId);
         }
-        if (! $tree['received'] && ! $tree['proof']) return null;
+        if (! $tree['received'] && ! $tree['proof'] && ! $tree['progress']) return null;
         if (DB::transactionLevel() !== 0) throw new \LogicException('Legacy received completion must own its transaction');
         $result = DB::transaction(function () use ($user, $id, $tree, $eventId) {
             foreach ($tree['chain'] as $assignment) ProjectJobAssignment::whereKey($assignment->id)->lockForUpdate()->firstOrFail();
             $again = $this->inspect($user, $id, true);
-            if ($again['mixed'] || (! $again['received'] && ! $again['proof']) || $this->signature($tree) !== $this->signature($again)) {
+            if ($again['mixed'] || (! $again['received'] && ! $again['proof'] && ! $again['progress']) || $this->signature($tree) !== $this->signature($again)) {
                 $this->invalid('続き元または依頼が更新されました。詳細を開き直してください。');
             }
             $occurredOn = null;
@@ -47,7 +51,8 @@ class LegacyReceivedJobCompletion
             $originals = app(WorkJobReceivedCompletion::class)->originals($user, $again['chain']);
             $expected = array_unique(array_filter(array_map(fn ($a) => $a->supersedes_assignment_id, $again['chain'])));
             if (! $again['proof'] && count($originals) !== count($expected)) $this->invalid('依頼の種類が更新されました。詳細を開き直してください。');
-            $changed = ! $again['chain'][count($again['chain']) - 1]->completed;
+            $changed = ! $again['chain'][count($again['chain']) - 1]->completed
+                || app(ProgressStageCompletion::class)->pending($again['chain']);
             $syncAssignments = app(WorkJobLegacyCompletion::class)->complete($user, $again['chain'], $occurredOn);
             return ['id' => $id, 'type' => 'assignment', 'changed' => $changed,
                 'completed_targets' => array_map(fn ($a) => ['type' => 'assignment', 'id' => (int) $a->id], $again['chain']),
@@ -59,6 +64,36 @@ class LegacyReceivedJobCompletion
         return $result + ['pending_syncs' => $pending];
     }
 
+    /** Direct requested stage jobs keep their existing independent (non-import) completion path. */
+    private function completeDirectProgress(User $user, ProjectJobAssignment $reference, ?int $context, ?int $eventId): array
+    {
+        if ($context !== null && $context !== (int) $user->company_id) throw new AuthorizationException;
+        if (DB::transactionLevel() !== 0) throw new \LogicException('Completion must own its transaction');
+        $result = DB::transaction(function () use ($user, $reference, $eventId) {
+            $assignment = ProjectJobAssignment::whereKey($reference->id)->lockForUpdate()->firstOrFail();
+            if ((int) $assignment->user_id !== (int) $user->id || $assignment->job_type === 'proof'
+                || ($assignment->company_id !== null && (int) $assignment->company_id !== (int) $user->company_id)
+                || ($assignment->department_id !== null && (int) $assignment->department_id !== (int) $user->department_id)
+                || ! $assignment->projectJob
+                || ($assignment->projectJob->company_id !== null && (int) $assignment->projectJob->company_id !== (int) $user->company_id)) throw new AuthorizationException;
+            if ($eventId !== null) $this->lockEvent($user, (int) $assignment->id, $eventId);
+            $stage = app(ProgressStageCompletion::class)->confirm($user, $assignment);
+            $changed = ! $assignment->completed || $stage['changed'];
+            $assignment->completed = true;
+            if ($status = DB::table('statuses')->where('key', 'completed')->orWhere('slug', 'completed')->first()) $assignment->status_id = $status->id;
+            $assignment->save();
+            if ($stage['changed']) JobNotificationService::notifyProgressCompleted($user, $assignment->projectJob, $assignment, true);
+            foreach (Event::where('project_job_assignment_id', $assignment->id)->lockForUpdate()->get() as $event) {
+                $this->lockEvent($user, (int) $assignment->id, (int) $event->id);
+                if (! str_starts_with((string) $event->title, '【完了】')) { $event->title = '【完了】'.$event->title; $event->save(); }
+            }
+            return ['changed' => $changed];
+        }, 3);
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)->complete($reference->fresh(), $user->id);
+        return $result + ['id' => (int) $reference->id, 'type' => 'assignment', 'pending_syncs' => 0,
+            'completed_targets' => [['type' => 'assignment', 'id' => (int) $reference->id]]];
+    }
+
     /** Do not reroute unrelated legacy self jobs or direct-request continuation chains. */
     private function hasCandidate(User $user, int $id): bool
     {
@@ -67,6 +102,7 @@ class LegacyReceivedJobCompletion
             if (isset($seen[$id])) $this->invalid('続き元が循環しています。');
             $seen[$id] = true;
             $job = ProjectJobAssignment::where('user_id', $user->id)->findOrFail($id);
+            if (\App\Models\ProgressCell::where('assignment_id', $job->id)->exists()) return true;
             if ($job->job_type === 'proof' || $job->coordinator_assignment_id || $job->supersedes_assignment_id || $job->source_personal_work_entry_id) return true;
             if (! $job->source_assignment_id) return false;
             $id = (int) $job->source_assignment_id;
@@ -76,7 +112,7 @@ class LegacyReceivedJobCompletion
 
     private function inspect(User $user, int $id, bool $lock = false): array
     {
-        $chain = []; $seen = []; $received = false; $proof = false; $mixed = false;
+        $chain = []; $seen = []; $received = false; $proof = false; $mixed = false; $progress = false;
         for ($depth = 0; $depth < 100; $depth++) {
             if (isset($seen[$id])) $this->invalid('続き元が循環しています。');
             $seen[$id] = true;
@@ -88,6 +124,7 @@ class LegacyReceivedJobCompletion
                 || ! $assignment->projectJob
                 || ($assignment->projectJob->company_id !== null && (int) $assignment->projectJob->company_id !== (int) $user->company_id)) throw new AuthorizationException;
             $chain[] = $assignment;
+            $progress = $progress || \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
             $proof = $proof || $assignment->job_type === 'proof';
             if ($assignment->coordinator_assignment_id) {
                 $linked = ProjectJobAssignment::whereKey($assignment->coordinator_assignment_id)->where('user_id', $user->id)->where('project_job_id', $assignment->project_job_id)->firstOrFail();
@@ -109,7 +146,7 @@ class LegacyReceivedJobCompletion
             $id = (int) $assignment->source_assignment_id;
             if ($depth === 99) $this->invalid('系列が長いため、管理者に確認してください。');
         }
-        return ['chain' => array_reverse($chain), 'received' => $received, 'proof' => $proof, 'mixed' => $mixed];
+        return ['chain' => array_reverse($chain), 'received' => $received, 'proof' => $proof, 'mixed' => $mixed, 'progress' => $progress];
     }
 
     private function signature(array $tree): array

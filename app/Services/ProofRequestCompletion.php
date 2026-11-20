@@ -31,19 +31,22 @@ class ProofRequestCompletion
                     $this->invalid('校正依頼の案件を確認してください。');
                 }
                 if (! $source->proof_completed_at) { $source->proof_completed_at = now(); $source->save(); }
+                app(ProgressStageCompletion::class)->confirm($actor, $source, true);
             }
             if ($proof) {
                 $proof = ProjectJobAssignment::whereKey($proof->id)->lockForUpdate()->firstOrFail();
                 if ($proof->job_type !== 'proof' || (int) $proof->project_job_id !== (int) $request->project_job_id
                     || (int) $proof->user_id !== (int) $request->proofreader_id) $this->invalid('校正担当の関係を確認してください。');
                 $proof->completed = true;
+                $proof->proof_completed_at ??= now();
                 if ($status = DB::table('statuses')->where('key', 'completed')->orWhere('slug', 'completed')->first()) $proof->status_id = $status->id;
                 $proof->save();
+                app(ProgressStageCompletion::class)->confirm($actor, $proof, true);
             }
             $request->status = 'completed'; $request->completed_at = now(); $request->save();
             JobNotificationService::notifyProofCompleted($actor, $request, true);
             return true;
-        });
+        }, 3);
     }
 
     /** An assignment has just transitioned, inside its caller's transaction. */

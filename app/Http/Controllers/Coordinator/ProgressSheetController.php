@@ -195,7 +195,7 @@ class ProgressSheetController extends Controller
                 'assignment_end_date'         => $c->assignment?->desired_end_date?->format('Y-m-d'),
                 'proof_assignment_id'         => $c->proof_assignment_id,
                 'proof_assignment_title'      => $c->proofAssignment?->title,
-                'proof_assignment_completed'  => $c->proofAssignment?->completed || $c->proofAssignment?->proof_completed_at !== null,
+                'proof_assignment_completed'  => $c->proofAssignment?->proof_completed_at !== null,
                 'proof_request_pending'       => $c->id ? $pendingProofRequestMap->has($c->id) : false,
                 'proof_request_id'            => $c->id ? ($pendingProofRequestMap->get($c->id)?->id ?? null) : null,
                 'proof_request_deadline'      => $c->id ? ($pendingProofRequestMap->get($c->id)?->deadline?->format('Y-m-d') ?? null) : null,
@@ -585,35 +585,21 @@ class ProgressSheetController extends Controller
         $isOwner = $assignment->user_id === $user->id;
         abort_unless($isAdmin || $isOwner, 403);
 
-        $assignment->completed = true;
-        $this->setCompletedStatus($assignment);
-        $assignment->save();
-
-        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
-            ->complete($assignment, $user->id);
-
-        // workerセルの completed_at を記録
-        try {
-            \App\Models\ProgressCell::where('assignment_id', $assignment->id)
-                ->whereNull('completed_at')
-                ->update(['completed_at' => now()]);
-        } catch (\Throwable $__e) {
-            // non-fatal
-        }
-
-        // ジョブ通知（進行管理表リンクあり → リーダー/サブCoへ）
-        try {
-            $pj = $assignment->projectJob
-                ?? \App\Models\ProjectJob::find($assignment->project_job_id);
-            if ($pj) {
-                $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
-                if ($hasProgressLink) {
-                    \App\Services\JobNotificationService::notifyProgressCompleted($user, $pj, $assignment);
-                }
+        $project = $assignment->projectJob;
+        abort_unless($project && ($project->company_id === null || (int) $project->company_id === (int) $user->company_id), 403);
+        DB::transaction(function () use ($assignment, $user) {
+            $locked = ProjectJobAssignment::whereKey($assignment->id)->lockForUpdate()->firstOrFail();
+            abort_unless((int) $locked->project_job_id === (int) $assignment->project_job_id, 409);
+            $locked->completed = true;
+            $this->setCompletedStatus($locked);
+            $locked->save();
+            $stage = app(\App\Services\ProgressStageCompletion::class)->confirm($user, $locked);
+            if ($stage['changed'] && $locked->job_type !== 'proof') {
+                \App\Services\JobNotificationService::notifyProgressCompleted($user, $locked->projectJob, $locked, true);
             }
-        } catch (\Throwable $__eNotify) {
-            \Illuminate\Support\Facades\Log::warning('ProgressSheetController: completeAssignment notification error', ['error' => $__eNotify->getMessage()]);
-        }
+        }, 3);
+        // Preserve the existing external sync path, after the local transaction commits.
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)->complete($assignment->fresh(), $user->id);
 
         // イベントも完了にする（進行表→イベント同期）
         try {
@@ -652,21 +638,15 @@ class ProgressSheetController extends Controller
         $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk', 'leader']);
         abort_unless($isAdmin, 403);
 
-        $assignment->completed = false;
-        $assignment->status_id = null;
-        $assignment->save();
-
-        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
-            ->reopen($assignment, $user->id);
-
-        // 進行表セルの completed_at もクリア
-        try {
-            \App\Models\ProgressCell::where('assignment_id', $assignment->id)
-                ->whereNotNull('completed_at')
-                ->update(['completed_at' => null]);
-        } catch (\Throwable $__e) {
-            // non-fatal
-        }
+        $project = $assignment->projectJob;
+        abort_unless($project && ($project->company_id === null || (int) $project->company_id === (int) $user->company_id), 403);
+        DB::transaction(function () use ($assignment) {
+            $locked = ProjectJobAssignment::whereKey($assignment->id)->lockForUpdate()->firstOrFail();
+            abort_unless((int) $locked->project_job_id === (int) $assignment->project_job_id, 409);
+            $locked->completed = false; $locked->status_id = null; $locked->save();
+            app(\App\Services\ProgressStageCompletion::class)->reopen($locked);
+        }, 3);
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)->reopen($assignment->fresh(), $user->id);
 
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
     }
@@ -745,7 +725,8 @@ class ProgressSheetController extends Controller
             ->with([
                 'valueUser:id,name',
                 'valueSubcontractor:id,name',
-                'assignment:id,desired_end_date,completed',
+                'assignment:id,desired_end_date,completed,proof_completed_at',
+                'proofAssignment:id,proof_completed_at',
                 'schedule:id,name,end_date,completed_at',
                 'noteUser:id,name,user_role',
             ])
@@ -763,10 +744,11 @@ class ProgressSheetController extends Controller
                 'value_subcontractor_id'   => $c->value_subcontractor_id,
                 'value_subcontractor_name' => $c->valueSubcontractor?->name,
                 'assignment_id'            => null,
-                'assignment_completed'     => $c->completed_at !== null || ($c->assignment?->completed ?? false),
+                'assignment_completed'     => ($c->assignment?->completed ?? false),
                 'assignment_end_date'      => $c->assignment?->desired_end_date?->format('Y-m-d'),
                 'proof_assignment_id'      => null,
-                'proof_assignment_completed' => false,
+                'assignment_proof_completed' => $c->assignment?->proof_completed_at !== null,
+                'proof_assignment_completed' => $c->proofAssignment?->proof_completed_at !== null,
                 'schedule_id'              => $c->schedule_id,
                 'schedule_name'            => $c->schedule?->name,
                 'schedule_end_date'        => $c->schedule?->end_date?->format('Y-m-d'),

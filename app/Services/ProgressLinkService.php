@@ -12,7 +12,7 @@ use Carbon\Carbon;
 class ProgressLinkService
 {
     // column_config の type と ProgressCell の cell_type の両方をカバー
-    const COMPLETABLE_TYPES = ['worker', 'schedlink', 'proof_v2', 'proof_user'];
+    const COMPLETABLE_TYPES = ['worker', 'schedlink', 'proof_v2', 'proof_user', 'joblink'];
 
     /**
      * セル完了/未完了後に呼び出す。紐づく全スケジュールの進捗を再計算する。
@@ -50,9 +50,8 @@ class ProgressLinkService
             if ($total === 0) continue;
             $done = ProgressCell::where('row_id', $item->row_id)
                 ->whereIn('col_key', $sheetLeafKeys)
-                ->whereNotNull('completed_at')
-                ->count();
-            self::applyProgressCounts($item->linked_schedule_id, $done, $total);
+                ->orderBy('id')->lockForUpdate()->with('assignment', 'proofAssignment', 'row.sheet')->get()->filter(fn ($cell) => ProgressStageCompletion::confirmed($cell))->count();
+            self::applyProgressCounts($item->linked_schedule_id, $done, $total, (int) $sheet->project_job_id);
         }
 
         // 列リンク
@@ -68,9 +67,8 @@ class ProgressLinkService
                 if ($total === 0) continue;
                 $done = ProgressCell::whereIn('col_key', $leafKeys)
                     ->whereHas('row', fn($q) => $q->where('sheet_id', $sheetId))
-                    ->whereNotNull('completed_at')
-                    ->count();
-                self::applyProgressCounts($item->linked_schedule_id, $done, $total);
+                    ->orderBy('id')->lockForUpdate()->with('assignment', 'proofAssignment', 'row.sheet')->get()->filter(fn ($cell) => ProgressStageCompletion::confirmed($cell))->count();
+                self::applyProgressCounts($item->linked_schedule_id, $done, $total, (int) $sheet->project_job_id);
             }
         }
     }
@@ -95,10 +93,9 @@ class ProgressLinkService
 
         $done = ProgressCell::where('row_id', $rowId)
             ->whereIn('col_key', $leafKeys)
-            ->whereNotNull('completed_at')
-            ->count();
+            ->orderBy('id')->lockForUpdate()->with('assignment', 'proofAssignment', 'row.sheet')->get()->filter(fn ($cell) => ProgressStageCompletion::confirmed($cell))->count();
 
-        self::applyProgressCounts($item->linked_schedule_id, $done, $total);
+        self::applyProgressCounts($item->linked_schedule_id, $done, $total, (int) $sheet->project_job_id);
     }
 
     // ── 列リンク ──────────────────────────────────────────────────────────────
@@ -130,19 +127,21 @@ class ProgressLinkService
 
             $done = ProgressCell::whereIn('col_key', $leafKeys)
                 ->whereHas('row', fn($q) => $q->where('sheet_id', $sheetId))
-                ->whereNotNull('completed_at')
-                ->count();
+                ->orderBy('id')->lockForUpdate()->with('assignment', 'proofAssignment', 'row.sheet')->get()->filter(fn ($cell) => ProgressStageCompletion::confirmed($cell))->count();
 
-            self::applyProgressCounts($item->linked_schedule_id, $done, $total);
+            self::applyProgressCounts($item->linked_schedule_id, $done, $total, (int) $sheet->project_job_id);
         }
     }
 
     // ── スケジュール更新 ──────────────────────────────────────────────────────
 
-    private static function applyProgressCounts(int $scheduleId, int $done, int $total): void
+    private static function applyProgressCounts(int $scheduleId, int $done, int $total, int $projectId): void
     {
         $progress    = (int) round($done / $total * 100);
-        $completedAt = $progress >= 100 ? Carbon::now() : null;
+        $schedule = ProjectSchedule::whereKey($scheduleId)->lockForUpdate()->first();
+        if (! $schedule) return;
+        abort_unless((int) $schedule->project_job_id === $projectId, 422, 'リンク先の予定の案件を確認してください。');
+        $completedAt = $progress >= 100 ? ($schedule->completed_at ?? Carbon::now()) : null;
 
         ProjectSchedule::where('id', $scheduleId)->update([
             'progress'     => $progress,

@@ -126,6 +126,7 @@ class WorkJobReader
             foreach (['planned', 'lunch', 'afterLunch', 'recorded'] as $field) $totals[$field] = array_sum(array_column(array_column($items, 'time'), $field));
         }
         return ['items' => $items, 'totals' => $totals, 'allCompleted' => ! in_array(false, array_column($items, 'completed'), true),
+            'stagePending' => app(ProgressStageCompletion::class)->pending(array_map(fn ($node) => $this->resolve($user, 'assignment', $node['id'], $context), array_values(array_filter($ancestors, fn ($node) => $node['type'] === 'assignment')))),
             'operationsEnabled' => true, 'canContinue' => true, 'mixed' => $mixed,
             'syncPending' => \Illuminate\Support\Facades\DB::table('work_job_completion_syncs')->whereNull('synced_at')
                 ->where('user_id', $user->id)->whereIn('assignment_id', $this->syncAssignmentIds($items))->exists(),

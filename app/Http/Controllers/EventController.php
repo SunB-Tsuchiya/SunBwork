@@ -1223,6 +1223,8 @@ class EventController extends Controller
             'lunch_overlap_minutes'        => $lunchOverlapMinutes,
             'proof_requested'              => $proofRequested,
             'chain_series'                 => $chainSeries,
+            'stage_pending' => $event->projectJobAssignment && (int) $event->user_id === (int) request()->user()->id
+                ? app(\App\Services\ProgressStageCompletion::class)->pendingChain($event->projectJobAssignment) : false,
             'overlapping_events'           => $overlappingEvents,
             'dynamic_interruption_minutes' => $dynamicInterruptionMinutes,
         ]);
@@ -1348,6 +1350,8 @@ class EventController extends Controller
             'lunch_end'                    => $lunchEnd,
             'lunch_overlap_minutes'        => $lunchOverlapMinutes,
             'chain_series'                 => $chainSeries,
+            'stage_pending' => $event->projectJobAssignment && (int) $event->user_id === (int) request()->user()->id
+                ? app(\App\Services\ProgressStageCompletion::class)->pendingChain($event->projectJobAssignment) : false,
             'overlapping_events'           => $overlappingEvents,
             'dynamic_interruption_minutes' => $dynamicInterruptionMinutes,
         ]);

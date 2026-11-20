@@ -161,6 +161,7 @@
 </template>
 
 <script setup>
+import { isStageConfirmed } from '@/utils/progressStage';
 import { computed, reactive, ref, onMounted, onUpdated } from 'vue';
 import ProgressCell from '@/Components/ProgressCell.vue';
 
@@ -384,9 +385,7 @@ const rowCompletionMap = computed(() => {
     const done = completableCols.filter((l) => {
       const c = cellMap.value[`${row.id}_${l.key}`];
       if (!c) return false;
-      if (l.type === 'joblink') return !!c.assignment_completed;
-      if (l.type === 'proof_user') return !!(c.completed_at || c.assignment_completed || c.assignment_proof_completed || c.proof_assignment_completed);
-      return !!c.completed_at;
+      return isStageConfirmed(c, l.type);
     }).length;
     map[row.id] = { done, total };
   }
@@ -416,8 +415,7 @@ const groupProgressMap = computed(() => {
       return sum + props.rows.filter(row => {
         const c = cellMap.value[`${row.id}_${l.key}`];
         if (!c) return false;
-        if (l.type === 'proof_user') return !!(c.completed_at || c.assignment_proof_completed || c.assignment_completed);
-        return !!c.completed_at;
+        return isStageConfirmed(c, l.type);
       }).length;
     }, 0);
     map[node.key] = { done, total };

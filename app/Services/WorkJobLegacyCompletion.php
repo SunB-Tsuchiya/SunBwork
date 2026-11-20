@@ -23,12 +23,15 @@ class WorkJobLegacyCompletion
         $allAssignments = array_merge($assignments, array_values($originals));
         $notifications = []; $progressProjects = []; $receivedNotifications = [];
         foreach ($allAssignments as $assignment) {
-            $changed = ! $assignment->completed;
+            $workChanged = ! $assignment->completed;
+            $changed = $workChanged;
             $assignment->completed = true;
             $assignment->status_id = $status->id;
             $assignment->save();
-            $progress = ProgressCell::where('assignment_id', $assignment->id)->exists();
-            ProgressCell::where('assignment_id', $assignment->id)->whereNull('completed_at')->update(['completed_at' => now()]);
+            $stage = app(ProgressStageCompletion::class)->confirm($user, $assignment);
+            $progress = $stage['linked'];
+            $changed = $changed || $stage['changed'];
+            $notificationChanged = $progress ? $stage['changed'] : $workChanged;
             \App\Models\WorkflowCell::where('assignment_id', $assignment->id)->whereNull('completed_at')->update(['completed_at' => now()]);
             foreach (Event::where('project_job_assignment_id', $assignment->id)->lockForUpdate()->get() as $event) {
                 if ((int) $event->user_id !== (int) $user->id
@@ -41,15 +44,15 @@ class WorkJobLegacyCompletion
                     $event->save();
                 }
             }
-            if ($progress) $progressProjects[(int) $assignment->project_job_id] = true;
+            if ($progress && $stage['changed']) $progressProjects[(int) $assignment->project_job_id] = true;
             if (isset($originals[$assignment->id])) {
-                if ($changed) $receivedNotifications[] = [$assignment, $progress];
+                if ($notificationChanged) $receivedNotifications[] = [$assignment, $progress];
                 $messageState = [];
                 if (Schema::hasColumn('job_assignment_messages', 'completed')) $messageState['completed'] = true;
                 if (Schema::hasColumn('job_assignment_messages', 'status_id')) $messageState['status_id'] = $status->id;
                 if ($messageState) JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)->update($messageState);
             } elseif ($changed) $this->completeProof($user, $assignment);
-            if ($changed && $assignment->projectJob && ! isset($originals[$assignment->id])
+            if ($notificationChanged && $assignment->job_type !== 'proof' && $assignment->projectJob && ! isset($originals[$assignment->id])
                 && ! isset($originals[$assignment->supersedes_assignment_id])) {
                 // One notification per project per operation; a progress-linked ancestor wins.
                 $key = (int) $assignment->project_job_id;

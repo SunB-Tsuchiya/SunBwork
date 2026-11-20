@@ -103,6 +103,7 @@ class WorkJobMutation
                 if ($node['type'] === 'entry') $entryIds[] = $node['id'];
                 else $assignments[] = $this->reader->resolve($user, 'assignment', $node['id'], $context);
             }
+            $changed = $changed || app(ProgressStageCompletion::class)->pending($assignments);
             $syncAssignments = app(WorkJobLegacyCompletion::class)->complete($user, $assignments, $occurredOn);
             PersonalWorkEntry::whereIn('id', $entryIds)->whereNull('completed_at')->update(['completed_at' => now()]);
             return ['id' => $id, 'type' => $type, 'changed' => $changed, 'completed_ids' => $entryIds,

@@ -341,15 +341,16 @@
       <!-- 左70%: 担当者 + 締切/完了 -->
       <div class="flex-1 px-2 py-1 flex flex-col justify-center gap-0.5" style="min-width:0">
         <!-- 完了済み / 登録済み: 担当者ロック表示 -->
-        <template v-if="cell.assignment_id || cell.completed_at || cell.assignment_completed">
+        <template v-if="cell.assignment_id || isStageConfirmed(cell, colDef.type)">
           <div class="flex items-center gap-1">
             <span class="text-xs text-gray-400">🔒</span>
             <span class="text-sm font-medium text-gray-700 truncate">{{ workerAssigneeName }}</span>
           </div>
-          <span v-if="cell.completed_at || cell.assignment_completed" class="text-xs text-green-600">
+          <span v-if="isStageConfirmed(cell, colDef.type)" class="text-xs text-green-600">
             完了: {{ cell.completed_at ? formatDate(cell.completed_at) : '済' }}
           </span>
-          <span v-else-if="workerDeadline" class="text-xs" :class="workerDeadlineColor">
+          <span v-else-if="cell.assignment_completed" class="text-xs text-amber-700">作業記録は完了・工程未確定</span>
+          <span v-if="!isStageConfirmed(cell, colDef.type) && workerDeadline" class="text-xs" :class="workerDeadlineColor">
             締切: {{ formatShortDate(workerDeadline) }}
           </span>
           <span v-if="cell.work_minutes" class="text-xs text-gray-500">作業: {{ formatWorkMinutes(cell.work_minutes) }}</span>
@@ -388,7 +389,7 @@
       <!-- 右30%: ステータス・操作ボタン -->
       <div class="flex flex-col items-center justify-center gap-1 border-l border-gray-200 px-1.5 py-1" style="min-width:70px;max-width:80px">
         <!-- 完了済み -->
-        <template v-if="cell.completed_at || cell.assignment_completed">
+        <template v-if="isStageConfirmed(cell, colDef.type)">
           <span class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">✓ 完了</span>
           <button
             v-if="cell.assignment_id && canEdit"
@@ -604,7 +605,7 @@
   <td
     v-else-if="colDef.type === 'joblink'"
     class="border border-gray-200 px-2 py-1 text-center align-middle min-w-[80px] transition-colors"
-    :class="cell.assignment_completed ? 'bg-green-50' : ''"
+    :class="isStageConfirmed(cell, colDef.type) ? 'bg-green-50' : ''"
   >
     <template v-if="canEdit || jobLinkOnly">
       <button
@@ -616,7 +617,7 @@
       <div v-else class="flex flex-col items-center gap-0.5">
         <!-- 完了バッジ or 登録済バッジ -->
         <span
-          v-if="cell.assignment_completed"
+          v-if="isStageConfirmed(cell, colDef.type)"
           class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
         >✓ 完了</span>
         <span v-else class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
@@ -624,11 +625,11 @@
         <button
           type="button"
           class="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-300"
-          @click="emit('job-link-detail', { assignmentId: cell.assignment_id, assignmentTitle: cell.assignment_title, assigneeUserId: cell.assignment_user_id, assigneeSubcontractorId: cell.assignment_subcontractor_id, endDate: cell.assignment_end_date, completed: cell.assignment_completed, rowId, colKey: colDef.key })"
+          @click="emit('job-link-detail', { assignmentId: cell.assignment_id, assignmentTitle: cell.assignment_title, assigneeUserId: cell.assignment_user_id, assigneeSubcontractorId: cell.assignment_subcontractor_id, endDate: cell.assignment_end_date, completed: isStageConfirmed(cell, colDef.type), rowId, colKey: colDef.key })"
         >詳細</button>
         <!-- 担当者本人のみ: 完了にするボタン -->
         <button
-          v-if="!cell.assignment_completed && authUserId && String(cell.assignment_user_id) === String(authUserId)"
+          v-if="!isStageConfirmed(cell, colDef.type) && authUserId && String(cell.assignment_user_id) === String(authUserId)"
           type="button"
           class="mt-0.5 rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
           @click="emit('complete-assignment', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
@@ -640,7 +641,7 @@
       <!-- 閲覧のみ -->
       <div v-if="cell.assignment_id" class="flex flex-col items-center gap-0.5">
         <span
-          v-if="cell.assignment_completed"
+          v-if="isStageConfirmed(cell, colDef.type)"
           class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
         >✓ 完了</span>
         <span v-else class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
@@ -788,6 +789,7 @@
 </template>
 
 <script setup>
+import { isStageConfirmed } from '@/utils/progressStage';
 import { computed, ref } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
@@ -1000,7 +1002,7 @@ const workerDeadline = computed(() => {
 
 const workerDeadlineColor = computed(() => {
   const d = workerDeadline.value;
-  if (!d || props.cell.completed_at) return 'text-gray-500';
+  if (!d || isStageConfirmed(props.cell, props.colDef.type)) return 'text-gray-500';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const deadline = new Date(d);
@@ -1011,7 +1013,7 @@ const workerDeadlineColor = computed(() => {
 });
 
 const workerCellBg = computed(() => {
-  if (props.cell.completed_at) return 'bg-green-50';
+  if (isStageConfirmed(props.cell, props.colDef.type)) return 'bg-green-50';
   const d = workerDeadline.value;
   if (!d) return '';
   const today = new Date();
@@ -1024,7 +1026,7 @@ const workerCellBg = computed(() => {
 });
 
 const workerCellBorder = computed(() => {
-  if (props.cell.completed_at) return 'border-left: 3px solid #16a34a';
+  if (isStageConfirmed(props.cell, props.colDef.type)) return 'border-left: 3px solid #16a34a';
   const d = workerDeadline.value;
   if (!d) return '';
   const today = new Date();
@@ -1070,12 +1072,7 @@ function onWorkerAssigneeChange(val) {
 
 // ── proof_user型ヘルパー ─────────────────────────────────
 const proofCellCompleted = computed(() => {
-  return !!(
-    props.cell.completed_at ||
-    props.cell.assignment_completed ||
-    props.cell.assignment_proof_completed ||
-    props.cell.proof_assignment_completed
-  );
+  return isStageConfirmed(props.cell, props.colDef.type);
 });
 
 const proofAssigneeName = computed(() => {
@@ -1147,7 +1144,7 @@ const schedlinkDeadline = computed(() => {
 
 const schedlinkDeadlineColor = computed(() => {
   const d = schedlinkDeadline.value;
-  if (!d || props.cell.completed_at) return 'text-gray-500';
+  if (!d || isStageConfirmed(props.cell, props.colDef.type)) return 'text-gray-500';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const deadline = new Date(d);
@@ -1158,7 +1155,7 @@ const schedlinkDeadlineColor = computed(() => {
 });
 
 const schedlinkCellBg = computed(() => {
-  if (props.cell.completed_at) return 'bg-green-50';
+  if (isStageConfirmed(props.cell, props.colDef.type)) return 'bg-green-50';
   const d = schedlinkDeadline.value;
   if (!d) return '';
   const today = new Date();
@@ -1171,7 +1168,7 @@ const schedlinkCellBg = computed(() => {
 });
 
 const schedlinkCellBorder = computed(() => {
-  if (props.cell.completed_at) return 'border-left: 3px solid #16a34a';
+  if (isStageConfirmed(props.cell, props.colDef.type)) return 'border-left: 3px solid #16a34a';
   const d = schedlinkDeadline.value;
   if (!d) return '';
   const today = new Date();

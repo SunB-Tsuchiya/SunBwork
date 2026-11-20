@@ -9,6 +9,7 @@ import { route } from 'ziggy-js';
 
 const props = defineProps({
     event: Object,
+    stage_pending: { type: Boolean, default: false },
     jst_start: { type: String, default: null },
     jst_end: { type: String, default: null },
     hide_edit: { type: Boolean, default: false },
@@ -118,7 +119,7 @@ function confirmDelete() {
 }
 
 function submitComplete() {
-    // Coordinator割当は自動的に完了に設定されるため、直接完了処理を実行
+    if (props.stage_pending && !confirm('進行表の工程を確定し、完了通知に反映しますか？')) return;
     router.post(route('events.complete', { event: props.event.id }));
 }
 
@@ -251,12 +252,12 @@ const editHref = computed(() => {
                 <div v-if="event.project_job_assignment_id" class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
                     <button
                         @click="submitComplete"
-                        :disabled="isEventCompleted()"
-                        :class="isEventCompleted()
+                        :disabled="isEventCompleted() && !stage_pending"
+                        :class="isEventCompleted() && !stage_pending
                             ? 'inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
                             : 'inline-flex items-center gap-1.5 rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
                     >
-                        {{ isEventCompleted() ? '完了済み' : '完了する' }}
+                        {{ isEventCompleted() && stage_pending ? '工程完了を確定' : isEventCompleted() ? '完了済み' : '完了する' }}
                     </button>
 
                     <!-- 校正依頼ボタン（完了済みまたは校正ジョブは非表示） -->

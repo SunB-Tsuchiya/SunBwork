@@ -62,7 +62,13 @@ class UnifiedMyJobCreateTest extends TestCase
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_06_120001_support_legacy_continuation_results.php')->up();
         Schema::create('statuses', function (Blueprint $t) { $t->id(); $t->string('key'); $t->string('slug'); });
         DB::table('statuses')->insert(['id' => 1, 'key' => 'completed', 'slug' => 'completed']);
-        Schema::create('progress_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id'); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
+        Schema::create('progress_cells', function (Blueprint $t) { $t->id(); $t->integer('assignment_id')->nullable(); $t->integer('proof_assignment_id')->nullable(); $t->integer('row_id')->default(10); $t->string('col_key')->default('worker'); $t->string('cell_type')->nullable(); $t->integer('value_user_id')->nullable(); $t->integer('schedule_id')->nullable(); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
+        Schema::create('progress_sheets', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->json('column_config')->nullable(); });
+        Schema::create('progress_rows', function (Blueprint $t) { $t->id(); $t->integer('sheet_id'); $t->integer('order')->default(0); });
+        Schema::create('project_job_items', function (Blueprint $t) { $t->id(); $t->integer('progress_sheet_id'); $t->string('type'); $t->integer('row_id')->nullable(); $t->string('col_key')->nullable(); $t->integer('linked_schedule_id')->nullable(); });
+        Schema::create('project_schedules', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); $t->integer('progress')->default(0); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
+        DB::table('progress_sheets')->insert(['id' => 10, 'project_job_id' => 10, 'column_config' => json_encode([['key' => 'worker', 'type' => 'worker']])]);
+        DB::table('progress_rows')->insert(['id' => 10, 'sheet_id' => 10]);
         Schema::create('proof_requests', function (Blueprint $t) { $t->id(); $t->integer('project_job_id')->nullable(); $t->integer('proofreader_id')->nullable(); $t->integer('proof_coordinator_id')->nullable(); $t->integer('project_job_assignment_id')->nullable(); $t->integer('requester_id'); $t->string('title'); $t->string('status'); $t->dateTime('deadline')->nullable(); $t->text('note')->nullable(); $t->timestamp('completed_at')->nullable(); $t->timestamps(); });
         (require dirname(__DIR__, 2).'/database/migrations/2026_11_10_180001_add_quick_work_source_to_proof_requests.php')->up();
         Schema::create('job_notifications', function (Blueprint $t) { $t->id(); $t->string('type'); $t->integer('sender_id'); $t->integer('recipient_id'); $t->integer('project_job_id')->nullable(); $t->integer('assignment_id')->nullable(); $t->text('message'); $t->timestamps(); });
@@ -625,7 +631,7 @@ class UnifiedMyJobCreateTest extends TestCase
         self::assertFalse((bool) DB::table('project_job_assignments')->find(20)->completed);
         self::assertSame(1, DB::table('job_notifications')->where('type', 'proof_completed')->count());
         $mutation->completeEntry($this->user(), $entry, null);
-        self::assertSame(2, DB::table('job_notifications')->count());
+        self::assertSame(1, DB::table('job_notifications')->count());
     }
 
     public function test_ambiguous_proof_and_notification_failure_roll_back_every_default_database_change(): void
@@ -956,7 +962,7 @@ class UnifiedMyJobCreateTest extends TestCase
         DB::table('project_job_assignments')->insert(['id' => 200, 'project_job_id' => 10, 'user_id' => 1, 'sender_id' => 2, 'title' => '合成受信', 'job_type' => 'work',
             'detail' => '合成概要', 'work_item_type_id' => 1, 'stage_id' => 1, 'difficulty_id' => 1, 'estimated_hours' => '2', 'desired_time' => '17:30',
             'desired_end_date' => '2099-12-20', 'file_info' => json_encode($info), 'amounts' => 33, 'amounts_unit' => 'file']);
-        foreach (['progress', 'workflow'] as $prefix) {
+        foreach (['workflow'] as $prefix) {
             Schema::table($prefix.'_cells', function (Blueprint $t) use ($prefix) { $t->integer('row_id')->nullable(); $t->string($prefix === 'progress' ? 'col_key' : 'stage_key')->nullable(); $t->integer('value_user_id')->nullable(); if ($prefix === 'workflow') $t->integer('assigned_user_id')->nullable(); });
             Schema::create($prefix.'_rows', function (Blueprint $t) { $t->id(); $t->integer('sheet_id'); });
             Schema::create($prefix.'_sheets', function (Blueprint $t) { $t->id(); $t->integer('project_job_id'); });

@@ -115,14 +115,16 @@ async function complete() {
                     <button type="button" :disabled="detailsOpen" class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" @click="detailsOpen = true">詳細入力</button>
                     <button v-if="series.canContinue ?? series.operationsEnabled" type="button" class="rounded border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700" @click="continuing = true">続きのマイジョブを作成</button>
                     <Link :href="route('calendar.index', { date: work.work_date, view: 'day' })" class="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">この日のカレンダー</Link>
-                    <button v-if="series.operationsEnabled && !work.completed" type="button" class="rounded bg-yellow-700 px-3 py-2 text-sm font-semibold text-white" @click="completeError = ''; confirmationOpen = true">完了にする</button>
-                    <span v-if="work.completed" class="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">完了済み</span>
+                    <button v-if="series.operationsEnabled && (!work.completed || series.stagePending)" type="button" class="rounded bg-yellow-700 px-3 py-2 text-sm font-semibold text-white" @click="completeError = ''; confirmationOpen = true">{{ work.completed && series.stagePending ? '工程完了を確定' : '完了にする' }}</button>
+                    <span v-if="work.completed && !series.stagePending" class="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">完了済み</span>
                 </div>
             </section>
+            <p v-if="work.completed && series.stagePending" class="text-sm text-amber-800">作業記録は完了しています。工程が終わったら「工程完了を確定」を押してください。</p>
             <section v-if="confirmationOpen" role="region" aria-labelledby="complete-heading" class="rounded-lg border border-yellow-300 bg-yellow-50 p-5">
                 <h3 id="complete-heading" class="font-semibold text-gray-900">次の仕事を完了にしますか？</h3>
                 <ul class="my-3 list-inside list-disc text-sm"><li v-for="item in series.completionTargets" :key="item.type + ':' + item.id">{{ item.title || '（作業名なし）' }} {{ item.date }} {{ item.start }}〜{{ item.end }}{{ item.completed ? '（完了済み）' : '' }}</li></ul>
                 <p class="mb-3 text-sm text-gray-600">この仕事と続き元を完了にします。ほかの続きの状態や、予定・数量は変わりません。</p>
+                <p v-if="series.stagePending" class="mb-3 text-sm text-gray-600">進行表の工程と完了通知に反映します。</p>
                 <p v-if="series.completionTargets?.some(item => item.receivedRequest)" class="mb-3 text-sm text-gray-600">依頼から登録した仕事は、元依頼の完了状態と依頼主・案件リーダーへの通知にも反映します。</p>
                 <p v-if="completeError" role="alert" class="mb-3 text-sm text-red-700">{{ completeError }}</p>
                 <div class="flex justify-end gap-2"><button type="button" :disabled="completing" class="rounded border px-3 py-2 text-sm" @click="confirmationOpen = false">キャンセル</button><button type="button" :disabled="completing" class="rounded bg-yellow-700 px-3 py-2 text-sm text-white disabled:opacity-50" @click="complete">{{ completing ? '処理中…' : '完了にする' }}</button></div>

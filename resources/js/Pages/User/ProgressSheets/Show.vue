@@ -113,6 +113,7 @@
 </template>
 
 <script setup>
+import { isStageConfirmed } from '@/utils/progressStage';
 import ProgressTable from '@/Components/ProgressTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -271,7 +272,7 @@ function onWorkerJobDetail({ assignmentId, rowId, colKey }) {
         open: true,
         title: cell?.assignment_title ?? '(タイトルなし)',
         endDate: cell?.assignment_end_date ?? null,
-        completed: !!(cell?.assignment_completed),
+        completed: isStageConfirmed(cell, cell?.cell_type ?? 'worker'),
         assignmentId: assignmentId ?? null,
         completing: false,
     };
@@ -338,6 +339,7 @@ async function onCompleteAssignment({ assignmentId }) {
             const cellIdx = localCells.value.findIndex((c) => c.assignment_id === assignmentId);
             if (cellIdx >= 0) {
                 localCells.value.splice(cellIdx, 1, { ...localCells.value[cellIdx], assignment_completed: true });
+                router.reload({ only: ['cells'], preserveScroll: true });
             }
         }
     } catch {
@@ -397,6 +399,7 @@ async function completeFromModal() {
             const cellIdx = localCells.value.findIndex((c) => c.assignment_id === assignmentId);
             if (cellIdx >= 0) {
                 localCells.value.splice(cellIdx, 1, { ...localCells.value[cellIdx], assignment_completed: true });
+                router.reload({ only: ['cells'], preserveScroll: true });
             }
         }
     } catch {

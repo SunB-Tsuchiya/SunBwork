@@ -519,6 +519,7 @@ class MyProjectJobController extends Controller
             'assignment'              => $assignment,
             'canDelete'               => $canDelete,
             'linkedProgressCellCount' => $linkedProgressCellCount,
+            'stagePending' => app(\App\Services\ProgressStageCompletion::class)->pendingChain($assignment),
             'proofRequested'          => $proofRequested,
             'proofRequestInfo'        => $proofRequestInfo,
         ]);

@@ -63,7 +63,7 @@ class ProgressSheetController extends Controller
                 'assignment_end_date'         => $c->assignment?->desired_end_date?->format('Y-m-d'),
                 'proof_assignment_id'         => $c->proof_assignment_id,
                 'proof_assignment_title'      => $c->proofAssignment?->title,
-                'proof_assignment_completed'  => $c->proofAssignment?->completed,
+                'proof_assignment_completed'  => $c->proofAssignment?->proof_completed_at !== null,
             ]);
 
         // ユーザー名解決用（案件メンバー + Coordinator + オーナー）
@@ -126,7 +126,8 @@ class ProgressSheetController extends Controller
             ->with([
                 'valueUser:id,name',
                 'valueSubcontractor:id,name',
-                'assignment:id,desired_end_date,completed,user_id',
+                'assignment:id,desired_end_date,completed,proof_completed_at,user_id',
+                'proofAssignment:id,proof_completed_at',
                 'assignment.user:id,name',
                 'schedule:id,name,end_date,completed_at',
                 'noteUser:id,name,user_role',
@@ -145,10 +146,11 @@ class ProgressSheetController extends Controller
                 'value_subcontractor_id'   => $c->value_subcontractor_id,
                 'value_subcontractor_name' => $c->valueSubcontractor?->name,
                 'assignment_id'            => null,
-                'assignment_completed'     => $c->completed_at !== null || ($c->assignment?->completed ?? false),
+                'assignment_completed'     => ($c->assignment?->completed ?? false),
                 'assignment_end_date'      => $c->assignment?->desired_end_date?->format('Y-m-d'),
                 'proof_assignment_id'      => null,
-                'proof_assignment_completed' => false,
+                'assignment_proof_completed' => $c->assignment?->proof_completed_at !== null,
+                'proof_assignment_completed' => $c->proofAssignment?->proof_completed_at !== null,
                 'schedule_id'              => $c->schedule_id,
                 'schedule_name'            => $c->schedule?->name,
                 'schedule_end_date'        => $c->schedule?->end_date?->format('Y-m-d'),

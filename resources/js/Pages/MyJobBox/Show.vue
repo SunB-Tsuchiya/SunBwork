@@ -29,17 +29,17 @@
                                 予定を編集
                             </Link>
 
-                            <div v-if="(assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0">
+                            <div v-if="((assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0) || stagePending || workJobContinuation?.series?.stagePending">
                                 <button
                                     @click="submitComplete"
-                                    :disabled="isAssignmentCompleted || isSubmittingComplete"
+                                    :disabled="(isAssignmentCompleted && !stagePending && !workJobContinuation?.series?.stagePending) || isSubmittingComplete"
                                     :class="
-                                        isAssignmentCompleted || isSubmittingComplete
+                                        (isAssignmentCompleted && !stagePending && !workJobContinuation?.series?.stagePending) || isSubmittingComplete
                                             ? 'cursor-not-allowed rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
                                             : 'rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'
                                     "
                                 >
-                                    {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
+                                    {{ (stagePending || workJobContinuation?.series?.stagePending) && isAssignmentCompleted ? '工程完了を確定' : isAssignmentCompleted ? '完了済み' : '完了にする' }}
                                 </button>
                             </div>
 
@@ -291,7 +291,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
-const { projectJob, assignment, canDelete, linkedProgressCellCount, proofRequested, proofRequestInfo, workJobContinuation } = defineProps({
+const { stagePending, projectJob, assignment, canDelete, linkedProgressCellCount, proofRequested, proofRequestInfo, workJobContinuation } = defineProps({
+    stagePending: { type: Boolean, default: false },
     workJobContinuation: { type: Object, default: null },
     projectJob: Object,
     assignment: Object,
@@ -545,6 +546,7 @@ async function submitComplete() {
         if (targets?.some(item => item.receivedRequest)) {
             message += '\n依頼から登録した仕事は、元依頼の完了状態と依頼主・案件リーダーへの通知にも反映します。';
         }
+        if (stagePending || workJobContinuation?.series?.stagePending) message += '\n進行表の工程と完了通知に反映します。';
         if (!confirm(message)) return;
         if (!assignment || !assignment.id) {
             alert('割当情報が見つかりません。');
