@@ -1,7 +1,7 @@
 # 再開: 進行表 工程完了の明示確定
 AGENTS→JOB_EVALUATION_CONTROL1→PROGRESS_STAGE_CONFIRM_PLAN1/MANAGER1→PROGRESS_SHEET_233_AUDIT_20261120を読む。
 
-2026-11-20 実装・コード検証完了（未配備）
+2026-11-20 実装・コード検証・本番反映済み（利用者確認待ち）
 - 利用者が具体設計4点を承認済み。作業branch feature/progress-stage-confirmation-20261120、隔離worktree /tmp/sunbwork-nightly-confirm-20261120。基準df37f7e0d、当日承認SSHで本番0c20cba6b/main・既知未追跡6件・manifest差分なしを再確認。
 - ProgressStageCompletionで既存セル日時を明示確定とし、会社/案件/担当関係、割当→案件→セルとリンク予定のロック、再送時の日時維持、同一DBの進捗/通知失敗rollbackを実装。夜間コマンドは無変更。WorkJob/旧本人/通常依頼/Coordinatorセル入口を接続し、作業完了済みからも本人が確定可能。
 - worker/joblinkと校正の専用実績を区別し、本文/背景/期日/行/工程/全体/共有/印刷/リンク進捗を揃えた。見出し行など分母は変更なし。確定済み工程の後続作業では同じ工程の通知を再送しない。校正の明示完了は校正セルだけを確定し一般完了通知を重ねない。
@@ -11,3 +11,8 @@ AGENTS→JOB_EVALUATION_CONTROL1→PROGRESS_STAGE_CONFIRM_PLAN1/MANAGER1→PROGR
 次の1手: 保存・pushした固定差分とSHA256の配備スクリプトを提示し、正確SSHの承認後に本番へ反映する。
 
 配備承認前にアプリを本番へ反映しない。旧先行提案の「汎用完了旗fallbackで緑」「深夜バッチからセル同期」は利用者決定で置換済み。復元時はこのbranchの最新コミットと本番の版を照合し、origin/mainを本番と決めつけない。共有主作業のClaude/ziggy/売上等の変更は保護。今回のbuildは隔離worktreeで一回の環境変数指定により/members化し、主作業.env/ローカルbuildは変更していない。既確認の夜間処理/休暇/TODO配置等の画面試験は繰り返さない。
+
+2026-11-20 本番反映完了・利用者確認待ち
+利用者が正確な2コマンドと手順SHA256 d26e1e8273d9913be341ae5d1fad81c04b866f54695d4f8c753ea9528290c4f2を承認。feature/progress-stage-confirmation-20261120の3630c79abをpushし、固定元0c20cba6b→3630c79abを本番mainへ反映。版/作業中ファイル/差分inventory SHA256 72f6c6c102ac3790f7ff6beebe7366f20c352280627d68569170efa25af95f7d/PHP19件の事前構文検査を通過。config/cache clear、manifest887/refs1135/missing0/base=/members、HEAD固定先・追跡clean・既知未追跡6件の前後一致を確認しSSH終了0/DEPLOY_OK。旧資産を保持。migration/Seeder/業務完了操作/旧セル補正/通知送信は実行していない。
+状態: 実装・コード検証・本番反映済み。利用者画面と実通知の受信は未確認。次の1手は進行表233の未確定かつ実作業完了済み1件だけで、担当者詳細の工程確定ボタン→緑/完了件数増/既存の宛先への通知1件を確認すること。未操作の工程を巻き込まないことも同時確認する。担当者側を確認できない/対象がない場合は未確認として残す。既確認の深夜自動完了/数量時間/校正/TODO等の再試験はしない。
+この記録コミットは保存用で、本番アプリの配備済み版は3630c79ab。資料更新だけで再配備しない。

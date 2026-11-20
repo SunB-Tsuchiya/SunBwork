@@ -2542,3 +2542,5 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-20具体設計承認: 利用者が深夜は作業のみ/明示確定で工程・通知/完了済みでも確定可/既存2件無断補正なしの4点を承認。PROGRESS_STAGE_CONFIRM_PLAN1に沿って隔離branch feature/progress-stage-confirmation-20261120で実装開始。検証/配備/画面確認は別状態。
 
 2026-11-20工程確定修正の実装・コード検証完了、未配備。関連合成233件2438断言、共有/印刷追加を含む工程11件95断言、実Vueの旧新詳細/予定詳細・型別セル/集計、本番用/membersビルド成功。本番は承認済み読み取りで0c20cba6b/main・既知未追跡6件を再確認。既存2件を自動補正せず、工程の未確定→明示確定だけを通知対象にする。詳細PROGRESS_STAGE_CONFIRM_MANAGER1。次は固定差分の配備手順を正確SSH/SHA256で確認。利用者画面/実通知は未確認、Seeder/migrationは実行しない。
+
+2026-11-20工程確定修正を本番反映: 利用者承認の2コマンド/手順SHA256 d26e1e8273d9913be341ae5d1fad81c04b866f54695d4f8c753ea9528290c4f2で0c20cba6b→3630c79ab。差分/未追跡6件保護/追跡clean/PHP構文/config-cache clear/manifest887 refs1135 missing0 /members/HEAD一致、SSH終了0。既存2セル補正/通知/業務完了/migration/Seederなし。実装・検証・本番反映まで完了、画面と実通知は未確認。次は233の未確定で実作業完了済み1件だけを本人が確定し、緑/集計/通知と未操作の工程維持を確認。TODO繰り返し4条件は別件の保留を維持。
