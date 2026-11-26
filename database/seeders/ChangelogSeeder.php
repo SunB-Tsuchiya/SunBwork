@@ -162,7 +162,7 @@ class ChangelogSeeder extends Seeder
                 'title' => '日報閲覧のタイムテーブルに新マイジョブを反映',
                 'released_at' => '2026-11-27',
                 'summary' => 'Admin・Leader・日報管理者が閲覧する日報にも、対象者の新マイジョブを表示します。',
-                'design_files' => ['z_instructions/DIARY_REVIEW_TIMELINE_PLAN1.md'],
+                'design_files' => ['z_instructions/archived/DIARY_REVIEW_TIMELINE_PLAN1.md'],
                 'claude_notes' => '認可済みの日報showから本人/対象日/現在会社部署の新形式を読取投影。本人mineを他人用に開放せず、機密/非公開は既存の表示権限で伏せる。対象者切替時の遅延応答を排除。日報本文/勤務実績/評価/完了/通知/DB構造/通常予定APIは変更なし。',
                 'body' => '<section class="cl-fix"><h3>日報のタイムテーブル</h3><p>旧形式の予定に加え、新マイジョブも表示します。非公開・機密の名称は既存の閲覧ルールで保護され、ここから作業を編集することはありません。</p></section>',
             ]);

@@ -413,6 +413,6 @@ AppLayout 内にグローバル配置済み。各ページで重複させない�
 利用者は完了済みからの本人確定、緑/各集計と未操作の工程維持、実通知の重複なしの3条件を確認済み。設計/検証/配備/利用者画面/実通知の証拠はarchived/PROGRESS_STAGE_CONFIRM_MANAGER1.mdを参照する。
 
 
-## 2026-11-27 日報閲覧の新マイジョブ反映（本番9640ba707反映・利用者確認待ち）
+## 2026-11-27 日報閲覧の新マイジョブ反映（本番9640ba707反映・利用者3条件確認済み）
 Admin/Leader/SuperAdmin/日報管理者の認可済み日報showは、日報本人・対象日の独立PersonalWorkEntryをDiaryWorkTimelineで読取投影しdiaryWorkEventsへ渡す。本人mineを他人用に緩めない。会社context/既存の日報閲覧許可を確認し、部署一覧の表示対象スイッチを流用しない。非公開・機密はPersonalWorkScheduleの既存の名称投影を使い、他社の名称は伏せる。入力用メタ/本文/添付/数量/記録時間はイベントDTOに載せない。
-Interactions/Showは旧eventsと新propsを統合し、型付きID/青系/readOnlyで表示する。日付はdate:Y-m-dをJST日付として使い+9時間を重ねない。対象者・日付の切替では以前の応答で上書きしない。本文/既読/コメント/勤務記録/計算/評価/完了/通知、一般Userの入力画面は変更なし。状態と証拠はDIARY_REVIEW_TIMELINE_MANAGER1.mdを参照する。
+Interactions/Showは旧eventsと新propsを統合し、型付きID/青系/readOnlyで表示する。日付はdate:Y-m-dをJST日付として使い+9時間を重ねない。対象者・日付の切替では以前の応答で上書きしない。本文/既読/コメント/勤務記録/計算/評価/完了/通知、一般Userの入力画面は変更なし。Admin/Leaderの新旧同日表示、本文/勤務情報の維持と表示専用の3条件は利用者確認済み。状態と証拠はarchived/DIARY_REVIEW_TIMELINE_MANAGER1.mdを参照する。
