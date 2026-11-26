@@ -1,7 +1,7 @@
 # 再開: 日報閲覧 新マイジョブ反映
 AGENTS→JOB_EVALUATION_CONTROL1→DIARY_REVIEW_TIMELINE_PLAN1/MANAGER1→DIARY_REVIEW_TIMELINE_AUDIT_20261127を読む。
 
-2026-11-27 実装・コード検証完了（未配備）
+2026-11-27 実装・コード検証・本番反映済み（利用者確認待ち）
 基準bb4ec1235（具体設計保存）、branch feature/diary-review-timeline-fix-20261127、worktree /tmp/sunbwork-diary-view-audit-20261127。利用者は具体設計3点を承認済み。共有主作業のziggy/Claude/売上は保護。
 
 実装: DiaryWorkTimelineが日報showの既存許可リスト/対象本人/会社contextを確認し、対象日・本人の独立新形式だけを必要列でSELECTする。既存PersonalWorkScheduleで非公開・機密の名称を伏せ、グローバルSuperAdminにも他社の名称を開放しない。元イベント派生/不整合な会社部署/関連案件等を除外し、入力用メタや結果/数量/記録時間を返さない。午前午後等の旧スロットは日報本人の勤務枠を使う。
@@ -17,3 +17,10 @@ PHP5件の構文成功。/members本番用build35.51秒、manifest887/refs1135/m
 保留中TODO繰り返し4条件は今回の成功に含めない。
 
 /tmp消失時はこのbranchの最新保存コミットから復元する。origin/main b1d57e1dd/共有主作業985e6fffbを本番と混同しない。本番への書込は正確SSH承認後だけ。
+
+## 2026-11-27 本番反映完了・利用者画面待ち
+利用者が正確なpush/SSHの2コマンドと手順SHA256 98e599a0698151607e45248c4e3619895ce7c9043db3854e59b28566a12fe9d0を承認。修正9640ba707をpushし、固定元3630c79ab→9640ba707を本番mainへ反映。変更前とfetch/構文検査後の版/作業中ファイル/資産、inventory SHA256 66a424b5066c20419087c7632299950755ed27dcdee6839a2d448354cca74bd3、PHP5件の事前構文確認を通過。config/cache clear、class_exists DiaryWorkTimeline、manifest887 refs1135 missing0 /members、HEAD一致・追跡clean・既知未追跡6件の前後一致まで確認しSSH終了0/DEPLOY_OK。
+旧資産を保持、migration/Seeder/日報・作業データの更新/完了/通知は実行していない。既存の作業を日報へコピーせず表示時の投影のみ。
+状態: 実装・コード検証・本番反映済み。今回の利用者画面は未確認。
+次の1手: 再読み込み後、①Adminで情報出版の他人の日報に新形式と旧予定/会議が同日表示、②Leaderの許可対象日報でも同様、③本文・勤務情報の維持と新形式が表示専用、の今回3条件だけ確認する。確認できない役割は未確認と記録し、合成成功から本番画面の成功を推測しない。日報管理者の実画面や非公開/機密の実例は未確認で、コード検証と区別する。既確認の入力/校正/工程確定は繰り返さない。TODO繰り返し4条件は保留。
+記録commit/pushは保存用。本番アプリの反映済み版は9640ba707であり、資料更新だけの再配備はしない。
