@@ -498,3 +498,8 @@ Adminの権限管理「部署の作業の表示対象」で、情報出版の人
 日々の作業記録のcompleted旗と、進行表の工程確定を分ける。worker/joblinkはprogress_cells.completed_at、校正型はセル日時または専用proof_completed_atを参照し、汎用completed旗だけで緑や進捗にしない。表示と行/工程/全体/リンク予定で同じ型別基準を使う。深夜のauto-complete:my-jobsは変更せず、工程確定や通知を起こさない。
 旧新の本人詳細で、本人・続き元・明示した元依頼に未確定の工程があれば、作業記録が完了済みでも「工程完了を確定」が使える。確認文で進行表/完了通知への反映を案内する。操作時の未確定→確定だけを通知対象とし、再送では通知/確定日時を増やさない。過去セルの推定補正をしない。既存の戻る/編集削除位置と登録公開範囲は変更なし。進捗の見出し行など分母は現行維持。
 利用者は完了済みからの本人確定、緑/各集計と未操作の工程維持、実通知の重複なしの3条件を確認済み。設計/検証/配備/利用者画面/実通知の証拠はarchived/PROGRESS_STAGE_CONFIRM_MANAGER1.mdを参照する。
+
+
+## 2026-11-27 日報閲覧の新マイジョブ反映（実装中・未配備）
+Admin/Leader/SuperAdmin/日報管理者の認可済み日報showは、日報本人・対象日の独立PersonalWorkEntryをDiaryWorkTimelineで読取投影しdiaryWorkEventsへ渡す。本人mineを他人用に緩めない。会社context/既存の日報閲覧許可を確認し、部署一覧の表示対象スイッチを流用しない。非公開・機密はPersonalWorkScheduleの既存の名称投影を使い、他社の名称は伏せる。入力用メタ/本文/添付/数量/記録時間はイベントDTOに載せない。
+Interactions/Showは旧eventsと新propsを統合し、型付きID/青系/readOnlyで表示する。日付はdate:Y-m-dをJST日付として使い+9時間を重ねない。対象者・日付の切替では以前の応答で上書きしない。本文/既読/コメント/勤務記録/計算/評価/完了/通知、一般Userの入力画面は変更なし。状態と証拠はDIARY_REVIEW_TIMELINE_MANAGER1.mdを参照する。

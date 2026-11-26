@@ -1,6 +1,6 @@
 # 日報閲覧 新マイジョブ反映 設計1
 
-2026-11-27 JST。利用者「修正しましょう」により反映漏れの修正着手を承認。以下の具体設計は実装前の確認待ち。調査資料DIARY_REVIEW_TIMELINE_AUDIT_20261127.md、AGENTS/JOB_EVALUATION_CONTROL1/ROADMAP1/CONSOLIDATED_01/05を参照する。
+2026-11-27 JST。利用者「修正しましょう」により反映漏れの修正着手を承認。以下の具体設計3点は利用者が承認済み。実装/検証の状態はMANAGERを参照する。調査資料DIARY_REVIEW_TIMELINE_AUDIT_20261127.md、AGENTS/JOB_EVALUATION_CONTROL1/ROADMAP1/CONSOLIDATED_01/05を参照する。
 基準aac8f2b6d（調査資料）、本番同日の承認済み読取3630c79ab/main・追跡clean・既知未追跡6件。origin/main b1d57e1ddと主作業985e6fffbは本番と異なる。隔離/tmp/sunbwork-diary-view-audit-20261127を使用し、Claude/ziggy/売上作業は保護する。
 
 ## 問題と対象

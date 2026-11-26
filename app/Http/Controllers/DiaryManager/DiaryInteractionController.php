@@ -223,6 +223,9 @@ class DiaryInteractionController extends Controller
             'diary'       => $diaryArray,
             'routePrefix' => 'diary_manager',
             'workRecord'  => $workRecordData,
+            'diaryWorkEvents' => app(\App\Services\DiaryWorkTimeline::class)->forDiary(
+                Auth::user(), $diary, $permitted, Auth::user()->isSuperAdmin()
+                    ? request()->session()->get('superadmin_context.company_id') : (int) Auth::user()->company_id),
         ]);
     }
 

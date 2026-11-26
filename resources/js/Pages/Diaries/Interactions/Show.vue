@@ -2,7 +2,7 @@
 import TimelineDiary from '@/Components/TimelineDiary.vue';
 import { diaryTimelineHours, fetchDiaryTimelineEvents } from '@/Helpers/diaryTimelineEvents';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -10,6 +10,7 @@ const props = defineProps({
     routePrefix: { type: String, default: 'diaries' },
     workRecord: { type: Object, default: null },
     personalWorkEnabled: { type: Boolean, default: false },
+    diaryWorkEvents: { type: Array, default: null },
 });
 
 // 残業を「○時間○分」形式に変換
@@ -169,32 +170,26 @@ function markRead() {
 const events = ref([]);
 const timelineLoadFailed = ref(false);
 
-// helper to format YYYY-MM-DD in app/JST timezone (keep consistent with Diaries/Show.vue)
-function formatJstDate(dateStr) {
-    try {
-        const d = new Date(dateStr);
-        d.setHours(d.getHours() + 9);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
-    } catch (e) {
-        return String(dateStr).split('T')[0];
-    }
-}
-
-// fetch events for this diary's date (read-only display)
-onMounted(async () => {
+// The server's date:Y-m-d diary date already identifies the JST day.
+// On navigation, an older request must not overwrite another person's timeline.
+function formatJstDate(dateStr) { return String(dateStr || '').slice(0, 10); }
+let timelineRequest = 0;
+watch(() => [props.diary.id, props.diary.user_id, props.diary.date, props.diaryWorkEvents], async () => {
+    const requestId = ++timelineRequest;
+    events.value = [];
+    timelineLoadFailed.value = false;
     try {
         const date = formatJstDate(props.diary.date);
-        const result = await fetchDiaryTimelineEvents(date, props.diary.user_id, props.personalWorkEnabled);
-        events.value = result.events.map((event) => event.readOnly
+        const supplied = Array.isArray(props.diaryWorkEvents);
+        const result = await fetchDiaryTimelineEvents(date, props.diary.user_id, supplied ? false : props.personalWorkEnabled);
+        if (requestId !== timelineRequest) return;
+        events.value = [...result.events, ...(supplied ? props.diaryWorkEvents : [])].map((event) => event.readOnly
             ? event : { ...event, title: event.title.replace(/^【完了】\s*/, '') });
         timelineLoadFailed.value = result.failed;
     } catch {
-        timelineLoadFailed.value = true;
+        if (requestId === timelineRequest) timelineLoadFailed.value = true;
     }
-});
+}, { immediate: true });
 
 // when timeline emits open-edit in read-only view, navigate to events.show (no edit)
 function onTimelineOpenEdit(payload) {

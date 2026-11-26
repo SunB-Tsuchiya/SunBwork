@@ -482,7 +482,7 @@ class DiaryInteractionController extends Controller
         $isAdmin = in_array($currentUser->user_role ?? '', ['admin', 'superadmin']);
         $permitted = $this->buildPermittedUserIds($currentUser);
 
-        if (!in_array($diary->user_id, $permitted) && !$isAdmin) {
+        if (!in_array((int) $diary->user_id, array_map('intval', $permitted), true)) {
             abort(403, 'この日報を表示する権限がありません');
         }
 
@@ -544,8 +544,8 @@ class DiaryInteractionController extends Controller
             'diary'       => $diaryArray,
             'routePrefix' => $routePrefix,
             'workRecord'  => $workRecordData,
-            'personalWorkEnabled' => (int) $currentUser->id === (int) $diary->user_id
-                && app(\App\Services\PersonalWorkSchedule::class)->available($currentUser),
+            'diaryWorkEvents' => app(\App\Services\DiaryWorkTimeline::class)->forDiary(
+                $currentUser, $diary, $permitted, $this->contextCompanyId()),
         ]);
     }
 
