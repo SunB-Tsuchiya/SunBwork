@@ -101,6 +101,7 @@ class ExpenseController extends Controller
                 'status'          => $expense->status,
                 'charge_department_id' => $expense->charge_department_id,
                 'billing_date'    => $expense->billing_date->toDateString(),
+                'billing_date_manual' => $expense->billing_date_manual,
                 'total_amount'    => $expense->total_amount,
                 'submitted_at'    => $expense->submitted_at?->timezone('Asia/Tokyo')->format('Y/m/d H:i'),
                 'reviewed_at'     => $expense->reviewed_at?->timezone('Asia/Tokyo')->format('Y/m/d H:i'),
@@ -273,12 +274,22 @@ class ExpenseController extends Controller
                 \App\Services\Billing\Transport\TransportApplicationDate::validate($data['billing_date'], $data['billing_month']);
                 $attrs['billing_date'] = $data['billing_date'];
             }
+            if (array_key_exists('billing_date_manual', $data)) {
+                $attrs['billing_date_manual'] = (bool) $data['billing_date_manual'];
+                if (!$attrs['billing_date_manual']) {
+                    $attrs['billing_date'] = \App\Services\Billing\Transport\TransportApplicationDate::initial($data['billing_month']);
+                }
+            } elseif (array_key_exists('billing_date', $data)) {
+                // Older clients explicitly supplying a date keep that choice.
+                $attrs['billing_date_manual'] = true;
+            }
             if ($expense) {
                 $expense->update($attrs);
             } else {
                 $expense = TransportExpense::create($attrs + [
                     'user_id'       => $user->id,
                     'billing_month' => $data['billing_month'],
+                    'billing_date_manual' => false,
                     'billing_date'  => \App\Services\Billing\Transport\TransportApplicationDate::initial($data['billing_month']),
                     'status'        => TransportExpense::STATUS_DRAFT,
                 ]);

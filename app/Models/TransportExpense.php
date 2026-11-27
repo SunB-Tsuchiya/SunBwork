@@ -16,6 +16,7 @@ class TransportExpense extends Model
         'charge_department_id',
         'department_code',
         'billing_date',
+        'billing_date_manual',
         'billing_month',
         'total_amount',
         'status',
@@ -29,6 +30,7 @@ class TransportExpense extends Model
 
     protected $casts = [
         'billing_date' => 'date:Y-m-d',
+        'billing_date_manual' => 'boolean',
         'total_amount' => 'integer',
         'department_code' => 'integer',
         'submitted_at' => 'datetime',

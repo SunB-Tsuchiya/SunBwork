@@ -23,6 +23,7 @@ class TransportApplicationDateTest extends UnifiedMyJobCreateTest
         DB::table('users')->where('id',1)->update(['user_role'=>'user','name'=>'合成申請者']);
         Schema::table('departments',fn(Blueprint $t)=>$t->boolean('active')->default(true));
         Schema::create('transport_expenses',function(Blueprint $t){$t->id();foreach(['user_id','company_id','department_id','charge_department_id','department_code','total_amount','reviewed_by']as$c)$t->integer($c)->nullable();$t->string('billing_month');$t->date('billing_date');$t->string('status');foreach(['submitted_at','reviewed_at','billed_at']as$c)$t->timestamp($c)->nullable();foreach(['review_comment','applicant_comment']as$c)$t->text($c)->nullable();$t->timestamps();$t->unique(['user_id','billing_month']);});
+        if ($this->name() !== 'test_transport_migration_protects_existing_document_dates') (require base_path('database/migrations/2026_11_27_120000_add_billing_date_manual_to_transport_expenses.php'))->up();
         Schema::create('transport_expense_items',function(Blueprint $t){$t->id();$t->integer('transport_expense_id');$t->integer('sort_order');$t->date('occurrence_date')->nullable();foreach(['destination','purpose','purpose_text','station_from','station_to','fare_type']as$c)$t->string($c)->nullable();$t->json('via_stations')->nullable();$t->integer('amount');$t->integer('base_amount')->nullable();$t->boolean('auto_double')->default(false);$t->timestamps();});
         Schema::create('transport_expense_item_companions',function(Blueprint $t){$t->id();$t->integer('transport_expense_item_id');$t->integer('user_id');$t->timestamps();});
         Schema::create('transport_expense_events',function(Blueprint $t){$t->id();$t->integer('transport_expense_id');$t->integer('user_id');foreach(['action','from_status','to_status']as$c)$t->string($c);$t->text('comment')->nullable();$t->timestamp('created_at')->nullable();});
@@ -42,6 +43,24 @@ class TransportApplicationDateTest extends UnifiedMyJobCreateTest
     private function persist(array $data, int $user=1):TransportExpense {
         self::assertSame(':memory:',DB::connection()->getDatabaseName());
         return (new \ReflectionMethod(ExpenseController::class,'persist'))->invoke(app(ExpenseController::class),$data,User::findOrFail($user));
+    }
+    public function test_transport_migration_protects_existing_document_dates():void {
+        $id=DB::table('transport_expenses')->insertGetId(['user_id'=>1,'company_id'=>1,'billing_month'=>'2026-11','billing_date'=>'2026-11-06','status'=>'draft','total_amount'=>200]);
+        (require base_path('database/migrations/2026_11_27_120000_add_billing_date_manual_to_transport_expenses.php'))->up();
+        $e=TransportExpense::findOrFail($id);self::assertTrue($e->billing_date_manual);self::assertSame('2026-11-06',$e->billing_date->format('Y-m-d'));self::assertSame('draft',$e->status);self::assertSame(200,$e->total_amount);
+    }
+    public function test_transport_automatic_date_follows_save_day_and_manual_choice_survives():void {
+        $e=$this->persist($this->validated($this->body(['billing_date_manual'=>false])));
+        self::assertFalse($e->billing_date_manual);self::assertSame('2026-11-20',$e->billing_date->format('Y-m-d'));
+        Carbon::setTestNow(Carbon::parse('2026-11-27 09:00:00','Asia/Tokyo'));
+        $e=$this->persist($this->validated($this->body(['billing_date'=>'2026-11-20','billing_date_manual'=>false])));
+        self::assertSame('2026-11-27',$e->billing_date->format('Y-m-d'));
+        $e=$this->persist($this->validated($this->body(['billing_date_manual'=>true])));
+        self::assertTrue($e->billing_date_manual);self::assertSame('2026-11-30',$e->billing_date->format('Y-m-d'));
+        $b=$this->body();unset($b['billing_date']);$e=$this->persist($this->validated($b));
+        self::assertTrue($e->billing_date_manual);self::assertSame('2026-11-30',$e->billing_date->format('Y-m-d'));
+        $e=$this->persist($this->validated($this->body(['billing_date_manual'=>false])));
+        self::assertFalse($e->billing_date_manual);self::assertSame('2026-11-27',$e->billing_date->format('Y-m-d'));
     }
     public function test_transport_future_month_end_is_saved_and_omitted_date_preserves_it():void {
         $e=$this->persist($this->validated($this->body()));self::assertSame('2026-11-30',$e->billing_date->format('Y-m-d'));

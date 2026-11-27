@@ -45,6 +45,7 @@ class SaveExpenseRequest extends FormRequest
         return [
             'billing_month'           => ['required', 'date_format:Y-m'],
             'billing_date'            => ['sometimes', 'required', 'date_format:Y-m-d'],
+            'billing_date_manual' => ['sometimes', 'required', 'boolean'],
             'charge_department_id'    => ['nullable', 'integer'],
             'applicant_comment'       => ['nullable', 'string', 'max:1000'],
             'items'                   => ['required', 'array', 'min:1', 'max:200'],

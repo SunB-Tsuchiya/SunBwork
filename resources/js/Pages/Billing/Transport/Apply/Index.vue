@@ -105,6 +105,20 @@ let lastSaved = '';                    // 最後に保存できた状態（JSON�
 let skipUnloadGuard = false;           // 出力（ダウンロード）などで、離脱の確認を出さない間
 
 const billingDate = ref('');
+const billingDateManual = ref(false);
+function refreshAutomaticDate() {
+    if (billingDateManual.value) return;
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+    billingDate.value = today < props.periodStart ? props.periodStart : today > props.periodEnd ? props.periodEnd : today;
+}
+function useAutomaticDate() {
+    billingDateManual.value = false;
+    refreshAutomaticDate();
+}
+function applicationDateLabel() {
+    const parts = billingDate.value.split('-');
+    return parts.length === 3 ? `${Number(parts[1])}月${Number(parts[2])}日` : '未選択';
+}
 const chargeDeptId = ref(props.defaultDeptId);   // null = 共通
 const applicantComment = ref('');                // 申請者のコメント（申請・再申請に添える。書きかけも自動保存）
 const rows = ref([newRow()]);
@@ -116,6 +130,7 @@ function loadFromProps() {
     clearTimeout(autosaveTimer);
     savedExpense.value = null;
     autosaveState.value = 'clean';
+    billingDateManual.value = props.expense ? (props.expense.billing_date_manual ?? true) : false;
     billingDate.value = props.expense?.billing_date ?? (props.defaultBillingDate || props.periodStart);
     if (props.expense) {
         chargeDeptId.value = props.expense.charge_department_id;
@@ -133,6 +148,7 @@ function loadFromProps() {
         applicantComment.value = '';
         rows.value = [newRow()];
     }
+    if (!props.expense || props.expense.status === 'draft' || props.expense.status === 'returned') refreshAutomaticDate();
     lastSaved = JSON.stringify(payload());   // 読み込んだ状態が「保存済み」の基準
 }
 // 中身が実際に変わったときだけ読み直す（登録など、同じ内容の再読み込みで、入力中の行が消えないように）
@@ -283,6 +299,7 @@ function payload() {
     return {
         billing_month: props.month,
         billing_date: billingDate.value,
+        billing_date_manual: billingDateManual.value,
         charge_department_id: chargeDeptId.value,
         applicant_comment: applicantComment.value,
         items: rows.value.slice(0, n).map(({ companions, ...r }, i) => ({ ...r, companion_ids: (companions ?? []).map((c) => c.id), sort_order: i })),
@@ -300,6 +317,7 @@ async function save(after) {
     errors.value = {};
     clearTimeout(autosaveTimer);
     if (inFlight) await inFlight.catch(() => {});
+    refreshAutomaticDate();
     const body = payload();
     const snap = JSON.stringify(body);
     router.post(rt('store'), body, {
@@ -334,6 +352,7 @@ async function runAutosave() {
     if (inFlight) await inFlight.catch(() => {});
     if (submitting.value || !editable.value || !hasUnsaved()) return true;
 
+    refreshAutomaticDate();
     const body = payload();
     const snap = JSON.stringify(body);
     autosaveState.value = 'saving';
@@ -396,7 +415,8 @@ onBeforeUnmount(() => {
 
 function saveDraft() { save(); }
 function saveAndSubmit() {
-    if (!confirm(`${monthLabel(props.month)}の交通費（合計 ${totalAmount.value.toLocaleString()} 円）を申請します。よろしいですか？`)) return;
+    refreshAutomaticDate();
+    if (!confirm(`${monthLabel(props.month)}の交通費（合計 ${totalAmount.value.toLocaleString()} 円）を申請します。\n申請日：${applicationDateLabel()}\nよろしいですか？`)) return;
     save(() => {
         if (!curId.value) return;
         router.post(rt('submit', { expense: curId.value }), { comment: applicantComment.value }, {
@@ -454,8 +474,11 @@ async function changeMonth(e) {
 
                 <div class="mb-4 rounded border border-gray-200 bg-gray-50 p-3">
                     <label for="transport-application-date" class="mb-1 block text-sm font-medium text-gray-700">申請日（申請書に記載する日付）</label>
-                    <input id="transport-application-date" v-model="billingDate" type="date" :min="periodStart" :max="periodEnd"
+                    <input id="transport-application-date" v-model="billingDate" @change="billingDateManual = true" type="date" :min="periodStart" :max="periodEnd"
                         :disabled="!editable || submitting" class="rounded border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-100" />
+                    <span class="ml-2 text-xs text-gray-600">{{ billingDateManual ? '指定した日付を保持' : '入力・保存した日に自動設定' }}</span>
+                    <button v-if="editable && billingDateManual" type="button" :disabled="submitting" @click="useAutomaticDate" class="ml-2 rounded border border-blue-300 px-2 py-1 text-sm text-blue-700">今日に自動設定</button>
+                    <p v-if="editable && billingDateManual" class="mt-1 text-xs text-gray-600">保存済みの日付を使っています。当日に連動させる場合は「今日に自動設定」を押してください。</p>
                     <p v-if="errors.billing_date" class="mt-1 text-sm text-red-600" role="alert">{{ errors.billing_date }}</p>
                     <p class="mt-2 text-xs text-gray-600">当月分は、当月の最終営業日（土日祝を除く）までに申請してください。申請書に記載する日付を選んでください。実際に送信した日時は別に記録されます。</p>
                 </div>

@@ -6,7 +6,7 @@ global.Document=class {};global.ShadowRoot=class {};global.route=name=>name;glob
 global.window={addEventListener(){},removeEventListener(){},location:{href:''}};
 global.__transportAuto=[];global.__transportPosts=[];
 async function component(){
- let source=fs.readFileSync(root+'/resources/js/Pages/Billing/Transport/Apply/Index.vue','utf8').replace('</script>','globalThis.__transportHarness={billingDate,loadFromProps,payload,runAutosave,save,autosaveState,submitting};\n</script>');
+ let source=fs.readFileSync(root+'/resources/js/Pages/Billing/Transport/Apply/Index.vue','utf8').replace('</script>','globalThis.__transportHarness={billingDate,billingDateManual,useAutomaticDate,refreshAutomaticDate,saveAndSubmit,loadFromProps,payload,runAutosave,save,autosaveState,submitting};\n</script>');
  const code=compileScript(parse(source).descriptor,{id:'transport-date-test',inlineTemplate:true}).content;
  const outfile=path.join(out,'apply.cjs');await build({stdin:{contents:code,resolveDir:root,loader:'js'},outfile,bundle:true,platform:'node',format:'cjs',plugins:[{name:'transport-mocks',setup(b){
  b.onResolve({filter:/^vue$/},()=>({path:root+'/node_modules/vue/index.js',external:true}));
@@ -35,7 +35,7 @@ function text(n){return n.text+n.children.map(text).join('');}
  const item={occurrence_date:'2026-11-19',destination:'訪問先',purpose:'outbound',station_from:'駅A',station_to:'駅B',fare_type:'ic',amount:200,base_amount:200};
  const props=vue.reactive({month:'2026-11',months:['2026-11'],periodStart:'2026-11-01',periodEnd:'2026-11-30',defaultBillingDate:'2026-11-20',purposes:{outbound:'往路'},statusLabels:{draft:'下書き',submitted:'申請済み'},expense:{id:1,status:'draft',billing_date:'2026-11-20',items:[item],events:[]},canEdit:true});
  const view=mount(page,props),state=global.__transportHarness;
- assert.equal(state.billingDate.value,'2026-11-20');state.billingDate.value='2026-11-30';await vue.nextTick();
+ assert(state.billingDateManual.value);assert.equal(state.billingDate.value,'2026-11-20');state.billingDate.value='2026-11-30';await vue.nextTick();
  assert.equal(state.payload().billing_date,'2026-11-30');const input=nodes(view.host).find(n=>n.props.id==='transport-application-date');assert(input);assert.equal(input.value,'2026-11-30');assert.equal(input.props.min,'2026-11-01');assert.equal(input.props.max,'2026-11-30');
  assert(text(view.host).includes('最終営業日（土日祝を除く）'));assert(text(view.host).includes('実際に送信した日時は別'));
  const auto=state.runAutosave();assert.equal(global.__transportAuto.length,1);assert.equal(global.__transportAuto[0].body.billing_date,'2026-11-30');
@@ -44,5 +44,10 @@ function text(n){return n.text+n.children.map(text).join('');}
  assert.equal(global.__transportPosts.length,1);const post=global.__transportPosts[0];assert.equal(post.body.billing_date,'2026-11-27');assert.equal(state.billingDate.value,'2026-11-27');
  post.options.onError({billing_date:'対象月の日付を選んでください。'});post.options.onFinish();await flush();assert.equal(state.billingDate.value,'2026-11-27');assert(text(view.host).includes('対象月の日付'));
  props.expense={...props.expense,billing_date:'2026-11-27',status:'submitted'};props.canEdit=false;await flush();assert.equal(state.billingDate.value,'2026-11-27');assert(input.props.disabled);
+ props.canEdit=true;props.expense={...props.expense,status:'draft',billing_date:'2026-11-06',billing_date_manual:true};await flush();assert.equal(state.billingDate.value,'2026-11-06');
+ state.useAutomaticDate();await flush();assert.equal(state.billingDateManual.value,false);assert.equal(state.payload().billing_date_manual,false);
+ const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});assert.equal(state.billingDate.value,today<'2026-11-01'?'2026-11-01':today>'2026-11-30'?'2026-11-30':today);
+ state.billingDate.value='2026-11-30';input.props.onChange();await flush();assert(state.billingDateManual.value);state.refreshAutomaticDate();assert.equal(state.billingDate.value,'2026-11-30');
+ let confirmation='';global.confirm=message=>{confirmation=message;return false};state.saveAndSubmit();assert(confirmation.includes('申請日：11月30日'));
  view.app.unmount();console.log('PASS: actual transport date input, monthly bounds/future date, autosave payload, waiting for in-flight save, validation preservation and read-only state.');
 })().catch(e=>{console.error(e);process.exitCode=1});
