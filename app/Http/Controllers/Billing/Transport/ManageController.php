@@ -75,6 +75,7 @@ class ManageController extends Controller
                     'status'       => $e->status,
                     'total_amount' => $e->total_amount,
                     'item_count'   => $e->items_count,
+                    'billing_date' => $e->billing_date?->format('Y/m/d'),
                     'submitted_at' => $e->submitted_at?->timezone('Asia/Tokyo')->format('m/d H:i'),
                 ])->values(),
             ])

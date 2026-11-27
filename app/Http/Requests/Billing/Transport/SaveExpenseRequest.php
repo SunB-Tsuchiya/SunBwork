@@ -44,6 +44,7 @@ class SaveExpenseRequest extends FormRequest
     {
         return [
             'billing_month'           => ['required', 'date_format:Y-m'],
+            'billing_date'            => ['sometimes', 'required', 'date_format:Y-m-d'],
             'charge_department_id'    => ['nullable', 'integer'],
             'applicant_comment'       => ['nullable', 'string', 'max:1000'],
             'items'                   => ['required', 'array', 'min:1', 'max:200'],
@@ -87,6 +88,10 @@ class SaveExpenseRequest extends FormRequest
                 }
             }
             [$start, $end] = TransportExpense::monthRange($this->input('billing_month'));
+            $date = $this->input('billing_date');
+            if ($date !== null && ($date < $start || $date > $end)) {
+                $v->errors()->add('billing_date', '申請日は対象月の'.$start.'〜'.$end.'から選んでください。');
+            }
             foreach ($this->input('items', []) as $i => $it) {
                 $d = $it['occurrence_date'] ?? null;
                 if ($d && ($d < $start || $d > $end)) {
@@ -99,6 +104,8 @@ class SaveExpenseRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'billing_date.required' => '申請日を選んでください。',
+            'billing_date.date_format' => '申請日を日付として入力してください。',
             'items.*.occurrence_date.date_format' => ':position行目の発生日を日付として読み取れません。「0422」「4/22」のように入力してください。',
             'items.*.amount.integer' => ':position行目の金額は数字で入力してください。',
             'items.*.amount.min'     => ':position行目の金額は 0 円以上で入力してください。',

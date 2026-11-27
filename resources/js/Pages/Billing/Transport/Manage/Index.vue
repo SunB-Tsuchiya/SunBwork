@@ -166,7 +166,8 @@ function quickApprove(row) {
                                     <th class="px-4 py-2 text-center">状態</th>
                                     <th class="px-4 py-2 text-right">件数</th>
                                     <th class="px-4 py-2 text-right">合計金額</th>
-                                    <th class="px-4 py-2 text-left">申請日時</th>
+                                    <th class="px-4 py-2 text-left">申請日</th>
+                                    <th class="px-4 py-2 text-left">送信日時</th>
                                     <th class="px-4 py-2 text-center">操作</th>
                                 </tr>
                             </thead>
@@ -184,6 +185,7 @@ function quickApprove(row) {
                                     </td>
                                     <td class="px-4 py-2.5 text-right text-gray-600">{{ row.item_count }} 行</td>
                                     <td class="px-4 py-2.5 text-right font-medium text-gray-900">{{ row.total_amount.toLocaleString() }} 円</td>
+                                    <td class="px-4 py-2.5 text-gray-600">{{ row.billing_date || '―' }}</td>
                                     <td class="px-4 py-2.5 text-gray-600">{{ row.submitted_at }}</td>
                                     <td class="px-4 py-2.5 text-center">
                                         <div class="flex justify-center gap-1">

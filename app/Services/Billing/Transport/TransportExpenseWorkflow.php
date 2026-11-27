@@ -60,7 +60,8 @@ class TransportExpenseWorkflow
             $attrs = ['status' => $to];
             switch ($action) {
                 case 'submit':
-                    $attrs += ['submitted_at' => now(), 'billing_date' => now()->toDateString(),
+                    TransportApplicationDate::validate($fresh->billing_date->format('Y-m-d'), $fresh->billing_month);
+                    $attrs += ['submitted_at' => now(),
                         'reviewed_by' => null, 'reviewed_at' => null, 'review_comment' => null, 'billed_at' => null,
                         'applicant_comment' => null];   // 書きかけのコメントは、履歴（下の event）に残して、空に戻す
                     break;

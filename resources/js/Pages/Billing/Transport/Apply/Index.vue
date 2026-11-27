@@ -27,6 +27,7 @@ const props = defineProps({
     periodEnd:          { type: String, required: true },
     rowsPerPage:        { type: Number, default: 25 },
     defaultDeptId:      { type: Number, default: null },
+    defaultBillingDate: { type: String, default: '' },
     expense:            { type: Object, default: null },
     canEdit:            { type: Boolean, default: true },   // この月を編集（保存・申請）できるか（期限の判定を含む）
     deadline:           { type: Object, default: () => ({ passed: false, extended: false, end: '', requestable: true }) },
@@ -103,6 +104,7 @@ let inFlight = null;
 let lastSaved = '';                    // 最後に保存できた状態（JSON）
 let skipUnloadGuard = false;           // 出力（ダウンロード）などで、離脱の確認を出さない間
 
+const billingDate = ref('');
 const chargeDeptId = ref(props.defaultDeptId);   // null = 共通
 const applicantComment = ref('');                // 申請者のコメント（申請・再申請に添える。書きかけも自動保存）
 const rows = ref([newRow()]);
@@ -114,6 +116,7 @@ function loadFromProps() {
     clearTimeout(autosaveTimer);
     savedExpense.value = null;
     autosaveState.value = 'clean';
+    billingDate.value = props.expense?.billing_date ?? (props.defaultBillingDate || props.periodStart);
     if (props.expense) {
         chargeDeptId.value = props.expense.charge_department_id;
         applicantComment.value = props.expense.applicant_comment ?? '';
@@ -279,6 +282,7 @@ function payload() {
     while (n > 1 && isBlankRow(rows.value[n - 1])) n--;
     return {
         billing_month: props.month,
+        billing_date: billingDate.value,
         charge_department_id: chargeDeptId.value,
         applicant_comment: applicantComment.value,
         items: rows.value.slice(0, n).map(({ companions, ...r }, i) => ({ ...r, companion_ids: (companions ?? []).map((c) => c.id), sort_order: i })),
@@ -290,14 +294,17 @@ const otherErrors = computed(() =>
     Object.entries(errors.value).filter(([k]) => !/^items\.\d+\.occurrence_date$/.test(k)).map(([, v]) => v)
 );
 
-function save(after) {
+async function save(after) {
+    if (submitting.value) return;
     submitting.value = true;
     errors.value = {};
     clearTimeout(autosaveTimer);
-    const snap = JSON.stringify(payload());
-    router.post(rt('store'), payload(), {
+    if (inFlight) await inFlight.catch(() => {});
+    const body = payload();
+    const snap = JSON.stringify(body);
+    router.post(rt('store'), body, {
         preserveScroll: true,
-        onSuccess: () => { lastSaved = snap; autosaveState.value = 'clean'; if (after) after(); },
+        onSuccess: () => { lastSaved = snap; autosaveState.value = snapshot.value === snap ? 'clean' : 'dirty'; if (after) after(); },
         onError: (e) => { errors.value = e; },
         onFinish: () => { submitting.value = false; },
     });
@@ -325,7 +332,7 @@ watch(snapshot, (v) => {
 async function runAutosave() {
     clearTimeout(autosaveTimer);
     if (inFlight) await inFlight.catch(() => {});
-    if (!editable.value || !hasUnsaved()) return true;
+    if (submitting.value || !editable.value || !hasUnsaved()) return true;
 
     const body = payload();
     const snap = JSON.stringify(body);
@@ -442,7 +449,15 @@ async function changeMonth(e) {
                         {{ status ? statusLabels[status] : '未入力' }}
                     </span>
                     <span v-if="curId" class="text-xs text-gray-500" title="申請書（PDF・Excel）の右上に、同じ番号が入ります">申請No.{{ curId }}</span>
-                    <span v-if="expense?.submitted_at" class="text-xs text-gray-500">申請日時: {{ expense.submitted_at }}</span>
+                    <span v-if="expense?.submitted_at" class="text-xs text-gray-500">送信日時: {{ expense.submitted_at }}</span>
+                </div>
+
+                <div class="mb-4 rounded border border-gray-200 bg-gray-50 p-3">
+                    <label for="transport-application-date" class="mb-1 block text-sm font-medium text-gray-700">申請日（申請書に記載する日付）</label>
+                    <input id="transport-application-date" v-model="billingDate" type="date" :min="periodStart" :max="periodEnd"
+                        :disabled="!editable || submitting" class="rounded border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-100" />
+                    <p v-if="errors.billing_date" class="mt-1 text-sm text-red-600" role="alert">{{ errors.billing_date }}</p>
+                    <p class="mt-2 text-xs text-gray-600">当月分は、当月の最終営業日（土日祝を除く）までに申請してください。申請書に記載する日付を選んでください。実際に送信した日時は別に記録されます。</p>
                 </div>
 
                 <!-- 期限（当月末日）: 過ぎていると、入力・申請できない（閲覧・出力・下書きの削除はできる） -->

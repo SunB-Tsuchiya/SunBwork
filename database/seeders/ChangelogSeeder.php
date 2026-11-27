@@ -157,6 +157,16 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'transport-application-date-1') {
+            Changelog::updateOrCreate(['version' => 'transport-application-date-1'], [
+                'title' => '交通費申請書の日付をカレンダーで選択',
+                'released_at' => '2026-11-27',
+                'summary' => '対象月内の申請日を選択して保存し、PDF・Excelにも同じ日付を記載します。',
+                'design_files' => ['z_instructions/TRANSPORT_APPLICATION_DATE_PLAN1.md'],
+                'claude_notes' => 'billing_dateを自動保存・通常保存・再申請で保持。submitted_atと履歴は実送信日時を維持。最終営業日までの運用案内を追加し、既存の暦月末ロック・権限・通知・DB構造は変更しない。',
+                'body' => '<section class="cl-feature"><h3>交通費の申請日</h3><ul><li>申請書に記載する日付を対象月内から選択できます</li><li>申請時に当日へ上書きせず、帳票にも選択日を反映します</li><li>管理画面では申請日と実際の送信日時を区別します</li></ul></section>',
+            ]);
+        }
         if (!getenv('CHANGELOG_ONLY') || getenv('CHANGELOG_ONLY') === 'diary-review-new-myjob-timeline-1') {
             Changelog::updateOrCreate(['version' => 'diary-review-new-myjob-timeline-1'], [
                 'title' => '日報閲覧のタイムテーブルに新マイジョブを反映',

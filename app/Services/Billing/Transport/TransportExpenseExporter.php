@@ -181,7 +181,7 @@ class TransportExpenseExporter
         $set('A1', '交通費金銭請求伝票' . ($last > 0 ? '　' . ($page + 1) . '/' . ($last + 1) : ''));
         $sheet->setTitle(($page + 1) . '枚目');
 
-        // 請求日（= 申請日。申請時に伝票の billing_date を更新している）・対象月・所属（会社名）・氏名
+        // 請求日（= 申請者が選んだ用紙の申請日。実際の送信日時とは別）・対象月・所属（会社名）・氏名
         $d = $expense->billing_date;
         $set('D3', ExcelDate::PHPToExcel($d));   // 日付の値のまま（表示は雛形の書式「令和8年9月30日」）
         [$y, $m] = array_map('intval', explode('-', $expense->billing_month));

@@ -95,6 +95,7 @@ class ExpenseController extends Controller
                 'end'      => TransportDeadline::endOf($month)->toDateString(),
             ],
             'defaultDeptId'      => $defaultDeptId,
+            'defaultBillingDate' => \App\Services\Billing\Transport\TransportApplicationDate::initial($month),
             'expense'            => $expense ? [
                 'id'              => $expense->id,
                 'status'          => $expense->status,
@@ -268,13 +269,17 @@ class ExpenseController extends Controller
                 // 申請者のコメント（書きかけ。申請すると履歴に残り、空に戻る）。空は NULL
                 'applicant_comment'    => ($c = trim((string) ($data['applicant_comment'] ?? ''))) === '' ? null : $c,
             ];
+            if (array_key_exists('billing_date', $data)) {
+                \App\Services\Billing\Transport\TransportApplicationDate::validate($data['billing_date'], $data['billing_month']);
+                $attrs['billing_date'] = $data['billing_date'];
+            }
             if ($expense) {
                 $expense->update($attrs);
             } else {
                 $expense = TransportExpense::create($attrs + [
                     'user_id'       => $user->id,
                     'billing_month' => $data['billing_month'],
-                    'billing_date'  => now()->toDateString(),
+                    'billing_date'  => \App\Services\Billing\Transport\TransportApplicationDate::initial($data['billing_month']),
                     'status'        => TransportExpense::STATUS_DRAFT,
                 ]);
             }

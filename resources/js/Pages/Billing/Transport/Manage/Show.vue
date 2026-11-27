@@ -141,7 +141,8 @@ function insertFlagged() {
                     <div class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">会社</dt><dd class="text-gray-800">{{ expense.company_name || '―' }}</dd></div>
                     <div class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">所属</dt><dd class="text-gray-800">{{ expense.applicant_dept || '―' }}</dd></div>
                     <div class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">請求先部門</dt><dd class="text-gray-800">{{ expense.charge_dept || '共通' }}</dd></div>
-                    <div class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">申請日時</dt><dd class="text-gray-800">{{ expense.submitted_at || '―' }}</dd></div>
+                    <div class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">申請日</dt><dd class="text-gray-800">{{ expense.billing_date || '―' }}</dd></div>
+                    <div class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500" title="実際に申請操作を行った日時">送信日時</dt><dd class="text-gray-800">{{ expense.submitted_at || '―' }}</dd></div>
                     <div v-if="expense.reviewed_at" class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">確認</dt><dd class="text-gray-800">{{ expense.reviewer_name }}（{{ expense.reviewed_at }}）</dd></div>
                     <div v-if="expense.billed_at" class="flex gap-3"><dt class="w-24 shrink-0 text-gray-500">請求済み</dt><dd class="text-gray-800">{{ expense.billed_at }}</dd></div>
                 </dl>
