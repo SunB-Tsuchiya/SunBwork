@@ -222,17 +222,17 @@ function insertFlagged() {
                                 <td class="px-2 py-1.5 text-xs">
                                     <!-- 運賃マスタとの照合 -->
                                     <div v-if="it.check.fare.state === 'match'" class="text-green-700">○ 台帳と一致（片道 {{ yen(it.check.fare.registered) }}<span v-if="it.check.fare.expected !== it.check.fare.registered"> → {{ yen(it.check.fare.expected) }}</span>）</div>
-                                    <div v-if="it.check.fare.via_used && it.check.fare.legs?.length" class="mt-0.5 text-gray-500">
-                                        区間ごとの合計:
-                                        <span v-for="(lg, k) in it.check.fare.legs" :key="k" class="mr-1 whitespace-nowrap">{{ lg.from }}－{{ lg.to }} {{ lg.fare !== null ? yen(lg.fare) : '台帳に無し' }}</span>
-                                    </div>
                                     <div v-else-if="it.check.fare.state === 'diff'" class="font-semibold text-red-700">
                                         △ 台帳 {{ yen(it.check.fare.expected) }}／申請 {{ yen(it.amount) }}（差 {{ it.check.fare.diff > 0 ? '+' : '' }}{{ it.check.fare.diff }}円）
                                     </div>
-                                    <div v-else-if="it.check.fare.state !== 'skip'" class="text-amber-800">
+                                    <div v-else-if="['none', 'unverified'].includes(it.check.fare.state)" class="text-amber-800">
                                         未検査<span class="text-gray-500">（台帳に登録がありません）</span>
                                         <button type="button" @click="registerFare(it)"
                                             class="ml-1 rounded border border-green-400 bg-white px-2 py-0.5 text-green-700 hover:bg-green-50">この金額で登録</button>
+                                    </div>
+                                    <div v-if="it.check.fare.via_used && it.check.fare.legs?.length" class="mt-0.5 text-gray-500">
+                                        区間ごとの合計:
+                                        <span v-for="(lg, k) in it.check.fare.legs" :key="k" class="mr-1 whitespace-nowrap">{{ lg.from }}－{{ lg.to }} {{ lg.fare !== null ? yen(lg.fare) : '台帳に無し' }}</span>
                                     </div>
                                     <div v-if="it.check.fare.recheck" class="mt-0.5"><span class="rounded bg-amber-200 px-1.5 py-0.5 text-amber-900">登録から1年以上</span></div>
                                     <!-- 入力の内容からの注意（重複・休日・金額など） -->
