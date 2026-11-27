@@ -2575,3 +2575,6 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-27 追加修正実装・コード検証完了、未配備。自動/手動boolean追加（既存はtrueで日付保護、新規は明示false）、自動はJST操作日を対象月内へ調整、手動指定は保持し「今日に自動設定」で復帰。申請confirmに○月○日を表示。関連回帰117件1,218断言、追加migration保護1件6断言、実Vueの既存日付/自動切替/手動保持/confirm、PHP4件構文、/members build成功。本番再読取はeeb32d525/main、既知未追跡6件・追跡変更なし。既存申請日/状態/通知/締切は未変更。前回3条件の利用者成功は記録済みだが今回追加修正の画面確認は未実施。次は専用migrationだけを含む固定配備手順の承認を受けて反映。
 
 2026-11-27 追加修正配備完了。正確な2コマンドへの利用者承認後push、SHA256 3f2fa4f4a35a13089dee70111420c10fcdd133e24e78a78b9baa8e5b3da2ce37の手順で本番eeb32d525→17244fd51、専用2026_11_27_120000 migrationのみ107.38ms DONE。config/cache clear、manifest887/ref1135欠落0・/members base・既知未追跡6件保持・HEAD一致、DEPLOY_OKを確認。既存申請日/状態の更新、実申請/通知/Seederなし。今回追加修正の利用者画面は未確認。次の1手: 既存下書きの保存日保持と自動設定切替→保存/再読込、手動指定保持、申請confirmの日付（キャンセル可）を確認。前回の帳票確認は再試験不要。
+
+2026-11-27 完了（最新状態）: 利用者「成功」により直前の3条件すべてを確認。①既存下書きから「今日に自動設定」→保存/再読込でも当日、②手動指定日が保存/再読込後も保持、③申請confirmに選択した○月○日が表示。confirmから実申請・通知を行ったとは推定しない。前回の対象月選択/保存保持/PDF・Excel同日記載も利用者確認済み。本番17244fd51、保存ブランチfeature/transport-application-date-20261127。実装・コード検証・配備・要求した利用者画面確認は完了。管理者/Leaderレビューは本件依頼なし。変更履歴Seederは未実行。今回3資料をarchivedへ保管し、成功済み確認は繰り返さない。次の1手: 利用者の次の作業指示を待つ。TODO繰返し4条件の保留は別件のまま。
+完了資料: archived/TRANSPORT_APPLICATION_DATE_PLAN1.md・MANAGER1.md・1_PROMPT.md。
