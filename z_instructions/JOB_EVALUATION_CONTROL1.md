@@ -2589,3 +2589,5 @@ ssh -T silverlamb759@silverlamb759.sakura.ne.jp 'cd ~/SunBWork && git rev-parse 
 2026-11-27 利用者が運賃誤警告の修正を指示。Manage/Showの状態表示を排他化し区間内訳を独立表示へ移動。実Vueの該当セルを5状態×直通/経由10条件でrenderし、一致/相違/未登録/非対象と登録ボタン/区間内訳を検証成功。運賃計算・DB・API変更なし。今回配備/利用者画面は未確認。次の1手は本番用buildと固定差分確認後に配備承認。TODO未確認4条件は保持。
 
 運賃表示修正の/members build・manifest参照検証成功。本番読取は17244fd51/main、追跡変更なし。従来6未追跡にstorage/fonts/Helvetica.afm.jsonが追加された7件を保護する。修正はまだ未配備。
+
+2026-11-27 運賃表示修正の本番反映完了: 利用者が正確なpush/SSH2コマンドを承認。SHA256 77b98bd82ed856f117639e3e6157ffa8d93814224feb0c5fd88e2a14215c9a19の固定手順により17244fd51→1b3a24f09、HEAD/差分/既知未追跡7件保持・PHP事前構文・manifest887/ref1135欠落0・/members baseを照合、DEPLOY_OK/SSH exit0。DB/計算/migration/Seeder/実申請/通知なし。Gitの自動gcはpack-objects signal9の警告を返したがffと最終検査は成功。gc.log削除/再pack等の保守は未実施。今回の利用者画面は未確認。次の1手は申請11を再読込し、赤坂―代々木上原178円の一致表示が残り誤った未登録/登録ボタンが消えることを確認（登録操作不要）。TODO繰返し4条件はその後へ保持。
